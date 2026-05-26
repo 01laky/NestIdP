@@ -1,0 +1,608 @@
+# NestIdP — Project Proposal
+
+## 1. Executive Summary
+
+**NestIdP** is a deployable SAML Identity Provider (IdP) delivered as a single monolithic application consisting of a NestJS backend and a React frontend. It provides:
+
+- An **administration console** for operators to configure identity sources, SAML applications, and attribute mappings.
+- A **standalone SAML login page** where end users authenticate when redirected from a Service Provider (SP).
+- A **SAML assertion issuance flow** that, upon successful authentication, produces a SAML Response and posts it back to the requesting SP application.
+
+The system synchronizes users, groups, and roles from externally configured REST APIs into a local database. Password hashes returned by those APIs during sync are stored locally and used to authenticate users at login time.
+
+This document describes the product scope, architecture, core flows, data model, security considerations, deployment strategy, and a phased delivery roadmap.
+
+---
+
+## 2. Problem Statement
+
+Organizations often operate user and authorization data in internal APIs or backend services, while individual applications (SPs) need a standards-based single sign-on (SSO) mechanism. Building a full identity platform (e.g. Okta, Keycloak) is unnecessary for many use cases.
+
+NestIdP addresses the gap between a minimal SAML configuration tool and an enterprise identity platform by providing:
+
+- A focused SAML IdP with a login experience under our control.
+- An admin UI to wire up external identity APIs and SAML-consuming applications.
+- A single deployable unit suitable for cloud or on-premise hosting.
+
+---
+
+## 3. Goals and Non-Goals
+
+### 3.1 Goals
+
+| Goal | Description |
+|------|-------------|
+| **Deployable IdP** | Single Docker image (or equivalent) deployable to common hosting platforms. |
+| **SAML IdP** | Issue signed SAML 2.0 assertions to configured Service Providers. |
+| **Admin console** | Web UI for all operator-facing configuration. |
+| **Identity sync** | Pull users, groups, roles, and password hashes from configured REST APIs. |
+| **SAML login page** | Dedicated React page for end-user authentication during SP-initiated SSO. |
+| **Monolithic delivery** | One repository, one build, one deployment artifact. |
+
+### 3.2 Non-Goals (v1)
+
+| Non-Goal | Rationale |
+|----------|-----------|
+| OIDC / OAuth 2.0 | Out of scope for initial release; SAML only. |
+| Multi-tenant SaaS | Single deployment instance per environment in v1. |
+| Social login, MFA | Deferred to future phases. |
+| SCIM / LDAP connectors | v1 uses a defined REST API contract only. |
+| Microservices architecture | Unnecessary complexity for initial scope. |
+| Full identity platform features | No billing, org hierarchies, app marketplace, etc. |
+
+---
+
+## 4. Product Overview
+
+NestIdP serves two distinct audiences:
+
+| Audience | Interface | Purpose |
+|----------|-----------|---------|
+| **Operator / Admin** | Admin SPA (`/admin`) | Configure API connections, sync identity data, manage SP connections, view sync status. |
+| **End User** | SAML Login Page (`/login`) | Authenticate when redirected from a Service Provider during SSO. |
+| **Service Provider** | SAML endpoints (`/saml/*`) | Receive SAML Responses; consume IdP metadata. |
+
+### 4.1 Two Types of Connections
+
+A common source of confusion is mixing **identity sources** with **SAML applications**. These are separate concepts and must be separate sections in the admin UI.
+
+#### API Connection (Identity Source)
+
+- **Direction:** External API → NestIdP (inbound sync)
+- **Purpose:** Define where users, groups, roles, and password hashes come from.
+- **Protocol:** REST (custom contract, defined below)
+- **Configured by admin:** Base URL, authentication credentials, sync schedule/trigger, field mapping.
+
+The IdP **reads** from API connections. It does not send SAML data to them.
+
+#### SP Connection (SAML Application)
+
+- **Direction:** NestIdP → Service Provider (outbound assertion)
+- **Purpose:** Define which applications may authenticate users via this IdP.
+- **Protocol:** SAML 2.0
+- **Configured by admin:** SP Entity ID, ACS URL, signing certificate, NameID format, attribute mapping (groups, roles, email, etc.).
+
+The IdP **sends** SAML Responses to SP connections after successful login.
+
+```
+┌──────────────────┐         sync          ┌──────────────────┐
+│  External API    │ ──────────────────►  │     NestIdP      │
+│  (users/groups/  │   users, groups,     │  (local DB +     │
+│   roles/password)│   roles, passwords   │   SAML engine)   │
+└──────────────────┘                       └────────┬─────────┘
+                                                    │
+                                          SAML Response (POST)
+                                                    │
+                                                    ▼
+                                           ┌──────────────────┐
+                                           │  Service Provider│
+                                           │  (application)   │
+                                           └──────────────────┘
+```
+
+---
+
+## 5. Architecture
+
+### 5.1 High-Level Architecture
+
+NestIdP is a **monolith**: NestJS serves the REST API, SAML endpoints, and the built React static assets (Admin SPA + Login Page).
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     NestIdP (single deployable)                 │
+│                                                                 │
+│  ┌─────────────┐  ┌─────────────┐  ┌──────────────────────────┐  │
+│  │  Admin SPA  │  │ Login Page  │  │   NestJS Backend         │  │
+│  │  (React)    │  │ (React)     │  │                          │  │
+│  │  /admin/*   │  │ /login      │  │  • Admin API             │  │
+│  └──────┬──────┘  └──────┬──────┘  │  • Auth API              │  │
+│         │                │         │  • Sync Service          │  │
+│         └────────────────┴────────►│  • SAML Module           │  │
+│                                    │  • Static file serving   │  │
+│                                    └────────────┬─────────────┘  │
+└─────────────────────────────────────────────────┼───────────────┘
+                                                  │
+                                    ┌─────────────▼─────────────┐
+                                    │        PostgreSQL         │
+                                    │  config, users, groups,   │
+                                    │  roles, SP records, audit │
+                                    └───────────────────────────┘
+```
+
+### 5.2 Technology Stack
+
+| Layer | Technology |
+|-------|------------|
+| Backend | NestJS (TypeScript) |
+| Frontend | React + Vite (TypeScript) |
+| Database | PostgreSQL |
+| SAML library | `@node-saml/node-saml` (or equivalent) |
+| ORM | TypeORM or Prisma |
+| Package management | pnpm workspaces (monorepo) |
+| Containerization | Docker + docker-compose |
+| Session | HTTP-only secure cookies |
+
+### 5.3 Repository Structure
+
+```
+nest-idp/
+├── apps/
+│   ├── api/                    # NestJS application
+│   │   └── src/
+│   │       ├── admin/          # Admin API (API connections, SP connections)
+│   │       ├── auth/           # Admin auth + end-user login
+│   │       ├── sync/           # Identity sync from external APIs
+│   │       ├── saml/           # SAML metadata, SSO, ACS, SLO
+│   │       ├── identity/       # Users, groups, roles (local store)
+│   │       └── main.ts
+│   └── web/                    # React application
+│       └── src/
+│           ├── admin/          # Admin console pages
+│           └── login/          # SAML login page
+├── packages/
+│   └── shared/                 # Shared types, constants, validation schemas
+├── docs/
+│   └── proposal.MD
+├── docker-compose.yml
+├── Dockerfile
+└── package.json
+```
+
+### 5.4 Routing (Production)
+
+| Path | Handler | Description |
+|------|---------|-------------|
+| `/api/admin/*` | NestJS Admin API | Protected; operator configuration. |
+| `/api/auth/*` | NestJS Auth API | End-user login, session management. |
+| `/saml/metadata` | NestJS SAML Module | IdP metadata XML (public). |
+| `/saml/sso` | NestJS SAML Module | SSO endpoint; receives SAMLRequest. |
+| `/saml/slo` | NestJS SAML Module | Single Logout (future phase). |
+| `/login` | React Login Page | End-user authentication UI. |
+| `/admin/*` | React Admin SPA | Operator configuration UI. |
+| `/*` | React fallback | SPA routing for admin. |
+
+---
+
+## 6. Core Flows
+
+### 6.1 Identity Sync Flow
+
+The operator configures an API connection in the admin console. Sync can be triggered manually or on a schedule (cron).
+
+```
+Admin UI  →  POST /api/admin/api-connections  →  save connection config
+Admin UI  →  POST /api/admin/sync/:connectionId  →  trigger sync
+
+Sync Service:
+  1. Authenticate to external API (API key / Bearer token)
+  2. GET /users          → upsert users (including password hash)
+  3. GET /users/:id/groups → upsert group memberships
+  4. GET /users/:id/roles  → upsert role assignments
+  5. Record sync timestamp, status, errors in audit log
+```
+
+**Password handling during sync:**
+
+- The external API returns a password hash per user (see Section 7 for API contract).
+- NestIdP stores the hash in the local database.
+- At login time, the IdP verifies the submitted plaintext password against the stored hash using the same algorithm parameters indicated by the API (e.g. bcrypt cost factor).
+- Plaintext passwords are never stored and never logged.
+
+### 6.2 SP-Initiated SSO Flow (Primary)
+
+This is the main authentication flow. The Service Provider redirects the user to the IdP.
+
+```
+Step  Actor              Action
+────  ─────              ──────
+ 1    End User           Opens SP application (e.g. ReportPortal)
+ 2    SP                 No valid session → redirects to IdP SSO URL
+                         with SAMLRequest (HTTP-Redirect binding)
+ 3    NestIdP            Validates SAMLRequest, stores RelayState +
+                         SAMLRequest in server-side session
+ 4    NestIdP            Redirects user to /login (React login page)
+ 5    End User           Enters username + password on login page
+ 6    Login Page         POST /api/auth/login { username, password }
+ 7    NestIdP Auth       Verifies password against synced hash in DB
+ 8    NestIdP Auth       Loads user groups and roles from local DB
+ 9    NestIdP SAML       Builds signed SAMLResponse with attributes
+10    NestIdP            Returns HTML auto-submit form (HTTP-POST binding)
+                         POST SAMLResponse + RelayState to SP ACS URL
+11    SP                 Validates assertion, creates local session
+12    End User           Logged into SP application
+```
+
+**Important:** The SAML Response MUST be delivered via **HTTP-POST binding** (auto-submit HTML form), not as a query parameter on a redirect URL. This is standard practice and prevents assertion leakage via browser history or referrer headers.
+
+### 6.3 Admin Configuration Flow
+
+```
+Operator  →  /admin/login  →  authenticate (separate admin credentials)
+Operator  →  /admin/api-connections  →  create/edit API connection
+Operator  →  /admin/api-connections/:id/sync  →  trigger identity sync
+Operator  →  /admin/sp-connections  →  create/edit SP connection
+Operator  →  /admin/sp-connections/:id  →  configure attribute mapping
+Operator  →  copy IdP metadata URL  →  provide to SP administrator
+```
+
+Admin authentication is separate from end-user SAML authentication. Admin credentials are managed locally within NestIdP (not synced from external API in v1).
+
+---
+
+## 7. External API Contract (Identity Source)
+
+v1 defines a single REST API contract that external identity sources must implement. Adapters for other protocols (SCIM, LDAP) are deferred.
+
+### 7.1 Authentication to External API
+
+Configured per API connection:
+
+- **Bearer token** (static API key), or
+- **OAuth 2.0 Client Credentials** (future phase)
+
+### 7.2 Required Endpoints
+
+#### List Users
+
+```
+GET /users
+Authorization: Bearer <token>
+
+Response 200:
+[
+  {
+    "id": "usr_001",
+    "username": "jdoe",
+    "email": "jdoe@example.com",
+    "displayName": "John Doe",
+    "passwordHash": "$2b$12$...",
+    "passwordHashAlgorithm": "bcrypt",
+    "active": true
+  }
+]
+```
+
+#### List Groups for User
+
+```
+GET /users/:id/groups
+Authorization: Bearer <token>
+
+Response 200:
+[
+  { "id": "grp_001", "name": "developers" },
+  { "id": "grp_002", "name": "admins" }
+]
+```
+
+#### List Roles for User
+
+```
+GET /users/:id/roles
+Authorization: Bearer <token>
+
+Response 200:
+[
+  { "id": "role_001", "name": "editor" },
+  { "id": "role_002", "name": "viewer" }
+]
+```
+
+### 7.3 Password Hash Requirements
+
+| Field | Requirement |
+|-------|-------------|
+| `passwordHash` | Non-empty string; hash only, never plaintext. |
+| `passwordHashAlgorithm` | Supported in v1: `bcrypt`. Extensible for `argon2`, `pbkdf2`. |
+| Sync behavior | Upsert on every sync; hash updated if changed in source API. |
+| Deactivation | Users with `active: false` are disabled in IdP; cannot log in. |
+
+---
+
+## 8. SAML Configuration
+
+### 8.1 IdP Settings (Global)
+
+| Setting | Description |
+|---------|-------------|
+| Entity ID | Unique IdP identifier (e.g. `https://idp.example.com`) |
+| SSO URL | `{baseUrl}/saml/sso` |
+| Metadata URL | `{baseUrl}/saml/metadata` |
+| Signing certificate | X.509 cert + private key (PEM); used to sign assertions |
+| NameID format | Default: `urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress` |
+
+### 8.2 SP Connection Settings (Per Application)
+
+| Setting | Description |
+|---------|-------------|
+| SP Entity ID | Unique identifier of the Service Provider |
+| ACS URL | Assertion Consumer Service URL (POST binding) |
+| SP certificate | Used to encrypt assertions if required |
+| NameID format | Override per SP if needed |
+| Attribute mapping | Map local fields → SAML attributes (see below) |
+
+### 8.3 Default Attribute Mapping
+
+| Local Field | SAML Attribute | NameFormat |
+|-------------|----------------|------------|
+| `email` | `email` | `urn:oasis:names:tc:SAML:2.0:attrname-format:basic` |
+| `displayName` | `displayName` | basic |
+| `groups[].name` | `memberOf` | basic (multi-valued) |
+| `roles[].name` | `role` | basic (multi-valued) |
+
+Attribute mapping is configurable per SP connection in the admin UI.
+
+### 8.4 Certificate Management
+
+- IdP signing key pair generated on first setup (or uploaded by admin).
+- Support for two active signing certificates during rotation (old + new both published in metadata until cutover).
+- Private keys stored encrypted at rest in the database or in a secrets manager.
+
+---
+
+## 9. Data Model
+
+### 9.1 Core Entities
+
+```
+ApiConnection
+  id, name, baseUrl, authType, authCredentials (encrypted),
+  syncSchedule, lastSyncAt, lastSyncStatus, createdAt, updatedAt
+
+User
+  id, externalId, apiConnectionId, username, email, displayName,
+  passwordHash, passwordHashAlgorithm, active, createdAt, updatedAt
+
+Group
+  id, externalId, apiConnectionId, name, createdAt, updatedAt
+
+Role
+  id, externalId, apiConnectionId, name, createdAt, updatedAt
+
+UserGroup (join)
+  userId, groupId
+
+UserRole (join)
+  userId, roleId
+
+SpConnection
+  id, name, spEntityId, acsUrl, spCertificate, nameIdFormat,
+  attributeMapping (JSON), active, createdAt, updatedAt
+
+AdminUser
+  id, username, passwordHash, createdAt, updatedAt
+
+SyncLog
+  id, apiConnectionId, startedAt, finishedAt, status, usersSynced,
+  groupsSynced, rolesSynced, errors (JSON)
+
+SamlSession
+  id, samlRequestId, relayState, spConnectionId, userId,
+  expiresAt, createdAt
+```
+
+### 9.2 Entity Relationships
+
+```
+ApiConnection  1 ──── * User
+ApiConnection  1 ──── * Group
+ApiConnection  1 ──── * Role
+User           * ──── * Group   (via UserGroup)
+User           * ──── * Role   (via UserRole)
+SpConnection   1 ──── * SamlSession
+User           1 ──── * SamlSession
+```
+
+---
+
+## 10. Security
+
+### 10.1 Authentication Boundaries
+
+| Context | Mechanism |
+|---------|-----------|
+| Admin console | Local admin credentials; HTTP-only session cookie |
+| End-user login | Username + password verified against synced hash |
+| SP → IdP | SAMLRequest signature validation (if SP signs requests) |
+| IdP → SP | SAMLResponse signed with IdP private key |
+| Sync → External API | Bearer token / client credentials (encrypted at rest) |
+
+### 10.2 Security Requirements
+
+- **HTTPS only** in all environments (TLS termination at load balancer or app).
+- **HTTP-only, Secure, SameSite** cookies for all sessions.
+- **Password hashes only** — plaintext passwords never persisted or logged.
+- **Encrypted storage** for API credentials and IdP private keys.
+- **SAML assertion lifetime** — short `NotOnOrAfter` window (e.g. 5 minutes).
+- **Clock skew tolerance** — configurable (default ±120 seconds).
+- **CSRF protection** on admin mutating endpoints.
+- **Rate limiting** on `/api/auth/login` to prevent brute force.
+- **Audit log** for admin actions and sync events.
+
+### 10.3 Admin vs End-User Separation
+
+Admin accounts and end-user accounts are stored in separate tables with separate authentication flows. An admin logging into the admin console does not trigger a SAML flow. An end user logging in via the SAML login page has no access to the admin console.
+
+---
+
+## 11. Admin UI — Page Structure
+
+```
+/admin
+├── /login                        Admin authentication
+├── /dashboard                    Sync status, SP count, user count
+├── /api-connections
+│   ├── /                         List API connections
+│   ├── /new                      Create API connection
+│   ├── /:id                      Edit connection
+│   └── /:id/sync                 Trigger sync + view sync log
+├── /sp-connections
+│   ├── /                         List SP connections
+│   ├── /new                      Create SP connection
+│   └── /:id                      Edit SP + attribute mapping
+├── /identity
+│   ├── /users                    Browse synced users (read-only)
+│   ├── /groups                   Browse synced groups (read-only)
+│   └── /roles                    Browse synced roles (read-only)
+└── /settings
+    ├── /idp                      IdP entity ID, certificates, metadata URL
+    └── /admins                   Manage admin accounts
+```
+
+Login page (separate from admin):
+
+```
+/login?samlRequest=...&relayState=...
+  Username field
+  Password field
+  Submit → POST /api/auth/login → SAML Response POST back to SP
+```
+
+---
+
+## 12. Deployment
+
+### 12.1 Deployment Model
+
+Single Docker container running the NestJS process. PostgreSQL as a separate service (managed or containerized).
+
+```
+┌─────────────────────┐       ┌─────────────────────┐
+│   Load Balancer     │       │    PostgreSQL       │
+│   (TLS termination) │       │    (managed RDS or  │
+└─────────┬───────────┘       │     docker volume)  │
+          │                   └────────▲────────────┘
+          │                              │
+          ▼                              │
+┌─────────────────────┐                  │
+│   NestIdP container │──────────────────┘
+│   (NestJS + React)  │
+└─────────────────────┘
+```
+
+### 12.2 Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `SESSION_SECRET` | Cookie signing secret |
+| `ENCRYPTION_KEY` | Key for encrypting stored credentials and private keys |
+| `IDP_BASE_URL` | Public base URL (e.g. `https://idp.example.com`) |
+| `NODE_ENV` | `production` / `development` |
+
+### 12.3 Target Platforms
+
+Any platform supporting Docker containers and PostgreSQL:
+
+- Fly.io
+- Railway
+- Render
+- AWS ECS / Fargate
+- Azure App Service
+- Self-hosted VPS (docker-compose)
+
+### 12.4 Initial Setup (First Deploy)
+
+1. Deploy container + database.
+2. Run database migrations.
+3. Access admin console; create first admin account (bootstrap endpoint or env seed).
+4. Configure IdP settings (entity ID, generate signing certificate).
+5. Add API connection; trigger first sync.
+6. Add SP connection; provide IdP metadata URL to SP administrator.
+7. Test SP-initiated SSO end-to-end.
+
+---
+
+## 13. Phased Roadmap
+
+### Phase 1 — MVP
+
+- [ ] NestJS monolith scaffold (API + static serving)
+- [ ] React Admin SPA (API connections, SP connections, IdP settings)
+- [ ] React SAML login page
+- [ ] PostgreSQL schema and migrations
+- [ ] API connection CRUD + manual sync
+- [ ] User/group/role upsert from external API (with password hash)
+- [ ] End-user login against synced credentials
+- [ ] SP-initiated SSO (HTTP-Redirect in, HTTP-POST out)
+- [ ] IdP metadata endpoint
+- [ ] Signed SAML assertions with attribute mapping
+- [ ] Admin authentication (local)
+- [ ] Docker + docker-compose for local dev and deployment
+- [ ] Basic audit log (sync events, admin actions)
+
+### Phase 2 — Hardening
+
+- [ ] Scheduled sync (cron)
+- [ ] Certificate rotation (dual-cert in metadata)
+- [ ] Rate limiting and brute-force protection
+- [ ] Sync error reporting in admin UI
+- [ ] IdP-initiated SSO
+- [ ] Single Logout (SLO)
+
+### Phase 3 — Extensibility
+
+- [ ] Additional hash algorithms (argon2, pbkdf2)
+- [ ] OAuth 2.0 Client Credentials for API connections
+- [ ] SCIM connector
+- [ ] Multi-tenant support
+- [ ] OIDC support
+
+---
+
+## 14. Open Questions
+
+| # | Question | Impact |
+|---|----------|--------|
+| 1 | Should sync be full-replace or incremental (delta by `updatedAt`)? | Sync performance and API contract complexity. |
+| 2 | What happens to users removed from the external API — soft-delete or hard-delete? | Data retention policy. |
+| 3 | Should the login page support SP branding (logo per SP connection)? | UX scope for v1. |
+| 4 | Is one API connection sufficient for v1, or multiple from day one? | Admin UI and sync engine complexity. |
+| 5 | Which bcrypt library/parameters must the external API use? | Interoperability contract. |
+
+---
+
+## 15. Glossary
+
+| Term | Definition |
+|------|------------|
+| **IdP** | Identity Provider — authenticates users and issues SAML assertions. |
+| **SP** | Service Provider — an application that relies on the IdP for authentication. |
+| **ACS** | Assertion Consumer Service — SP endpoint that receives the SAML Response. |
+| **SAMLRequest** | XML message sent by SP to initiate SSO. |
+| **SAMLResponse** | XML message sent by IdP containing the signed assertion. |
+| **RelayState** | Opaque value passed through the SSO flow; returned to SP with the assertion. |
+| **API Connection** | Configured external REST API used as an identity source (inbound sync). |
+| **SP Connection** | Configured SAML application that consumes assertions from this IdP (outbound). |
+| **NameID** | SAML element identifying the user; typically email address. |
+| **HTTP-POST binding** | SAML delivery method using an auto-submit HTML form (used for SAMLResponse). |
+| **HTTP-Redirect binding** | SAML delivery method using URL query parameters (used for SAMLRequest). |
+
+---
+
+## 16. Summary
+
+NestIdP is a focused, deployable SAML Identity Provider built as a NestJS + React monolith. Operators configure two distinct connection types in the admin console: **API connections** (identity sources synced inbound) and **SP connections** (SAML applications receiving outbound assertions). End users authenticate on a dedicated login page; the backend verifies credentials against password hashes synced from the external API and, upon success, issues a signed SAML Response posted back to the requesting Service Provider.
+
+The architecture prioritizes simplicity, a single deployment artifact, and clear module boundaries within the monolith — enabling future extraction or extension without premature complexity.
