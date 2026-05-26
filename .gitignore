@@ -1,2 +1,27 @@
 # Local Cursor config and rules — not shared via git
 .cursor/
+
+# Local prompts — not shared via git
+prompts/
+
+# Dependencies and build output
+node_modules/
+dist/
+build/
+coverage/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE and OS
+.idea/
+.vscode/
+.DS_Store
+*.log
+
+# Prisma
+apps/api/prisma/*.db
+apps/api/prisma/*.db-journal
+*.tsbuildinfo

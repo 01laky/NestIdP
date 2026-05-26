@@ -46,7 +46,10 @@ NestIdP addresses the gap between a minimal SAML configuration tool and an enter
 | OIDC / OAuth 2.0 | Out of scope for initial release; SAML only. |
 | Multi-tenant SaaS | Single deployment instance per environment in v1. |
 | Social login, MFA | Deferred to future phases. |
-| SCIM / LDAP connectors | v1 uses a defined REST API contract only. |
+| Configurable API contract mapping | v1 uses a fixed REST contract; endpoint/field mapping deferred to v2. |
+| Outbound HTTP proxy for sync | v1 direct connection only; per API connection proxy settings in v2. |
+| Multiple identity APIs for sync | v1 and v2: one API connection per sync; merge from multiple sources in v3. |
+| SCIM / LDAP connectors | Deferred; v1 uses REST only. |
 | Microservices architecture | Unnecessary complexity for initial scope. |
 | Full identity platform features | No billing, org hierarchies, app marketplace, etc. |
 
@@ -70,10 +73,15 @@ A common source of confusion is mixing **identity sources** with **SAML applicat
 
 - **Direction:** External API → NestIdP (inbound sync)
 - **Purpose:** Define where users, groups, roles, and password hashes come from.
-- **Protocol:** REST (custom contract, defined below)
-- **Configured by admin:** Base URL, authentication credentials, sync schedule/trigger, field mapping.
+- **Protocol:** REST (fixed contract in v1 — see Section 7)
+- **Configured by admin (v1):** Base URL, authentication credentials, manual sync trigger.
+- **Configured by admin (v2):** Endpoint paths, response field mapping, sync schedule, outbound HTTP proxy.
 
 The IdP **reads** from API connections. It does not send SAML data to them.
+
+In v1 the sync engine calls **hardcoded** paths (`/users`, `/users/:id/groups`, `/users/:id/roles`) and expects **fixed JSON field names**. The external API must adapt to this contract; NestIdP does not yet let the admin remap endpoints or fields.
+
+**v1 sync scope:** exactly **one API connection** is active for identity sync. Multiple external APIs merged into one directory is a v3 feature (Section 7.6).
 
 #### SP Connection (SAML Application)
 
@@ -137,7 +145,8 @@ NestIdP is a **monolith**: NestJS serves the REST API, SAML endpoints, and the b
 | Backend | NestJS (TypeScript) |
 | Frontend | React + Vite (TypeScript) |
 | Database | PostgreSQL |
-| SAML library | `@node-saml/node-saml` (or equivalent) |
+| SAML (IdP) | Custom NestJS `SamlModule` — see Section 5.5 |
+| SAML XML/signing | `xmlbuilder2`, `xml-crypto` (>= 6.0.1), `@xmldom/xmldom`, `xpath` |
 | ORM | TypeORM or Prisma |
 | Package management | pnpm workspaces (monorepo) |
 | Containerization | Docker + docker-compose |
@@ -153,7 +162,13 @@ nest-idp/
 │   │       ├── admin/          # Admin API (API connections, SP connections)
 │   │       ├── auth/           # Admin auth + end-user login
 │   │       ├── sync/           # Identity sync from external APIs
-│   │       ├── saml/           # SAML metadata, SSO, ACS, SLO
+│   │       ├── saml/           # Custom IdP SAML module (see Section 5.5)
+│   │       │   ├── saml.module.ts
+│   │       │   ├── saml.controller.ts
+│   │       │   ├── saml-request-parser.service.ts
+│   │       │   ├── saml-response-builder.service.ts
+│   │       │   ├── saml-metadata.service.ts
+│   │       │   └── saml-post-binding.service.ts
 │   │       ├── identity/       # Users, groups, roles (local store)
 │   │       └── main.ts
 │   └── web/                    # React application
@@ -182,6 +197,55 @@ nest-idp/
 | `/admin/*` | React Admin SPA | Operator configuration UI. |
 | `/*` | React fallback | SPA routing for admin. |
 
+### 5.5 SAML Module (Custom IdP Implementation)
+
+NestIdP acts as a **SAML 2.0 Identity Provider**. We do **not** use off-the-shelf IdP libraries such as `samlify` or `@node-saml/node-saml` — the latter is primarily designed for **Service Provider** flows (consuming assertions from external IdPs), not issuing them.
+
+Instead, SAML IdP behaviour is implemented as a dedicated NestJS **`SamlModule`** with a thin layer over low-level XML libraries. This keeps full control over XML shape, signing, and dynamic configuration loaded from PostgreSQL (SP connections, certificates, attribute mapping).
+
+#### Design decision
+
+| Approach | Verdict |
+|----------|---------|
+| `samlify` | Not used — avoids third-party IdP abstraction; past CVE surface in SAML libraries |
+| `@node-saml/node-saml` | Not used — SP-focused; poor fit for assertion issuance |
+| **Custom `SamlModule`** | **Chosen** — explicit, testable, aligns with admin-driven config from DB |
+
+#### Dependencies
+
+| Package | Role |
+|---------|------|
+| `xmlbuilder2` | Build SAMLResponse, Assertion, and IdP metadata XML |
+| `xml-crypto` (>= 6.0.1) | Sign assertions and responses (patched for SAMLStorm CVEs) |
+| `@xmldom/xmldom` | Parse incoming SAMLRequest XML |
+| `xpath` | Select elements during request validation |
+
+#### Services
+
+| Service | Responsibility |
+|---------|----------------|
+| `SamlRequestParserService` | Decode HTTP-Redirect SAMLRequest (deflate + base64), parse XML, validate `Issuer`, `Destination`, `ID` |
+| `SamlResponseBuilderService` | Build SAMLResponse + Assertion; set Conditions, AuthnStatement, attributes from synced user/groups/roles |
+| `SamlMetadataService` | Generate IdP metadata XML from DB config (entity ID, SSO URL, signing cert) |
+| `SamlPostBindingService` | Render HTML auto-submit form for HTTP-POST delivery to SP ACS URL |
+
+#### MVP scope (SamlModule)
+
+Included in v1:
+
+- SP-initiated SSO (HTTP-Redirect in, HTTP-POST out)
+- Signed assertions
+- IdP metadata endpoint
+- Attribute mapping per SP connection
+- `InResponseTo` validation against server-side SAML session
+
+Deferred (Phase 2+):
+
+- Encrypted assertions
+- Single Logout (SLO)
+- IdP-initiated SSO
+- SAMLRequest signature verification (optional hardening)
+
 ---
 
 ## 6. Core Flows
@@ -194,12 +258,14 @@ The operator configures an API connection in the admin console. Sync can be trig
 Admin UI  →  POST /api/admin/api-connections  →  save connection config
 Admin UI  →  POST /api/admin/sync/:connectionId  →  trigger sync
 
-Sync Service:
-  1. Authenticate to external API (API key / Bearer token)
-  2. GET /users          → upsert users (including password hash)
-  3. GET /users/:id/groups → upsert group memberships
-  4. GET /users/:id/roles  → upsert role assignments
+Sync Service (v1 — fixed contract):
+  1. Authenticate to external API (Bearer token)
+  2. GET {baseUrl}/users              → upsert users (including password hash)
+  3. GET {baseUrl}/users/:id/groups   → upsert group memberships
+  4. GET {baseUrl}/users/:id/roles    → upsert role assignments
   5. Record sync timestamp, status, errors in audit log
+
+Endpoint paths and JSON field names are not configurable in v1.
 ```
 
 **Password handling during sync:**
@@ -252,16 +318,31 @@ Admin authentication is separate from end-user SAML authentication. Admin creden
 
 ## 7. External API Contract (Identity Source)
 
-v1 defines a single REST API contract that external identity sources must implement. Adapters for other protocols (SCIM, LDAP) are deferred.
+### 7.0 Version roadmap (API connections)
 
-### 7.1 Authentication to External API
+| Aspect | v1 (MVP) | v2 | v3 |
+|--------|----------|-----|-----|
+| Endpoint paths | **Fixed** — `/users`, `/users/:id/groups`, `/users/:id/roles` | Configurable per API connection | Same as v2 |
+| Response field mapping | **Fixed** — field names below | Configurable | Same as v2 |
+| Auth to external API | Bearer token only | OAuth 2.0 Client Credentials (optional) | Same as v2 |
+| Outbound proxy | **None** — direct HTTP to `baseUrl` | Optional HTTP/HTTPS proxy per connection | Same as v2 |
+| **Number of sync sources** | **One** API connection | **One** API connection | **Multiple** API connections merged into local identity store |
+| What admin configures | `baseUrl` + token | + endpoints, field mapping, proxy | + multi-source sync groups and merge rules |
+
+**v1 rule:** the external identity API must implement the contract exactly as defined below. NestIdP only prepends the configured `baseUrl`.
+
+**v2 goal:** admin defines how to reach users, groups, and roles on arbitrary APIs without code changes.
+
+Adapters for other protocols (SCIM, LDAP) remain deferred beyond v2 unless explicitly added to the roadmap.
+
+### 7.1 Authentication to External API (v1)
 
 Configured per API connection:
 
-- **Bearer token** (static API key), or
-- **OAuth 2.0 Client Credentials** (future phase)
+- **Bearer token** (static API key) — only option in v1
+- **OAuth 2.0 Client Credentials** — v2
 
-### 7.2 Required Endpoints
+### 7.2 Fixed Endpoints (v1)
 
 #### List Users
 
@@ -309,7 +390,47 @@ Response 200:
 ]
 ```
 
-### 7.3 Password Hash Requirements
+### 7.3 Configurable Contract (v2 — planned)
+
+Deferred to Phase 2. Admin UI will allow per API connection:
+
+- Custom endpoint paths (e.g. `/api/v1/accounts`, `/api/v1/accounts/:id/memberships`)
+- JSON field mapping (e.g. external `login` → internal `username`, `pwd_hash` → `passwordHash`)
+- Optional pagination/query parameters
+
+### 7.4 Outbound Proxy (v2 — planned)
+
+Deferred to Phase 2. Some deployments require identity APIs to be reached through a corporate HTTP/HTTPS proxy. Admin configures this **per API connection** (not globally):
+
+| Setting | Description |
+|---------|-------------|
+| `proxyEnabled` | Toggle proxy for this connection's sync requests |
+| `proxyUrl` | Proxy URL (e.g. `http://proxy.corp.example:8080`) |
+| `proxyUsername` / `proxyPassword` | Optional proxy authentication (encrypted at rest) |
+| `noProxyHosts` | Optional comma-separated host patterns to bypass proxy |
+
+v1 sync always connects directly to `baseUrl`. Proxy credentials follow the same encryption rules as API connection tokens.
+
+Until v2 ships, all external APIs must conform to the fixed v1 contract in Section 7.2 and be reachable without a configured proxy.
+
+### 7.6 Multiple API Sources (v3 — planned)
+
+Deferred to Phase 3. Today each sync run pulls from **one** API connection. v3 allows the operator to register **multiple API connections** and sync from all of them into the shared local user/group/role store.
+
+Example use cases:
+
+- Users from HR API + roles from permissions API
+- Gradual migration from old user service to new one (both synced during cutover)
+
+Planned admin capabilities (v3):
+
+- Enable multiple API connections for sync (not limited to one active source)
+- Define sync order or parallel sync per connection
+- Conflict rules when the same `username` or `externalId` appears in more than one source (e.g. primary source wins, last sync wins, manual merge)
+
+Open design details (user/group/role ownership per source, deactivation when removed from one API but not another) to be resolved before implementation.
+
+### 7.7 Password Hash Requirements
 
 | Field | Requirement |
 |-------|-------------|
@@ -321,6 +442,8 @@ Response 200:
 ---
 
 ## 8. SAML Configuration
+
+SAML protocol behaviour is implemented by the custom NestJS `SamlModule` (Section 5.5). Configuration below defines what the module reads from the database at runtime.
 
 ### 8.1 IdP Settings (Global)
 
@@ -368,7 +491,9 @@ Attribute mapping is configurable per SP connection in the admin UI.
 ```
 ApiConnection
   id, name, baseUrl, authType, authCredentials (encrypted),
-  syncSchedule, lastSyncAt, lastSyncStatus, createdAt, updatedAt
+  lastSyncAt, lastSyncStatus, createdAt, updatedAt
+  -- v2 adds: endpointMapping (JSON), fieldMapping (JSON), syncSchedule,
+  --          proxyEnabled, proxyUrl, proxyCredentials (encrypted), noProxyHosts
 
 User
   id, externalId, apiConnectionId, username, email, displayName,
@@ -426,7 +551,7 @@ User           1 ──── * SamlSession
 | End-user login | Username + password verified against synced hash |
 | SP → IdP | SAMLRequest signature validation (if SP signs requests) |
 | IdP → SP | SAMLResponse signed with IdP private key |
-| Sync → External API | Bearer token / client credentials (encrypted at rest) |
+| Sync → External API | Bearer token / client credentials (encrypted at rest); v2 optional proxy auth (encrypted at rest) |
 
 ### 10.2 Security Requirements
 
@@ -454,9 +579,10 @@ Admin accounts and end-user accounts are stored in separate tables with separate
 ├── /dashboard                    Sync status, SP count, user count
 ├── /api-connections
 │   ├── /                         List API connections
-│   ├── /new                      Create API connection
-│   ├── /:id                      Edit connection
+│   ├── /new                      Create API connection (baseUrl + Bearer token)
+│   ├── /:id                      Edit connection (v1: baseUrl + token only)
 │   └── /:id/sync                 Trigger sync + view sync log
+│                                 (v2: endpoint + field mapping + proxy on /:id)
 ├── /sp-connections
 │   ├── /                         List SP connections
 │   ├── /new                      Create SP connection
@@ -542,9 +668,10 @@ Any platform supporting Docker containers and PostgreSQL:
 - [ ] React Admin SPA (API connections, SP connections, IdP settings)
 - [ ] React SAML login page
 - [ ] PostgreSQL schema and migrations
-- [ ] API connection CRUD + manual sync
-- [ ] User/group/role upsert from external API (with password hash)
+- [ ] API connection CRUD (baseUrl + Bearer token) + manual sync from **one** active source
+- [ ] User/group/role upsert via **fixed** v1 REST contract (with password hash)
 - [ ] End-user login against synced credentials
+- [ ] **Custom `SamlModule`** — parse SAMLRequest, build/sign SAMLResponse, metadata, POST binding (xmlbuilder2 + xml-crypto)
 - [ ] SP-initiated SSO (HTTP-Redirect in, HTTP-POST out)
 - [ ] IdP metadata endpoint
 - [ ] Signed SAML assertions with attribute mapping
@@ -552,19 +679,22 @@ Any platform supporting Docker containers and PostgreSQL:
 - [ ] Docker + docker-compose for local dev and deployment
 - [ ] Basic audit log (sync events, admin actions)
 
-### Phase 2 — Hardening
+### Phase 2 — Hardening and Configurable API Contract
 
+- [ ] **Configurable API contract** — endpoint paths and JSON field mapping per API connection in admin UI
+- [ ] **Outbound HTTP proxy** — optional proxy URL and auth per API connection for sync requests
 - [ ] Scheduled sync (cron)
 - [ ] Certificate rotation (dual-cert in metadata)
 - [ ] Rate limiting and brute-force protection
 - [ ] Sync error reporting in admin UI
+- [ ] OAuth 2.0 Client Credentials for API connections
 - [ ] IdP-initiated SSO
 - [ ] Single Logout (SLO)
 
 ### Phase 3 — Extensibility
 
+- [ ] **Multiple API connections for sync** — merge users, groups, and roles from more than one identity API into the local store
 - [ ] Additional hash algorithms (argon2, pbkdf2)
-- [ ] OAuth 2.0 Client Credentials for API connections
 - [ ] SCIM connector
 - [ ] Multi-tenant support
 - [ ] OIDC support
@@ -578,8 +708,11 @@ Any platform supporting Docker containers and PostgreSQL:
 | 1 | Should sync be full-replace or incremental (delta by `updatedAt`)? | Sync performance and API contract complexity. |
 | 2 | What happens to users removed from the external API — soft-delete or hard-delete? | Data retention policy. |
 | 3 | Should the login page support SP branding (logo per SP connection)? | UX scope for v1. |
-| 4 | Is one API connection sufficient for v1, or multiple from day one? | Admin UI and sync engine complexity. |
-| 5 | Which bcrypt library/parameters must the external API use? | Interoperability contract. |
+| 4 | ~~Is one API connection sufficient for v1?~~ **Resolved:** v1 and v2 use one sync source; multiple APIs in v3 (Section 7.6). | — |
+| 5 | Which bcrypt library/parameters must the external API use in v1? | Fixed contract interoperability; document in integration guide. |
+| 6 | v2 field mapping UI — simple key map or JSONPath-style? | Admin UX and sync engine complexity. |
+| 7 | v2 proxy — per API connection only, or also a global default? | Admin UX and sync client implementation. |
+| 8 | v3 multi-source sync — conflict resolution when same user exists in two APIs? | Merge strategy and data model. |
 
 ---
 
