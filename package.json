@@ -1,6 +1,6 @@
 {
 	"name": "nest-idp",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"private": true,
 	"packageManager": "pnpm@9.15.9",
 	"engines": {
@@ -8,7 +8,7 @@
 		"pnpm": ">=9"
 	},
 	"scripts": {
-		"postinstall": "pnpm --filter @nestidp/api prisma:generate",
+		"postinstall": "pnpm --filter @nestidp/shared build && pnpm --filter @nestidp/api prisma:generate",
 		"dev": "pnpm --filter @nestidp/shared build && concurrently -n api,web -c blue,green \"pnpm --filter @nestidp/api dev\" \"pnpm --filter @nestidp/web dev\"",
 		"build": "pnpm --filter @nestidp/shared build && pnpm --filter @nestidp/web build && pnpm --filter @nestidp/api build",
 		"lint": "eslint . && pnpm --filter @nestidp/api lint && pnpm --filter @nestidp/web lint",

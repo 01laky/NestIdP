@@ -1,3 +1,4 @@
+import { join } from 'path';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ServeStaticModule } from '@nestjs/serve-static';
@@ -29,6 +30,7 @@ const enableStaticServing = shouldEnableStaticServing(
 		ConfigModule.forRoot({
 			isGlobal: true,
 			validate: validateEnv,
+			envFilePath: [join(process.cwd(), '../../.env'), join(process.cwd(), '.env'), '.env'],
 		}),
 		...(enableStaticServing
 			? [

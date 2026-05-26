@@ -23,6 +23,10 @@ RUN pnpm --filter @nestidp/web build
 FROM build-shared AS build-api
 COPY apps/api ./apps/api
 COPY --from=build-web /app/apps/web/dist ./apps/web/dist
+ARG DATABASE_PROVIDER=postgresql
+ARG DATABASE_URL=postgresql://nestidp:nestidp@postgres:5432/nestidp
+ENV DATABASE_PROVIDER=${DATABASE_PROVIDER}
+ENV DATABASE_URL=${DATABASE_URL}
 RUN pnpm --filter @nestidp/api prisma:generate
 RUN pnpm --filter @nestidp/api build
 

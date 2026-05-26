@@ -27,7 +27,8 @@ describe('Routing (e2e)', () => {
 					ignoreEnvFile: true,
 					load: [
 						() => ({
-							DATABASE_URL: 'postgresql://localhost:5432/nestidp',
+							DATABASE_PROVIDER: 'sqlite',
+							DATABASE_URL: 'file:../data/nestidp.db',
 							SESSION_SECRET: 'test-session-secret',
 							ENCRYPTION_KEY: 'test-encryption-key',
 							IDP_BASE_URL: 'http://localhost:3000',

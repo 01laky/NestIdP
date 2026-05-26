@@ -1,22 +1,23 @@
 # NestIdP
 
-Deployable SAML Identity Provider monolith (NestJS + React + PostgreSQL).
+Deployable SAML Identity Provider monolith (NestJS + React + SQL via Prisma).
 
 Architecture and product scope: [docs/proposal.MD](docs/proposal.MD)
 
-Detailed dev notes: [docs/development.md](docs/development.md)
+Development guide: [docs/development.md](docs/development.md)
+
+Database selection: [docs/database.md](docs/database.md)
 
 ## Prerequisites
 
 - Node.js **>= 18**
 - pnpm **>= 9**
-- Docker (for local PostgreSQL)
+- Docker **optional** — only if you use PostgreSQL locally (`docker compose --profile postgres`)
 
-## Quick start
+## Quick start (SQLite — default)
 
 ```bash
 cp .env.example .env
-docker compose up -d
 pnpm install
 pnpm dev
 ```
@@ -29,6 +30,8 @@ pnpm dev
 | Readiness      | http://localhost:3000/ready  |
 
 Vite proxies `/api`, `/saml`, `/health`, and `/ready` to the API during development.
+
+Local SQLite database file: `apps/api/data/nestidp.db` (created on first migration).
 
 ## Scripts
 
@@ -46,13 +49,16 @@ pnpm build
 NODE_ENV=production node apps/api/dist/main.js
 ```
 
+Set `DATABASE_PROVIDER` and `DATABASE_URL` for your deployment database. See [docs/database.md](docs/database.md).
+
 Or build and run the Docker image (requires `pnpm-lock.yaml` after first install).
 
 ## Environment
 
 Copy `.env.example` to `.env` and adjust values. Required variables:
 
-- `DATABASE_URL`
+- `DATABASE_PROVIDER` — `sqlite` (dev) or `postgresql` (typical production)
+- `DATABASE_URL` — must match the provider (see [docs/database.md](docs/database.md))
 - `SESSION_SECRET`
 - `ENCRYPTION_KEY`
 - `IDP_BASE_URL`

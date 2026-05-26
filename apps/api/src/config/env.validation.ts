@@ -1,5 +1,12 @@
-import { plainToInstance } from 'class-transformer';
-import { IsEnum, IsNotEmpty, IsOptional, IsString, validateSync } from 'class-validator';
+import { plainToInstance, Transform } from 'class-transformer';
+import { IsEnum, IsIn, IsNotEmpty, IsOptional, IsString, validateSync } from 'class-validator';
+import {
+	DATABASE_PROVIDERS,
+	DatabaseProvider,
+	DEFAULT_DATABASE_PROVIDER,
+	validateDatabaseUrlForProvider,
+} from '@nestidp/shared';
+import { resolveDatabaseProvider } from './database.config';
 
 export enum NodeEnv {
 	Development = 'development',
@@ -8,6 +15,10 @@ export enum NodeEnv {
 }
 
 export class EnvironmentVariables {
+	@IsIn([...DATABASE_PROVIDERS])
+	@Transform(({ value }) => resolveDatabaseProvider(value))
+	DATABASE_PROVIDER!: DatabaseProvider;
+
 	@IsString()
 	@IsNotEmpty()
 	DATABASE_URL!: string;
@@ -41,12 +52,17 @@ export class EnvironmentVariables {
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {
-	const validated = plainToInstance(EnvironmentVariables, config, {
+	const configWithDefaults = {
+		DATABASE_PROVIDER: DEFAULT_DATABASE_PROVIDER,
+		...config,
+	};
+	const validated = plainToInstance(EnvironmentVariables, configWithDefaults, {
 		enableImplicitConversion: true,
 	});
 	const errors = validateSync(validated, { skipMissingProperties: false });
 	if (errors.length > 0) {
 		throw new Error(errors.toString());
 	}
+	validateDatabaseUrlForProvider(validated.DATABASE_PROVIDER, validated.DATABASE_URL);
 	return validated;
 }

@@ -4,6 +4,24 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.1]
+
+### Changed
+
+- Database layer is **provider-agnostic**: choose `sqlite` or `postgresql` at deploy time via
+  `DATABASE_PROVIDER` + `DATABASE_URL` (validated on startup)
+- **Local development default:** SQLite (`file:../data/nestidp.db`) — no Docker required
+- `prisma:prepare` syncs `schema.prisma` provider before generate/migrate (Prisma requires a
+  fixed provider at client generation time)
+- PostgreSQL moved to optional `docker compose --profile postgres`
+- Docker build accepts `DATABASE_PROVIDER` and `DATABASE_URL` build-args
+
+### Added
+
+- `docs/database.md` — database selection guide for dev and production
+- Shared database types and URL validation in `@nestidp/shared`
+- Unit tests for database provider resolution and env validation
+
 ## [0.1.0]
 
 ### Added

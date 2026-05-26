@@ -2,7 +2,8 @@ import { validateEnv, NodeEnv } from './env.validation';
 
 describe('validateEnv', () => {
 	const validConfig = {
-		DATABASE_URL: 'postgresql://localhost:5432/nestidp',
+		DATABASE_PROVIDER: 'sqlite',
+		DATABASE_URL: 'file:../data/nestidp.db',
 		SESSION_SECRET: 'session-secret-min-16-chars',
 		ENCRYPTION_KEY: 'encryption-key-min-16-chars',
 		IDP_BASE_URL: 'http://localhost:3000',
@@ -12,7 +13,48 @@ describe('validateEnv', () => {
 	it('accepts a complete valid configuration', () => {
 		const result = validateEnv(validConfig);
 		expect(result.NODE_ENV).toBe(NodeEnv.Test);
+		expect(result.DATABASE_PROVIDER).toBe('sqlite');
 		expect(result.DATABASE_URL).toBe(validConfig.DATABASE_URL);
+	});
+
+	it('defaults DATABASE_PROVIDER to sqlite when omitted', () => {
+		const { DATABASE_PROVIDER, ...rest } = validConfig;
+		void DATABASE_PROVIDER;
+		const result = validateEnv(rest);
+		expect(result.DATABASE_PROVIDER).toBe('sqlite');
+	});
+
+	it('accepts postgresql provider with matching URL', () => {
+		const result = validateEnv({
+			...validConfig,
+			DATABASE_PROVIDER: 'postgresql',
+			DATABASE_URL: 'postgresql://localhost:5432/nestidp',
+		});
+		expect(result.DATABASE_PROVIDER).toBe('postgresql');
+	});
+
+	it('rejects sqlite URL with postgresql provider', () => {
+		expect(() =>
+			validateEnv({
+				...validConfig,
+				DATABASE_PROVIDER: 'postgresql',
+				DATABASE_URL: 'file:../data/nestidp.db',
+			}),
+		).toThrow(/postgresql/);
+	});
+
+	it('rejects postgresql URL with sqlite provider', () => {
+		expect(() =>
+			validateEnv({
+				...validConfig,
+				DATABASE_PROVIDER: 'sqlite',
+				DATABASE_URL: 'postgresql://localhost:5432/nestidp',
+			}),
+		).toThrow(/file:/);
+	});
+
+	it('rejects invalid DATABASE_PROVIDER', () => {
+		expect(() => validateEnv({ ...validConfig, DATABASE_PROVIDER: 'mysql' })).toThrow();
 	});
 
 	it('accepts all supported NODE_ENV values', () => {

@@ -144,7 +144,7 @@ NestIdP is a **monolith**: NestJS serves the REST API, SAML endpoints, and the b
 |-------|------------|
 | Backend | NestJS (TypeScript) |
 | Frontend | React + Vite (TypeScript) |
-| Database | PostgreSQL |
+| Database | SQL via Prisma (`sqlite` dev default, `postgresql` recommended for production) |
 | SAML (IdP) | Custom NestJS `SamlModule` — see Section 5.5 |
 | SAML XML/signing | `xmlbuilder2`, `xml-crypto` (>= 6.0.1), `@xmldom/xmldom`, `xpath` |
 | ORM | TypeORM or Prisma |
@@ -201,7 +201,7 @@ nest-idp/
 
 NestIdP acts as a **SAML 2.0 Identity Provider**. We do **not** use off-the-shelf IdP libraries such as `samlify` or `@node-saml/node-saml` — the latter is primarily designed for **Service Provider** flows (consuming assertions from external IdPs), not issuing them.
 
-Instead, SAML IdP behaviour is implemented as a dedicated NestJS **`SamlModule`** with a thin layer over low-level XML libraries. This keeps full control over XML shape, signing, and dynamic configuration loaded from PostgreSQL (SP connections, certificates, attribute mapping).
+Instead, SAML IdP behaviour is implemented as a dedicated NestJS **`SamlModule`** with a thin layer over low-level XML libraries. This keeps full control over XML shape, signing, and dynamic configuration loaded from the database (SP connections, certificates, attribute mapping).
 
 #### Design decision
 
@@ -611,7 +611,7 @@ Login page (separate from admin):
 
 ### 12.1 Deployment Model
 
-Single Docker container running the NestJS process. PostgreSQL as a separate service (managed or containerized).
+Single Docker container running the NestJS process. Database as a separate service or SQLite file depending on deployment (`DATABASE_PROVIDER`).
 
 ```
 ┌─────────────────────┐       ┌─────────────────────┐
@@ -631,7 +631,8 @@ Single Docker container running the NestJS process. PostgreSQL as a separate ser
 
 | Variable | Description |
 |----------|-------------|
-| `DATABASE_URL` | PostgreSQL connection string |
+| `DATABASE_PROVIDER` | Prisma engine: `sqlite` or `postgresql` |
+| `DATABASE_URL` | Connection string matching the provider (see `docs/database.md`) |
 | `SESSION_SECRET` | Cookie signing secret |
 | `ENCRYPTION_KEY` | Key for encrypting stored credentials and private keys |
 | `IDP_BASE_URL` | Public base URL (e.g. `https://idp.example.com`) |
@@ -639,7 +640,7 @@ Single Docker container running the NestJS process. PostgreSQL as a separate ser
 
 ### 12.3 Target Platforms
 
-Any platform supporting Docker containers and PostgreSQL:
+Any platform supporting Docker containers and a SQL database (SQLite or PostgreSQL via Prisma):
 
 - Fly.io
 - Railway
@@ -667,7 +668,7 @@ Any platform supporting Docker containers and PostgreSQL:
 - [ ] NestJS monolith scaffold (API + static serving)
 - [ ] React Admin SPA (API connections, SP connections, IdP settings)
 - [ ] React SAML login page
-- [ ] PostgreSQL schema and migrations
+- [ ] Prisma schema and migrations (portable across sqlite/postgresql)
 - [ ] API connection CRUD (baseUrl + Bearer token) + manual sync from **one** active source
 - [ ] User/group/role upsert via **fixed** v1 REST contract (with password hash)
 - [ ] End-user login against synced credentials
