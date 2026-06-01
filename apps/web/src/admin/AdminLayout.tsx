@@ -1,7 +1,23 @@
 import { useEffect, useState } from 'react';
 import { Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
-import { API_CONNECTION_ROUTE_PREFIX, SP_CONNECTION_ROUTE_PREFIX } from '@nestidp/shared';
+import {
+	API_CONNECTION_ROUTE_PREFIX,
+	IDENTITY_ROUTE_PREFIX,
+	SP_CONNECTION_ROUTE_PREFIX,
+} from '@nestidp/shared';
 import { AdminApiError, getAdminMe, logoutAdmin } from './adminApi';
+import { ApiConnectionFormPage } from './pages/ApiConnectionFormPage';
+import { ApiConnectionSyncPage } from './pages/ApiConnectionSyncPage';
+import { ApiConnectionsListPage } from './pages/ApiConnectionsListPage';
+import { DashboardPage } from './pages/DashboardPage';
+import { IdentityGroupsPage } from './pages/IdentityGroupsPage';
+import { IdentityRolesPage } from './pages/IdentityRolesPage';
+import { IdentityUserDetailPage } from './pages/IdentityUserDetailPage';
+import { IdentityUsersPage } from './pages/IdentityUsersPage';
+import { SpConnectionFormPage } from './pages/SpConnectionFormPage';
+import { SpConnectionTestSsoPage } from './pages/SpConnectionTestSsoPage';
+import { SpConnectionsListPage } from './pages/SpConnectionsListPage';
+import { SyncLogDetailPage } from './pages/SyncLogDetailPage';
 
 export function AdminLayout() {
 	const navigate = useNavigate();
@@ -48,10 +64,8 @@ export function AdminLayout() {
 
 	if (authState === 'loading') {
 		return (
-			<div className="layout">
-				<div className="card">
-					<p className="muted">Loading admin session…</p>
-				</div>
+			<div className="admin-shell">
+				<p className="muted admin-loading">Loading admin session…</p>
 			</div>
 		);
 	}
@@ -61,36 +75,41 @@ export function AdminLayout() {
 	}
 
 	return (
-		<div className="layout">
-			<div className="card">
-				<h1>NestIdP Admin</h1>
-				<p className="muted">
-					API connection CRUD is available via REST; configuration UI comes in a later prompt.
-				</p>
-				<button type="button" onClick={() => void handleLogout()}>
+		<div className="admin-shell">
+			<aside className="admin-sidebar">
+				<h1 className="admin-brand">NestIdP</h1>
+				<nav className="admin-nav">
+					<Link to="/admin">Dashboard</Link>
+					<Link to={API_CONNECTION_ROUTE_PREFIX}>API connections</Link>
+					<Link to={SP_CONNECTION_ROUTE_PREFIX}>SP connections</Link>
+					<Link to={`${IDENTITY_ROUTE_PREFIX}/users`}>Users</Link>
+					<Link to={`${IDENTITY_ROUTE_PREFIX}/groups`}>Groups</Link>
+					<Link to={`${IDENTITY_ROUTE_PREFIX}/roles`}>Roles</Link>
+					<Link to="/login">SAML login</Link>
+				</nav>
+				<button type="button" className="admin-logout" onClick={() => void handleLogout()}>
 					Logout
 				</button>
-				<ul>
-					<li>
-						API connections (identity sync): <code>{API_CONNECTION_ROUTE_PREFIX}</code>
-					</li>
-					<li>
-						SP connections (SAML apps): <code>{SP_CONNECTION_ROUTE_PREFIX}</code>
-					</li>
-				</ul>
+			</aside>
+			<main className="admin-main">
 				<Routes>
-					<Route
-						index
-						element={
-							<p className="muted">Dashboard placeholder for sync status and connection counts.</p>
-						}
-					/>
-					<Route path="*" element={<p className="muted">Admin sub-route placeholder.</p>} />
+					<Route index element={<DashboardPage />} />
+					<Route path="api-connections" element={<ApiConnectionsListPage />} />
+					<Route path="api-connections/new" element={<ApiConnectionFormPage />} />
+					<Route path="api-connections/:id" element={<ApiConnectionFormPage />} />
+					<Route path="api-connections/:id/sync" element={<ApiConnectionSyncPage />} />
+					<Route path="sync-logs/:syncLogId" element={<SyncLogDetailPage />} />
+					<Route path="sp-connections" element={<SpConnectionsListPage />} />
+					<Route path="sp-connections/new" element={<SpConnectionFormPage />} />
+					<Route path="sp-connections/:id" element={<SpConnectionFormPage />} />
+					<Route path="sp-connections/:id/test-sso" element={<SpConnectionTestSsoPage />} />
+					<Route path="identity/users" element={<IdentityUsersPage />} />
+					<Route path="identity/users/:id" element={<IdentityUserDetailPage />} />
+					<Route path="identity/groups" element={<IdentityGroupsPage />} />
+					<Route path="identity/roles" element={<IdentityRolesPage />} />
+					<Route path="*" element={<p className="muted">Page not found.</p>} />
 				</Routes>
-				<p>
-					<Link to="/login">Go to SAML login page</Link>
-				</p>
-			</div>
+			</main>
 		</div>
 	);
 }

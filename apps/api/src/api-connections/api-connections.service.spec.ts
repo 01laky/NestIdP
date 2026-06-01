@@ -25,7 +25,17 @@ describe('ApiConnectionsService', () => {
 		get: jest.fn((key: string) => (key === 'NODE_ENV' ? 'test' : undefined)),
 	} as unknown as ConfigService;
 
-	const service = new ApiConnectionsService(prisma as never, encryption, configService);
+	const audit = {
+		logCreated: jest.fn(),
+		logUpdated: jest.fn(),
+		logDeleted: jest.fn(),
+	};
+	const service = new ApiConnectionsService(
+		prisma as never,
+		encryption,
+		configService,
+		audit as never,
+	);
 
 	const sampleRow = {
 		id: 'c1234567890123456789012345',

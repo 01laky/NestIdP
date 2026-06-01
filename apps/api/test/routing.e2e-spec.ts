@@ -27,7 +27,10 @@ describe('Routing (e2e)', () => {
 		},
 		group: { count: jest.fn().mockResolvedValue(0) },
 		role: { count: jest.fn().mockResolvedValue(0) },
-		apiConnection: { count: jest.fn().mockResolvedValue(0) },
+		apiConnection: {
+			count: jest.fn().mockResolvedValue(0),
+			findFirst: jest.fn().mockResolvedValue(null),
+		},
 		spConnection: {
 			count: jest.fn().mockResolvedValue(0),
 			findUnique: jest.fn(),
@@ -226,7 +229,7 @@ describe('Routing (e2e)', () => {
 		});
 	});
 
-	it('GET /api/admin status remains stub with counts payload when authenticated', async () => {
+	it('E2E-ADM-08-01: GET /api/admin returns dashboard DTO when authenticated', async () => {
 		const password = 'e2e-admin-password-2';
 		const { hashPassword } = await import('../src/admin-auth/password.util');
 		const passwordHash = await hashPassword(password);
@@ -246,9 +249,11 @@ describe('Routing (e2e)', () => {
 		await agent.post('/api/admin/auth/login').send({ username: 'admin2', password }).expect(200);
 
 		const response = await agent.get('/api/admin').expect(200);
-		expect(response.body.status).toBe('stub');
+		expect(response.body.counts).toBeDefined();
 		expect(response.body.apiConnectionsRoute).toContain('api-connections');
 		expect(response.body.syncApiPath).toBe('/api/admin/sync');
+		expect(response.body.entityId).toBe('http://localhost:3000');
+		expect(response.body.metadataUrl).toContain('/saml/metadata');
 	});
 
 	it('GET /api/auth/session is separate from /api/admin', async () => {

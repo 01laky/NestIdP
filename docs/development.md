@@ -68,17 +68,25 @@ This syncs `schema.prisma` with `DATABASE_PROVIDER`. Root `pnpm install` runs `p
 
 ### End-user auth API (v0.6.0)
 
-| Method | Path                           | Auth                          | Description                                                                                          |
-| ------ | ------------------------------ | ----------------------------- | ---------------------------------------------------------------------------------------------------- |
-| POST   | `/api/auth/login`              | —                             | Username + password against synced `User`; optional `{ "samlSessionId" }` binds pending SAML session |
-| GET    | `/api/auth/me`                 | `nestidp_user_session` cookie | Profile with group/role names (no secrets)                                                           |
-| GET    | `/api/auth/session`            | —                             | Read-only: `authenticated` + optional `?samlSessionId=` pending SAML state                           |
-| POST   | `/api/auth/logout`             | cookie optional               | Clears end-user session (idempotent)                                                                 |
-| POST   | `/api/auth/login/complete-sso` | end-user session              | Signed SAMLResponse as **text/html** auto-post form to SP ACS                                        |
-| GET    | `/saml/metadata`               | —                             | IdP SAML metadata XML                                                                                |
-| GET    | `/saml/sso`                    | —                             | SP-initiated SSO (HTTP-Redirect `SAMLRequest`) → redirect `/login?samlSessionId=`                    |
-| GET    | `/api/admin/sp-connections`    | admin session                 | Read-only SP list (Prompt 08 adds mutating CRUD)                                                     |
-| GET    | `/api/admin/idp/metadata-url`  | admin session                 | Public metadata + SSO URLs for operators                                                             |
+| Method | Path                                     | Auth                          | Description                                                                                          |
+| ------ | ---------------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------- |
+| POST   | `/api/auth/login`                        | —                             | Username + password against synced `User`; optional `{ "samlSessionId" }` binds pending SAML session |
+| GET    | `/api/auth/me`                           | `nestidp_user_session` cookie | Profile with group/role names (no secrets)                                                           |
+| GET    | `/api/auth/session`                      | —                             | Read-only: `authenticated` + optional `?samlSessionId=` pending SAML state                           |
+| POST   | `/api/auth/logout`                       | cookie optional               | Clears end-user session (idempotent)                                                                 |
+| POST   | `/api/auth/login/complete-sso`           | end-user session              | Signed SAMLResponse as **text/html** auto-post form to SP ACS                                        |
+| GET    | `/saml/metadata`                         | —                             | IdP SAML metadata XML                                                                                |
+| GET    | `/saml/sso`                              | —                             | SP-initiated SSO (HTTP-Redirect `SAMLRequest`) → redirect `/login?samlSessionId=`                    |
+| GET    | `/api/admin/sp-connections`              | admin session                 | List SP connections                                                                                  |
+| POST   | `/api/admin/sp-connections`              | admin session                 | Create SP (CSRF)                                                                                     |
+| PATCH  | `/api/admin/sp-connections/:id`          | admin session                 | Update SP (CSRF)                                                                                     |
+| DELETE | `/api/admin/sp-connections/:id`          | admin session                 | Delete SP (CSRF)                                                                                     |
+| POST   | `/api/admin/sp-connections/:id/test-acs` | admin session                 | ACS reachability probe (CSRF)                                                                        |
+| GET    | `/api/admin/idp/metadata-url`            | admin session                 | Public metadata + SSO URLs for operators                                                             |
+| GET    | `/api/admin/identity/users`              | admin session                 | Browse synced users (`?search=`, `limit`, `offset`)                                                  |
+| GET    | `/api/admin/identity/users/:id`          | admin session                 | User detail with groups and roles                                                                    |
+| GET    | `/api/admin/identity/groups`             | admin session                 | Browse groups                                                                                        |
+| GET    | `/api/admin/identity/roles`              | admin session                 | Browse roles                                                                                         |
 
 Constants:
 
@@ -132,7 +140,7 @@ curl -b cookies.txt http://localhost:3000/api/auth/me
 
 **Default SAML attributes** (when `attributeMapping` is null): `email`, `displayName`, `memberOf` (groups), `role` (roles). NameID: email when format is email-oriented, else `username`.
 
-**Operator SP setup** until Prompt 08 UI: Prisma Studio / seed / `createTestSpConnection` in tests. Mock SP URL:
+**Operator SP setup:** Admin UI at `/admin/sp-connections` or REST CRUD above. Mock SP URL:
 
 ```bash
 SP_ENTITY_ID=urn:test:sp node docs/examples/saml-sp-initiated-redirect.mjs
@@ -148,7 +156,7 @@ SP_ENTITY_ID=urn:test:sp node docs/examples/saml-sp-initiated-redirect.mjs
 
 Inject `@Inject(SAML_SESSION_BIND_PORT)` from `AuthModule` — do not duplicate bind SQL in `SamlModule`.
 
-**Prompt 08:** mutating SP admin CRUD + React pages. **Prompt 09:** IdP cert upload/rotation UI.
+**Prompt 09:** IdP cert upload/rotation UI (admin settings). **Prompt 10:** Docker packaging.
 
 ### Admin REST API (v0.5.0)
 
@@ -159,7 +167,7 @@ Full operator surface:
 | POST   | `/api/admin/auth/login`                | —       | —     | Operator login                                        |
 | POST   | `/api/admin/auth/logout`               | session | yes\* | Logout (\*when session cookie present)                |
 | GET    | `/api/admin/auth/me`                   | session | —     | Session + `csrfToken`                                 |
-| GET    | `/api/admin`                           | session | —     | Dashboard stats stub                                  |
+| GET    | `/api/admin`                           | session | —     | Dashboard (`AdminDashboardResponseDto`)               |
 | GET    | `/api/admin/api-connections`           | session | —     | List API connections                                  |
 | POST   | `/api/admin/api-connections`           | session | yes   | Create connection (**v1: max 1**)                     |
 | GET    | `/api/admin/api-connections/:id`       | session | —     | Get connection                                        |
@@ -175,7 +183,9 @@ Constants in `@nestidp/shared`:
 
 - **`API_CONNECTIONS_API_PATH`** — REST base (`/api/admin/api-connections`)
 - **`SYNC_API_PATH`** — identity sync REST base (`/api/admin/sync`)
-- **`API_CONNECTION_ROUTE_PREFIX`** — future React UI route (`/admin/api-connections`, Prompt 08)
+- **`API_CONNECTION_ROUTE_PREFIX`** — React UI route (`/admin/api-connections`)
+- **`SP_CONNECTION_ROUTE_PREFIX`** — React UI route (`/admin/sp-connections`)
+- **`IDENTITY_ROUTE_PREFIX`** — React UI route (`/admin/identity`)
 - **`ADMIN_CSRF_HEADER_NAME`** — `X-CSRF-Token` on mutating admin calls
 
 ![API connection CRUD flow](./img/api-connection-crud.svg)

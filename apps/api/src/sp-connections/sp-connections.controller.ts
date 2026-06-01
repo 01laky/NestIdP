@@ -1,26 +1,80 @@
-import { Controller, Get, Param, UseGuards } from '@nestjs/common';
-import type { IdpMetadataUrlResponseDto, SpConnectionListResponseDto } from '@nestidp/shared';
+import {
+	Body,
+	Controller,
+	Delete,
+	Get,
+	HttpCode,
+	HttpStatus,
+	Param,
+	Patch,
+	Post,
+	UseGuards,
+	ValidationPipe,
+} from '@nestjs/common';
+import {
+	SP_CONNECTIONS_API_PATH,
+	type DeleteSpConnectionResponseDto,
+	type SpConnectionListResponseDto,
+	type SpConnectionPublicDto,
+	type SpConnectionResponseDto,
+	type SpConnectionTestAcsResponseDto,
+} from '@nestidp/shared';
 import { AdminAuthGuard } from '../admin-auth/admin-auth.guard';
+import { AdminCsrfGuard } from '../admin-auth/admin-csrf.guard';
 import { ParseCuidPipe } from '../common/parse-cuid.pipe';
+import { SpConnectionTestAcsService } from './sp-connection-test-acs.service';
+import { CreateSpConnectionBodyDto } from './create-sp-connection.dto';
 import { SpConnectionsService } from './sp-connections.service';
+import { UpdateSpConnectionBodyDto } from './update-sp-connection.dto';
 
-@Controller('api/admin')
+@Controller(SP_CONNECTIONS_API_PATH)
 @UseGuards(AdminAuthGuard)
 export class SpConnectionsController {
-	constructor(private readonly spConnectionsService: SpConnectionsService) {}
+	constructor(
+		private readonly spConnectionsService: SpConnectionsService,
+		private readonly testAcsService: SpConnectionTestAcsService,
+	) {}
 
-	@Get('sp-connections')
+	@Get()
 	list(): Promise<SpConnectionListResponseDto> {
 		return this.spConnectionsService.list();
 	}
 
-	@Get('sp-connections/:id')
-	getById(@Param('id', ParseCuidPipe) id: string) {
+	@Post()
+	@HttpCode(HttpStatus.CREATED)
+	@UseGuards(AdminCsrfGuard)
+	create(
+		@Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+		body: CreateSpConnectionBodyDto,
+	): Promise<SpConnectionResponseDto> {
+		return this.spConnectionsService.create(body);
+	}
+
+	@Get(':id')
+	getById(@Param('id', ParseCuidPipe) id: string): Promise<SpConnectionPublicDto> {
 		return this.spConnectionsService.getById(id);
 	}
 
-	@Get('idp/metadata-url')
-	getMetadataUrl(): Promise<IdpMetadataUrlResponseDto> {
-		return this.spConnectionsService.getMetadataUrl();
+	@Patch(':id')
+	@UseGuards(AdminCsrfGuard)
+	update(
+		@Param('id', ParseCuidPipe) id: string,
+		@Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+		body: UpdateSpConnectionBodyDto,
+	): Promise<SpConnectionResponseDto> {
+		return this.spConnectionsService.update(id, body);
+	}
+
+	@Delete(':id')
+	@UseGuards(AdminCsrfGuard)
+	delete(@Param('id', ParseCuidPipe) id: string): Promise<DeleteSpConnectionResponseDto> {
+		return this.spConnectionsService.delete(id);
+	}
+
+	@Post(':id/test-acs')
+	@HttpCode(HttpStatus.OK)
+	@UseGuards(AdminCsrfGuard)
+	testAcs(@Param('id', ParseCuidPipe) id: string): Promise<SpConnectionTestAcsResponseDto> {
+		return this.testAcsService.testAcs(id);
 	}
 }

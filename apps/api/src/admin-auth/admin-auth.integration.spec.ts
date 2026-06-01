@@ -109,8 +109,9 @@ describe('admin-auth integration (SQLite)', () => {
 			.expect(200);
 
 		const admin = await agent.get('/api/admin').expect(200);
-		expect(admin.body.module).toBe('admin');
 		expect(admin.body.counts).toBeDefined();
+		expect(admin.body.metadataUrl).toContain('/saml/metadata');
+		expect(admin.body.apiConnectionsRoute).toContain('api-connections');
 	});
 
 	it('API-AUTH-INT-03: No login → GET /api/admin → 401', async () => {

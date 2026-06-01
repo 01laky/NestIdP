@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
 	ADMIN_CSRF_HEADER_NAME,
 	API_CONNECTIONS_API_PATH,
+	IDENTITY_USERS_API_PATH,
 	IDP_METADATA_URL_API_PATH,
 	SP_CONNECTIONS_API_PATH,
 	SYNC_API_PATH,
@@ -460,5 +461,120 @@ describe('adminApi', () => {
 		vi.stubGlobal('fetch', fetchMock);
 		await getIdpMetadataUrl();
 		expect(fetchMock).toHaveBeenCalledWith(IDP_METADATA_URL_API_PATH, expect.any(Object));
+	});
+
+	it('WEB-ADM-24: getAdminDashboard GETs /api/admin', async () => {
+		const { getAdminDashboard } = await import('./adminApi');
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({
+				counts: { users: 0, groups: 0, roles: 0, apiConnections: 0, spConnections: 0 },
+			}),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		await getAdminDashboard();
+		expect(fetchMock).toHaveBeenCalledWith('/api/admin', expect.any(Object));
+	});
+
+	it('WEB-ADM-25: createSpConnection POSTs with CSRF', async () => {
+		const { createSpConnection, setCsrfToken } = await import('./adminApi');
+		setCsrfToken('csrf-xyz');
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 201,
+			json: async () => ({ item: { id: 'sp-1' } }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		await createSpConnection({
+			name: 'App',
+			spEntityId: 'urn:sp:app',
+			acsUrl: 'https://sp.example.com/acs',
+		});
+		expect(fetchMock).toHaveBeenCalledWith(
+			SP_CONNECTIONS_API_PATH,
+			expect.objectContaining({
+				method: 'POST',
+				headers: expect.objectContaining({ [ADMIN_CSRF_HEADER_NAME]: 'csrf-xyz' }),
+			}),
+		);
+	});
+
+	it('WEB-ADM-26: listIdentityUsers builds search query', async () => {
+		const { listIdentityUsers } = await import('./adminApi');
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ items: [], total: 0 }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		await listIdentityUsers({ search: 'alice' });
+		expect(fetchMock).toHaveBeenCalledWith(
+			`${IDENTITY_USERS_API_PATH}?search=alice`,
+			expect.any(Object),
+		);
+	});
+
+	it('WEB-ADM-34: updateSpConnection PATCHes with CSRF', async () => {
+		const { updateSpConnection, setCsrfToken } = await import('./adminApi');
+		setCsrfToken('csrf-patch');
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ item: { id: 'sp-1' } }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		await updateSpConnection('sp-1', { active: false });
+		expect(fetchMock).toHaveBeenCalledWith(
+			`${SP_CONNECTIONS_API_PATH}/sp-1`,
+			expect.objectContaining({
+				method: 'PATCH',
+				headers: expect.objectContaining({ [ADMIN_CSRF_HEADER_NAME]: 'csrf-patch' }),
+			}),
+		);
+	});
+
+	it('WEB-ADM-35: deleteSpConnection DELETEs with CSRF', async () => {
+		const { deleteSpConnection, setCsrfToken } = await import('./adminApi');
+		setCsrfToken('csrf-del');
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ ok: true, id: 'sp-1' }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		await deleteSpConnection('sp-1');
+		expect(fetchMock).toHaveBeenCalledWith(
+			`${SP_CONNECTIONS_API_PATH}/sp-1`,
+			expect.objectContaining({ method: 'DELETE' }),
+		);
+	});
+
+	it('WEB-ADM-36: testSpConnectionAcs POSTs test endpoint', async () => {
+		const { testSpConnectionAcs, setCsrfToken } = await import('./adminApi');
+		setCsrfToken('csrf-tacs');
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ ok: true, reachable: true, message: 'ok' }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		await testSpConnectionAcs('sp-1');
+		expect(fetchMock).toHaveBeenCalledWith(
+			`${SP_CONNECTIONS_API_PATH}/sp-1/test-acs`,
+			expect.objectContaining({ method: 'POST' }),
+		);
+	});
+
+	it('WEB-ADM-37: getIdentityUser GETs user detail path', async () => {
+		const { getIdentityUser } = await import('./adminApi');
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ user: { id: 'u1' }, groups: [], roles: [] }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		await getIdentityUser('u1');
+		expect(fetchMock).toHaveBeenCalledWith(`${IDENTITY_USERS_API_PATH}/u1`, expect.any(Object));
 	});
 });

@@ -32,6 +32,22 @@ function renderAdminAt(path: string) {
 	);
 }
 
+const dashboardStub = {
+	counts: { users: 0, groups: 0, roles: 0, apiConnections: 0, spConnections: 0 },
+	apiConnectionsRoute: API_CONNECTION_ROUTE_PREFIX,
+	spConnectionsRoute: SP_CONNECTION_ROUTE_PREFIX,
+	identityUsersRoute: '/admin/identity/users',
+	apiConnectionsApiPath: '/api/admin/api-connections',
+	syncApiPath: '/api/admin/sync',
+	spConnectionsApiPath: '/api/admin/sp-connections',
+	metadataUrl: 'http://localhost:3000/saml/metadata',
+	entityId: 'http://localhost:3000',
+	ssoUrl: 'http://localhost:3000/saml/sso',
+	apiConnection: null,
+	lastSyncStatus: null,
+	lastSyncAt: null,
+};
+
 describe('AdminLayout', () => {
 	it('WEB-ADM-15: shows loading state while checking session', () => {
 		vi.spyOn(adminApi, 'getAdminMe').mockImplementation(
@@ -69,16 +85,17 @@ describe('AdminLayout', () => {
 		await waitFor(() => expect(logoutSpy).toHaveBeenCalled());
 	});
 
-	it('renders admin heading when authenticated', async () => {
+	it('WEB-ADM-20: renders sidebar brand when authenticated', async () => {
 		vi.spyOn(adminApi, 'getAdminMe').mockResolvedValue({
 			admin: { id: '1', username: 'admin' },
 			csrfToken: 'test-csrf-token',
 		});
+		vi.spyOn(adminApi, 'getAdminDashboard').mockResolvedValue(dashboardStub);
 
 		renderAdminAt('/admin');
 
 		await waitFor(() => {
-			expect(screen.getByRole('heading', { name: 'NestIdP Admin' })).toBeDefined();
+			expect(screen.getByRole('heading', { name: 'NestIdP' })).toBeDefined();
 		});
 	});
 
@@ -87,6 +104,7 @@ describe('AdminLayout', () => {
 			admin: { id: '1', username: 'admin' },
 			csrfToken: 'test-csrf-token',
 		});
+		vi.spyOn(adminApi, 'getAdminDashboard').mockResolvedValue(dashboardStub);
 		const logoutSpy = vi.spyOn(adminApi, 'logoutAdmin').mockResolvedValue({ ok: true });
 
 		renderAdminAt('/admin');
@@ -99,41 +117,48 @@ describe('AdminLayout', () => {
 		});
 	});
 
-	it('shows separate API and SP connection route prefixes when authenticated', async () => {
+	it('WEB-ADM-21: sidebar links to API and SP sections', async () => {
 		vi.spyOn(adminApi, 'getAdminMe').mockResolvedValue({
 			admin: { id: '1', username: 'admin' },
 			csrfToken: 'test-csrf-token',
 		});
+		vi.spyOn(adminApi, 'getAdminDashboard').mockResolvedValue(dashboardStub);
 
 		renderAdminAt('/admin');
 
 		await waitFor(() => {
-			expect(screen.getByText(API_CONNECTION_ROUTE_PREFIX)).toBeDefined();
-			expect(screen.getByText(SP_CONNECTION_ROUTE_PREFIX)).toBeDefined();
+			expect(screen.getByRole('link', { name: 'API connections' }).getAttribute('href')).toBe(
+				API_CONNECTION_ROUTE_PREFIX,
+			);
+			expect(screen.getByRole('link', { name: 'SP connections' }).getAttribute('href')).toBe(
+				SP_CONNECTION_ROUTE_PREFIX,
+			);
 		});
 	});
 
-	it('renders sub-route placeholder for nested admin paths when authenticated', async () => {
+	it('WEB-ADM-22: nested api-connections route renders list page', async () => {
 		vi.spyOn(adminApi, 'getAdminMe').mockResolvedValue({
 			admin: { id: '1', username: 'admin' },
 			csrfToken: 'test-csrf-token',
 		});
+		vi.spyOn(adminApi, 'listApiConnections').mockResolvedValue({ connections: [] });
 
 		renderAdminAt('/admin/api-connections');
 		await waitFor(() => {
-			expect(screen.getByText(/Admin sub-route placeholder/)).toBeDefined();
+			expect(screen.getByRole('heading', { name: 'API connections' })).toBeDefined();
 		});
 	});
 
-	it('links to SAML login page when authenticated', async () => {
+	it('WEB-ADM-23: links to SAML login page when authenticated', async () => {
 		vi.spyOn(adminApi, 'getAdminMe').mockResolvedValue({
 			admin: { id: '1', username: 'admin' },
 			csrfToken: 'test-csrf-token',
 		});
+		vi.spyOn(adminApi, 'getAdminDashboard').mockResolvedValue(dashboardStub);
 
 		renderAdminAt('/admin');
 		await waitFor(() => {
-			const link = screen.getByRole('link', { name: 'Go to SAML login page' });
+			const link = screen.getByRole('link', { name: 'SAML login' });
 			expect(link.getAttribute('href')).toBe('/login');
 		});
 	});

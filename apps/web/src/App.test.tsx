@@ -4,6 +4,22 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AppRoutes } from './AppRoutes';
 import * as adminApi from './admin/adminApi';
 
+const dashboardStub = {
+	counts: { users: 0, groups: 0, roles: 0, apiConnections: 0, spConnections: 0 },
+	apiConnectionsRoute: '/admin/api-connections',
+	spConnectionsRoute: '/admin/sp-connections',
+	identityUsersRoute: '/admin/identity/users',
+	apiConnectionsApiPath: '/api/admin/api-connections',
+	syncApiPath: '/api/admin/sync',
+	spConnectionsApiPath: '/api/admin/sp-connections',
+	metadataUrl: 'http://localhost:3000/saml/metadata',
+	entityId: 'http://localhost:3000',
+	ssoUrl: 'http://localhost:3000/saml/sso',
+	apiConnection: null,
+	lastSyncStatus: null,
+	lastSyncAt: null,
+};
+
 vi.mock('./admin/adminApi', () => ({
 	AdminApiError: class AdminApiError extends Error {
 		constructor(
@@ -14,6 +30,8 @@ vi.mock('./admin/adminApi', () => ({
 		}
 	},
 	getAdminMe: vi.fn(),
+	getAdminDashboard: vi.fn(),
+	listApiConnections: vi.fn(),
 	loginAdmin: vi.fn(),
 	logoutAdmin: vi.fn(),
 	adminFetch: vi.fn(),
@@ -32,15 +50,21 @@ function renderAt(path: string) {
 	);
 }
 
+function mockAuthenticatedAdmin() {
+	vi.mocked(adminApi.getAdminMe).mockResolvedValue({
+		admin: { id: '1', username: 'admin' },
+		csrfToken: 'test-csrf-token',
+	});
+	vi.mocked(adminApi.getAdminDashboard).mockResolvedValue(dashboardStub);
+}
+
 describe('App routing', () => {
-	it('renders admin placeholder at /admin when authenticated', async () => {
-		vi.mocked(adminApi.getAdminMe).mockResolvedValue({
-			admin: { id: '1', username: 'admin' },
-			csrfToken: 'test-csrf-token',
-		});
+	it('renders admin shell at /admin when authenticated', async () => {
+		mockAuthenticatedAdmin();
 		renderAt('/admin');
 		await waitFor(() => {
-			expect(screen.getByRole('heading', { name: 'NestIdP Admin' })).toBeDefined();
+			expect(screen.getByRole('heading', { name: 'NestIdP' })).toBeDefined();
+			expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeDefined();
 		});
 	});
 
@@ -82,37 +106,28 @@ describe('App routing', () => {
 	});
 
 	it('keeps admin and login as separate surfaces', async () => {
-		vi.mocked(adminApi.getAdminMe).mockResolvedValue({
-			admin: { id: '1', username: 'admin' },
-			csrfToken: 'test-csrf-token',
-		});
+		mockAuthenticatedAdmin();
 		const { unmount } = renderAt('/admin');
-		await waitFor(() => screen.getByRole('heading', { name: 'NestIdP Admin' }));
+		await waitFor(() => screen.getByRole('heading', { name: 'NestIdP' }));
 		expect(screen.queryByRole('heading', { name: 'SAML Login' })).toBeNull();
 		unmount();
 		renderAt('/login');
-		expect(screen.queryByRole('heading', { name: 'NestIdP Admin' })).toBeNull();
+		expect(screen.queryByRole('heading', { name: 'NestIdP' })).toBeNull();
 	});
 
 	it('renders nested admin sub-routes when authenticated', async () => {
-		vi.mocked(adminApi.getAdminMe).mockResolvedValue({
-			admin: { id: '1', username: 'admin' },
-			csrfToken: 'test-csrf-token',
-		});
+		mockAuthenticatedAdmin();
+		vi.mocked(adminApi.listApiConnections).mockResolvedValue({ connections: [] });
 		renderAt('/admin/api-connections');
 		await waitFor(() => {
-			expect(screen.getAllByRole('heading', { name: 'NestIdP Admin' }).length).toBe(1);
-			expect(screen.getByText(/Admin sub-route placeholder/)).toBeDefined();
+			expect(screen.getByRole('heading', { name: 'API connections' })).toBeDefined();
 		});
 	});
 
 	it('does not expose API stub JSON in the UI', async () => {
-		vi.mocked(adminApi.getAdminMe).mockResolvedValue({
-			admin: { id: '1', username: 'admin' },
-			csrfToken: 'test-csrf-token',
-		});
+		mockAuthenticatedAdmin();
 		renderAt('/admin');
-		await waitFor(() => screen.getByRole('heading', { name: 'NestIdP Admin' }));
+		await waitFor(() => screen.getByRole('heading', { name: 'Dashboard' }));
 		expect(screen.queryByText(/"status":\s*"stub"/)).toBeNull();
 	});
 });

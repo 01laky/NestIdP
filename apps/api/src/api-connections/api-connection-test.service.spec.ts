@@ -14,7 +14,8 @@ describe('ApiConnectionTestService', () => {
 		},
 	};
 
-	const service = new ApiConnectionTestService(prisma as never, encryption);
+	const audit = { logTested: jest.fn() };
+	const service = new ApiConnectionTestService(prisma as never, encryption, audit as never);
 
 	const connection = {
 		id: 'c1234567890123456789012345',

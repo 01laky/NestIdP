@@ -1,4 +1,5 @@
 import type {
+	AdminDashboardResponseDto,
 	AdminLoginRequestDto,
 	AdminLoginResponseDto,
 	AdminLogoutResponseDto,
@@ -8,18 +9,31 @@ import type {
 	ApiConnectionTestResponseDto,
 	ApiErrorResponseDto,
 	CreateApiConnectionRequestDto,
+	CreateSpConnectionRequestDto,
 	DeleteApiConnectionResponseDto,
+	DeleteSpConnectionResponseDto,
+	IdentityGroupListResponseDto,
+	IdentityRoleListResponseDto,
+	IdentityUserDetailResponseDto,
+	IdentityUserListResponseDto,
+	SpConnectionPublicDto,
+	SpConnectionResponseDto,
+	SpConnectionTestAcsResponseDto,
 	SyncLogListResponseDto,
 	SyncLogResponseDto,
 	SyncStatusResponseDto,
 	TriggerSyncRequestDto,
 	TriggerSyncResponseDto,
 	UpdateApiConnectionRequestDto,
+	UpdateSpConnectionRequestDto,
 } from '@nestidp/shared';
 import type { IdpMetadataUrlResponseDto, SpConnectionListResponseDto } from '@nestidp/shared';
 import {
 	ADMIN_CSRF_HEADER_NAME,
 	API_CONNECTIONS_API_PATH,
+	IDENTITY_GROUPS_API_PATH,
+	IDENTITY_ROLES_API_PATH,
+	IDENTITY_USERS_API_PATH,
 	IDP_METADATA_URL_API_PATH,
 	SP_CONNECTIONS_API_PATH,
 	SYNC_API_PATH,
@@ -197,3 +211,89 @@ export function getSpConnection(id: string): Promise<SpConnectionListResponseDto
 export function getIdpMetadataUrl(): Promise<IdpMetadataUrlResponseDto> {
 	return adminFetch<IdpMetadataUrlResponseDto>(IDP_METADATA_URL_API_PATH);
 }
+
+export function getAdminDashboard(): Promise<AdminDashboardResponseDto> {
+	return adminFetch<AdminDashboardResponseDto>('/api/admin');
+}
+
+export function createSpConnection(
+	body: CreateSpConnectionRequestDto,
+): Promise<SpConnectionResponseDto> {
+	return adminFetch<SpConnectionResponseDto>(SP_CONNECTIONS_API_PATH, {
+		method: 'POST',
+		body: JSON.stringify(body),
+	});
+}
+
+export function updateSpConnection(
+	id: string,
+	body: UpdateSpConnectionRequestDto,
+): Promise<SpConnectionResponseDto> {
+	return adminFetch<SpConnectionResponseDto>(`${SP_CONNECTIONS_API_PATH}/${id}`, {
+		method: 'PATCH',
+		body: JSON.stringify(body),
+	});
+}
+
+export function deleteSpConnection(id: string): Promise<DeleteSpConnectionResponseDto> {
+	return adminFetch<DeleteSpConnectionResponseDto>(`${SP_CONNECTIONS_API_PATH}/${id}`, {
+		method: 'DELETE',
+	});
+}
+
+export function testSpConnectionAcs(id: string): Promise<SpConnectionTestAcsResponseDto> {
+	return adminFetch<SpConnectionTestAcsResponseDto>(`${SP_CONNECTIONS_API_PATH}/${id}/test-acs`, {
+		method: 'POST',
+	});
+}
+
+export function listIdentityUsers(
+	params: { limit?: number; offset?: number; search?: string } = {},
+): Promise<IdentityUserListResponseDto> {
+	const query = new URLSearchParams();
+	if (params.limit != null) {
+		query.set('limit', String(params.limit));
+	}
+	if (params.offset != null) {
+		query.set('offset', String(params.offset));
+	}
+	if (params.search) {
+		query.set('search', params.search);
+	}
+	const suffix = query.size > 0 ? `?${query.toString()}` : '';
+	return adminFetch<IdentityUserListResponseDto>(`${IDENTITY_USERS_API_PATH}${suffix}`);
+}
+
+export function getIdentityUser(id: string): Promise<IdentityUserDetailResponseDto> {
+	return adminFetch<IdentityUserDetailResponseDto>(`${IDENTITY_USERS_API_PATH}/${id}`);
+}
+
+export function listIdentityGroups(
+	params: { limit?: number; offset?: number } = {},
+): Promise<IdentityGroupListResponseDto> {
+	const query = new URLSearchParams();
+	if (params.limit != null) {
+		query.set('limit', String(params.limit));
+	}
+	if (params.offset != null) {
+		query.set('offset', String(params.offset));
+	}
+	const suffix = query.size > 0 ? `?${query.toString()}` : '';
+	return adminFetch<IdentityGroupListResponseDto>(`${IDENTITY_GROUPS_API_PATH}${suffix}`);
+}
+
+export function listIdentityRoles(
+	params: { limit?: number; offset?: number } = {},
+): Promise<IdentityRoleListResponseDto> {
+	const query = new URLSearchParams();
+	if (params.limit != null) {
+		query.set('limit', String(params.limit));
+	}
+	if (params.offset != null) {
+		query.set('offset', String(params.offset));
+	}
+	const suffix = query.size > 0 ? `?${query.toString()}` : '';
+	return adminFetch<IdentityRoleListResponseDto>(`${IDENTITY_ROLES_API_PATH}${suffix}`);
+}
+
+export type { SpConnectionPublicDto };

@@ -4,6 +4,26 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.8.0]
+
+### Added
+
+- **Admin console SPA** — dashboard, API connection list/create/edit/sync, sync log detail, SP list/create/edit, Test SSO wizard, identity users/groups/roles browse + user detail
+- **Mutating SP admin API** — `POST/PATCH/DELETE /api/admin/sp-connections`, `POST …/:id/test-acs` (CSRF on writes)
+- **`GET /api/admin`** — `AdminDashboardResponseDto` (counts, routes, IdP URLs, optional API connection + last sync)
+- **Identity admin API** — `GET /api/admin/identity/users`, `users/:id`, `groups`, `roles` (pagination + user search)
+- **`assertValidAcsUrl`** in `apps/api/src/common/acs-url.util.ts`; SP attribute mapping + certificate validation
+- **`ApiConnectionsAuditService`** / **`SpConnectionsAuditService`** — structured stdout audit on CRUD/test
+- Shared: `identity-admin.ts`, SP CRUD DTOs, `AdminDashboardResponseDto`, `SAML_NAME_ID_FORMATS`
+- Web: `adminApi` CRUD/dashboard/identity helpers; reusable admin UI components (breadcrumbs, mapping editor, presets, empty/loading/error states)
+- Integration tests: `API-SPC-*`, `API-IDN-ADM-*`, `API-ADM-DASH-*`; web `WEB-ADM-20`…`26`
+
+### Changed
+
+- `GET /api/admin` no longer returns stub `status`/`note` — full dashboard payload for the React home page
+- Admin layout: sidebar navigation and nested routes under `/admin/*`
+- Docs and diagrams updated for v0.8 operator UI (development guide, routing)
+
 ## [0.7.0]
 
 ### Added

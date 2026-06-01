@@ -6,6 +6,7 @@ import {
 } from '../encryption/credentials-encryption.port';
 import { redactBearerToken } from '../encryption/redact-secret.util';
 import { PrismaService } from '../prisma/prisma.service';
+import { ApiConnectionsAuditService } from './api-connections-audit.service';
 import { normalizeBaseUrl } from './base-url.util';
 
 @Injectable()
@@ -16,6 +17,7 @@ export class ApiConnectionTestService {
 		private readonly prisma: PrismaService,
 		@Inject(CREDENTIALS_ENCRYPTION)
 		private readonly encryption: CredentialsEncryptionPort,
+		private readonly audit: ApiConnectionsAuditService,
 	) {}
 
 	async testConnection(id: string): Promise<ApiConnectionTestResponseDto> {
@@ -48,7 +50,7 @@ export class ApiConnectionTestService {
 			});
 
 			const ok = response.status >= 200 && response.status < 300;
-			return {
+			const result = {
 				ok,
 				reachable: true,
 				statusCode: response.status,
@@ -56,22 +58,28 @@ export class ApiConnectionTestService {
 					? 'Identity API responded successfully'
 					: `Identity API returned HTTP ${response.status}`,
 			};
+			this.audit.logTested(id, true, response.status);
+			return result;
 		} catch (error) {
 			this.logger.warn(
 				`Connectivity test failed for connection ${id}: ${error instanceof Error ? error.message : 'unknown error'}`,
 			);
 			if (error instanceof Error && error.name === 'TimeoutError') {
-				return {
+				const result = {
 					ok: false,
 					reachable: false,
 					message: 'Identity API request timed out',
 				};
+				this.audit.logTested(id, false);
+				return result;
 			}
-			return {
+			const result = {
 				ok: false,
 				reachable: false,
 				message: 'Could not reach identity API',
 			};
+			this.audit.logTested(id, false);
+			return result;
 		}
 	}
 }

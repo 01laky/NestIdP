@@ -61,3 +61,46 @@ export interface IdpMetadataUrlResponseDto {
 	entityId: string;
 	ssoUrl: string;
 }
+
+export interface SpConnectionResponseDto {
+	item: SpConnectionPublicDto;
+}
+
+export interface CreateSpConnectionRequestDto {
+	name: string;
+	spEntityId: string;
+	acsUrl: string;
+	nameIdFormat?: string;
+	attributeMapping?: SpAttributeMappingConfig | null;
+	active?: boolean;
+	spCertificate?: string | null;
+}
+
+export interface UpdateSpConnectionRequestDto {
+	name?: string;
+	spEntityId?: string;
+	acsUrl?: string;
+	nameIdFormat?: string;
+	attributeMapping?: SpAttributeMappingConfig | null;
+	active?: boolean;
+	spCertificate?: string | null;
+}
+
+export interface DeleteSpConnectionResponseDto {
+	ok: true;
+	id: string;
+}
+
+export interface SpConnectionTestAcsResponseDto {
+	ok: boolean;
+	reachable: boolean;
+	statusCode?: number;
+	message: string;
+}
+
+export const SAML_NAME_ID_FORMATS = [
+	'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
+	'urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified',
+	'urn:oasis:names:tc:SAML:2.0:nameid-format:persistent',
+	'urn:oasis:names:tc:SAML:2.0:nameid-format:transient',
+] as const;

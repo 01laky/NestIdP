@@ -22,6 +22,7 @@ import {
 } from '../encryption/credentials-encryption.port';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertValidBaseUrl, BaseUrlValidationError } from './base-url.util';
+import { ApiConnectionsAuditService } from './api-connections-audit.service';
 import { toApiConnectionDto } from './api-connections.mapper';
 
 @Injectable()
@@ -33,6 +34,7 @@ export class ApiConnectionsService {
 		@Inject(CREDENTIALS_ENCRYPTION)
 		private readonly encryption: CredentialsEncryptionPort,
 		private readonly configService: ConfigService,
+		private readonly audit: ApiConnectionsAuditService,
 	) {}
 
 	async list(): Promise<ApiConnectionListResponseDto> {
@@ -106,11 +108,12 @@ export class ApiConnectionsService {
 			data,
 		});
 
+		this.audit.logUpdated(row.id, row.name);
 		return { connection: toApiConnectionDto(row) };
 	}
 
 	async delete(id: string): Promise<DeleteApiConnectionResponseDto> {
-		await this.findOrThrow(id);
+		const existing = await this.findOrThrow(id);
 		try {
 			await this.prisma.apiConnection.delete({ where: { id } });
 		} catch (error) {
@@ -119,6 +122,7 @@ export class ApiConnectionsService {
 			}
 			throw error;
 		}
+		this.audit.logDeleted(existing.id, existing.name);
 		return { ok: true, id };
 	}
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { AdminStatsDto, AdminStubResponseDto } from './admin-types.js';
+import type { AdminDashboardResponseDto, AdminStatsDto } from './admin-types.js';
 import { API_CONNECTION_ROUTE_PREFIX, API_CONNECTIONS_API_PATH } from './connections.js';
 import { SAML_METADATA_PATH, SP_CONNECTIONS_API_PATH } from './saml.js';
 import { SYNC_API_PATH } from './sync.js';
@@ -34,17 +34,9 @@ describe('AdminStatsDto', () => {
 	});
 });
 
-describe('AdminStubResponseDto', () => {
-	it('SH-ADM-03: status is literal stub and module is admin', () => {
-		const response: AdminStubResponseDto = {
-			status: 'stub',
-			module: 'admin',
-			note: 'pending',
-			apiConnectionsRoute: API_CONNECTION_ROUTE_PREFIX,
-			apiConnectionsApiPath: API_CONNECTIONS_API_PATH,
-			syncApiPath: SYNC_API_PATH,
-			spConnectionsApiPath: SP_CONNECTIONS_API_PATH,
-			metadataUrl: `https://idp.example.com${SAML_METADATA_PATH}`,
+describe('AdminDashboardResponseDto', () => {
+	it('SH-ADM-03: includes dashboard routes and sync metadata fields', () => {
+		const response: AdminDashboardResponseDto = {
 			counts: {
 				users: 0,
 				groups: 0,
@@ -52,21 +44,25 @@ describe('AdminStubResponseDto', () => {
 				apiConnections: 0,
 				spConnections: 0,
 			},
+			apiConnectionsRoute: API_CONNECTION_ROUTE_PREFIX,
+			spConnectionsRoute: '/admin/sp-connections',
+			identityUsersRoute: '/admin/identity/users',
+			apiConnectionsApiPath: API_CONNECTIONS_API_PATH,
+			syncApiPath: SYNC_API_PATH,
+			spConnectionsApiPath: SP_CONNECTIONS_API_PATH,
+			metadataUrl: `https://idp.example.com${SAML_METADATA_PATH}`,
+			entityId: 'https://idp.example.com',
+			ssoUrl: 'https://idp.example.com/saml/sso',
+			apiConnection: null,
+			lastSyncStatus: null,
+			lastSyncAt: null,
 		};
-		expect(response.status).toBe('stub');
-		expect(response.module).toBe('admin');
+		expect(response.entityId).toContain('idp.example.com');
+		expect(response.lastSyncAt).toBeNull();
 	});
 
 	it('SH-ADM-04: apiConnectionsRoute points at identity source not SP', () => {
-		const response: AdminStubResponseDto = {
-			status: 'stub',
-			module: 'admin',
-			note: '',
-			apiConnectionsRoute: API_CONNECTION_ROUTE_PREFIX,
-			apiConnectionsApiPath: API_CONNECTIONS_API_PATH,
-			syncApiPath: SYNC_API_PATH,
-			spConnectionsApiPath: SP_CONNECTIONS_API_PATH,
-			metadataUrl: `https://idp.example.com${SAML_METADATA_PATH}`,
+		const response: AdminDashboardResponseDto = {
 			counts: {
 				users: 0,
 				groups: 0,
@@ -74,6 +70,18 @@ describe('AdminStubResponseDto', () => {
 				apiConnections: 0,
 				spConnections: 0,
 			},
+			apiConnectionsRoute: API_CONNECTION_ROUTE_PREFIX,
+			spConnectionsRoute: '/admin/sp-connections',
+			identityUsersRoute: '/admin/identity/users',
+			apiConnectionsApiPath: API_CONNECTIONS_API_PATH,
+			syncApiPath: SYNC_API_PATH,
+			spConnectionsApiPath: SP_CONNECTIONS_API_PATH,
+			metadataUrl: `https://idp.example.com${SAML_METADATA_PATH}`,
+			entityId: 'https://idp.example.com',
+			ssoUrl: 'https://idp.example.com/saml/sso',
+			apiConnection: null,
+			lastSyncStatus: 'NEVER',
+			lastSyncAt: null,
 		};
 		expect(response.apiConnectionsRoute).toContain('api-connections');
 		expect(response.apiConnectionsRoute).not.toContain('sp-connections');
