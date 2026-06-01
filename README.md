@@ -72,4 +72,9 @@ Copy `.env.example` to `.env` and adjust values. Required variables:
 - `IDP_BASE_URL`
 - `NODE_ENV`
 
-Optional bootstrap placeholders: `ADMIN_USERNAME`, `ADMIN_PASSWORD`.
+Optional bootstrap (first admin + IdpSettings on API start when tables are empty):
+
+- `ADMIN_USERNAME`, `ADMIN_PASSWORD` — see [docs/database.md](docs/database.md#first-admin-bootstrap-v030)
+- `ADMIN_SESSION_TTL_SECONDS` — operator session lifetime (default 8h)
+
+Operator login: **http://localhost:5173/admin/login** (separate from end-user SAML `/login`).

@@ -1,25 +1,33 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '../prisma/prisma.service';
+import { runBootstrap } from './run-bootstrap';
 
 @Injectable()
 export class BootstrapService implements OnModuleInit {
 	private readonly logger = new Logger(BootstrapService.name);
 
-	constructor(private readonly configService: ConfigService) {}
+	constructor(
+		private readonly configService: ConfigService,
+		private readonly prisma: PrismaService,
+	) {}
 
-	onModuleInit(): void {
-		const adminUsername = this.configService.get<string>('ADMIN_USERNAME');
-		const adminPassword = this.configService.get<string>('ADMIN_PASSWORD');
-
-		if (adminUsername && adminPassword) {
-			this.logger.log(
-				`Bootstrap placeholder: ADMIN_USERNAME is set; first admin seeding not implemented yet (TODO: next prompt).`,
+	async onModuleInit(): Promise<void> {
+		try {
+			await runBootstrap(
+				this.prisma,
+				{
+					adminUsername: this.configService.get<string>('ADMIN_USERNAME'),
+					adminPassword: this.configService.get<string>('ADMIN_PASSWORD'),
+					idpBaseUrl: this.configService.get<string>('IDP_BASE_URL') ?? '',
+					nodeEnv: this.configService.get<string>('NODE_ENV'),
+				},
+				this.logger,
 			);
-			return;
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			this.logger.error(`Bootstrap failed: ${message}`);
+			throw error;
 		}
-
-		this.logger.warn(
-			'Bootstrap placeholder: ADMIN_USERNAME / ADMIN_PASSWORD not set; admin seed deferred.',
-		);
 	}
 }

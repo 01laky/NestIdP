@@ -1,83 +1,84 @@
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { BootstrapService } from './bootstrap.service';
+import { runBootstrap } from './run-bootstrap';
+
+jest.mock('./run-bootstrap', () => ({
+	runBootstrap: jest.fn().mockResolvedValue({ adminCreated: true, idpSettingsCreated: true }),
+}));
 
 describe('BootstrapService', () => {
 	let logSpy: jest.SpyInstance;
-	let warnSpy: jest.SpyInstance;
+	let errorSpy: jest.SpyInstance;
+	const prisma = {} as never;
 
 	beforeEach(() => {
+		jest.clearAllMocks();
 		logSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation();
-		warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+		errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+		jest.spyOn(Logger.prototype, 'warn').mockImplementation();
 	});
 
 	afterEach(() => {
 		jest.restoreAllMocks();
 	});
 
-	it('logs placeholder message when admin env vars are set', () => {
+	it('delegates to runBootstrap with env config', async () => {
 		const config = {
 			get: jest.fn((key: string) => {
 				if (key === 'ADMIN_USERNAME') return 'admin';
-				if (key === 'ADMIN_PASSWORD') return 'secret';
+				if (key === 'ADMIN_PASSWORD') return 'strong-password-123';
+				if (key === 'IDP_BASE_URL') return 'https://idp.example.com';
+				if (key === 'NODE_ENV') return 'development';
 				return undefined;
 			}),
 		} as unknown as ConfigService;
 
-		const service = new BootstrapService(config);
-		service.onModuleInit();
+		const service = new BootstrapService(config, prisma);
+		await service.onModuleInit();
 
-		expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('TODO'));
-		expect(warnSpy).not.toHaveBeenCalled();
+		expect(runBootstrap).toHaveBeenCalledWith(
+			prisma,
+			expect.objectContaining({
+				adminUsername: 'admin',
+				adminPassword: 'strong-password-123',
+				idpBaseUrl: 'https://idp.example.com',
+			}),
+			expect.any(Object),
+		);
+		expect(logSpy).not.toHaveBeenCalledWith(expect.stringContaining('TODO'));
 	});
 
-	it('warns when admin env vars are missing', () => {
-		const config = {
-			get: jest.fn(() => undefined),
-		} as unknown as ConfigService;
-
-		const service = new BootstrapService(config);
-		service.onModuleInit();
-
-		expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('not set'));
-	});
-
-	it('warns when only ADMIN_USERNAME is set', () => {
-		const config = {
-			get: jest.fn((key: string) => (key === 'ADMIN_USERNAME' ? 'admin' : undefined)),
-		} as unknown as ConfigService;
-
-		const service = new BootstrapService(config);
-		service.onModuleInit();
-
-		expect(warnSpy).toHaveBeenCalled();
-		expect(logSpy).not.toHaveBeenCalled();
-	});
-
-	it('warns when only ADMIN_PASSWORD is set', () => {
-		const config = {
-			get: jest.fn((key: string) => (key === 'ADMIN_PASSWORD' ? 'secret' : undefined)),
-		} as unknown as ConfigService;
-
-		const service = new BootstrapService(config);
-		service.onModuleInit();
-
-		expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('not set'));
-		expect(logSpy).not.toHaveBeenCalled();
-	});
-
-	it('warns when ADMIN_USERNAME is empty string', () => {
+	it('rethrows bootstrap failures', async () => {
+		jest.mocked(runBootstrap).mockRejectedValueOnce(new Error('bootstrap failed'));
 		const config = {
 			get: jest.fn((key: string) => {
-				if (key === 'ADMIN_USERNAME') return '';
-				if (key === 'ADMIN_PASSWORD') return 'secret';
+				if (key === 'IDP_BASE_URL') return 'https://idp.example.com';
 				return undefined;
 			}),
 		} as unknown as ConfigService;
 
-		const service = new BootstrapService(config);
-		service.onModuleInit();
+		const service = new BootstrapService(config, prisma);
+		await expect(service.onModuleInit()).rejects.toThrow('bootstrap failed');
+		expect(errorSpy).toHaveBeenCalled();
+	});
 
-		expect(warnSpy).toHaveBeenCalled();
+	it('API-BST-SVC-01: passes NODE_ENV to runBootstrap', async () => {
+		const config = {
+			get: jest.fn((key: string) => {
+				if (key === 'IDP_BASE_URL') return 'https://idp.example.com';
+				if (key === 'NODE_ENV') return 'production';
+				return undefined;
+			}),
+		} as unknown as ConfigService;
+
+		const service = new BootstrapService(config, prisma);
+		await service.onModuleInit();
+
+		expect(runBootstrap).toHaveBeenCalledWith(
+			prisma,
+			expect.objectContaining({ nodeEnv: 'production' }),
+			expect.any(Object),
+		);
 	});
 });

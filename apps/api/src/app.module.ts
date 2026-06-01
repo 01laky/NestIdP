@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { AdminModule } from './admin/admin.module';
+import { AdminAuthModule } from './admin-auth/admin-auth.module';
 import { AuthModule } from './auth/auth.module';
 import { BootstrapModule } from './bootstrap/bootstrap.module';
 import {
@@ -46,6 +47,7 @@ const enableStaticServing = shouldEnableStaticServing(
 		PrismaModule,
 		BootstrapModule,
 		HealthModule,
+		AdminAuthModule,
 		AdminModule,
 		AuthModule,
 		SyncModule,

@@ -13,6 +13,7 @@ contexts — **commit updated `.svg` files** whenever you edit `.mmd` sources.
 | `routing.mmd`            | Production URL routing (API vs SAML vs SPA)                    | [development.md](../development.md)                                   |
 | `database-providers.mmd` | `DATABASE_PROVIDER` + `prisma:prepare` workflow                | [database.md](../database.md)                                         |
 | `schema-entities.mmd`    | Entity-relationship diagram (11 Prisma models)                 | [database.md](../database.md), [proposal.MD](../proposal.MD) §9       |
+| `admin-auth-flow.mmd`    | Operator admin login + session cookie sequence                 | [database.md](../database.md), [development.md](../development.md)    |
 
 Regenerate after editing sources:
 

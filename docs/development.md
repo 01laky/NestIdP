@@ -1,6 +1,6 @@
 # Development guide
 
-Companion to [proposal.MD](./proposal.MD) for local setup (**v0.2.0** — full Prisma schema).
+Companion to [proposal.MD](./proposal.MD) for local setup (**v0.3.0** — admin bootstrap + authentication).
 
 Database selection: **[database.md](./database.md)** — SQLite for local dev, PostgreSQL (or SQLite) at deploy time.
 
@@ -48,15 +48,34 @@ This syncs `schema.prisma` with `DATABASE_PROVIDER`. Root `pnpm install` runs `p
 
 ![Production routing](./img/routing.svg)
 
-| Path           | Handler                           |
-| -------------- | --------------------------------- |
-| `/api/admin/*` | Admin REST API (stub + stats)     |
-| `/api/auth/*`  | Auth REST API (stub)              |
-| `/saml/*`      | SAML protocol (stub, HTTP 501)    |
-| `/health`      | Liveness — always OK, no database |
-| `/ready`       | Readiness — Prisma ping           |
-| `/admin/*`     | React admin SPA                   |
-| `/login`       | React SAML login page             |
+| Path                     | Handler                                            |
+| ------------------------ | -------------------------------------------------- |
+| `/api/admin/*`           | Admin REST API (requires session except auth)      |
+| `/api/admin/auth/login`  | Operator login (public)                            |
+| `/api/admin/auth/logout` | Clears session cookie (public)                     |
+| `/api/admin/auth/me`     | Current admin session (protected)                  |
+| `/api/auth/*`            | End-user auth REST API (stub)                      |
+| `/saml/*`                | SAML protocol (stub, HTTP 501)                     |
+| `/health`                | Liveness — always OK, no database                  |
+| `/ready`                 | Readiness — Prisma ping                            |
+| `/admin/login`           | React operator login (separate from SAML `/login`) |
+| `/admin/*`               | React admin SPA (session gate)                     |
+| `/login`                 | React SAML login page                              |
+
+![Admin login sequence](./img/admin-auth-flow.svg)
+
+### Admin session cookies
+
+Operator sessions use signed HTTP-only cookie **`nestidp_admin_session`** (HMAC-SHA256 + `SESSION_SECRET`).
+
+| Environment            | `Secure` cookie flag                                |
+| ---------------------- | --------------------------------------------------- |
+| `production`           | `true` (HTTPS required per proposal §10.2)          |
+| `development` / `test` | `false` — allows `http://localhost` with Vite proxy |
+
+Vite dev server proxies `/api` to Nest; admin fetches must use **`credentials: 'include'`** (see `apps/web/src/admin/adminApi.ts`).
+
+First boot: set `ADMIN_USERNAME` / `ADMIN_PASSWORD` in `.env` — bootstrap creates the first admin when the table is empty. Change default password after deploy.
 
 There is **no** global `/api` prefix on the Nest app. Controllers use full path segments.
 
@@ -93,6 +112,16 @@ pnpm diagrams:check
 Integration tests live under `apps/api/src/prisma/*.integration.spec.ts` and run as part of `pnpm test`.
 
 CI (`.github/workflows/ci.yml`) runs lint, test (with Postgres service), build, and `diagrams:check` on push/PR to `main`.
+
+## Git hooks
+
+Once per clone, install repo hooks (strip / block AI co-author trailers in commit messages):
+
+```bash
+./scripts/setup-githooks.sh
+```
+
+This sets `core.hooksPath=.githooks`. Hooks run on `prepare-commit-msg` and `commit-msg` — commits are **rejected** if `Co-authored-by: Cursor`, `cursoragent@cursor.com`, or similar attribution remains.
 
 ## Docker
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	BCRYPT_COST_FACTOR,
 	DEFAULT_PASSWORD_HASH_ALGORITHM,
 	isPasswordHashAlgorithm,
 	PASSWORD_HASH_ALGORITHMS,
@@ -25,5 +26,9 @@ describe('password-hash-algorithms', () => {
 
 	it('SH-PWD-05: PASSWORD_HASH_ALGORITHMS contains only bcrypt in v1', () => {
 		expect(PASSWORD_HASH_ALGORITHMS).toEqual(['bcrypt']);
+	});
+
+	it('SH-PWD-06: BCRYPT_COST_FACTOR is 12', () => {
+		expect(BCRYPT_COST_FACTOR).toBe(12);
 	});
 });

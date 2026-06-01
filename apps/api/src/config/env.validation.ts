@@ -1,5 +1,14 @@
 import { plainToInstance, Transform } from 'class-transformer';
-import { IsEnum, IsIn, IsNotEmpty, IsOptional, IsString, validateSync } from 'class-validator';
+import {
+	IsEnum,
+	IsIn,
+	IsInt,
+	IsNotEmpty,
+	IsOptional,
+	IsString,
+	Min,
+	validateSync,
+} from 'class-validator';
 import {
 	DATABASE_PROVIDERS,
 	DatabaseProvider,
@@ -45,6 +54,18 @@ export class EnvironmentVariables {
 	@IsOptional()
 	@IsString()
 	ADMIN_PASSWORD?: string;
+
+	@IsOptional()
+	@Transform(({ value }) => {
+		if (value === undefined || value === null || value === '') {
+			return undefined;
+		}
+		const parsed = Number.parseInt(String(value), 10);
+		return Number.isFinite(parsed) ? parsed : value;
+	})
+	@IsInt()
+	@Min(1)
+	ADMIN_SESSION_TTL_SECONDS?: number;
 
 	@IsOptional()
 	@IsString()

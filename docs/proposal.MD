@@ -650,7 +650,7 @@ Any platform supporting Docker containers and a SQL database (SQLite or PostgreS
 - [ ] SP-initiated SSO (HTTP-Redirect in, HTTP-POST out)
 - [ ] IdP metadata endpoint
 - [ ] Signed SAML assertions with attribute mapping
-- [ ] Admin authentication (local)
+- [x] Admin authentication (local)
 - [ ] Docker + docker-compose for local dev and deployment
 - [ ] Basic audit log (sync events, admin actions)
 

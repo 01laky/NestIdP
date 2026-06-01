@@ -4,6 +4,9 @@ export type PasswordHashAlgorithm = (typeof PASSWORD_HASH_ALGORITHMS)[number];
 
 export const DEFAULT_PASSWORD_HASH_ALGORITHM: PasswordHashAlgorithm = 'bcrypt';
 
+/** bcrypt cost factor for AdminUser and synced User password verification (v1). */
+export const BCRYPT_COST_FACTOR = 12 as const;
+
 export function isPasswordHashAlgorithm(value: string): value is PasswordHashAlgorithm {
 	return (PASSWORD_HASH_ALGORITHMS as readonly string[]).includes(value);
 }

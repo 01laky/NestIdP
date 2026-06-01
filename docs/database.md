@@ -91,6 +91,40 @@ Migration SQL is generated per provider. Dev default creates migrations against 
 
 If PostgreSQL migration diverges after a SQLite-first workflow, reset the target database and run `migrate deploy`, or regenerate migrations against a fresh PostgreSQL dev instance.
 
+## First admin bootstrap (v0.3.0)
+
+On API startup, **`BootstrapService`** calls **`runBootstrap`** (same logic as `prisma db seed`):
+
+| Step        | Condition                                                          | Action                                          |
+| ----------- | ------------------------------------------------------------------ | ----------------------------------------------- |
+| Admin seed  | `ADMIN_USERNAME` + `ADMIN_PASSWORD` set, **zero** `AdminUser` rows | Insert first admin (bcrypt hash)                |
+| Admin skip  | One or more admins exist                                           | Skip — password never reset on restart          |
+| IdpSettings | No row with `id = default`                                         | Insert singleton with `entityId = IDP_BASE_URL` |
+
+**Idempotency:** restarting the API never duplicates admins or overwrites `entityId`.
+
+**Production:** `NODE_ENV=production` with an empty `AdminUser` table requires a **strong** `ADMIN_PASSWORD` (not `changeme`, minimum 12 characters). Weak or missing credentials fail fast at startup.
+
+**Development:** default `changeme` is allowed with a startup warning.
+
+**Reset local SQLite data:**
+
+```bash
+rm -f apps/api/data/nestidp.db
+pnpm db:migrate
+pnpm dev
+```
+
+**Manual seed** (optional, from `apps/api`):
+
+```bash
+pnpm exec prisma db seed
+```
+
+Prefer API startup bootstrap in production deploys — seed CLI is for local/ops convenience.
+
+![Admin authentication flow](./img/admin-auth-flow.svg)
+
 ## Production boot
 
 1. Set `DATABASE_PROVIDER` + `DATABASE_URL`

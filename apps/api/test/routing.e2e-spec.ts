@@ -1,13 +1,16 @@
 import { INestApplication } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
+import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AdminModule } from '../src/admin/admin.module';
+import { AdminAuthModule } from '../src/admin-auth/admin-auth.module';
 import { AuthModule } from '../src/auth/auth.module';
 import { HealthModule } from '../src/health/health.module';
-import { PrismaService } from '../src/prisma/prisma.service';
+import { IdentityModule } from '../src/identity/identity.module';
 import { PrismaModule } from '../src/prisma/prisma.module';
+import { PrismaService } from '../src/prisma/prisma.service';
 import { SamlModule } from '../src/saml/saml.module';
 import { SpaModule } from '../src/spa/spa.module';
 
@@ -22,6 +25,9 @@ describe('Routing (e2e)', () => {
 		role: { count: jest.fn().mockResolvedValue(0) },
 		apiConnection: { count: jest.fn().mockResolvedValue(0) },
 		spConnection: { count: jest.fn().mockResolvedValue(0) },
+		adminUser: {
+			findUnique: jest.fn(),
+		},
 	};
 
 	beforeAll(async () => {
@@ -43,6 +49,8 @@ describe('Routing (e2e)', () => {
 				}),
 				HealthModule,
 				PrismaModule,
+				IdentityModule,
+				AdminAuthModule,
 				AdminModule,
 				AuthModule,
 				SamlModule,
@@ -54,6 +62,7 @@ describe('Routing (e2e)', () => {
 			.compile();
 
 		app = moduleFixture.createNestApplication();
+		app.use(cookieParser());
 		await app.init();
 	});
 
@@ -63,6 +72,7 @@ describe('Routing (e2e)', () => {
 
 	beforeEach(() => {
 		jest.clearAllMocks();
+		prismaMock.adminUser.findUnique.mockResolvedValue(null);
 	});
 
 	it('GET /health returns 200 without database ping', async () => {
@@ -108,31 +118,38 @@ describe('Routing (e2e)', () => {
 			.expect(501);
 	});
 
-	it('GET /api/admin is under /api/admin not global /api only', async () => {
-		const response = await request(app.getHttpServer() as App)
+	it('GET /api/admin without session returns 401', async () => {
+		await request(app.getHttpServer() as App)
 			.get('/api/admin')
-			.expect(200);
-		expect(response.body.module).toBe('admin');
-		expect(response.body.counts).toEqual({
-			users: 0,
-			groups: 0,
-			roles: 0,
-			apiConnections: 0,
-			spConnections: 0,
-		});
+			.expect(401);
 	});
 
-	it('GET /api/admin returns non-zero counts when prisma mocks return data', async () => {
+	it('GET /api/admin returns counts when authenticated via session cookie', async () => {
 		prismaMock.user.count.mockResolvedValue(5);
 		prismaMock.group.count.mockResolvedValue(2);
 		prismaMock.role.count.mockResolvedValue(1);
 		prismaMock.apiConnection.count.mockResolvedValue(3);
 		prismaMock.spConnection.count.mockResolvedValue(4);
 
-		const response = await request(app.getHttpServer() as App)
-			.get('/api/admin')
-			.expect(200);
+		const password = 'e2e-admin-password';
+		const { hashPassword } = await import('../src/admin-auth/password.util');
+		const passwordHash = await hashPassword(password);
+		prismaMock.adminUser.findUnique.mockImplementation(
+			async (args: { where: { username?: string; id?: string } }) => {
+				if (args.where.username === 'admin') {
+					return { id: 'admin-1', username: 'admin', passwordHash };
+				}
+				if (args.where.id === 'admin-1') {
+					return { id: 'admin-1', username: 'admin', passwordHash };
+				}
+				return null;
+			},
+		);
 
+		const agent = request.agent(app.getHttpServer() as App);
+		await agent.post('/api/admin/auth/login').send({ username: 'admin', password }).expect(200);
+
+		const response = await agent.get('/api/admin').expect(200);
 		expect(response.body.counts).toEqual({
 			users: 5,
 			groups: 2,
@@ -140,27 +157,73 @@ describe('Routing (e2e)', () => {
 			apiConnections: 3,
 			spConnections: 4,
 		});
-		expect(prismaMock.user.count).toHaveBeenCalled();
-		expect(prismaMock.apiConnection.count).toHaveBeenCalled();
 	});
 
-	it('GET /api/admin status remains stub with counts payload', async () => {
-		const response = await request(app.getHttpServer() as App)
-			.get('/api/admin')
-			.expect(200);
+	it('GET /api/admin status remains stub with counts payload when authenticated', async () => {
+		const password = 'e2e-admin-password-2';
+		const { hashPassword } = await import('../src/admin-auth/password.util');
+		const passwordHash = await hashPassword(password);
+		prismaMock.adminUser.findUnique.mockImplementation(
+			async (args: { where: { username?: string; id?: string } }) => {
+				if (args.where.username === 'admin2') {
+					return { id: 'admin-2', username: 'admin2', passwordHash };
+				}
+				if (args.where.id === 'admin-2') {
+					return { id: 'admin-2', username: 'admin2', passwordHash };
+				}
+				return null;
+			},
+		);
+
+		const agent = request.agent(app.getHttpServer() as App);
+		await agent.post('/api/admin/auth/login').send({ username: 'admin2', password }).expect(200);
+
+		const response = await agent.get('/api/admin').expect(200);
 		expect(response.body.status).toBe('stub');
 		expect(response.body.apiConnectionsRoute).toContain('api-connections');
 	});
 
 	it('GET /api/auth is separate from /api/admin', async () => {
-		const admin = await request(app.getHttpServer() as App)
+		await request(app.getHttpServer() as App)
 			.get('/api/admin')
-			.expect(200);
+			.expect(401);
 		const auth = await request(app.getHttpServer() as App)
 			.get('/api/auth')
 			.expect(200);
-		expect(admin.body.module).toBe('admin');
 		expect(auth.body.module).toBe('auth');
+	});
+
+	it('E2E-AUTH-01: POST /api/admin/auth/login with wrong password returns 401', async () => {
+		const password = 'e2e-wrong-pass-test';
+		const { hashPassword } = await import('../src/admin-auth/password.util');
+		const passwordHash = await hashPassword(password);
+		prismaMock.adminUser.findUnique.mockImplementation(
+			async (args: { where: { username?: string } }) => {
+				if (args.where.username === 'admin') {
+					return { id: 'admin-1', username: 'admin', passwordHash };
+				}
+				return null;
+			},
+		);
+
+		await request(app.getHttpServer() as App)
+			.post('/api/admin/auth/login')
+			.send({ username: 'admin', password: 'not-the-password' })
+			.expect(401);
+	});
+
+	it('E2E-AUTH-02: POST /api/admin/auth/login with empty body returns 400', async () => {
+		await request(app.getHttpServer() as App)
+			.post('/api/admin/auth/login')
+			.send({})
+			.expect(400);
+	});
+
+	it('E2E-AUTH-03: POST /api/admin/auth/logout returns ok without session', async () => {
+		const response = await request(app.getHttpServer() as App)
+			.post('/api/admin/auth/logout')
+			.expect(200);
+		expect(response.body).toEqual({ ok: true });
 	});
 
 	it('GET /admin does not hit admin API controller (no JSON stub)', async () => {

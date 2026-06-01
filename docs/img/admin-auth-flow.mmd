@@ -1,0 +1,26 @@
+sequenceDiagram
+    participant Op as Operator browser
+    participant Web as React /admin/login
+    participant API as NestJS admin-auth
+    participant DB as AdminUser table
+
+    Op->>Web: Enter username + password
+    Web->>API: POST /api/admin/auth/login
+    API->>DB: Find AdminUser by username
+    DB-->>API: passwordHash (or null)
+    API->>API: verifyPasswordTimingSafe (bcrypt)
+    alt valid credentials
+        API->>API: Sign session cookie (HMAC + SESSION_SECRET)
+        API-->>Web: Set-Cookie nestidp_admin_session + { ok, admin }
+        Web->>Web: navigate /admin
+        Web->>API: GET /api/admin/auth/me (credentials)
+        API-->>Web: { admin }
+        Web->>API: GET /api/admin (credentials)
+        API-->>Web: dashboard stub + counts
+    else invalid credentials
+        API-->>Web: 401 Invalid credentials
+    end
+
+    Op->>Web: Logout
+    Web->>API: POST /api/admin/auth/logout
+    API-->>Web: Clear cookie + { ok: true }

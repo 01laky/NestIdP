@@ -4,6 +4,33 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.3.0]
+
+### Added
+
+- Admin bootstrap: seed first `AdminUser` from env when table empty; `IdpSettings` singleton from `IDP_BASE_URL`
+- `run-bootstrap.ts` shared by API startup and `prisma db seed`
+- `admin-auth` module: `POST /api/admin/auth/login|logout`, `GET /api/admin/auth/me`
+- Signed HTTP-only session cookie (`nestidp_admin_session`), `AdminAuthGuard`
+- `PasswordService` + timing-safe `verifyPasswordTimingSafe` (bcrypt cost 12)
+- Production bootstrap guard — rejects weak/default first admin password
+- `LoginRateLimiterService` — in-memory brute-force protection on login
+- `BCRYPT_COST_FACTOR`, admin auth DTOs, `ApiErrorResponseDto` in `@nestidp/shared`
+- `AdminLoginPage` at `/admin/login`, session gate in `AdminLayout`, `adminApi.ts` fetch wrapper
+- Stale session invalidation when admin row deleted; cookie cleared on 401 in web
+- `createTestAdminUserWithPassword` test fixture
+- ER-adjacent diagram `docs/img/admin-auth-flow.mmd` + SVG
+- Integration tests: bootstrap (API-BST-\*), admin auth SQLite + PostgreSQL smoke
+
+### Changed
+
+- `GET /api/admin` requires authenticated admin session
+- `BootstrapService` performs idempotent seeding on startup
+- `.env.example`, README, `docs/database.md`, `docs/development.md` — bootstrap + admin login workflow
+- Proposal Phase 1: Admin authentication (local) marked complete
+- E2E routing tests expect 401 without session on admin API
+- Expanded edge-case tests for v0.3.0 admin auth — **329** tests (5 PostgreSQL smoke skipped locally)
+
 ## [0.2.0]
 
 ### Added

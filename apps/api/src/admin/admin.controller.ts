@@ -1,8 +1,10 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, UseGuards } from '@nestjs/common';
 import { API_CONNECTION_ROUTE_PREFIX, type AdminStubResponseDto } from '@nestidp/shared';
+import { AdminAuthGuard } from '../admin-auth/admin-auth.guard';
 import { AdminStatsService } from './admin-stats.service';
 
 @Controller('api/admin')
+@UseGuards(AdminAuthGuard)
 export class AdminController {
 	constructor(private readonly adminStatsService: AdminStatsService) {}
 

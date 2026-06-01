@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { DEFAULT_PASSWORD_HASH_ALGORITHM } from '@nestidp/shared';
 import {
 	createTestAdminUser,
+	createTestAdminUserWithPassword,
 	createTestApiConnection,
 	createTestGroup,
 	createTestIdpSettings,
@@ -165,5 +166,42 @@ describe('test-fixtures', () => {
 				entityId: 'https://idp.example.com',
 			}),
 		});
+	});
+
+	it('API-FIX-12: createTestAdminUserWithPassword stores bcrypt hash', async () => {
+		const prisma = {
+			adminUser: { create: jest.fn().mockResolvedValue({ id: 'admin-1' }) },
+		};
+		await createTestAdminUserWithPassword(
+			prisma as unknown as PrismaClient,
+			'fixture-admin',
+			'known-password',
+		);
+		expect(prisma.adminUser.create).toHaveBeenCalledWith({
+			data: expect.objectContaining({
+				username: 'fixture-admin',
+				passwordHash: expect.stringMatching(/^\$2/),
+			}),
+		});
+	});
+
+	it('API-FIX-13: createTestAdminUserWithPassword hash verifies with known plaintext', async () => {
+		const { verifyPassword } = await import('../admin-auth/password.util');
+		let capturedHash = '';
+		const prisma = {
+			adminUser: {
+				create: jest.fn().mockImplementation(({ data }: { data: { passwordHash: string } }) => {
+					capturedHash = data.passwordHash;
+					return { id: 'admin-1', username: 'fixture-admin' };
+				}),
+			},
+		};
+		await createTestAdminUserWithPassword(
+			prisma as unknown as PrismaClient,
+			'fixture-admin',
+			'super-secret-pass',
+		);
+		expect(await verifyPassword('super-secret-pass', capturedHash)).toBe(true);
+		expect(await verifyPassword('wrong', capturedHash)).toBe(false);
 	});
 });

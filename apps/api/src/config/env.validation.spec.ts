@@ -142,4 +142,13 @@ describe('validateEnv', () => {
 		expect(result.ADMIN_PASSWORD).toBeUndefined();
 		expect(result.PORT).toBeUndefined();
 	});
+
+	it('allows optional ADMIN_SESSION_TTL_SECONDS as positive integer', () => {
+		const result = validateEnv({ ...validConfig, ADMIN_SESSION_TTL_SECONDS: '3600' });
+		expect(result.ADMIN_SESSION_TTL_SECONDS).toBe(3600);
+	});
+
+	it('rejects invalid ADMIN_SESSION_TTL_SECONDS', () => {
+		expect(() => validateEnv({ ...validConfig, ADMIN_SESSION_TTL_SECONDS: '0' })).toThrow();
+	});
 });

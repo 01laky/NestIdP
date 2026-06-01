@@ -12,6 +12,7 @@ import type {
 	User,
 } from '@prisma/client';
 import { DEFAULT_PASSWORD_HASH_ALGORITHM } from '@nestidp/shared';
+import { hashPassword } from '../admin-auth/password.util';
 
 export const TEST_ENCRYPTED_CREDENTIALS = 'test-encrypted-token';
 export const TEST_PASSWORD_HASH = '$2b$12$test.hash.for.integration.tests.only';
@@ -119,6 +120,22 @@ export async function createTestAdminUser(
 		data: {
 			username: `admin-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
 			passwordHash: TEST_PASSWORD_HASH,
+			...overrides,
+		},
+	});
+}
+
+export async function createTestAdminUserWithPassword(
+	prisma: PrismaClient,
+	username: string,
+	plaintextPassword: string,
+	overrides: AdminUserOverrides = {},
+): Promise<AdminUser> {
+	const passwordHash = await hashPassword(plaintextPassword);
+	return prisma.adminUser.create({
+		data: {
+			username,
+			passwordHash,
 			...overrides,
 		},
 	});

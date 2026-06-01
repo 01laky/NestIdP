@@ -1,6 +1,6 @@
 {
 	"name": "nest-idp",
-	"version": "0.2.0",
+	"version": "0.3.0",
 	"private": true,
 	"packageManager": "pnpm@9.15.9",
 	"engines": {
@@ -16,6 +16,7 @@
 		"format": "prettier --write \"**/*.{ts,tsx,js,json,md}\"",
 		"diagrams:build": "node scripts/build-diagrams.mjs",
 		"diagrams:check": "node scripts/check-diagrams.mjs",
+		"setup:githooks": "sh scripts/setup-githooks.sh",
 		"db:migrate": "pnpm --filter @nestidp/api prisma:migrate",
 		"db:migrate:deploy": "pnpm --filter @nestidp/api prisma:migrate:deploy"
 	},
