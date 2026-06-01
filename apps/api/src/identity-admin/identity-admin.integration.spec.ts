@@ -213,4 +213,45 @@ describe('Identity admin API (SQLite)', () => {
 		expect(res.body.items).toHaveLength(1);
 		expect(res.body.total).toBeGreaterThanOrEqual(2);
 	});
+
+	it('API-IDN-ADM-16: list users never exposes passwordHash', async () => {
+		const conn = await createTestApiConnection(prisma, { name: 'Secret API' });
+		await createTestUser(prisma, conn.id, { username: 'secret-user' });
+		const agent = await adminAgent();
+		const res = await agent.get(IDENTITY_USERS_API_PATH).expect(200);
+		for (const row of res.body.items) {
+			expect(row.passwordHash).toBeUndefined();
+			expect(row.passwordHashAlgorithm).toBeUndefined();
+		}
+	});
+
+	it('API-IDN-ADM-17: user detail never exposes passwordHash', async () => {
+		const conn = await createTestApiConnection(prisma, { name: 'Detail Secret API' });
+		const user = await createTestUser(prisma, conn.id, { username: 'detail-secret' });
+		const agent = await adminAgent();
+		const res = await agent.get(`${IDENTITY_USERS_API_PATH}/${user.id}`).expect(200);
+		expect(res.body.user.passwordHash).toBeUndefined();
+		expect(JSON.stringify(res.body)).not.toContain('passwordHash');
+	});
+
+	it('API-IDN-ADM-18: inactive user listed with active false', async () => {
+		const conn = await createTestApiConnection(prisma, { name: 'Inactive API' });
+		await createTestUser(prisma, conn.id, { username: 'inactive-user', active: false });
+		const agent = await adminAgent();
+		const res = await agent.get(IDENTITY_USERS_API_PATH).expect(200);
+		const row = res.body.items.find((u: { username: string }) => u.username === 'inactive-user');
+		expect(row?.active).toBe(false);
+	});
+
+	it('API-IDN-ADM-19: list groups without session → 401', async () => {
+		await request(app.getHttpServer() as App)
+			.get(IDENTITY_GROUPS_API_PATH)
+			.expect(401);
+	});
+
+	it('API-IDN-ADM-20: list roles without session → 401', async () => {
+		await request(app.getHttpServer() as App)
+			.get(IDENTITY_ROLES_API_PATH)
+			.expect(401);
+	});
 });

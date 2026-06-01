@@ -433,4 +433,257 @@ describe('SP connections admin API (SQLite)', () => {
 			.expect(200);
 		expect(res.body.item.attributeMapping).toBeNull();
 	});
+
+	it('API-SPC-23: list ordered by createdAt asc', async () => {
+		const first = await createTestSpConnection(prisma, { name: 'Order First' });
+		const second = await createTestSpConnection(prisma, { name: 'Order Second' });
+		await prisma.spConnection.update({
+			where: { id: first.id },
+			data: { createdAt: new Date('2020-01-01T00:00:00.000Z') },
+		});
+		await prisma.spConnection.update({
+			where: { id: second.id },
+			data: { createdAt: new Date('2021-01-01T00:00:00.000Z') },
+		});
+		const agent = await adminAgent();
+		const res = await agent.get(SP_CONNECTIONS_API_PATH).expect(200);
+		const ids = res.body.items.map((item: { id: string }) => item.id);
+		expect(ids.indexOf(first.id)).toBeLessThan(ids.indexOf(second.id));
+	});
+
+	it('API-SPC-24: POST create with attributeMapping round-trip GET', async () => {
+		const mapping = {
+			nameId: { source: 'username' as const },
+			attributes: [{ samlName: 'uid', source: 'username' as const }],
+		};
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		const created = await agent
+			.post(SP_CONNECTIONS_API_PATH)
+			.set(csrfHeader(csrf))
+			.send({
+				name: 'Mapped SP',
+				spEntityId: 'urn:sp:mapped-create',
+				acsUrl: 'https://sp.example.com/acs/mapped',
+				attributeMapping: mapping,
+			})
+			.expect(201);
+		const detail = await agent
+			.get(`${SP_CONNECTIONS_API_PATH}/${created.body.item.id}`)
+			.expect(200);
+		expect(detail.body.attributeMapping).toEqual(mapping);
+	});
+
+	it('API-SPC-25: POST attributeMapping nameId override round-trip', async () => {
+		const mapping = {
+			nameId: {
+				source: 'email' as const,
+				format: 'urn:oasis:names:tc:SAML:2.0:nameid-format:persistent',
+			},
+		};
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		const created = await agent
+			.post(SP_CONNECTIONS_API_PATH)
+			.set(csrfHeader(csrf))
+			.send({
+				name: 'NameID SP',
+				spEntityId: 'urn:sp:nameid-override',
+				acsUrl: 'https://sp.example.com/acs/nameid',
+				attributeMapping: mapping,
+			})
+			.expect(201);
+		expect(created.body.item.attributeMapping).toEqual(mapping);
+	});
+
+	it('API-SPC-26: PATCH deactivate then SSO redirect → 400', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		const created = await agent
+			.post(SP_CONNECTIONS_API_PATH)
+			.set(csrfHeader(csrf))
+			.send({
+				name: 'Deactivate SSO',
+				spEntityId: 'urn:sp:deactivate-sso',
+				acsUrl: 'https://sp.example.com/acs/deact',
+			})
+			.expect(201);
+		await agent
+			.patch(`${SP_CONNECTIONS_API_PATH}/${created.body.item.id}`)
+			.set(csrfHeader(csrf))
+			.send({ active: false })
+			.expect(200);
+		const { samlRequest } = buildTestAuthnRequestRedirectPayload({
+			issuer: 'urn:sp:deactivate-sso',
+		});
+		await request(app.getHttpServer() as App)
+			.get(`/saml/sso?${SAML_REQUEST_QUERY_PARAM}=${samlRequest}`)
+			.expect(400);
+	});
+
+	it('API-SPC-27: POST http acsUrl allowed in test env', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		const res = await agent
+			.post(SP_CONNECTIONS_API_PATH)
+			.set(csrfHeader(csrf))
+			.send({
+				name: 'HTTP ACS',
+				spEntityId: 'urn:sp:http-acs',
+				acsUrl: 'http://sp.example.com/acs',
+			})
+			.expect(201);
+		expect(res.body.item.acsUrl).toBe('http://sp.example.com/acs');
+	});
+
+	it('API-SPC-28: POST spCertificate PEM → hasSpCertificate true, GET omits PEM', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		const created = await agent
+			.post(SP_CONNECTIONS_API_PATH)
+			.set(csrfHeader(csrf))
+			.send({
+				name: 'Cert SP',
+				spEntityId: 'urn:sp:with-cert',
+				acsUrl: 'https://sp.example.com/acs/cert',
+				spCertificate: VALID_PEM,
+			})
+			.expect(201);
+		expect(created.body.item.hasSpCertificate).toBe(true);
+		expect(created.body.item.spCertificate).toBeUndefined();
+		const detail = await agent
+			.get(`${SP_CONNECTIONS_API_PATH}/${created.body.item.id}`)
+			.expect(200);
+		expect(detail.body.hasSpCertificate).toBe(true);
+		expect(detail.body.spCertificate).toBeUndefined();
+	});
+
+	it('API-SPC-29: PATCH partial name only', async () => {
+		const sp = await createTestSpConnection(prisma, { name: 'Old Name' });
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		const res = await agent
+			.patch(`${SP_CONNECTIONS_API_PATH}/${sp.id}`)
+			.set(csrfHeader(csrf))
+			.send({ name: 'Renamed SP' })
+			.expect(200);
+		expect(res.body.item.name).toBe('Renamed SP');
+		expect(res.body.item.spEntityId).toBe(sp.spEntityId);
+	});
+
+	it('API-SPC-30: PATCH spEntityId conflict → 409', async () => {
+		const existing = await createTestSpConnection(prisma, { spEntityId: 'urn:sp:taken-entity' });
+		const target = await createTestSpConnection(prisma, { spEntityId: 'urn:sp:other-entity' });
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent
+			.patch(`${SP_CONNECTIONS_API_PATH}/${target.id}`)
+			.set(csrfHeader(csrf))
+			.send({ spEntityId: existing.spEntityId })
+			.expect(409);
+	});
+
+	it('API-SPC-31: DELETE unknown id → 404', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent
+			.delete(`${SP_CONNECTIONS_API_PATH}/clxxxxxxxxxxxxxxxxxxxxxxxxx`)
+			.set(csrfHeader(csrf))
+			.expect(404);
+	});
+
+	it('API-SPC-32: PATCH without admin session → 401', async () => {
+		const sp = await createTestSpConnection(prisma);
+		await request(app.getHttpServer() as App)
+			.patch(`${SP_CONNECTIONS_API_PATH}/${sp.id}`)
+			.send({ name: 'No Session' })
+			.expect(401);
+	});
+
+	it('API-SPC-33: create with active:false', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		const res = await agent
+			.post(SP_CONNECTIONS_API_PATH)
+			.set(csrfHeader(csrf))
+			.send({
+				name: 'Inactive SP',
+				spEntityId: 'urn:sp:inactive-create',
+				acsUrl: 'https://sp.example.com/acs/inactive',
+				active: false,
+			})
+			.expect(201);
+		expect(res.body.item.active).toBe(false);
+	});
+
+	it('API-SPC-34: name trim applied on create', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		const res = await agent
+			.post(SP_CONNECTIONS_API_PATH)
+			.set(csrfHeader(csrf))
+			.send({
+				name: '  Trimmed Name  ',
+				spEntityId: 'urn:sp:trim-name',
+				acsUrl: 'https://sp.example.com/acs/trim',
+			})
+			.expect(201);
+		expect(res.body.item.name).toBe('Trimmed Name');
+	});
+
+	it('API-SPC-35: acsUrl trailing slash normalized on create', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		const res = await agent
+			.post(SP_CONNECTIONS_API_PATH)
+			.set(csrfHeader(csrf))
+			.send({
+				name: 'Slash ACS',
+				spEntityId: 'urn:sp:slash-acs',
+				acsUrl: 'https://sp.example.com/acs/',
+			})
+			.expect(201);
+		expect(res.body.item.acsUrl).toBe('https://sp.example.com/acs');
+	});
+
+	it('API-SPC-36: default nameIdFormat applied on create', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		const res = await agent
+			.post(SP_CONNECTIONS_API_PATH)
+			.set(csrfHeader(csrf))
+			.send({
+				name: 'Default Format',
+				spEntityId: 'urn:sp:default-format',
+				acsUrl: 'https://sp.example.com/acs/format',
+			})
+			.expect(201);
+		expect(res.body.item.nameIdFormat).toBe(
+			'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
+		);
+	});
+
+	it('API-SPC-37: DELETE cascades SamlSession rows', async () => {
+		const sp = await createTestSpConnection(prisma, { active: false });
+		const session = await createTestSamlSession(prisma, sp.id);
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent.delete(`${SP_CONNECTIONS_API_PATH}/${sp.id}`).set(csrfHeader(csrf)).expect(200);
+		const gone = await prisma.samlSession.findUnique({ where: { id: session.id } });
+		expect(gone).toBeNull();
+	});
+
+	it('API-SPC-38: test-acs without CSRF → 403', async () => {
+		const sp = await createTestSpConnection(prisma);
+		const agent = await adminAgent();
+		await agent.post(`${SP_CONNECTIONS_API_PATH}/${sp.id}/test-acs`).expect(403);
+	});
+
+	it('API-SPC-39: deactivated SP still listed with active badge field', async () => {
+		const sp = await createTestSpConnection(prisma, { active: false, name: 'Inactive Listed' });
+		const agent = await adminAgent();
+		const res = await agent.get(SP_CONNECTIONS_API_PATH).expect(200);
+		const item = res.body.items.find((row: { id: string }) => row.id === sp.id);
+		expect(item?.active).toBe(false);
+	});
 });

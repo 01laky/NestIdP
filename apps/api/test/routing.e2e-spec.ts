@@ -4,7 +4,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { AUTH_API_PATH } from '@nestidp/shared';
+import { AUTH_API_PATH, SP_CONNECTIONS_API_PATH } from '@nestidp/shared';
 import { AdminModule } from '../src/admin/admin.module';
 import { AdminAuthModule } from '../src/admin-auth/admin-auth.module';
 import { AuthModule } from '../src/auth/auth.module';
@@ -254,6 +254,52 @@ describe('Routing (e2e)', () => {
 		expect(response.body.syncApiPath).toBe('/api/admin/sync');
 		expect(response.body.entityId).toBe('http://localhost:3000');
 		expect(response.body.metadataUrl).toContain('/saml/metadata');
+	});
+
+	it('E2E-ADM-08-02: GET /api/admin/sp-connections returns JSON with admin cookie', async () => {
+		const password = 'e2e-sp-admin-pass';
+		const { hashPassword } = await import('../src/admin-auth/password.util');
+		const passwordHash = await hashPassword(password);
+		prismaMock.adminUser.findUnique.mockImplementation(
+			async (args: { where: { username?: string; id?: string } }) => {
+				if (args.where.username === 'spadmin') {
+					return { id: 'admin-sp', username: 'spadmin', passwordHash };
+				}
+				if (args.where.id === 'admin-sp') {
+					return { id: 'admin-sp', username: 'spadmin', passwordHash };
+				}
+				return null;
+			},
+		);
+		prismaMock.spConnection.findMany.mockResolvedValue([
+			{
+				id: 'sp-1',
+				name: 'App',
+				spEntityId: 'urn:sp:app',
+				acsUrl: 'https://sp.example.com/acs',
+				nameIdFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
+				attributeMapping: null,
+				active: true,
+				spCertificate: null,
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			},
+		]);
+
+		const agent = request.agent(app.getHttpServer() as App);
+		await agent.post('/api/admin/auth/login').send({ username: 'spadmin', password }).expect(200);
+
+		const response = await agent.get(SP_CONNECTIONS_API_PATH).expect(200);
+		expect(response.headers['content-type']).toMatch(/application\/json/);
+		expect(response.body.items).toHaveLength(1);
+		expect(response.text).not.toContain('<!DOCTYPE html>');
+	});
+
+	it('E2E-ADM-08-05: GET /api/admin/sp-connections without session returns 401 JSON', async () => {
+		const response = await request(app.getHttpServer() as App).get(SP_CONNECTIONS_API_PATH);
+		expect(response.status).toBe(401);
+		expect(response.headers['content-type']).toMatch(/application\/json/);
+		expect(response.body?.module).not.toBe('admin');
 	});
 
 	it('GET /api/auth/session is separate from /api/admin', async () => {

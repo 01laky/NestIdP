@@ -97,4 +97,34 @@ describe('IdentityAdminService', () => {
 		expect(result.total).toBe(1);
 		expect(result.items).toHaveLength(1);
 	});
+
+	it('API-IDN-SVC-09: listUsers select omits password fields', async () => {
+		prisma.user.findMany.mockResolvedValue([]);
+		prisma.user.count.mockResolvedValue(0);
+
+		await service.listUsers();
+
+		const select = prisma.user.findMany.mock.calls[0][0].select as Record<string, boolean>;
+		expect(select.passwordHash).toBeUndefined();
+		expect(select.passwordHashAlgorithm).toBeUndefined();
+	});
+
+	it('API-IDN-SVC-10: getUserById select omits password fields', async () => {
+		prisma.user.findUnique.mockResolvedValue({
+			id: 'u1',
+			username: 'alice',
+			email: null,
+			displayName: null,
+			active: true,
+			externalId: 'ext-1',
+			apiConnectionId: 'conn-1',
+			groups: [],
+			roles: [],
+		});
+
+		await service.getUserById('u1');
+
+		const select = prisma.user.findUnique.mock.calls[0][0].select as Record<string, boolean>;
+		expect(select.passwordHash).toBeUndefined();
+	});
 });

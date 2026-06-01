@@ -217,4 +217,43 @@ describe('SpConnectionsService', () => {
 			}),
 		).rejects.toThrow(BadRequestException);
 	});
+
+	it('API-SPC-SVC-15: list returns items ordered by createdAt asc', async () => {
+		const older = {
+			...sampleRow,
+			id: 'c1111111111111111111111111',
+			createdAt: new Date('2020-01-01'),
+		};
+		const newer = {
+			...sampleRow,
+			id: 'c2222222222222222222222222',
+			createdAt: new Date('2021-01-01'),
+		};
+		prisma.spConnection.findMany.mockResolvedValue([older, newer]);
+
+		const result = await service.list();
+
+		expect(result.items[0]?.id).toBe(older.id);
+		expect(prisma.spConnection.findMany).toHaveBeenCalledWith(
+			expect.objectContaining({ orderBy: { createdAt: 'asc' } }),
+		);
+	});
+
+	it('API-SPC-SVC-16: create stores valid spCertificate PEM', async () => {
+		const pem = '-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----';
+		prisma.spConnection.create.mockResolvedValue({ ...sampleRow, spCertificate: pem });
+
+		await service.create({
+			name: 'Cert',
+			spEntityId: 'urn:sp:cert',
+			acsUrl: 'https://sp.example.com/acs',
+			spCertificate: pem,
+		});
+
+		expect(prisma.spConnection.create).toHaveBeenCalledWith(
+			expect.objectContaining({
+				data: expect.objectContaining({ spCertificate: pem }),
+			}),
+		);
+	});
 });

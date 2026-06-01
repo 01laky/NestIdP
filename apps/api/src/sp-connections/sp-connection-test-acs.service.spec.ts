@@ -72,4 +72,27 @@ describe('SpConnectionTestAcsService', () => {
 		const result = await service.testAcs(row.id);
 		expect(result.message).toContain('timed out');
 	});
+
+	it('API-SPC-TACS-07: only reads SP row (no writes)', async () => {
+		prisma.spConnection.findUnique.mockResolvedValue(row);
+		(global.fetch as jest.Mock).mockResolvedValue({ status: 200 });
+
+		await service.testAcs(row.id);
+
+		expect(prisma.spConnection.findUnique).toHaveBeenCalledTimes(1);
+		expect(prisma.spConnection.findUnique).toHaveBeenCalledWith({ where: { id: row.id } });
+	});
+
+	it('API-SPC-TACS-08: response never includes spCertificate', async () => {
+		prisma.spConnection.findUnique.mockResolvedValue({
+			...row,
+			spCertificate: '-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----',
+		});
+		(global.fetch as jest.Mock).mockResolvedValue({ status: 200 });
+
+		const result = await service.testAcs(row.id);
+
+		expect(result).not.toHaveProperty('spCertificate');
+		expect(JSON.stringify(result)).not.toContain('BEGIN CERTIFICATE');
+	});
 });

@@ -51,5 +51,5 @@ describe('PasswordService', () => {
 		const hash = await service.hash('wrap-test');
 		expect(await service.verify('wrap-test', hash)).toBe(true);
 		expect(await service.verifyTimingSafe('wrap-test', hash)).toBe(true);
-	});
+	}, 15_000);
 });

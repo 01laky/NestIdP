@@ -134,4 +134,23 @@ describe('Admin dashboard API (SQLite)', () => {
 		expect(res.body.spConnectionsRoute).toContain('sp-connections');
 		expect(res.body.identityUsersRoute).not.toContain('sp-connections');
 	});
+
+	it('API-ADM-DASH-07: lastSyncStatus and lastSyncAt from api connection row', async () => {
+		const finishedAt = new Date('2026-03-01T10:00:00.000Z');
+		await prisma.apiConnection.updateMany({
+			data: { lastSyncStatus: 'SUCCESS', lastSyncAt: finishedAt },
+		});
+		const agent = await adminAgent();
+		const res = await agent.get('/api/admin').expect(200);
+		expect(res.body.lastSyncStatus).toBe('SUCCESS');
+		expect(res.body.lastSyncAt).toBe(finishedAt.toISOString());
+	});
+
+	it('API-ADM-DASH-08: ssoUrl and syncApiPath present on dashboard', async () => {
+		const agent = await adminAgent();
+		const res = await agent.get('/api/admin').expect(200);
+		expect(res.body.ssoUrl).toBe('http://localhost:3000/saml/sso');
+		expect(res.body.syncApiPath).toBe('/api/admin/sync');
+		expect(res.body.spConnectionsApiPath).toContain('sp-connections');
+	});
 });
