@@ -28,16 +28,46 @@ describe('Routing (e2e)', () => {
 		group: { count: jest.fn().mockResolvedValue(0) },
 		role: { count: jest.fn().mockResolvedValue(0) },
 		apiConnection: { count: jest.fn().mockResolvedValue(0) },
-		spConnection: { count: jest.fn().mockResolvedValue(0) },
+		spConnection: {
+			count: jest.fn().mockResolvedValue(0),
+			findUnique: jest.fn(),
+			findMany: jest.fn().mockResolvedValue([]),
+		},
 		adminUser: {
 			findUnique: jest.fn(),
 		},
 		samlSession: {
 			findUnique: jest.fn(),
+			create: jest.fn(),
+			delete: jest.fn(),
+			deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+		},
+		idpSettings: {
+			findUnique: jest.fn(),
+			update: jest.fn(),
 		},
 	};
 
 	beforeAll(async () => {
+		const { encrypt } = await import('../src/encryption/encryption.util');
+		const { getTestSigningMaterial } = await import('../src/prisma/test-fixtures');
+		const { privateKeyPem, certPem } = getTestSigningMaterial('http://localhost:3000');
+		const signingKeyEncrypted = encrypt(privateKeyPem, 'test-encryption-key-32chars!!');
+		prismaMock.idpSettings.findUnique.mockResolvedValue({
+			id: 'default',
+			entityId: 'http://localhost:3000',
+			nameIdFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
+			signingCertPem: certPem,
+			signingKeyEncrypted,
+		});
+		prismaMock.idpSettings.update.mockImplementation(
+			async (args: { data: Record<string, unknown> }) => ({
+				id: 'default',
+				entityId: 'http://localhost:3000',
+				...args.data,
+			}),
+		);
+
 		const moduleFixture: TestingModule = await Test.createTestingModule({
 			imports: [
 				ConfigModule.forRoot({
@@ -107,23 +137,25 @@ describe('Routing (e2e)', () => {
 		expect(response.body.database).toBe('connected');
 	});
 
-	it('GET /saml/metadata returns 501 stub', async () => {
+	it('E2E-SAML-01: GET /saml/metadata returns 200 XML', async () => {
 		const response = await request(app.getHttpServer() as App)
 			.get('/saml/metadata')
-			.expect(501);
-		expect(response.body.status).toBe('not_implemented');
+			.expect(200);
+		expect(response.headers['content-type']).toMatch(/xml/);
+		expect(response.text).toContain('EntityDescriptor');
+		expect(response.body?.status).not.toBe('not_implemented');
 	});
 
-	it('GET /saml/sso returns 501 stub', async () => {
+	it('E2E-SAML-02: GET /saml/sso without SAMLRequest returns 400', async () => {
 		await request(app.getHttpServer() as App)
 			.get('/saml/sso')
-			.expect(501);
+			.expect(400);
 	});
 
-	it('POST /saml/sso returns 501 stub', async () => {
+	it('E2E-SAML-03: POST /saml/sso returns 405', async () => {
 		await request(app.getHttpServer() as App)
 			.post('/saml/sso')
-			.expect(501);
+			.expect(405);
 	});
 
 	it('GET /api/admin without session returns 401', async () => {
@@ -298,13 +330,19 @@ describe('Routing (e2e)', () => {
 		expect(response.status).toBe(200);
 	});
 
-	it('API-AUTH-E2E-06: POST /api/auth/login/complete-sso returns 501 JSON stub', async () => {
+	it('E2E-SAML-05: POST /api/auth/login/complete-sso without cookie returns 401', async () => {
 		const response = await request(app.getHttpServer() as App)
 			.post(`${AUTH_API_PATH}/login/complete-sso`)
 			.send({ samlSessionId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx' })
-			.expect(501);
+			.expect(401);
 		expect(response.headers['content-type']).toMatch(/application\/json/);
-		expect(response.body.status).toBe('not_implemented');
+	});
+
+	it('E2E-SAML-06: GET /api/auth/session still returns JSON', async () => {
+		const response = await request(app.getHttpServer() as App)
+			.get(`${AUTH_API_PATH}/session`)
+			.expect(200);
+		expect(response.headers['content-type']).toMatch(/application\/json/);
 	});
 
 	it('GET /admin does not hit admin API controller (no JSON stub)', async () => {

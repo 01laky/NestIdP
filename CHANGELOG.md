@@ -4,6 +4,37 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.7.0]
+
+### Added
+
+- **Custom `SamlModule`** — SP-initiated SSO (HTTP-Redirect in, HTTP-POST out)
+- **`GET /saml/metadata`** — SAML 2.0 IdP metadata with signing cert, NameID formats, optional AttributeConsumingService
+- **`GET /saml/sso`** — parse `SAMLRequest`, create `SamlSession`, redirect to `/login?samlSessionId=`
+- **`POST /api/auth/login/complete-sso`** — signed `SAMLResponse` as auto-submit HTML (requires end-user session)
+- **`SamlRequestParserService`**, **`SamlResponseBuilderService`**, **`SamlMetadataService`**, **`SamlPostBindingService`**, **`IdpSigningService`**, **`SamlAttributeMapperService`**, **`SamlSsoService`**, **`SamlSessionCleanupService`**, **`SamlAuthAuditService`**
+- Read-only admin API: **`GET /api/admin/sp-connections`**, **`GET /api/admin/sp-connections/:id`**, **`GET /api/admin/idp/metadata-url`**
+- Shared SAML types/constants in **`packages/shared/src/saml.ts`**; **`readyToComplete`** on session probe
+- XML stack: `xmlbuilder2`, `xml-crypto`, `@xmldom/xmldom`, `xpath`
+- **`docs/examples/saml-sp-initiated-redirect.mjs`** — manual SP redirect URL builder
+- **`verifySamlXmlSignature`** test helper; integration tests with cryptographic signature verification
+- Env: **`SAML_ASSERTION_TTL_SECONDS`**, **`SAML_SESSION_TTL_SECONDS`**, **`SAML_CLOCK_SKEW_SECONDS`**, **`SAML_METADATA_INCLUDE_ACS`**, **`SAML_SESSION_CLEANUP_INTERVAL_MS`**
+- Web: **`completeSsoLogin`** returns HTML; **`LoginPage`** auto-complete SSO when bound / `readyToComplete`
+- **`adminApi`**: `listSpConnections`, `getSpConnection`, `getIdpMetadataUrl`
+
+### Changed
+
+- Lazy auto-generation of IdP signing key when `IdpSettings` cert/key missing (encrypted at rest)
+- `SamlSession` deleted after successful complete-sso (one-time assertion delivery)
+- SSO diagram and docs updated for full v0.7 flow
+- Expanded SAML edge-case tests — **752** total via `pnpm test` (648 API Jest + 29 API e2e + 66 web + shared; 9 PostgreSQL smoke skipped locally)
+
+### Security
+
+- **`complete-sso`** requires **`EndUserAuthGuard`** (no unauthenticated assertion issuance)
+- HTML POST binding escapes ACS URL and RelayState; assertion only in base64 hidden field
+- SAML audit events omit XML bodies and private keys
+
 ## [0.6.0]
 
 ### Added

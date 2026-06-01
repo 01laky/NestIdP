@@ -6,6 +6,8 @@ import {
 	createTestApiConnection,
 	createTestGroup,
 	createTestIdpSettings,
+	createTestIdpSettingsWithSigningKey,
+	buildTestAuthnRequestRedirectPayload,
 	createTestRole,
 	createTestSamlSession,
 	createTestSpConnection,
@@ -247,5 +249,37 @@ describe('test-fixtures', () => {
 
 		expect(stored.startsWith('v1:')).toBe(true);
 		expect(decrypt(stored, TEST_ENCRYPTION_KEY)).toBe('fixture-plain-token');
+	});
+
+	it('API-FIX-16: createTestIdpSettingsWithSigningKey stores cert and encrypted key', async () => {
+		const prisma = {
+			idpSettings: {
+				upsert: jest.fn().mockResolvedValue({
+					id: 'default',
+					signingCertPem: 'cert',
+					signingKeyEncrypted: 'enc',
+				}),
+			},
+		};
+		await createTestIdpSettingsWithSigningKey(prisma as unknown as PrismaClient, {
+			entityId: 'http://idp.test',
+		});
+		expect(prisma.idpSettings.upsert).toHaveBeenCalledWith(
+			expect.objectContaining({
+				where: { id: 'default' },
+				create: expect.objectContaining({
+					signingCertPem: expect.stringContaining('BEGIN CERTIFICATE'),
+					signingKeyEncrypted: expect.stringMatching(/^v1:/),
+				}),
+			}),
+		);
+	});
+
+	it('API-FIX-17: buildTestAuthnRequestRedirectPayload returns encoded SAMLRequest', () => {
+		const payload = buildTestAuthnRequestRedirectPayload({
+			issuer: 'urn:fixture:sp',
+		});
+		expect(payload.samlRequest.length).toBeGreaterThan(10);
+		expect(decodeURIComponent(payload.samlRequest)).toBeTruthy();
 	});
 });

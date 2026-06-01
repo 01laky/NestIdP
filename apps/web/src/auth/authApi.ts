@@ -1,5 +1,4 @@
 import type {
-	CompleteSsoNotImplementedResponseDto,
 	EndUserLoginRequestDto,
 	EndUserLoginResponseDto,
 	EndUserLogoutResponseDto,
@@ -77,9 +76,7 @@ export function getEndUserSession(
 	return authFetch<EndUserSessionStatusResponseDto>(`${AUTH_API_PATH}/session${query}`);
 }
 
-export async function completeSsoLogin(
-	samlSessionId: string,
-): Promise<CompleteSsoNotImplementedResponseDto> {
+export async function completeSsoLogin(samlSessionId: string): Promise<string> {
 	const response = await fetch(`${AUTH_API_PATH}/login/complete-sso`, {
 		method: 'POST',
 		credentials: 'include',
@@ -87,15 +84,10 @@ export async function completeSsoLogin(
 		body: JSON.stringify({ samlSessionId }),
 	});
 
-	// Prompt 07 stub — 501 is the expected success shape for this endpoint
-	if (response.status === 501) {
-		return (await response.json()) as CompleteSsoNotImplementedResponseDto;
-	}
-
 	if (!response.ok) {
 		const error = await parseErrorResponse(response);
 		throw new AuthApiError(error.statusCode, error.message);
 	}
 
-	return (await response.json()) as CompleteSsoNotImplementedResponseDto;
+	return response.text();
 }

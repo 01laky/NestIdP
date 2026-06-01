@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ADMIN_CSRF_HEADER_NAME, API_CONNECTIONS_API_PATH, SYNC_API_PATH } from '@nestidp/shared';
+import {
+	ADMIN_CSRF_HEADER_NAME,
+	API_CONNECTIONS_API_PATH,
+	IDP_METADATA_URL_API_PATH,
+	SP_CONNECTIONS_API_PATH,
+	SYNC_API_PATH,
+} from '@nestidp/shared';
 import {
 	AdminApiError,
 	adminFetch,
@@ -18,6 +24,9 @@ import {
 	triggerIdentitySync,
 	updateApiConnection,
 	getAdminMe,
+	getIdpMetadataUrl,
+	getSpConnection,
+	listSpConnections,
 } from './adminApi';
 
 describe('adminApi', () => {
@@ -411,5 +420,45 @@ describe('adminApi', () => {
 			name: 'AdminApiError',
 			statusCode: 404,
 		});
+	});
+
+	it('WEB-ADM-SAML-01: listSpConnections GETs admin SP path', async () => {
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ items: [] }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		await listSpConnections();
+		expect(fetchMock).toHaveBeenCalledWith(
+			SP_CONNECTIONS_API_PATH,
+			expect.objectContaining({ credentials: 'include' }),
+		);
+	});
+
+	it('WEB-ADM-SAML-02: getSpConnection GETs by id', async () => {
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ id: 'sp-1', spEntityId: 'urn:sp' }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		await getSpConnection('sp-1');
+		expect(fetchMock).toHaveBeenCalledWith(`${SP_CONNECTIONS_API_PATH}/sp-1`, expect.any(Object));
+	});
+
+	it('WEB-ADM-SAML-03: getIdpMetadataUrl GETs metadata helper', async () => {
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({
+				metadataUrl: 'http://localhost:3000/saml/metadata',
+				entityId: 'http://localhost:3000',
+				ssoUrl: 'http://localhost:3000/saml/sso',
+			}),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		await getIdpMetadataUrl();
+		expect(fetchMock).toHaveBeenCalledWith(IDP_METADATA_URL_API_PATH, expect.any(Object));
 	});
 });

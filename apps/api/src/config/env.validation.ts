@@ -164,6 +164,58 @@ export class EnvironmentVariables {
 	END_USER_LOGIN_RATE_LIMIT_USERNAME_WINDOW_MS?: number;
 
 	@IsOptional()
+	@Transform(({ value }) => {
+		if (value === undefined || value === null || value === '') {
+			return undefined;
+		}
+		const parsed = Number.parseInt(String(value), 10);
+		return Number.isFinite(parsed) ? parsed : value;
+	})
+	@IsInt()
+	@Min(1)
+	SAML_ASSERTION_TTL_SECONDS?: number;
+
+	@IsOptional()
+	@Transform(({ value }) => {
+		if (value === undefined || value === null || value === '') {
+			return undefined;
+		}
+		const parsed = Number.parseInt(String(value), 10);
+		return Number.isFinite(parsed) ? parsed : value;
+	})
+	@IsInt()
+	@Min(1)
+	SAML_SESSION_TTL_SECONDS?: number;
+
+	@IsOptional()
+	@Transform(({ value }) => {
+		if (value === undefined || value === null || value === '') {
+			return undefined;
+		}
+		const parsed = Number.parseInt(String(value), 10);
+		return Number.isFinite(parsed) ? parsed : value;
+	})
+	@IsInt()
+	@Min(1)
+	SAML_CLOCK_SKEW_SECONDS?: number;
+
+	@IsOptional()
+	@Transform(({ value }) => {
+		if (value === undefined || value === null || value === '') {
+			return undefined;
+		}
+		const parsed = Number.parseInt(String(value), 10);
+		return Number.isFinite(parsed) ? parsed : value;
+	})
+	@IsInt()
+	@Min(0)
+	SAML_SESSION_CLEANUP_INTERVAL_MS?: number;
+
+	@IsOptional()
+	@IsString()
+	SAML_METADATA_INCLUDE_ACS?: string;
+
+	@IsOptional()
 	@IsString()
 	PORT?: string;
 }

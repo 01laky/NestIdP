@@ -35,6 +35,7 @@ describe('end-user-auth shared', () => {
 				bound: false,
 				expired: false,
 				spActive: true,
+				readyToComplete: false,
 			},
 		};
 		expect(sample.samlSession?.bound).toBe(false);

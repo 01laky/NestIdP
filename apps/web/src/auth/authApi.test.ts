@@ -53,23 +53,31 @@ describe('authApi', () => {
 		);
 	});
 
-	it('WEB-AUTH-API-04: completeSsoLogin treats 501 as success body', async () => {
+	it('WEB-AUTH-API-04: completeSsoLogin returns HTML on 200', async () => {
 		const sessionId = 'clxxxxxxxxxxxxxxxxxxxxxxxxx';
+		const html = '<html><form><input name="SAMLResponse" value="abc"/></form></html>';
 		const fetchMock = vi.fn().mockResolvedValue({
-			ok: false,
-			status: 501,
-			json: async () => ({
-				status: 'not_implemented',
-				message: 'SAML response delivery is not implemented yet. See Prompt 07.',
-				samlSessionId: sessionId,
-			}),
+			ok: true,
+			status: 200,
+			text: async () => html,
 		});
 		vi.stubGlobal('fetch', fetchMock);
 
-		await expect(completeSsoLogin(sessionId)).resolves.toMatchObject({
-			status: 'not_implemented',
-			samlSessionId: sessionId,
+		await expect(completeSsoLogin(sessionId)).resolves.toBe(html);
+	});
+
+	it('WEB-AUTH-API-07: completeSsoLogin throws AuthApiError on 401', async () => {
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: false,
+			status: 401,
+			statusText: 'Unauthorized',
+			json: async () => ({ statusCode: 401, message: 'Unauthorized' }),
 		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		await expect(completeSsoLogin('clxxxxxxxxxxxxxxxxxxxxxxxxx')).rejects.toBeInstanceOf(
+			AuthApiError,
+		);
 	});
 
 	it('WEB-AUTH-API-05: loginEndUser surfaces 429 rate limit message', async () => {

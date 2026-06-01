@@ -20,6 +20,12 @@ describe('EndUserAuthService', () => {
 		samlSession: {
 			findUnique: jest.fn(),
 		},
+		idpSettings: {
+			findUnique: jest.fn(),
+		},
+	};
+	const idpSigningService = {
+		hasSigningMaterial: jest.fn().mockResolvedValue(true),
 	};
 	const audit = {
 		logLoginSuccess: jest.fn(),
@@ -32,6 +38,7 @@ describe('EndUserAuthService', () => {
 		identityRepository as never,
 		samlSessionBindService as never,
 		prisma as never,
+		idpSigningService as never,
 		audit as never,
 	);
 
@@ -179,6 +186,10 @@ describe('EndUserAuthService', () => {
 			expiresAt: new Date(Date.now() + 60_000),
 			spConnection: { active: true },
 		});
+		prisma.idpSettings.findUnique.mockResolvedValue({
+			id: 'default',
+			entityId: 'http://localhost:3000',
+		});
 
 		const status = await service.getSessionStatus({
 			userId: 'u1',
@@ -191,6 +202,7 @@ describe('EndUserAuthService', () => {
 			bound: true,
 			expired: false,
 			spActive: true,
+			readyToComplete: true,
 		});
 	});
 

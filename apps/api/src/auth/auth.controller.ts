@@ -16,7 +16,6 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import type {
-	CompleteSsoNotImplementedResponseDto,
 	EndUserLoginResponseDto,
 	EndUserLogoutResponseDto,
 	EndUserMeResponseDto,
@@ -25,6 +24,8 @@ import type {
 import { END_USER_SESSION_COOKIE_NAME } from '@nestidp/shared';
 import { EndUserAuthGuard } from './end-user-auth.guard';
 import type { EndUserAuthenticatedRequest } from './end-user-auth.types';
+import { SamlSsoService } from '../saml/saml-sso.service';
+import { EndUserAuthAuditService } from './end-user-auth-audit.service';
 import { EndUserAuthService } from './end-user-auth.service';
 import { EndUserSessionService } from './end-user-session.service';
 import { EndUserLoginRateLimiterService } from './end-user-login-rate-limiter.service';
@@ -39,6 +40,8 @@ export class AuthController {
 		private readonly endUserAuthService: EndUserAuthService,
 		private readonly endUserSessionService: EndUserSessionService,
 		private readonly rateLimiter: EndUserLoginRateLimiterService,
+		private readonly samlSsoService: SamlSsoService,
+		private readonly endUserAuthAudit: EndUserAuthAuditService,
 	) {}
 
 	@Post('login')
@@ -125,15 +128,28 @@ export class AuthController {
 	}
 
 	@Post('login/complete-sso')
-	@HttpCode(HttpStatus.NOT_IMPLEMENTED)
-	completeSso(
+	@HttpCode(HttpStatus.OK)
+	@UseGuards(EndUserAuthGuard)
+	async completeSso(
 		@Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
 		body: CompleteSsoBodyDto,
-	): CompleteSsoNotImplementedResponseDto {
-		return {
-			status: 'not_implemented',
-			message: 'SAML response delivery is not implemented yet. See Prompt 07.',
-			samlSessionId: body.samlSessionId,
-		};
+		@Req() req: EndUserAuthenticatedRequest,
+		@Res() res: Response,
+	): Promise<void> {
+		if (!req.endUser) {
+			throw new UnauthorizedException('Unauthorized');
+		}
+
+		const clientIp = req.ip ?? 'unknown';
+		try {
+			const html = await this.samlSsoService.completeSso(body.samlSessionId, req.endUser.id);
+			this.endUserAuthAudit.logSsoCompleteSuccess(body.samlSessionId, req.endUser.id, clientIp);
+			res.setHeader('Content-Type', 'text/html; charset=utf-8');
+			res.status(200).send(html);
+		} catch (error) {
+			const reason = error instanceof Error ? error.message : 'sso_complete_failed';
+			this.endUserAuthAudit.logSsoCompleteFailure(body.samlSessionId, clientIp, reason);
+			throw error;
+		}
 	}
 }

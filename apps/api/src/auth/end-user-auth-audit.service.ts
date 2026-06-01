@@ -63,4 +63,26 @@ export class EndUserAuthAuditService {
 			}),
 		);
 	}
+
+	logSsoCompleteSuccess(samlSessionId: string, userId: string, clientIp: string): void {
+		this.logger.log(
+			JSON.stringify({
+				event: 'end_user_sso_complete_success',
+				samlSessionId,
+				userId,
+				clientIp,
+			}),
+		);
+	}
+
+	logSsoCompleteFailure(samlSessionId: string, clientIp: string, reason: string): void {
+		this.logger.warn(
+			JSON.stringify({
+				event: 'end_user_sso_complete_failure',
+				samlSessionId,
+				clientIp,
+				reason,
+			}),
+		);
+	}
 }

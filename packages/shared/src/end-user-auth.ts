@@ -62,9 +62,12 @@ export interface EndUserSessionStatusResponseDto {
 		bound: boolean;
 		expired: boolean;
 		spActive: boolean;
+		/** True when authenticated user may POST complete-sso successfully. */
+		readyToComplete: boolean;
 	} | null;
 }
 
+/** @deprecated v0.7.0 returns text/html from complete-sso — do not use in new code. */
 export interface CompleteSsoNotImplementedResponseDto {
 	status: 'not_implemented';
 	message: string;

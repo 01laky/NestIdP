@@ -16,7 +16,14 @@ import type {
 	TriggerSyncResponseDto,
 	UpdateApiConnectionRequestDto,
 } from '@nestidp/shared';
-import { ADMIN_CSRF_HEADER_NAME, API_CONNECTIONS_API_PATH, SYNC_API_PATH } from '@nestidp/shared';
+import type { IdpMetadataUrlResponseDto, SpConnectionListResponseDto } from '@nestidp/shared';
+import {
+	ADMIN_CSRF_HEADER_NAME,
+	API_CONNECTIONS_API_PATH,
+	IDP_METADATA_URL_API_PATH,
+	SP_CONNECTIONS_API_PATH,
+	SYNC_API_PATH,
+} from '@nestidp/shared';
 
 export class AdminApiError extends Error {
 	constructor(
@@ -175,4 +182,18 @@ export function listSyncLogs(
 
 export function getSyncLog(syncLogId: string): Promise<SyncLogResponseDto> {
 	return adminFetch<SyncLogResponseDto>(`${SYNC_API_PATH}/logs/${syncLogId}`);
+}
+
+export function listSpConnections(): Promise<SpConnectionListResponseDto> {
+	return adminFetch<SpConnectionListResponseDto>(SP_CONNECTIONS_API_PATH);
+}
+
+export function getSpConnection(id: string): Promise<SpConnectionListResponseDto['items'][number]> {
+	return adminFetch<SpConnectionListResponseDto['items'][number]>(
+		`${SP_CONNECTIONS_API_PATH}/${id}`,
+	);
+}
+
+export function getIdpMetadataUrl(): Promise<IdpMetadataUrlResponseDto> {
+	return adminFetch<IdpMetadataUrlResponseDto>(IDP_METADATA_URL_API_PATH);
 }

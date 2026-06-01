@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { SAML_SESSION_QUERY_PARAM } from '@nestidp/shared';
 import { AuthApiError, completeSsoLogin, getEndUserSession, loginEndUser } from '../auth/authApi';
@@ -12,9 +12,35 @@ export function LoginPage() {
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [success, setSuccess] = useState<string | null>(null);
-	const [ssoStubMessage, setSsoStubMessage] = useState<string | null>(null);
+	const [ssoError, setSsoError] = useState<string | null>(null);
+	const [ssoRedirecting, setSsoRedirecting] = useState(false);
 	const [sessionBanner, setSessionBanner] = useState<string | null>(null);
 	const [samlSessionBound, setSamlSessionBound] = useState(false);
+	const [readyToComplete, setReadyToComplete] = useState(false);
+	const autoCompleteAttempted = useRef(false);
+
+	const submitSsoHtml = useCallback((html: string) => {
+		document.open();
+		document.write(html);
+		document.close();
+	}, []);
+
+	const runCompleteSso = useCallback(
+		async (sessionId: string) => {
+			setSsoError(null);
+			setSsoRedirecting(true);
+			try {
+				const html = await completeSsoLogin(sessionId);
+				submitSsoHtml(html);
+			} catch (err) {
+				const message = err instanceof AuthApiError ? err.message : 'Could not continue SSO.';
+				setSsoError(message);
+			} finally {
+				setSsoRedirecting(false);
+			}
+		},
+		[submitSsoHtml],
+	);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -32,6 +58,16 @@ export function LoginPage() {
 				} else if (status.samlSession && !status.samlSession.spActive) {
 					setSessionBanner('Service provider connection is inactive.');
 				}
+				setReadyToComplete(status.samlSession?.readyToComplete ?? false);
+
+				if (
+					status.samlSession?.readyToComplete &&
+					samlSessionId &&
+					!autoCompleteAttempted.current
+				) {
+					autoCompleteAttempted.current = true;
+					await runCompleteSso(samlSessionId);
+				}
 			} catch {
 				// ignore probe errors on mount
 			}
@@ -39,14 +75,14 @@ export function LoginPage() {
 		return () => {
 			cancelled = true;
 		};
-	}, [samlSessionId]);
+	}, [samlSessionId, runCompleteSso]);
 
 	async function handleSubmit(event: FormEvent) {
 		event.preventDefault();
 		setLoading(true);
 		setError(null);
 		setSuccess(null);
-		setSsoStubMessage(null);
+		setSsoError(null);
 		try {
 			const result = await loginEndUser({
 				username,
@@ -54,10 +90,10 @@ export function LoginPage() {
 				samlSessionId,
 			});
 			setSamlSessionBound(result.samlSessionBound);
-			if (result.samlSessionBound) {
-				setSuccess(
-					'SSO session ready. Continue to your application when SAML delivery is enabled.',
-				);
+			if (result.samlSessionBound && samlSessionId) {
+				setSuccess('SSO session ready. Redirecting to your application…');
+				autoCompleteAttempted.current = true;
+				await runCompleteSso(samlSessionId);
 			} else {
 				setSuccess(`Signed in as ${result.user.username}`);
 			}
@@ -70,26 +106,13 @@ export function LoginPage() {
 		}
 	}
 
-	async function handleContinueSso() {
-		if (!samlSessionId) {
-			return;
-		}
-		setSsoStubMessage(null);
-		try {
-			const body = await completeSsoLogin(samlSessionId);
-			setSsoStubMessage(`${body.message} (session ${body.samlSessionId})`);
-		} catch (err) {
-			const message = err instanceof AuthApiError ? err.message : 'Could not continue SSO.';
-			setSsoStubMessage(message);
-		}
-	}
-
 	return (
 		<div className="layout">
 			<div className="card">
 				<h1>SAML Login</h1>
 				<p className="muted">Sign in with credentials synced from your identity API.</p>
 				{sessionBanner ? <p className="muted">{sessionBanner}</p> : null}
+				{ssoRedirecting ? <p className="muted">Redirecting to application…</p> : null}
 				<form onSubmit={handleSubmit}>
 					<p>
 						<label>
@@ -100,7 +123,7 @@ export function LoginPage() {
 								autoComplete="username"
 								value={username}
 								onChange={(e) => setUsername(e.target.value)}
-								disabled={loading}
+								disabled={loading || ssoRedirecting}
 							/>
 						</label>
 					</p>
@@ -114,24 +137,28 @@ export function LoginPage() {
 								autoComplete="current-password"
 								value={password}
 								onChange={(e) => setPassword(e.target.value)}
-								disabled={loading}
+								disabled={loading || ssoRedirecting}
 							/>
 						</label>
 					</p>
-					<button type="submit" disabled={loading}>
+					<button type="submit" disabled={loading || ssoRedirecting}>
 						{loading ? 'Signing in…' : 'Sign in'}
 					</button>
 				</form>
 				{error ? <p role="alert">{error}</p> : null}
 				{success ? <p>{success}</p> : null}
-				{samlSessionBound && samlSessionId ? (
+				{(samlSessionBound || readyToComplete) && samlSessionId ? (
 					<p>
-						<button type="button" onClick={() => void handleContinueSso()}>
+						<button
+							type="button"
+							disabled={ssoRedirecting}
+							onClick={() => void runCompleteSso(samlSessionId)}
+						>
 							Continue to application
 						</button>
 					</p>
 				) : null}
-				{ssoStubMessage ? <p className="muted">{ssoStubMessage}</p> : null}
+				{ssoError ? <p role="alert">{ssoError}</p> : null}
 				<p>
 					<Link to="/admin">Back to admin</Link>
 				</p>

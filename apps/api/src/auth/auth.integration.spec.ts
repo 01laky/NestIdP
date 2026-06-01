@@ -14,6 +14,7 @@ import {
 	END_USER_SESSION_COOKIE_NAME,
 } from '@nestidp/shared';
 import { AdminAuthModule } from '../admin-auth/admin-auth.module';
+import { EncryptionModule } from '../encryption/encryption.module';
 import { EndUserLoginRateLimiterService } from './end-user-login-rate-limiter.service';
 import { AuthModule } from './auth.module';
 import { PrismaModule } from '../prisma/prisma.module';
@@ -21,6 +22,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import {
 	createTestAdminUserWithPassword,
 	createTestApiConnection,
+	createTestIdpSettingsWithSigningKey,
 	createTestSamlSession,
 	createTestSpConnection,
 	createTestUserWithPassword,
@@ -65,6 +67,7 @@ describe('end-user auth integration (SQLite)', () => {
 					],
 				}),
 				PrismaModule,
+				EncryptionModule,
 				AuthModule,
 				AdminAuthModule,
 			],
@@ -82,6 +85,7 @@ describe('end-user auth integration (SQLite)', () => {
 		connectionId = connection.id;
 		const sp = await createTestSpConnection(prisma);
 		spConnectionId = sp.id;
+		await createTestIdpSettingsWithSigningKey(prisma, { entityId: 'http://localhost:3000' });
 		await createTestUserWithPassword(prisma, connectionId, 'alice', endUserPassword);
 		await createTestAdminUserWithPassword(prisma, 'admin', adminPassword);
 	});
@@ -388,6 +392,7 @@ describe('end-user auth integration (SQLite)', () => {
 			.get(`${AUTH_API_PATH}/session?samlSessionId=${session.id}`)
 			.expect(200);
 		expect(status.body.samlSession?.bound).toBe(true);
+		expect(status.body.samlSession?.readyToComplete).toBe(true);
 	});
 
 	it('API-AUTH-INT-28: username lookup is case-sensitive', async () => {
@@ -525,24 +530,19 @@ describe('end-user auth integration (SQLite)', () => {
 			.expect(429);
 	});
 
-	it('API-AUTH-INT-40: POST /login/complete-sso returns 501 stub', async () => {
+	it('API-AUTH-INT-40: POST /login/complete-sso without session returns 401', async () => {
 		const session = await createTestSamlSession(prisma, spConnectionId);
-		const response = await request(app.getHttpServer() as App)
+		await request(app.getHttpServer() as App)
 			.post(`${AUTH_API_PATH}/login/complete-sso`)
 			.send({ samlSessionId: session.id })
-			.expect(501);
-		expect(response.body).toMatchObject({
-			status: 'not_implemented',
-			samlSessionId: session.id,
-		});
-		expect(response.body.message).toContain('Prompt 07');
+			.expect(401);
 	});
 
-	it('API-AUTH-INT-41: complete-sso rejects invalid samlSessionId', async () => {
+	it('API-AUTH-INT-41: complete-sso without session rejects unauthorized', async () => {
 		await request(app.getHttpServer() as App)
 			.post(`${AUTH_API_PATH}/login/complete-sso`)
 			.send({ samlSessionId: 'nope' })
-			.expect(400);
+			.expect(401);
 	});
 
 	it('API-AUTH-INT-42: logout clears session cookie', async () => {
@@ -647,6 +647,70 @@ describe('end-user auth integration (SQLite)', () => {
 			.get(`${AUTH_API_PATH}/session?samlSessionId=${session.id}`)
 			.expect(200);
 		expect(response.body.samlSession?.spActive).toBe(false);
+		expect(response.body.samlSession?.readyToComplete).toBe(false);
+	});
+
+	it('API-AUTH-INT-48: unbound SAML session has readyToComplete false', async () => {
+		const session = await createTestSamlSession(prisma, spConnectionId);
+		const response = await request(app.getHttpServer() as App)
+			.get(`${AUTH_API_PATH}/session?samlSessionId=${session.id}`)
+			.expect(200);
+		expect(response.body.samlSession?.readyToComplete).toBe(false);
+	});
+
+	it('API-AUTH-INT-49: bound session with auth cookie has readyToComplete true', async () => {
+		const session = await createTestSamlSession(prisma, spConnectionId);
+		const agent = request.agent(app.getHttpServer() as App);
+		await agent
+			.post(`${AUTH_API_PATH}/login`)
+			.send({
+				username: 'alice',
+				password: endUserPassword,
+				samlSessionId: session.id,
+			})
+			.expect(200);
+		const status = await agent
+			.get(`${AUTH_API_PATH}/session?samlSessionId=${session.id}`)
+			.expect(200);
+		expect(status.body.samlSession?.readyToComplete).toBe(true);
+	});
+
+	it('API-AUTH-INT-50: expired SAML session has readyToComplete false', async () => {
+		const expired = await createTestSamlSession(prisma, spConnectionId, {
+			expiresAt: new Date(Date.now() - 60_000),
+		});
+		const agent = request.agent(app.getHttpServer() as App);
+		await agent
+			.post(`${AUTH_API_PATH}/login`)
+			.send({
+				username: 'alice',
+				password: endUserPassword,
+				samlSessionId: expired.id,
+			})
+			.expect(400);
+		const status = await agent
+			.get(`${AUTH_API_PATH}/session?samlSessionId=${expired.id}`)
+			.expect(200);
+		expect(status.body.samlSession?.readyToComplete).toBe(false);
+	});
+
+	it('API-AUTH-INT-52: wrong user cookie yields readyToComplete false', async () => {
+		await createTestUserWithPassword(prisma, connectionId, 'bob', 'bob-pass-12345');
+		const session = await createTestSamlSession(prisma, spConnectionId);
+		const agent = request.agent(app.getHttpServer() as App);
+		await agent
+			.post(`${AUTH_API_PATH}/login`)
+			.send({ username: 'bob', password: 'bob-pass-12345' })
+			.expect(200);
+		const alice = await prisma.user.findFirst({ where: { username: 'alice' } });
+		await prisma.samlSession.update({
+			where: { id: session.id },
+			data: { userId: alice!.id },
+		});
+		const status = await agent
+			.get(`${AUTH_API_PATH}/session?samlSessionId=${session.id}`)
+			.expect(200);
+		expect(status.body.samlSession?.readyToComplete).toBe(false);
 	});
 
 	it('admin cookie and end-user cookie use different names', async () => {

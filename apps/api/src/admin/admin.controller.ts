@@ -1,7 +1,10 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
 	API_CONNECTION_ROUTE_PREFIX,
 	API_CONNECTIONS_API_PATH,
+	SAML_METADATA_PATH,
+	SP_CONNECTIONS_API_PATH,
 	SYNC_API_PATH,
 	type AdminStubResponseDto,
 } from '@nestidp/shared';
@@ -11,12 +14,16 @@ import { AdminStatsService } from './admin-stats.service';
 @Controller('api/admin')
 @UseGuards(AdminAuthGuard)
 export class AdminController {
-	constructor(private readonly adminStatsService: AdminStatsService) {}
+	constructor(
+		private readonly adminStatsService: AdminStatsService,
+		private readonly configService: ConfigService,
+	) {}
 
 	@Get()
 	async getStub(): Promise<AdminStubResponseDto> {
 		const counts = await this.adminStatsService.getCounts();
 
+		const base = (this.configService.get<string>('IDP_BASE_URL') ?? '').replace(/\/+$/, '');
 		return {
 			status: 'stub',
 			module: 'admin',
@@ -24,6 +31,8 @@ export class AdminController {
 			apiConnectionsRoute: API_CONNECTION_ROUTE_PREFIX,
 			apiConnectionsApiPath: API_CONNECTIONS_API_PATH,
 			syncApiPath: SYNC_API_PATH,
+			spConnectionsApiPath: SP_CONNECTIONS_API_PATH,
+			metadataUrl: `${base}${SAML_METADATA_PATH}`,
 			counts,
 		};
 	}

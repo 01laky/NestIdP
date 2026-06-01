@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AdminStatsDto, AdminStubResponseDto } from './admin-types.js';
 import { API_CONNECTION_ROUTE_PREFIX, API_CONNECTIONS_API_PATH } from './connections.js';
+import { SAML_METADATA_PATH, SP_CONNECTIONS_API_PATH } from './saml.js';
 import { SYNC_API_PATH } from './sync.js';
 
 describe('AdminStatsDto', () => {
@@ -42,6 +43,8 @@ describe('AdminStubResponseDto', () => {
 			apiConnectionsRoute: API_CONNECTION_ROUTE_PREFIX,
 			apiConnectionsApiPath: API_CONNECTIONS_API_PATH,
 			syncApiPath: SYNC_API_PATH,
+			spConnectionsApiPath: SP_CONNECTIONS_API_PATH,
+			metadataUrl: `https://idp.example.com${SAML_METADATA_PATH}`,
 			counts: {
 				users: 0,
 				groups: 0,
@@ -62,6 +65,8 @@ describe('AdminStubResponseDto', () => {
 			apiConnectionsRoute: API_CONNECTION_ROUTE_PREFIX,
 			apiConnectionsApiPath: API_CONNECTIONS_API_PATH,
 			syncApiPath: SYNC_API_PATH,
+			spConnectionsApiPath: SP_CONNECTIONS_API_PATH,
+			metadataUrl: `https://idp.example.com${SAML_METADATA_PATH}`,
 			counts: {
 				users: 0,
 				groups: 0,

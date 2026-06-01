@@ -74,7 +74,11 @@ This syncs `schema.prisma` with `DATABASE_PROVIDER`. Root `pnpm install` runs `p
 | GET    | `/api/auth/me`                 | `nestidp_user_session` cookie | Profile with group/role names (no secrets)                                                           |
 | GET    | `/api/auth/session`            | —                             | Read-only: `authenticated` + optional `?samlSessionId=` pending SAML state                           |
 | POST   | `/api/auth/logout`             | cookie optional               | Clears end-user session (idempotent)                                                                 |
-| POST   | `/api/auth/login/complete-sso` | —                             | **501** stub until Prompt 07 (stable JSON contract)                                                  |
+| POST   | `/api/auth/login/complete-sso` | end-user session              | Signed SAMLResponse as **text/html** auto-post form to SP ACS                                        |
+| GET    | `/saml/metadata`               | —                             | IdP SAML metadata XML                                                                                |
+| GET    | `/saml/sso`                    | —                             | SP-initiated SSO (HTTP-Redirect `SAMLRequest`) → redirect `/login?samlSessionId=`                    |
+| GET    | `/api/admin/sp-connections`    | admin session                 | Read-only SP list (Prompt 08 adds mutating CRUD)                                                     |
+| GET    | `/api/admin/idp/metadata-url`  | admin session                 | Public metadata + SSO URLs for operators                                                             |
 
 Constants:
 
@@ -118,15 +122,33 @@ curl -c cookies.txt -X POST http://localhost:3000/api/auth/login \
 curl -b cookies.txt http://localhost:3000/api/auth/me
 ```
 
-#### Prompt 07 integration
+#### SAML / SSO (v0.7.0)
 
-1. `GET /saml/sso` parses SAMLRequest → creates `SamlSession` → redirects to `/login?samlSessionId=<cuid>`
-2. User signs in → `POST /api/auth/login` with `samlSessionId` → `SamlSession.userId` set
-3. Prompt 07 replaces `POST /api/auth/login/complete-sso` stub with SAMLResponse HTTP-POST to SP ACS
+1. `GET /saml/sso?SAMLRequest=&RelayState=` — parse AuthnRequest, create `SamlSession`, **302** to `/login?samlSessionId=<cuid>`
+2. `POST /api/auth/login` with optional `samlSessionId` — binds `SamlSession.userId`
+3. `GET /api/auth/session?samlSessionId=` — `readyToComplete` when bound + authenticated user matches
+4. `POST /api/auth/login/complete-sso` (session required) — signed `SAMLResponse` as HTML form POST to `SpConnection.acsUrl`
+5. `LoginPage` auto-calls complete-sso after bind or when `readyToComplete` on refresh
 
-Inject `@Inject(SAML_SESSION_BIND_PORT) bind: SamlSessionBindPort` from `AuthModule` — do not duplicate bind SQL in `SamlModule`.
+**Default SAML attributes** (when `attributeMapping` is null): `email`, `displayName`, `memberOf` (groups), `role` (roles). NameID: email when format is email-oriented, else `username`.
 
-SSO diagram steps 6–7 are **API-only in v0.6**; steps 8–9 (SAMLResponse) ship in **v0.7**.
+**Operator SP setup** until Prompt 08 UI: Prisma Studio / seed / `createTestSpConnection` in tests. Mock SP URL:
+
+```bash
+SP_ENTITY_ID=urn:test:sp node docs/examples/saml-sp-initiated-redirect.mjs
+```
+
+| Env var                            | Default | Purpose                                           |
+| ---------------------------------- | ------- | ------------------------------------------------- |
+| `SAML_ASSERTION_TTL_SECONDS`       | `300`   | Assertion `NotOnOrAfter` window                   |
+| `SAML_SESSION_TTL_SECONDS`         | `900`   | Pending `SamlSession` TTL                         |
+| `SAML_CLOCK_SKEW_SECONDS`          | `120`   | `IssueInstant` validation skew                    |
+| `SAML_METADATA_INCLUDE_ACS`        | `true`  | `AttributeConsumingService` in metadata           |
+| `SAML_SESSION_CLEANUP_INTERVAL_MS` | `0`     | Periodic expired-session purge (0 = startup only) |
+
+Inject `@Inject(SAML_SESSION_BIND_PORT)` from `AuthModule` — do not duplicate bind SQL in `SamlModule`.
+
+**Prompt 08:** mutating SP admin CRUD + React pages. **Prompt 09:** IdP cert upload/rotation UI.
 
 ### Admin REST API (v0.5.0)
 

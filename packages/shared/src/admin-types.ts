@@ -14,5 +14,9 @@ export interface AdminStubResponseDto {
 	apiConnectionsApiPath: string;
 	/** Admin REST path for manual identity sync (Prompt 05). */
 	syncApiPath: string;
+	/** Read-only SP connections list (v0.7.0). */
+	spConnectionsApiPath: string;
+	/** Public IdP SAML metadata URL. */
+	metadataUrl: string;
 	counts: AdminStatsDto;
 }

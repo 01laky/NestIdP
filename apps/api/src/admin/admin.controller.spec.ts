@@ -10,7 +10,13 @@ describe('AdminController', () => {
 	const adminStatsService = {
 		getCounts: jest.fn(),
 	};
-	const controller = new AdminController(adminStatsService as unknown as AdminStatsService);
+	const configService = {
+		get: jest.fn((key: string) => (key === 'IDP_BASE_URL' ? 'http://localhost:3000' : undefined)),
+	};
+	const controller = new AdminController(
+		adminStatsService as unknown as AdminStatsService,
+		configService as never,
+	);
 
 	beforeEach(() => {
 		jest.clearAllMocks();

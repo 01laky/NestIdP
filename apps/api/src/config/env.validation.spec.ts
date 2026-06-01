@@ -209,4 +209,18 @@ describe('validateEnv', () => {
 			validateEnv({ ...validConfig, END_USER_LOGIN_RATE_LIMIT_WINDOW_MS: '500' }),
 		).toThrow();
 	});
+
+	it('API-ENV-SAML-01: accepts optional SAML_ASSERTION_TTL_SECONDS', () => {
+		const result = validateEnv({ ...validConfig, SAML_ASSERTION_TTL_SECONDS: '600' });
+		expect(result.SAML_ASSERTION_TTL_SECONDS).toBe(600);
+	});
+
+	it('API-ENV-SAML-02: accepts SAML_SESSION_CLEANUP_INTERVAL_MS zero', () => {
+		const result = validateEnv({ ...validConfig, SAML_SESSION_CLEANUP_INTERVAL_MS: '0' });
+		expect(result.SAML_SESSION_CLEANUP_INTERVAL_MS).toBe(0);
+	});
+
+	it('API-ENV-SAML-03: rejects invalid SAML_CLOCK_SKEW_SECONDS', () => {
+		expect(() => validateEnv({ ...validConfig, SAML_CLOCK_SKEW_SECONDS: '0' })).toThrow();
+	});
 });

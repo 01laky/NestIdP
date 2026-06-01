@@ -34,6 +34,10 @@ function renderLogin(initialPath = '/login') {
 
 describe('LoginPage', () => {
 	beforeEach(() => {
+		vi.spyOn(document, 'open').mockImplementation(() => window);
+		vi.spyOn(document, 'write').mockImplementation(() => undefined);
+		vi.spyOn(document, 'close').mockImplementation(() => undefined);
+		vi.mocked(authApi.completeSsoLogin).mockResolvedValue('<html><form></form></html>');
 		vi.mocked(authApi.getEndUserSession).mockResolvedValue({
 			authenticated: false,
 			user: null,
@@ -172,6 +176,7 @@ describe('LoginPage', () => {
 				bound: false,
 				expired: true,
 				spActive: true,
+				readyToComplete: false,
 			},
 		});
 
@@ -181,7 +186,7 @@ describe('LoginPage', () => {
 		});
 	});
 
-	it('WEB-AUTH-10: SSO continue button calls completeSsoLogin stub', async () => {
+	it('WEB-AUTH-10: SSO continue button calls completeSsoLogin with HTML', async () => {
 		const sessionId = 'clxxxxxxxxxxxxxxxxxxxxxxxxx';
 		vi.mocked(authApi.loginEndUser).mockResolvedValue({
 			ok: true,
@@ -195,10 +200,34 @@ describe('LoginPage', () => {
 				roles: [],
 			},
 		});
-		vi.mocked(authApi.completeSsoLogin).mockResolvedValue({
-			status: 'not_implemented',
-			message: 'SAML response delivery is not implemented yet. See Prompt 07.',
-			samlSessionId: sessionId,
+		vi.mocked(authApi.completeSsoLogin).mockResolvedValue(
+			'<html><form><input name="SAMLResponse" value="abc"/></form></html>',
+		);
+
+		renderLogin(`/login?samlSessionId=${sessionId}`);
+		fireEvent.change(screen.getByLabelText(/Username/i), { target: { value: 'alice' } });
+		fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: 'secret' } });
+		fireEvent.click(screen.getByRole('button', { name: /Sign in/i }));
+
+		await waitFor(() => {
+			expect(authApi.completeSsoLogin).toHaveBeenCalledWith(sessionId);
+			expect(document.write).toHaveBeenCalled();
+		});
+	});
+
+	it('WEB-SAML-08: auto complete after login when samlSessionBound', async () => {
+		const sessionId = 'clxxxxxxxxxxxxxxxxxxxxxxxxx';
+		vi.mocked(authApi.loginEndUser).mockResolvedValue({
+			ok: true,
+			samlSessionBound: true,
+			user: {
+				id: 'u1',
+				username: 'alice',
+				email: null,
+				displayName: null,
+				groups: [],
+				roles: [],
+			},
 		});
 
 		renderLogin(`/login?samlSessionId=${sessionId}`);
@@ -207,13 +236,63 @@ describe('LoginPage', () => {
 		fireEvent.click(screen.getByRole('button', { name: /Sign in/i }));
 
 		await waitFor(() => {
-			expect(screen.getByRole('button', { name: /Continue to application/i })).toBeDefined();
+			expect(authApi.completeSsoLogin).toHaveBeenCalledWith(sessionId);
+		});
+	});
+
+	it('WEB-SAML-09: mount probe triggers complete when readyToComplete', async () => {
+		const sessionId = 'clxxxxxxxxxxxxxxxxxxxxxxxxx';
+		vi.mocked(authApi.getEndUserSession).mockResolvedValue({
+			authenticated: true,
+			user: {
+				id: 'u1',
+				username: 'alice',
+				email: null,
+				displayName: null,
+				groups: [],
+				roles: [],
+			},
+			samlSession: {
+				id: sessionId,
+				bound: true,
+				expired: false,
+				spActive: true,
+				readyToComplete: true,
+			},
 		});
 
-		fireEvent.click(screen.getByRole('button', { name: /Continue to application/i }));
+		renderLogin(`/login?samlSessionId=${sessionId}`);
 		await waitFor(() => {
 			expect(authApi.completeSsoLogin).toHaveBeenCalledWith(sessionId);
-			expect(screen.getByText(/Prompt 07/i)).toBeDefined();
+		});
+	});
+
+	it('WEB-SAML-10: failed auto-complete shows error and manual Continue', async () => {
+		const sessionId = 'clxxxxxxxxxxxxxxxxxxxxxxxxx';
+		vi.mocked(authApi.loginEndUser).mockResolvedValue({
+			ok: true,
+			samlSessionBound: true,
+			user: {
+				id: 'u1',
+				username: 'alice',
+				email: null,
+				displayName: null,
+				groups: [],
+				roles: [],
+			},
+		});
+		vi.mocked(authApi.completeSsoLogin).mockRejectedValue(
+			new authApi.AuthApiError(400, 'SAML session expired'),
+		);
+
+		renderLogin(`/login?samlSessionId=${sessionId}`);
+		fireEvent.change(screen.getByLabelText(/Username/i), { target: { value: 'alice' } });
+		fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: 'secret' } });
+		fireEvent.click(screen.getByRole('button', { name: /Sign in/i }));
+
+		await waitFor(() => {
+			expect(screen.getByRole('alert').textContent).toContain('SAML session expired');
+			expect(screen.getByRole('button', { name: /Continue to application/i })).toBeDefined();
 		});
 	});
 

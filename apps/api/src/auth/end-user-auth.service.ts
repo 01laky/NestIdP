@@ -10,6 +10,7 @@ import { IdentityRepository } from '../identity/identity.repository';
 import { PrismaService } from '../prisma/prisma.service';
 import { EndUserAuthAuditService } from './end-user-auth-audit.service';
 import { toEndUserPublicDto } from './end-user-auth.mapper';
+import { IdpSigningService } from '../saml/idp-signing.service';
 import { SamlSessionBindService } from './saml-session-bind.service';
 
 export const INVALID_CREDENTIALS_MESSAGE = 'Invalid username or password';
@@ -20,6 +21,7 @@ export class EndUserAuthService {
 		private readonly identityRepository: IdentityRepository,
 		private readonly samlSessionBindService: SamlSessionBindService,
 		private readonly prisma: PrismaService,
+		private readonly idpSigningService: IdpSigningService,
 		private readonly audit: EndUserAuthAuditService,
 	) {}
 
@@ -112,11 +114,25 @@ export class EndUserAuthService {
 				include: { spConnection: true },
 			});
 			if (row) {
+				const bound = row.userId != null;
+				const expired = row.expiresAt <= new Date();
+				const spActive = row.spConnection.active;
+				const idpSettings = await this.prisma.idpSettings.findUnique({
+					where: { id: 'default' },
+				});
+				const hasSigning =
+					(await this.idpSigningService.hasSigningMaterial()) || idpSettings != null;
+				const userMatches =
+					options.userId != null && row.userId != null && options.userId === row.userId;
+				const readyToComplete =
+					!expired && bound && spActive && hasSigning && userMatches && authenticated;
+
 				samlSession = {
 					id: row.id,
-					bound: row.userId != null,
-					expired: row.expiresAt <= new Date(),
-					spActive: row.spConnection.active,
+					bound,
+					expired,
+					spActive,
+					readyToComplete,
 				};
 			}
 		}
