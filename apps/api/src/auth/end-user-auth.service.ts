@@ -1,0 +1,126 @@
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import type {
+	EndUserLoginResponseDto,
+	EndUserPublicDto,
+	EndUserSessionStatusResponseDto,
+} from '@nestidp/shared';
+import { isPasswordHashAlgorithm } from '@nestidp/shared';
+import { verifyPasswordTimingSafe } from '../admin-auth/password.util';
+import { IdentityRepository } from '../identity/identity.repository';
+import { PrismaService } from '../prisma/prisma.service';
+import { EndUserAuthAuditService } from './end-user-auth-audit.service';
+import { toEndUserPublicDto } from './end-user-auth.mapper';
+import { SamlSessionBindService } from './saml-session-bind.service';
+
+export const INVALID_CREDENTIALS_MESSAGE = 'Invalid username or password';
+
+@Injectable()
+export class EndUserAuthService {
+	constructor(
+		private readonly identityRepository: IdentityRepository,
+		private readonly samlSessionBindService: SamlSessionBindService,
+		private readonly prisma: PrismaService,
+		private readonly audit: EndUserAuthAuditService,
+	) {}
+
+	async login(
+		username: string,
+		password: string,
+		options?: { samlSessionId?: string; clientIp?: string },
+	): Promise<EndUserLoginResponseDto> {
+		const trimmedUsername = username.trim();
+		const clientIp = options?.clientIp ?? 'unknown';
+		const user = await this.identityRepository.findUserByUsername(trimmedUsername);
+
+		const rejectLogin = async (
+			reason: 'invalid_credentials' | 'inactive' | 'unsupported_algorithm',
+		): Promise<never> => {
+			await verifyPasswordTimingSafe(password, null);
+			if (user && reason === 'unsupported_algorithm') {
+				this.audit.logUnsupportedAlgorithm(user.id);
+			}
+			this.audit.logLoginFailure(trimmedUsername, clientIp, reason);
+			throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
+		};
+
+		if (!user || !user.active) {
+			return rejectLogin(user && !user.active ? 'inactive' : 'invalid_credentials');
+		}
+
+		if (!isPasswordHashAlgorithm(user.passwordHashAlgorithm)) {
+			return rejectLogin('unsupported_algorithm');
+		}
+
+		const valid = await verifyPasswordTimingSafe(password, user.passwordHash);
+		if (!valid) {
+			return rejectLogin('invalid_credentials');
+		}
+
+		let samlSessionBound = false;
+		if (options?.samlSessionId) {
+			try {
+				await this.samlSessionBindService.bindUserToSession(options.samlSessionId, user.id);
+				samlSessionBound = true;
+			} catch (error) {
+				const reason = error instanceof Error ? error.message : 'saml_bind_failed';
+				this.audit.logSamlBindFailure(options.samlSessionId, clientIp, reason);
+				throw error;
+			}
+		}
+
+		const profile = await this.identityRepository.findUserProfileById(user.id);
+		if (!profile) {
+			throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
+		}
+
+		this.audit.logLoginSuccess(user.id, user.username, clientIp, samlSessionBound);
+
+		return {
+			ok: true,
+			user: toEndUserPublicDto(profile),
+			samlSessionBound,
+		};
+	}
+
+	async getMe(userId: string): Promise<EndUserPublicDto> {
+		const profile = await this.identityRepository.findUserProfileById(userId);
+		if (!profile || !profile.active) {
+			throw new UnauthorizedException('Unauthorized');
+		}
+		return toEndUserPublicDto(profile);
+	}
+
+	async getSessionStatus(options: {
+		userId?: string;
+		samlSessionId?: string;
+	}): Promise<EndUserSessionStatusResponseDto> {
+		let user: EndUserPublicDto | null = null;
+		let authenticated = false;
+
+		if (options.userId) {
+			const profile = await this.identityRepository.findUserProfileById(options.userId);
+			if (profile?.active) {
+				authenticated = true;
+				user = toEndUserPublicDto(profile);
+			}
+		}
+
+		let samlSession: EndUserSessionStatusResponseDto['samlSession'] = null;
+		if (options.samlSessionId) {
+			const row = await this.prisma.samlSession.findUnique({
+				where: { id: options.samlSessionId },
+				include: { spConnection: true },
+			});
+			if (row) {
+				samlSession = {
+					id: row.id,
+					bound: row.userId != null,
+					expired: row.expiresAt <= new Date(),
+					spActive: row.spConnection.active,
+				};
+			}
+		}
+
+		return { authenticated, user, samlSession };
+	}
+}

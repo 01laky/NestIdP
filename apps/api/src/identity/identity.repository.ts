@@ -33,6 +33,16 @@ export class RoleNameCollisionError extends Error {
 	}
 }
 
+export type UserProfileForAuth = {
+	id: string;
+	username: string;
+	email: string | null;
+	displayName: string | null;
+	active: boolean;
+	groups: string[];
+	roles: string[];
+};
+
 export type UpsertUserInput = {
 	externalId: string;
 	username: string;
@@ -57,6 +67,41 @@ export class IdentityRepository {
 
 	countRoles(): Promise<number> {
 		return this.prisma.role.count();
+	}
+
+	findUserByUsername(username: string): Promise<User | null> {
+		return this.prisma.user.findUnique({ where: { username } });
+	}
+
+	async findUserProfileById(userId: string): Promise<UserProfileForAuth | null> {
+		const row = await this.prisma.user.findUnique({
+			where: { id: userId },
+			select: {
+				id: true,
+				username: true,
+				email: true,
+				displayName: true,
+				active: true,
+				groups: {
+					select: { group: { select: { name: true } } },
+				},
+				roles: {
+					select: { role: { select: { name: true } } },
+				},
+			},
+		});
+		if (!row) {
+			return null;
+		}
+		return {
+			id: row.id,
+			username: row.username,
+			email: row.email,
+			displayName: row.displayName,
+			active: row.active,
+			groups: row.groups.map((ug) => ug.group.name),
+			roles: row.roles.map((ur) => ur.role.name),
+		};
 	}
 
 	async upsertUser(connectionId: string, user: UpsertUserInput): Promise<User> {

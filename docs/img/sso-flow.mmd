@@ -13,8 +13,10 @@ sequenceDiagram
 	SAML->>Login: Redirect to login page
 	User->>Login: Username + password
 	Login->>Auth: POST /api/auth/login
+	Note over Auth,DB: v0.6 — verify hash + bind SamlSession
 	Auth->>DB: Verify synced password hash
 	Auth->>DB: Load groups + roles
+	Note over Auth,SAML: v0.7 — SAMLResponse POST
 	Auth->>SAML: Build signed SAMLResponse
 	SAML->>SP: HTTP-POST auto-submit form
 	SP->>User: Local SP session

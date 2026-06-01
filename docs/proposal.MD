@@ -646,14 +646,15 @@ Any platform supporting Docker containers and a SQL database (SQLite or PostgreS
 - [x] API connection CRUD (baseUrl + Bearer token)
 - [x] Manual identity sync from one active source
 - [x] User/group/role upsert via **fixed** v1 REST contract (with password hash)
-- [ ] End-user login against synced credentials
+- [x] End-user login against synced credentials
 - [ ] **Custom `SamlModule`** — parse SAMLRequest, build/sign SAMLResponse, metadata, POST binding (xmlbuilder2 + xml-crypto)
 - [ ] SP-initiated SSO (HTTP-Redirect in, HTTP-POST out)
 - [ ] IdP metadata endpoint
 - [ ] Signed SAML assertions with attribute mapping
 - [x] Admin authentication (local)
+- [x] React SAML login page (functional form; SAML POST completion in Prompt 07)
 - [ ] Docker + docker-compose for local dev and deployment
-- [ ] Basic audit log (sync events, admin actions)
+- [ ] Basic audit log (sync events, admin actions) — v0.6 adds structured stdout auth events; persistent audit → later prompt
 
 ### Phase 2 — Hardening and Configurable API Contract
 

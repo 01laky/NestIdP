@@ -1,6 +1,6 @@
 # Development guide
 
-Companion to [proposal.MD](./proposal.MD) for local setup (**v0.5.0** — admin bootstrap, authentication, API connection CRUD, identity sync).
+Companion to [proposal.MD](./proposal.MD) for local setup (**v0.6.0** — admin bootstrap, API connections, identity sync, end-user login).
 
 Database selection: **[database.md](./database.md)** — SQLite for local dev, PostgreSQL (or SQLite) at deploy time.
 
@@ -56,7 +56,7 @@ This syncs `schema.prisma` with `DATABASE_PROVIDER`. Root `pnpm install` runs `p
 | `/api/admin/auth/me`         | Current admin session + `csrfToken` (protected)    |
 | `/api/admin/api-connections` | API connection CRUD + connectivity test            |
 | `/api/admin/sync/*`          | Identity sync trigger, status, logs                |
-| `/api/auth/*`                | End-user auth REST API (stub)                      |
+| `/api/auth/*`                | End-user login API (synced credentials)            |
 | `/saml/*`                    | SAML protocol (stub, HTTP 501)                     |
 | `/health`                    | Liveness — always OK, no database                  |
 | `/ready`                     | Readiness — Prisma ping                            |
@@ -65,6 +65,68 @@ This syncs `schema.prisma` with `DATABASE_PROVIDER`. Root `pnpm install` runs `p
 | `/login`                     | React SAML login page                              |
 
 ![Admin login sequence](./img/admin-auth-flow.svg)
+
+### End-user auth API (v0.6.0)
+
+| Method | Path                           | Auth                          | Description                                                                                          |
+| ------ | ------------------------------ | ----------------------------- | ---------------------------------------------------------------------------------------------------- |
+| POST   | `/api/auth/login`              | —                             | Username + password against synced `User`; optional `{ "samlSessionId" }` binds pending SAML session |
+| GET    | `/api/auth/me`                 | `nestidp_user_session` cookie | Profile with group/role names (no secrets)                                                           |
+| GET    | `/api/auth/session`            | —                             | Read-only: `authenticated` + optional `?samlSessionId=` pending SAML state                           |
+| POST   | `/api/auth/logout`             | cookie optional               | Clears end-user session (idempotent)                                                                 |
+| POST   | `/api/auth/login/complete-sso` | —                             | **501** stub until Prompt 07 (stable JSON contract)                                                  |
+
+Constants:
+
+- **`AUTH_API_PATH`** — `/api/auth`
+- **`END_USER_SESSION_COOKIE_NAME`** — `nestidp_user_session`
+- **`LOGIN_PAGE_ROUTE`** — `/login`
+- **`SAML_SESSION_QUERY_PARAM`** — `samlSessionId` (Prompt 07 redirects here after parsing SAMLRequest)
+- **`SAML_SESSION_BIND_PORT`** — Nest token for `SamlSessionBindPort` (Prompt 07 imports from `AuthModule`)
+
+#### End-user login (v1)
+
+- **Login identifier:** `User.username` only (trimmed, **case-sensitive** — `Alice` ≠ `alice`)
+- **bcrypt-only** verification via shared `verifyPasswordTimingSafe`
+- **Inactive users** (`active: false`) → generic **401** `Invalid username or password`
+- **Rate limits:** per-IP (default 10 / 15 min) and per-username (default 5 / 15 min), separate from admin
+- **No CSRF** on end-user routes (admin-only in v1)
+- **SAML prep:** optional `samlSessionId` on login binds `SamlSession.userId`; SAML XML/POST is **Prompt 07**
+- **SP branding:** none in v0.6 (proposal §14 Q3 — single neutral `/login` page)
+- **Audit:** structured stdout events (`end_user_login_success`, `end_user_login_failure`, …) — persistent audit table → Prompt 10
+
+Optional env:
+
+| Variable                                       | Default  | Purpose                      |
+| ---------------------------------------------- | -------- | ---------------------------- |
+| `END_USER_SESSION_TTL_SECONDS`                 | `3600`   | End-user session cookie TTL  |
+| `END_USER_LOGIN_RATE_LIMIT_MAX`                | `10`     | IP failures per window       |
+| `END_USER_LOGIN_RATE_LIMIT_WINDOW_MS`          | `900000` | IP window                    |
+| `END_USER_LOGIN_RATE_LIMIT_USERNAME_MAX`       | `5`      | Username failures per window |
+| `END_USER_LOGIN_RATE_LIMIT_USERNAME_WINDOW_MS` | `900000` | Username window              |
+
+#### Dev proxy and cookies
+
+`apps/web/vite.config.ts` proxies `/api`, `/saml`, `/health`, `/ready` to `VITE_API_PROXY_TARGET` (default `http://localhost:3000`). The login page uses `credentials: 'include'` — browser tests require this proxy (or same-origin production build).
+
+```bash
+# After sync created user "alice" with known password
+curl -c cookies.txt -X POST http://localhost:3000/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"alice","password":"your-password"}'
+
+curl -b cookies.txt http://localhost:3000/api/auth/me
+```
+
+#### Prompt 07 integration
+
+1. `GET /saml/sso` parses SAMLRequest → creates `SamlSession` → redirects to `/login?samlSessionId=<cuid>`
+2. User signs in → `POST /api/auth/login` with `samlSessionId` → `SamlSession.userId` set
+3. Prompt 07 replaces `POST /api/auth/login/complete-sso` stub with SAMLResponse HTTP-POST to SP ACS
+
+Inject `@Inject(SAML_SESSION_BIND_PORT) bind: SamlSessionBindPort` from `AuthModule` — do not duplicate bind SQL in `SamlModule`.
+
+SSO diagram steps 6–7 are **API-only in v0.6**; steps 8–9 (SAMLResponse) ship in **v0.7**.
 
 ### Admin REST API (v0.5.0)
 
@@ -272,6 +334,6 @@ This sets `core.hooksPath=.githooks`. Hooks run on `prepare-commit-msg` and `com
 1. ~~Admin bootstrap seed + authentication (Prompt 03)~~
 2. ~~API connection CRUD (baseUrl + Bearer token) (Prompt 04)~~
 3. ~~Identity sync (fixed v1 REST contract) — Prompt 05~~
-4. End-user login + password verification
-5. Custom SamlModule XML implementation
+4. ~~End-user login + password verification — Prompt 06~~
+5. Custom SamlModule XML implementation (Prompt 07)
 6. Admin SPA pages

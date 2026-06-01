@@ -136,6 +136,28 @@ export async function createTestAdminUser(
 	});
 }
 
+export async function createTestUserWithPassword(
+	prisma: PrismaClient,
+	apiConnectionId: string,
+	username: string,
+	plaintextPassword: string,
+	overrides: UserOverrides = {},
+): Promise<User> {
+	const passwordHash = await hashPassword(plaintextPassword);
+	const { externalId, ...rest } = overrides;
+	return prisma.user.create({
+		data: {
+			externalId: externalId ?? `ext-${username}`,
+			apiConnectionId,
+			username,
+			passwordHash,
+			passwordHashAlgorithm: DEFAULT_PASSWORD_HASH_ALGORITHM,
+			active: true,
+			...rest,
+		},
+	});
+}
+
 export async function createTestAdminUserWithPassword(
 	prisma: PrismaClient,
 	username: string,

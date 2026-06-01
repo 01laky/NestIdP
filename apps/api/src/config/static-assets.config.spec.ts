@@ -68,5 +68,11 @@ describe('static-assets.config', () => {
 			expect(STATIC_ROUTE_EXCLUDES.some((pattern) => pattern === '/api*')).toBe(true);
 			expect(syncPath.startsWith('/api')).toBe(true);
 		});
+
+		it('API-STA-04: /api/auth/login matches /api* exclude pattern', () => {
+			const loginPath = '/api/auth/login';
+			expect(STATIC_ROUTE_EXCLUDES.some((pattern) => pattern === '/api*')).toBe(true);
+			expect(loginPath.startsWith('/api')).toBe(true);
+		});
 	});
 });

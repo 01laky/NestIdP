@@ -4,6 +4,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import { App } from 'supertest/types';
+import { AUTH_API_PATH } from '@nestidp/shared';
 import { AdminModule } from '../src/admin/admin.module';
 import { AdminAuthModule } from '../src/admin-auth/admin-auth.module';
 import { AuthModule } from '../src/auth/auth.module';
@@ -20,12 +21,18 @@ describe('Routing (e2e)', () => {
 	const prismaMock = {
 		pingDatabase: jest.fn(),
 		$disconnect: jest.fn(),
-		user: { count: jest.fn().mockResolvedValue(0) },
+		user: {
+			count: jest.fn().mockResolvedValue(0),
+			findUnique: jest.fn(),
+		},
 		group: { count: jest.fn().mockResolvedValue(0) },
 		role: { count: jest.fn().mockResolvedValue(0) },
 		apiConnection: { count: jest.fn().mockResolvedValue(0) },
 		spConnection: { count: jest.fn().mockResolvedValue(0) },
 		adminUser: {
+			findUnique: jest.fn(),
+		},
+		samlSession: {
 			findUnique: jest.fn(),
 		},
 	};
@@ -212,14 +219,14 @@ describe('Routing (e2e)', () => {
 		expect(response.body.syncApiPath).toBe('/api/admin/sync');
 	});
 
-	it('GET /api/auth is separate from /api/admin', async () => {
+	it('GET /api/auth/session is separate from /api/admin', async () => {
 		await request(app.getHttpServer() as App)
 			.get('/api/admin')
 			.expect(401);
 		const auth = await request(app.getHttpServer() as App)
-			.get('/api/auth')
+			.get(`${AUTH_API_PATH}/session`)
 			.expect(200);
-		expect(auth.body.module).toBe('auth');
+		expect(auth.body.authenticated).toBe(false);
 	});
 
 	it('E2E-AUTH-01: POST /api/admin/auth/login with wrong password returns 401', async () => {
@@ -253,6 +260,51 @@ describe('Routing (e2e)', () => {
 			.post('/api/admin/auth/logout')
 			.expect(200);
 		expect(response.body).toEqual({ ok: true });
+	});
+
+	it('API-AUTH-E2E-01: POST /api/auth/login without synced user returns 401', async () => {
+		prismaMock.user.findUnique.mockResolvedValue(null);
+		const response = await request(app.getHttpServer() as App)
+			.post(`${AUTH_API_PATH}/login`)
+			.send({ username: 'nobody', password: 'any' })
+			.expect(401);
+		expect(response.body.message).toBe('Invalid username or password');
+	});
+
+	it('API-AUTH-E2E-02: POST /api/auth/login with empty body returns 400', async () => {
+		await request(app.getHttpServer() as App)
+			.post(`${AUTH_API_PATH}/login`)
+			.send({})
+			.expect(400);
+	});
+
+	it('API-AUTH-E2E-03: GET /api/auth/me without session returns 401', async () => {
+		await request(app.getHttpServer() as App)
+			.get(`${AUTH_API_PATH}/me`)
+			.expect(401);
+	});
+
+	it('API-AUTH-E2E-04: POST /api/auth/logout returns ok without session', async () => {
+		const response = await request(app.getHttpServer() as App)
+			.post(`${AUTH_API_PATH}/logout`)
+			.expect(200);
+		expect(response.body).toEqual({ ok: true });
+	});
+
+	it('API-AUTH-E2E-05: GET /api/auth/session returns JSON not SPA HTML', async () => {
+		const response = await request(app.getHttpServer() as App).get(`${AUTH_API_PATH}/session`);
+		expect(response.headers['content-type']).toMatch(/application\/json/);
+		expect(response.text).not.toContain('<!DOCTYPE html>');
+		expect(response.status).toBe(200);
+	});
+
+	it('API-AUTH-E2E-06: POST /api/auth/login/complete-sso returns 501 JSON stub', async () => {
+		const response = await request(app.getHttpServer() as App)
+			.post(`${AUTH_API_PATH}/login/complete-sso`)
+			.send({ samlSessionId: 'clxxxxxxxxxxxxxxxxxxxxxxxxx' })
+			.expect(501);
+		expect(response.headers['content-type']).toMatch(/application\/json/);
+		expect(response.body.status).toBe('not_implemented');
 	});
 
 	it('GET /admin does not hit admin API controller (no JSON stub)', async () => {

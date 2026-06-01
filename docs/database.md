@@ -47,6 +47,13 @@ The `authCredentialsEncrypted` column stores **AES-256-GCM** ciphertext of the B
 - Phases include `dry_run_summary`, `user_limit`, `fetch_users`, `upsert_user`, etc.
 - **`durationMs`** appears on API `SyncLogDto` only (computed from timestamps, not persisted)
 
+### End-user sessions (v0.6.0)
+
+- **`AdminUser`** and **`User`** are separate tables — same username string may exist in both without conflict
+- End-user auth uses cookie **`nestidp_user_session`** (HMAC-signed with `SESSION_SECRET`) — not stored in DB
+- Admin uses **`nestidp_admin_session`** — separate cookie and session payload (includes CSRF)
+- **`SamlSession.userId`** — set after successful login when `samlSessionId` is provided (SSO bind)
+
 ## Local development (SQLite)
 
 No Docker required:

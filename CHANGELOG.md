@@ -4,6 +4,34 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.6.0]
+
+### Added
+
+- End-user auth API: **`POST /api/auth/login`**, **`GET /api/auth/me`**, **`GET /api/auth/session`**, **`POST /api/auth/logout`**, **`POST /api/auth/login/complete-sso`** (501 stub)
+- **`EndUserSessionService`** — HMAC-signed **`nestidp_user_session`** cookie (separate from admin)
+- **`SamlSessionBindService`** + **`SAML_SESSION_BIND_PORT`** for Prompt 07 handoff
+- **`EndUserLoginRateLimiterService`** — per-IP and per-username brute-force limits
+- **`EndUserAuthAuditService`** — structured login/bind/logout audit logs
+- Shared: **`EndUserPublicDto`**, auth DTOs, **`AUTH_API_PATH`**, **`LOGIN_PAGE_ROUTE`**, **`SAML_SESSION_QUERY_PARAM`**
+- **`createTestUserWithPassword`** test fixture
+- `authApi.ts` + functional **`LoginPage`** with SSO session probe and continue stub
+- Env: **`END_USER_SESSION_TTL_SECONDS`**, **`END_USER_LOGIN_RATE_LIMIT_*`**
+- Integration, sync→login, E2E, and web tests
+
+### Security
+
+- Timing-safe password verify via shared **`verifyPasswordTimingSafe`**
+- Generic **401** for all credential failures (no inactive-account enumeration)
+- Never expose **`passwordHash`** in JSON responses
+
+### Changed
+
+- **`AuthModule`** replaces stub with full end-user auth stack
+- **`IdentityRepository`** — `findUserByUsername`, `findUserProfileById`
+- SSO diagram notes v0.6 (login API) vs v0.7 (SAMLResponse)
+- Expanded edge-case tests for v0.6.0 — **790** total tests via `pnpm test` (53 shared + 647 API Jest + 28 API e2e + 62 web; **9** PostgreSQL smoke skipped locally)
+
 ## [0.5.0]
 
 ### Added

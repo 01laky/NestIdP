@@ -174,4 +174,39 @@ describe('validateEnv', () => {
 	it('rejects invalid SYNC_MAX_USERS_PER_RUN', () => {
 		expect(() => validateEnv({ ...validConfig, SYNC_MAX_USERS_PER_RUN: '0' })).toThrow();
 	});
+
+	it('allows optional END_USER_SESSION_TTL_SECONDS as positive integer', () => {
+		const result = validateEnv({ ...validConfig, END_USER_SESSION_TTL_SECONDS: '7200' });
+		expect(result.END_USER_SESSION_TTL_SECONDS).toBe(7200);
+	});
+
+	it('rejects invalid END_USER_SESSION_TTL_SECONDS', () => {
+		expect(() => validateEnv({ ...validConfig, END_USER_SESSION_TTL_SECONDS: '0' })).toThrow();
+	});
+
+	it('allows optional END_USER_LOGIN_RATE_LIMIT_MAX and WINDOW_MS', () => {
+		const result = validateEnv({
+			...validConfig,
+			END_USER_LOGIN_RATE_LIMIT_MAX: '20',
+			END_USER_LOGIN_RATE_LIMIT_WINDOW_MS: '600000',
+		});
+		expect(result.END_USER_LOGIN_RATE_LIMIT_MAX).toBe(20);
+		expect(result.END_USER_LOGIN_RATE_LIMIT_WINDOW_MS).toBe(600_000);
+	});
+
+	it('allows optional END_USER_LOGIN_RATE_LIMIT_USERNAME_MAX and WINDOW_MS', () => {
+		const result = validateEnv({
+			...validConfig,
+			END_USER_LOGIN_RATE_LIMIT_USERNAME_MAX: '8',
+			END_USER_LOGIN_RATE_LIMIT_USERNAME_WINDOW_MS: '900000',
+		});
+		expect(result.END_USER_LOGIN_RATE_LIMIT_USERNAME_MAX).toBe(8);
+		expect(result.END_USER_LOGIN_RATE_LIMIT_USERNAME_WINDOW_MS).toBe(900_000);
+	});
+
+	it('rejects END_USER_LOGIN_RATE_LIMIT_WINDOW_MS below minimum', () => {
+		expect(() =>
+			validateEnv({ ...validConfig, END_USER_LOGIN_RATE_LIMIT_WINDOW_MS: '500' }),
+		).toThrow();
+	});
 });

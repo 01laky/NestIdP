@@ -11,6 +11,7 @@ import {
 	createTestSpConnection,
 	createTestSyncLog,
 	createTestUser,
+	createTestUserWithPassword,
 	TEST_ENCRYPTED_CREDENTIALS,
 	TEST_PASSWORD_HASH,
 } from './test-fixtures';
@@ -202,6 +203,27 @@ describe('test-fixtures', () => {
 			'super-secret-pass',
 		);
 		expect(await verifyPassword('super-secret-pass', capturedHash)).toBe(true);
+		expect(await verifyPassword('wrong', capturedHash)).toBe(false);
+	});
+
+	it('API-FIX-15: createTestUserWithPassword hash verifies with known plaintext', async () => {
+		const { verifyPassword } = await import('../admin-auth/password.util');
+		let capturedHash = '';
+		const prisma = {
+			user: {
+				create: jest.fn().mockImplementation(({ data }: { data: { passwordHash: string } }) => {
+					capturedHash = data.passwordHash;
+					return { id: 'user-1', username: 'fixture-user' };
+				}),
+			},
+		};
+		await createTestUserWithPassword(
+			prisma as unknown as PrismaClient,
+			'conn-1',
+			'fixture-user',
+			'synced-plain-pass',
+		);
+		expect(await verifyPassword('synced-plain-pass', capturedHash)).toBe(true);
 		expect(await verifyPassword('wrong', capturedHash)).toBe(false);
 	});
 
