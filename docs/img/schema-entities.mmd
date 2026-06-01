@@ -1,0 +1,75 @@
+erDiagram
+	ApiConnection ||--o{ User : syncs
+	ApiConnection ||--o{ Group : syncs
+	ApiConnection ||--o{ Role : syncs
+	ApiConnection ||--o{ SyncLog : logs
+	User ||--o{ UserGroup : member
+	Group ||--o{ UserGroup : has
+	User ||--o{ UserRole : assigned
+	Role ||--o{ UserRole : has
+	SpConnection ||--o{ SamlSession : sso
+	User ||--o{ SamlSession : authenticates
+
+	ApiConnection {
+		string id PK
+		string name
+		string baseUrl
+		string authType
+		string authCredentialsEncrypted
+	}
+
+	User {
+		string id PK
+		string externalId
+		string apiConnectionId FK
+		string username UK
+		string passwordHash
+		boolean active
+	}
+
+	Group {
+		string id PK
+		string externalId
+		string apiConnectionId FK
+		string name
+	}
+
+	Role {
+		string id PK
+		string externalId
+		string apiConnectionId FK
+		string name
+	}
+
+	SpConnection {
+		string id PK
+		string spEntityId UK
+		string acsUrl
+		json attributeMapping
+	}
+
+	AdminUser {
+		string id PK
+		string username UK
+		string passwordHash
+	}
+
+	SyncLog {
+		string id PK
+		string apiConnectionId FK
+		string status
+		json errors
+	}
+
+	SamlSession {
+		string id PK
+		string samlRequestId UK
+		string spConnectionId FK
+		string userId FK
+	}
+
+	IdpSettings {
+		string id PK
+		string entityId
+		string signingCertPem
+	}

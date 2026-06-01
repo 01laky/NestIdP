@@ -1,6 +1,6 @@
 {
 	"name": "@nestidp/api",
-	"version": "0.1.1",
+	"version": "0.2.0",
 	"private": true,
 	"scripts": {
 		"dev": "nest start --watch",
@@ -9,11 +9,15 @@
 		"start:prod": "node dist/main.js",
 		"lint": "tsc -p tsconfig.json --noEmit",
 		"test": "jest && jest --config ./test/jest-e2e.config.js",
-		"test:e2e": "jest --config ./test/jest-e2e.json",
+		"test:e2e": "jest --config ./test/jest-e2e.config.js",
 		"test:watch": "jest --watch",
 		"prisma:prepare": "node scripts/sync-prisma-provider.mjs",
 		"prisma:generate": "pnpm prisma:prepare && prisma generate",
-		"prisma:migrate": "pnpm prisma:prepare && prisma migrate dev"
+		"prisma:migrate": "pnpm prisma:prepare && prisma migrate dev",
+		"prisma:migrate:deploy": "pnpm prisma:prepare && prisma migrate deploy"
+	},
+	"prisma": {
+		"seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
 	},
 	"dependencies": {
 		"@nestjs/common": "^11.0.12",

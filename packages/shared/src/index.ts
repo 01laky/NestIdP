@@ -1,3 +1,6 @@
 export * from './health.js';
 export * from './connections.js';
 export * from './database.js';
+export * from './schema-enums.js';
+export * from './password-hash-algorithms.js';
+export * from './admin-types.js';

@@ -1,0 +1,20 @@
+sequenceDiagram
+	autonumber
+	actor User as End user
+	participant SP as Service Provider
+	participant SAML as /saml/sso
+	participant Auth as /api/auth
+	participant Login as /login
+	participant DB as Local DB
+
+	User->>SP: Open application
+	SP->>SAML: Redirect + SAMLRequest
+	SAML->>SAML: Validate request · store session
+	SAML->>Login: Redirect to login page
+	User->>Login: Username + password
+	Login->>Auth: POST /api/auth/login
+	Auth->>DB: Verify synced password hash
+	Auth->>DB: Load groups + roles
+	Auth->>SAML: Build signed SAMLResponse
+	SAML->>SP: HTTP-POST auto-submit form
+	SP->>User: Local SP session

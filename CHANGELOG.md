@@ -4,6 +4,32 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.0]
+
+### Added
+
+- Full Prisma schema: ApiConnection, User, Group, Role, UserGroup, UserRole, SpConnection,
+  AdminUser, SyncLog, SamlSession, IdpSettings
+- Initial migration (`initial_schema`) for SQLite dev default
+- `IdentityRepository` / `IdentityService` with entity counts
+- `AdminStatsService` — `GET /api/admin` returns `AdminStubResponseDto` with table counts
+- Shared schema enums, `PasswordHashAlgorithm` constants, and admin response types
+- Integration tests for schema constraints and relations (SQLite + optional PostgreSQL smoke)
+- Test fixtures (`test-fixtures.ts`) and `test-db.helper.ts` for migration-backed tests
+- `prisma:migrate:deploy`, root `db:migrate` / `db:migrate:deploy` aliases
+- Empty `prisma/seed.ts` stub (Prompt 03 — no runtime seeding yet)
+- ER diagram `docs/img/schema-entities.mmd` + SVG
+- GitHub Actions CI workflow with PostgreSQL service for cross-provider smoke tests
+
+### Changed
+
+- `identity` module wired to Prisma; `AdminModule` imports `IdentityModule`
+- `docs/development.md`, `docs/database.md`, `README.md` — migrate workflow, production boot, ER diagram
+- `Dockerfile` — comment documenting migrate-before-start
+- Proposal Phase 1 checklist: Prisma schema and migrations marked complete
+- Fixed `apps/api` `test:e2e` script to use `jest-e2e.config.js`
+- Expanded edge-case tests for v0.2.0 data layer — **222** tests (3 PostgreSQL smoke skipped locally)
+
 ## [0.1.1]
 
 ### Changed

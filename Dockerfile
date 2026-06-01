@@ -43,4 +43,7 @@ COPY --from=build-api /app/packages/shared/dist ./packages/shared/dist
 COPY --from=build-api /app/packages/shared/package.json ./packages/shared/package.json
 COPY package.json pnpm-workspace.yaml ./
 EXPOSE 3000
+# Production deploy: run migrations before start, e.g.:
+#   pnpm --filter @nestidp/api prisma:migrate:deploy && node apps/api/dist/main.js
+# Or use an entrypoint script in a later prompt.
 CMD ["node", "apps/api/dist/main.js"]

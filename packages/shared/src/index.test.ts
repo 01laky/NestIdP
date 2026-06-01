@@ -43,6 +43,28 @@ describe('ApiConnectionStubDto', () => {
 		};
 		expect(dto.id).toBe('conn-1');
 	});
+
+	it('accepts sync metadata fields aligned with schema', () => {
+		const dto: ApiConnectionStubDto = {
+			name: 'HR',
+			baseUrl: 'https://hr.example.com',
+			authType: 'BEARER',
+			lastSyncStatus: 'SUCCESS',
+			lastSyncAt: '2026-01-01T00:00:00.000Z',
+		};
+		expect(dto.authType).toBe('BEARER');
+		expect(dto.lastSyncStatus).toBe('SUCCESS');
+		expect(dto.lastSyncAt).not.toBeNull();
+	});
+
+	it('allows null lastSyncAt before first sync', () => {
+		const dto: ApiConnectionStubDto = {
+			name: 'HR',
+			baseUrl: 'https://hr.example.com',
+			lastSyncAt: null,
+		};
+		expect(dto.lastSyncAt).toBeNull();
+	});
 });
 
 describe('SpConnectionStubDto', () => {
@@ -64,6 +86,18 @@ describe('SpConnectionStubDto', () => {
 			acsUrl: 'https://app.example.com/saml/acs',
 		};
 		expect(dto.id).toBe('sp-1');
+	});
+
+	it('accepts nameIdFormat and active flag', () => {
+		const dto: SpConnectionStubDto = {
+			name: 'My App',
+			spEntityId: 'urn:myapp:sp',
+			acsUrl: 'https://app.example.com/saml/acs',
+			nameIdFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
+			active: false,
+		};
+		expect(dto.active).toBe(false);
+		expect(dto.nameIdFormat).toContain('emailAddress');
 	});
 });
 

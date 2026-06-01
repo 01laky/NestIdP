@@ -1,0 +1,15 @@
+flowchart LR
+	EXT["External API\nusers · groups · roles · password hashes"]
+	NIDP["NestIdP\nlocal DB + SAML engine"]
+	SP["Service Provider"]
+
+	EXT -->|"inbound sync"| NIDP
+	NIDP -->|"SAML assertion POST"| SP
+
+	classDef ext fill:#3b0764,stroke:#c084fc,stroke-width:2px,color:#faf5ff
+	classDef idp fill:#134e4a,stroke:#2dd4bf,stroke-width:2px,color:#f0fdfa
+	classDef sp fill:#1e3a5f,stroke:#60a5fa,stroke-width:2px,color:#eff6ff
+
+	class EXT ext
+	class NIDP idp
+	class SP sp

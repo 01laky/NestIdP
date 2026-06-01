@@ -4,6 +4,8 @@ Deployable SAML Identity Provider monolith (NestJS + React + SQL via Prisma).
 
 Architecture and product scope: [docs/proposal.MD](docs/proposal.MD)
 
+Full documentation index: [docs/README.md](docs/README.md) (diagrams in [docs/img/](docs/img/))
+
 Development guide: [docs/development.md](docs/development.md)
 
 Database selection: [docs/database.md](docs/database.md)
@@ -18,7 +20,9 @@ Database selection: [docs/database.md](docs/database.md)
 
 ```bash
 cp .env.example .env
+mkdir -p apps/api/data
 pnpm install
+pnpm db:migrate
 pnpm dev
 ```
 
@@ -35,12 +39,16 @@ Local SQLite database file: `apps/api/data/nestidp.db` (created on first migrati
 
 ## Scripts
 
-| Command      | Description                           |
-| ------------ | ------------------------------------- |
-| `pnpm dev`   | Build shared package, start API + web |
-| `pnpm build` | Production build (shared → web → api) |
-| `pnpm lint`  | ESLint + TypeScript checks            |
-| `pnpm test`  | Run all package tests                 |
+| Command                  | Description                           |
+| ------------------------ | ------------------------------------- |
+| `pnpm dev`               | Build shared package, start API + web |
+| `pnpm build`             | Production build (shared → web → api) |
+| `pnpm lint`              | ESLint + TypeScript checks            |
+| `pnpm test`              | Run all package tests                 |
+| `pnpm db:migrate`        | Apply Prisma migrations (dev)         |
+| `pnpm db:migrate:deploy` | Apply migrations (production)         |
+| `pnpm diagrams:build`    | Render `docs/img/*.mmd` → `.svg`      |
+| `pnpm diagrams:check`    | Verify SVGs are up to date            |
 
 ## Production
 

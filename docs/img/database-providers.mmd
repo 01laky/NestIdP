@@ -1,0 +1,26 @@
+flowchart LR
+	ENV[".env\nDATABASE_PROVIDER\nDATABASE_URL"]
+	PREP["pnpm prisma:prepare\nsync schema.prisma provider"]
+	GEN["prisma generate / migrate"]
+	APP["NestJS API · PrismaService"]
+
+	ENV --> PREP --> GEN --> APP
+
+	subgraph DEV["Development default"]
+		SQLITE["sqlite\nfile:../data/nestidp.db"]
+	end
+
+	subgraph PROD["Production typical"]
+		PG["postgresql\nconnection string"]
+	end
+
+	ENV -.-> SQLITE
+	ENV -.-> PG
+
+	classDef cfg fill:#422006,stroke:#fbbf24,stroke-width:2px,color:#fffbeb
+	classDef step fill:#134e4a,stroke:#2dd4bf,stroke-width:2px,color:#f0fdfa
+	classDef db fill:#1e3a5f,stroke:#60a5fa,stroke-width:2px,color:#eff6ff
+
+	class ENV cfg
+	class PREP,GEN,APP step
+	class SQLITE,PG db

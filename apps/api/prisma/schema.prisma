@@ -1,10 +1,182 @@
 generator client {
-  provider = "prisma-client-js"
+	provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+	provider = "sqlite"
+	url      = env("DATABASE_URL")
 }
 
-// Domain models are added in the next prompt (schema + migrations).
+enum AuthType {
+	BEARER
+}
+
+enum LastSyncStatus {
+	NEVER
+	IN_PROGRESS
+	SUCCESS
+	FAILED
+}
+
+enum SyncLogStatus {
+	RUNNING
+	SUCCESS
+	FAILED
+}
+
+model ApiConnection {
+	id                       String         @id @default(cuid())
+	name                     String
+	baseUrl                  String
+	authType                 AuthType       @default(BEARER)
+	authCredentialsEncrypted String
+	lastSyncAt               DateTime?
+	lastSyncStatus           LastSyncStatus @default(NEVER)
+	createdAt                DateTime       @default(now())
+	updatedAt                DateTime       @updatedAt
+
+	users    User[]
+	groups   Group[]
+	roles    Role[]
+	syncLogs SyncLog[]
+}
+
+model User {
+	id                      String   @id @default(cuid())
+	externalId              String
+	apiConnectionId         String
+	username                String   @unique
+	email                   String?
+	displayName             String?
+	passwordHash            String
+	passwordHashAlgorithm   String   @default("bcrypt")
+	active                  Boolean  @default(true)
+	createdAt               DateTime @default(now())
+	updatedAt               DateTime @updatedAt
+
+	apiConnection ApiConnection @relation(fields: [apiConnectionId], references: [id], onDelete: Restrict)
+	groups        UserGroup[]
+	roles         UserRole[]
+	samlSessions  SamlSession[]
+
+	@@unique([apiConnectionId, externalId])
+	@@index([apiConnectionId])
+}
+
+model Group {
+	id              String   @id @default(cuid())
+	externalId      String
+	apiConnectionId String
+	name            String
+	createdAt       DateTime @default(now())
+	updatedAt       DateTime @updatedAt
+
+	apiConnection ApiConnection @relation(fields: [apiConnectionId], references: [id], onDelete: Restrict)
+	users         UserGroup[]
+
+	@@unique([apiConnectionId, externalId])
+	@@unique([apiConnectionId, name])
+	@@index([apiConnectionId])
+}
+
+model Role {
+	id              String   @id @default(cuid())
+	externalId      String
+	apiConnectionId String
+	name            String
+	createdAt       DateTime @default(now())
+	updatedAt       DateTime @updatedAt
+
+	apiConnection ApiConnection @relation(fields: [apiConnectionId], references: [id], onDelete: Restrict)
+	users         UserRole[]
+
+	@@unique([apiConnectionId, externalId])
+	@@unique([apiConnectionId, name])
+	@@index([apiConnectionId])
+}
+
+model UserGroup {
+	userId  String
+	groupId String
+
+	user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+	group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+	@@id([userId, groupId])
+}
+
+model UserRole {
+	userId String
+	roleId String
+
+	user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+	role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+	@@id([userId, roleId])
+}
+
+model SpConnection {
+	id               String   @id @default(cuid())
+	name             String
+	spEntityId       String   @unique
+	acsUrl           String
+	spCertificate    String?
+	nameIdFormat     String   @default("urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress")
+	attributeMapping Json?
+	active           Boolean  @default(true)
+	createdAt        DateTime @default(now())
+	updatedAt        DateTime @updatedAt
+
+	samlSessions SamlSession[]
+}
+
+model AdminUser {
+	id           String   @id @default(cuid())
+	username     String   @unique
+	passwordHash String
+	createdAt    DateTime @default(now())
+	updatedAt    DateTime @updatedAt
+}
+
+model SyncLog {
+	id              String        @id @default(cuid())
+	apiConnectionId String
+	startedAt       DateTime      @default(now())
+	finishedAt      DateTime?
+	status          SyncLogStatus
+	usersSynced     Int           @default(0)
+	groupsSynced    Int           @default(0)
+	rolesSynced     Int           @default(0)
+	errors          Json?
+
+	apiConnection ApiConnection @relation(fields: [apiConnectionId], references: [id], onDelete: Restrict)
+
+	@@index([apiConnectionId])
+	@@index([startedAt])
+}
+
+model SamlSession {
+	id             String   @id @default(cuid())
+	samlRequestId  String   @unique
+	relayState     String?
+	spConnectionId String
+	userId         String?
+	expiresAt      DateTime
+	createdAt      DateTime @default(now())
+
+	spConnection SpConnection @relation(fields: [spConnectionId], references: [id], onDelete: Cascade)
+	user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+	@@index([expiresAt])
+	@@index([spConnectionId])
+}
+
+model IdpSettings {
+	id                  String   @id @default("default")
+	entityId            String
+	signingCertPem      String?
+	signingKeyEncrypted String?
+	nameIdFormat        String   @default("urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress")
+	createdAt           DateTime @default(now())
+	updatedAt           DateTime @updatedAt
+}

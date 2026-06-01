@@ -1,0 +1,30 @@
+flowchart LR
+	subgraph INBOUND["API connection · identity source"]
+		direction TB
+		API_EXT["External REST API"]
+		API_CONN["ApiConnection config\nbaseUrl + Bearer token"]
+		SYNC["Sync service"]
+		STORE[("Local User / Group / Role")]
+		API_EXT -->|"GET /users …"| SYNC
+		API_CONN --> SYNC
+		SYNC --> STORE
+	end
+
+	subgraph OUTBOUND["SP connection · SAML application"]
+		direction TB
+		IDP["NestIdP SamlModule"]
+		SP_CONN["SpConnection config\nentity ID · ACS · attributes"]
+		SP_APP["Service Provider"]
+		STORE --> IDP
+		SP_CONN --> IDP
+		IDP -->|"HTTP-POST SAMLResponse"| SP_APP
+		SP_APP -->|"HTTP-Redirect SAMLRequest"| IDP
+	end
+
+	classDef in fill:#1e3a5f,stroke:#60a5fa,stroke-width:2px,color:#eff6ff
+	classDef out fill:#134e4a,stroke:#2dd4bf,stroke-width:2px,color:#f0fdfa
+	classDef cfg fill:#422006,stroke:#fbbf24,stroke-width:2px,color:#fffbeb
+
+	class API_EXT,SYNC in
+	class IDP,SP_APP out
+	class API_CONN,SP_CONN,STORE cfg

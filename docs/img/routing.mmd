@@ -1,0 +1,20 @@
+flowchart TB
+	REQ(["Incoming HTTP request"])
+
+	REQ --> HEALTH{"/health or /ready?"}
+	HEALTH -->|yes| HEALTH_API["HealthController"]
+	HEALTH -->|no| API{"/api/* ?"}
+	API -->|yes| REST["Admin / Auth REST API"]
+	API -->|no| SAML{"/saml/* ?"}
+	SAML -->|yes| SAML_API["SamlController · protocol"]
+	SAML -->|no| LOGIN{"/login ?"}
+	LOGIN -->|yes| SPA_LOGIN["React login page"]
+	LOGIN -->|no| ADMIN{"/admin/* ?"}
+	ADMIN -->|yes| SPA_ADMIN["React admin SPA"]
+	ADMIN -->|no| STATIC["Static assets / SPA fallback"]
+
+	classDef gate fill:#422006,stroke:#fbbf24,stroke-width:2px,color:#fffbeb
+	classDef handler fill:#134e4a,stroke:#2dd4bf,stroke-width:2px,color:#f0fdfa
+
+	class HEALTH,API,SAML,LOGIN,ADMIN gate
+	class HEALTH_API,REST,SAML_API,SPA_LOGIN,SPA_ADMIN,STATIC handler

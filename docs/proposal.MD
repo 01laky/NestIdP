@@ -69,6 +69,8 @@ NestIdP serves two distinct audiences:
 
 A common source of confusion is mixing **identity sources** with **SAML applications**. These are separate concepts and must be separate sections in the admin UI.
 
+![API connection vs SP connection](./img/connection-types.svg)
+
 #### API Connection (Identity Source)
 
 - **Direction:** External API → NestIdP (inbound sync)
@@ -92,21 +94,7 @@ In v1 the sync engine calls **hardcoded** paths (`/users`, `/users/:id/groups`, 
 
 The IdP **sends** SAML Responses to SP connections after successful login.
 
-```
-┌──────────────────┐         sync          ┌──────────────────┐
-│  External API    │ ──────────────────►  │     NestIdP      │
-│  (users/groups/  │   users, groups,     │  (local DB +     │
-│   roles/password)│   roles, passwords   │   SAML engine)   │
-└──────────────────┘                       └────────┬─────────┘
-                                                    │
-                                          SAML Response (POST)
-                                                    │
-                                                    ▼
-                                           ┌──────────────────┐
-                                           │  Service Provider│
-                                           │  (application)   │
-                                           └──────────────────┘
-```
+![High-level data flow](./img/data-flow.svg)
 
 ---
 
@@ -116,27 +104,7 @@ The IdP **sends** SAML Responses to SP connections after successful login.
 
 NestIdP is a **monolith**: NestJS serves the REST API, SAML endpoints, and the built React static assets (Admin SPA + Login Page).
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     NestIdP (single deployable)                 │
-│                                                                 │
-│  ┌─────────────┐  ┌─────────────┐  ┌──────────────────────────┐  │
-│  │  Admin SPA  │  │ Login Page  │  │   NestJS Backend         │  │
-│  │  (React)    │  │ (React)     │  │                          │  │
-│  │  /admin/*   │  │ /login      │  │  • Admin API             │  │
-│  └──────┬──────┘  └──────┬──────┘  │  • Auth API              │  │
-│         │                │         │  • Sync Service          │  │
-│         └────────────────┴────────►│  • SAML Module           │  │
-│                                    │  • Static file serving   │  │
-│                                    └────────────┬─────────────┘  │
-└─────────────────────────────────────────────────┼───────────────┘
-                                                  │
-                                    ┌─────────────▼─────────────┐
-                                    │        PostgreSQL         │
-                                    │  config, users, groups,   │
-                                    │  roles, SP records, audit │
-                                    └───────────────────────────┘
-```
+![Monolith architecture](./img/architecture.svg)
 
 ### 5.2 Technology Stack
 
@@ -147,7 +115,7 @@ NestIdP is a **monolith**: NestJS serves the REST API, SAML endpoints, and the b
 | Database | SQL via Prisma (`sqlite` dev default, `postgresql` recommended for production) |
 | SAML (IdP) | Custom NestJS `SamlModule` — see Section 5.5 |
 | SAML XML/signing | `xmlbuilder2`, `xml-crypto` (>= 6.0.1), `@xmldom/xmldom`, `xpath` |
-| ORM | TypeORM or Prisma |
+| ORM | Prisma |
 | Package management | pnpm workspaces (monorepo) |
 | Containerization | Docker + docker-compose |
 | Session | HTTP-only secure cookies |
@@ -254,6 +222,8 @@ Deferred (Phase 2+):
 
 The operator configures an API connection in the admin console. Sync can be triggered manually or on a schedule (cron).
 
+![Identity sync flow (v1 fixed contract)](./img/sync-flow.svg)
+
 ```
 Admin UI  →  POST /api/admin/api-connections  →  save connection config
 Admin UI  →  POST /api/admin/sync/:connectionId  →  trigger sync
@@ -278,6 +248,8 @@ Endpoint paths and JSON field names are not configurable in v1.
 ### 6.2 SP-Initiated SSO Flow (Primary)
 
 This is the main authentication flow. The Service Provider redirects the user to the IdP.
+
+![SP-initiated SSO sequence](./img/sso-flow.svg)
 
 ```
 Step  Actor              Action
@@ -486,6 +458,8 @@ Attribute mapping is configurable per SP connection in the admin UI.
 
 ## 9. Data Model
 
+![Entity relationship diagram](./img/schema-entities.svg)
+
 ### 9.1 Core Entities
 
 ```
@@ -668,7 +642,7 @@ Any platform supporting Docker containers and a SQL database (SQLite or PostgreS
 - [ ] NestJS monolith scaffold (API + static serving)
 - [ ] React Admin SPA (API connections, SP connections, IdP settings)
 - [ ] React SAML login page
-- [ ] Prisma schema and migrations (portable across sqlite/postgresql)
+- [x] Prisma schema and migrations (portable across sqlite/postgresql)
 - [ ] API connection CRUD (baseUrl + Bearer token) + manual sync from **one** active source
 - [ ] User/group/role upsert via **fixed** v1 REST contract (with password hash)
 - [ ] End-user login against synced credentials

@@ -1,0 +1,39 @@
+flowchart TB
+	subgraph MONOLITH["NestIdP monolith · single deployable"]
+		direction TB
+		ADMIN["Admin SPA · React · /admin/*"]
+		LOGIN["Login page · React · /login"]
+		API["NestJS backend"]
+		ADMIN --> API
+		LOGIN --> API
+		subgraph MODULES["Nest modules"]
+			direction LR
+			ADM["admin"]
+			AUTH["auth"]
+			SYNC["sync"]
+			ID["identity"]
+			SAML["saml"]
+		end
+		API --> MODULES
+	end
+
+	DB[("SQL database · Prisma\nsqlite dev · postgresql prod")]
+	EXT["External identity API"]
+	SP["Service Provider"]
+
+	EXT -->|"sync users/groups/roles"| SYNC
+	SYNC --> ID
+	ID --> DB
+	API --> DB
+	SAML -->|"SAMLResponse POST"| SP
+	SP -->|"SAMLRequest redirect"| SAML
+
+	classDef ui fill:#1e3a5f,stroke:#60a5fa,stroke-width:2px,color:#eff6ff
+	classDef core fill:#134e4a,stroke:#2dd4bf,stroke-width:2px,color:#f0fdfa
+	classDef store fill:#422006,stroke:#fbbf24,stroke-width:2px,color:#fffbeb
+	classDef ext fill:#3b0764,stroke:#c084fc,stroke-width:2px,color:#faf5ff
+
+	class ADMIN,LOGIN ui
+	class API,MODULES,SAML core
+	class DB store
+	class EXT,SP ext

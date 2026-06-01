@@ -17,6 +17,11 @@ describe('Routing (e2e)', () => {
 	const prismaMock = {
 		pingDatabase: jest.fn(),
 		$disconnect: jest.fn(),
+		user: { count: jest.fn().mockResolvedValue(0) },
+		group: { count: jest.fn().mockResolvedValue(0) },
+		role: { count: jest.fn().mockResolvedValue(0) },
+		apiConnection: { count: jest.fn().mockResolvedValue(0) },
+		spConnection: { count: jest.fn().mockResolvedValue(0) },
 	};
 
 	beforeAll(async () => {
@@ -108,6 +113,43 @@ describe('Routing (e2e)', () => {
 			.get('/api/admin')
 			.expect(200);
 		expect(response.body.module).toBe('admin');
+		expect(response.body.counts).toEqual({
+			users: 0,
+			groups: 0,
+			roles: 0,
+			apiConnections: 0,
+			spConnections: 0,
+		});
+	});
+
+	it('GET /api/admin returns non-zero counts when prisma mocks return data', async () => {
+		prismaMock.user.count.mockResolvedValue(5);
+		prismaMock.group.count.mockResolvedValue(2);
+		prismaMock.role.count.mockResolvedValue(1);
+		prismaMock.apiConnection.count.mockResolvedValue(3);
+		prismaMock.spConnection.count.mockResolvedValue(4);
+
+		const response = await request(app.getHttpServer() as App)
+			.get('/api/admin')
+			.expect(200);
+
+		expect(response.body.counts).toEqual({
+			users: 5,
+			groups: 2,
+			roles: 1,
+			apiConnections: 3,
+			spConnections: 4,
+		});
+		expect(prismaMock.user.count).toHaveBeenCalled();
+		expect(prismaMock.apiConnection.count).toHaveBeenCalled();
+	});
+
+	it('GET /api/admin status remains stub with counts payload', async () => {
+		const response = await request(app.getHttpServer() as App)
+			.get('/api/admin')
+			.expect(200);
+		expect(response.body.status).toBe('stub');
+		expect(response.body.apiConnectionsRoute).toContain('api-connections');
 	});
 
 	it('GET /api/auth is separate from /api/admin', async () => {
