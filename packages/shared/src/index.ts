@@ -6,3 +6,4 @@ export * from './password-hash-algorithms.js';
 export * from './admin-types.js';
 export * from './admin-auth.js';
 export * from './api-error.js';
+export * from './sync.js';

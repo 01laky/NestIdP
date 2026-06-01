@@ -79,4 +79,4 @@ Optional bootstrap (first admin + IdpSettings on API start when tables are empty
 
 Operator login: **http://localhost:5173/admin/login** (separate from end-user SAML `/login`).
 
-Configure identity source API connections via admin REST at **`/api/admin/api-connections`** (see [development.md](docs/development.md)). **`ENCRYPTION_KEY` must stay stable** — changing it invalidates stored Bearer tokens.
+Configure identity source API connections via admin REST at **`/api/admin/api-connections`**, then trigger sync at **`/api/admin/sync/:connectionId`** (see [development.md](docs/development.md)). Optional local mock: **`docs/examples/mock-identity-api.mjs`**. **`ENCRYPTION_KEY` must stay stable** — changing it invalidates stored Bearer tokens.

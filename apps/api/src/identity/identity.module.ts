@@ -6,6 +6,6 @@ import { IdentityService } from './identity.service';
 @Module({
 	imports: [PrismaModule],
 	providers: [IdentityRepository, IdentityService],
-	exports: [IdentityService],
+	exports: [IdentityService, IdentityRepository],
 })
 export class IdentityModule {}

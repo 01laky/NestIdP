@@ -9,9 +9,14 @@ import type {
 	ApiErrorResponseDto,
 	CreateApiConnectionRequestDto,
 	DeleteApiConnectionResponseDto,
+	SyncLogListResponseDto,
+	SyncLogResponseDto,
+	SyncStatusResponseDto,
+	TriggerSyncRequestDto,
+	TriggerSyncResponseDto,
 	UpdateApiConnectionRequestDto,
 } from '@nestidp/shared';
-import { ADMIN_CSRF_HEADER_NAME, API_CONNECTIONS_API_PATH } from '@nestidp/shared';
+import { ADMIN_CSRF_HEADER_NAME, API_CONNECTIONS_API_PATH, SYNC_API_PATH } from '@nestidp/shared';
 
 export class AdminApiError extends Error {
 	constructor(
@@ -144,4 +149,30 @@ export function testApiConnection(id: string): Promise<ApiConnectionTestResponse
 	return adminFetch<ApiConnectionTestResponseDto>(`${API_CONNECTIONS_API_PATH}/${id}/test`, {
 		method: 'POST',
 	});
+}
+
+export function triggerIdentitySync(
+	connectionId: string,
+	options: TriggerSyncRequestDto = {},
+): Promise<TriggerSyncResponseDto> {
+	return adminFetch<TriggerSyncResponseDto>(`${SYNC_API_PATH}/${connectionId}`, {
+		method: 'POST',
+		body: JSON.stringify(options),
+	});
+}
+
+export function getSyncStatus(connectionId: string): Promise<SyncStatusResponseDto> {
+	return adminFetch<SyncStatusResponseDto>(`${SYNC_API_PATH}/${connectionId}/status`);
+}
+
+export function listSyncLogs(
+	connectionId: string,
+	limit?: number,
+): Promise<SyncLogListResponseDto> {
+	const query = limit != null ? `?limit=${limit}` : '';
+	return adminFetch<SyncLogListResponseDto>(`${SYNC_API_PATH}/${connectionId}/logs${query}`);
+}
+
+export function getSyncLog(syncLogId: string): Promise<SyncLogResponseDto> {
+	return adminFetch<SyncLogResponseDto>(`${SYNC_API_PATH}/logs/${syncLogId}`);
 }

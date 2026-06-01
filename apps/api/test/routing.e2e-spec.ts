@@ -131,6 +131,27 @@ describe('Routing (e2e)', () => {
 			.expect(401);
 	});
 
+	it('API-SYNC-E2E-01: POST /api/admin/sync/:id without auth returns 401', async () => {
+		await request(app.getHttpServer() as App)
+			.post('/api/admin/sync/clxxxxxxxxxxxxxxxxxxxxxxxxx')
+			.expect(401);
+	});
+
+	it('API-SYNC-E2E-02: GET /api/admin/sync/:id/status without auth returns 401', async () => {
+		await request(app.getHttpServer() as App)
+			.get('/api/admin/sync/clxxxxxxxxxxxxxxxxxxxxxxxxx/status')
+			.expect(401);
+	});
+
+	it('API-SYNC-E2E-03: GET /api/admin/sync/:id/status returns JSON not SPA HTML', async () => {
+		const response = await request(app.getHttpServer() as App).get(
+			'/api/admin/sync/clxxxxxxxxxxxxxxxxxxxxxxxxx/status',
+		);
+		expect(response.headers['content-type']).toMatch(/application\/json/);
+		expect(response.text).not.toContain('<!DOCTYPE html>');
+		expect(response.status).toBe(401);
+	});
+
 	it('GET /api/admin returns counts when authenticated via session cookie', async () => {
 		prismaMock.user.count.mockResolvedValue(5);
 		prismaMock.group.count.mockResolvedValue(2);
@@ -188,6 +209,7 @@ describe('Routing (e2e)', () => {
 		const response = await agent.get('/api/admin').expect(200);
 		expect(response.body.status).toBe('stub');
 		expect(response.body.apiConnectionsRoute).toContain('api-connections');
+		expect(response.body.syncApiPath).toBe('/api/admin/sync');
 	});
 
 	it('GET /api/auth is separate from /api/admin', async () => {

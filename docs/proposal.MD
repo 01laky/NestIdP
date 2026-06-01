@@ -644,8 +644,8 @@ Any platform supporting Docker containers and a SQL database (SQLite or PostgreS
 - [ ] React SAML login page
 - [x] Prisma schema and migrations (portable across sqlite/postgresql)
 - [x] API connection CRUD (baseUrl + Bearer token)
-- [ ] Manual identity sync from one active source
-- [ ] User/group/role upsert via **fixed** v1 REST contract (with password hash)
+- [x] Manual identity sync from one active source
+- [x] User/group/role upsert via **fixed** v1 REST contract (with password hash)
 - [ ] End-user login against synced credentials
 - [ ] **Custom `SamlModule`** — parse SAMLRequest, build/sign SAMLResponse, metadata, POST binding (xmlbuilder2 + xml-crypto)
 - [ ] SP-initiated SSO (HTTP-Redirect in, HTTP-POST out)

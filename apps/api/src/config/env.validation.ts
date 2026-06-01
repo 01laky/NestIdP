@@ -68,6 +68,42 @@ export class EnvironmentVariables {
 	ADMIN_SESSION_TTL_SECONDS?: number;
 
 	@IsOptional()
+	@Transform(({ value }) => {
+		if (value === undefined || value === null || value === '') {
+			return undefined;
+		}
+		const parsed = Number.parseInt(String(value), 10);
+		return Number.isFinite(parsed) ? parsed : value;
+	})
+	@IsInt()
+	@Min(1000)
+	SYNC_HTTP_TIMEOUT_MS?: number;
+
+	@IsOptional()
+	@Transform(({ value }) => {
+		if (value === undefined || value === null || value === '') {
+			return undefined;
+		}
+		const parsed = Number.parseInt(String(value), 10);
+		return Number.isFinite(parsed) ? parsed : value;
+	})
+	@IsInt()
+	@Min(1)
+	SYNC_STALE_RUN_MINUTES?: number;
+
+	@IsOptional()
+	@Transform(({ value }) => {
+		if (value === undefined || value === null || value === '') {
+			return undefined;
+		}
+		const parsed = Number.parseInt(String(value), 10);
+		return Number.isFinite(parsed) ? parsed : value;
+	})
+	@IsInt()
+	@Min(1)
+	SYNC_MAX_USERS_PER_RUN?: number;
+
+	@IsOptional()
 	@IsString()
 	PORT?: string;
 }

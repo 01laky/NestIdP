@@ -62,5 +62,11 @@ describe('static-assets.config', () => {
 			expect(STATIC_ROUTE_EXCLUDES.some((path) => path.includes('admin'))).toBe(false);
 			expect(STATIC_ROUTE_EXCLUDES.some((path) => path.includes('login'))).toBe(false);
 		});
+
+		it('API-STA-03: /api/admin/sync matches /api* exclude pattern', () => {
+			const syncPath = '/api/admin/sync/connection-id/status';
+			expect(STATIC_ROUTE_EXCLUDES.some((pattern) => pattern === '/api*')).toBe(true);
+			expect(syncPath.startsWith('/api')).toBe(true);
+		});
 	});
 });

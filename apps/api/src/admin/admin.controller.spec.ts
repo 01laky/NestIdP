@@ -1,4 +1,8 @@
-import { API_CONNECTION_ROUTE_PREFIX, API_CONNECTIONS_API_PATH } from '@nestidp/shared';
+import {
+	API_CONNECTION_ROUTE_PREFIX,
+	API_CONNECTIONS_API_PATH,
+	SYNC_API_PATH,
+} from '@nestidp/shared';
 import { AdminController } from './admin.controller';
 import { AdminStatsService } from './admin-stats.service';
 
@@ -57,6 +61,7 @@ describe('AdminController', () => {
 			note: expect.any(String),
 			apiConnectionsRoute: API_CONNECTION_ROUTE_PREFIX,
 			apiConnectionsApiPath: API_CONNECTIONS_API_PATH,
+			syncApiPath: SYNC_API_PATH,
 			counts: expect.objectContaining({
 				users: expect.any(Number),
 				groups: expect.any(Number),

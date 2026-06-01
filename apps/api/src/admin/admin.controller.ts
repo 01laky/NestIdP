@@ -2,6 +2,7 @@ import { Controller, Get, UseGuards } from '@nestjs/common';
 import {
 	API_CONNECTION_ROUTE_PREFIX,
 	API_CONNECTIONS_API_PATH,
+	SYNC_API_PATH,
 	type AdminStubResponseDto,
 } from '@nestidp/shared';
 import { AdminAuthGuard } from '../admin-auth/admin-auth.guard';
@@ -19,9 +20,10 @@ export class AdminController {
 		return {
 			status: 'stub',
 			module: 'admin',
-			note: 'API connection CRUD and connectivity test available via REST; admin UI pages in a later release.',
+			note: 'API connection CRUD, connectivity test, and identity sync available via REST; admin UI pages in a later release.',
 			apiConnectionsRoute: API_CONNECTION_ROUTE_PREFIX,
 			apiConnectionsApiPath: API_CONNECTIONS_API_PATH,
+			syncApiPath: SYNC_API_PATH,
 			counts,
 		};
 	}

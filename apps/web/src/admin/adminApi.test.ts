@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ADMIN_CSRF_HEADER_NAME, API_CONNECTIONS_API_PATH } from '@nestidp/shared';
+import { ADMIN_CSRF_HEADER_NAME, API_CONNECTIONS_API_PATH, SYNC_API_PATH } from '@nestidp/shared';
 import {
 	AdminApiError,
 	adminFetch,
@@ -7,11 +7,15 @@ import {
 	deleteApiConnection,
 	getApiConnection,
 	getCsrfToken,
+	getSyncLog,
+	getSyncStatus,
 	listApiConnections,
+	listSyncLogs,
 	loginAdmin,
 	logoutAdmin,
 	setCsrfToken,
 	testApiConnection,
+	triggerIdentitySync,
 	updateApiConnection,
 	getAdminMe,
 } from './adminApi';
@@ -278,5 +282,134 @@ describe('adminApi', () => {
 
 		const headers = fetchMock.mock.calls[0][1]?.headers as Record<string, string>;
 		expect(headers[ADMIN_CSRF_HEADER_NAME]).toBeUndefined();
+	});
+
+	it('WEB-SYNC-01: triggerIdentitySync sends CSRF header', async () => {
+		setCsrfToken('sync-csrf');
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ syncLog: {}, connection: {} }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		await triggerIdentitySync('conn-1');
+
+		const headers = fetchMock.mock.calls[0][1]?.headers as Record<string, string>;
+		expect(headers[ADMIN_CSRF_HEADER_NAME]).toBe('sync-csrf');
+	});
+
+	it('WEB-SYNC-02: listSyncLogs builds query string', async () => {
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ syncLogs: [] }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		await listSyncLogs('conn-1', 50);
+
+		expect(fetchMock).toHaveBeenCalledWith(
+			`${SYNC_API_PATH}/conn-1/logs?limit=50`,
+			expect.objectContaining({ credentials: 'include' }),
+		);
+	});
+
+	it('WEB-SYNC-03: triggerIdentitySync dryRun sends body', async () => {
+		setCsrfToken('sync-csrf');
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ syncLog: {}, connection: {} }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		await triggerIdentitySync('conn-1', { dryRun: true });
+
+		expect(fetchMock.mock.calls[0][1]?.body).toBe(JSON.stringify({ dryRun: true }));
+	});
+
+	it('WEB-SYNC-04: getSyncStatus hits status endpoint', async () => {
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ connectionId: 'conn-1', syncInProgress: false }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		await getSyncStatus('conn-1');
+
+		expect(fetchMock).toHaveBeenCalledWith(
+			`${SYNC_API_PATH}/conn-1/status`,
+			expect.objectContaining({ credentials: 'include' }),
+		);
+	});
+
+	it('WEB-SYNC-05: getSyncLog hits log detail endpoint', async () => {
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ syncLog: { id: 'log-1' } }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		await getSyncLog('log-1');
+
+		expect(fetchMock).toHaveBeenCalledWith(
+			`${SYNC_API_PATH}/logs/log-1`,
+			expect.objectContaining({ credentials: 'include' }),
+		);
+	});
+
+	it('WEB-SYNC-06: triggerIdentitySync throws AdminApiError on 409', async () => {
+		setCsrfToken('sync-csrf');
+		vi.stubGlobal(
+			'fetch',
+			vi.fn().mockResolvedValue({
+				ok: false,
+				status: 409,
+				statusText: 'Conflict',
+				json: async () => ({ statusCode: 409, message: 'Sync already in progress' }),
+			}),
+		);
+
+		await expect(triggerIdentitySync('conn-1')).rejects.toMatchObject({
+			name: 'AdminApiError',
+			statusCode: 409,
+			message: 'Sync already in progress',
+		});
+	});
+
+	it('WEB-SYNC-07: listSyncLogs omits query when limit undefined', async () => {
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ syncLogs: [] }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		await listSyncLogs('conn-1');
+
+		expect(fetchMock).toHaveBeenCalledWith(
+			`${SYNC_API_PATH}/conn-1/logs`,
+			expect.objectContaining({ credentials: 'include' }),
+		);
+	});
+
+	it('WEB-SYNC-08: getSyncStatus throws AdminApiError on 404', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn().mockResolvedValue({
+				ok: false,
+				status: 404,
+				statusText: 'Not Found',
+				json: async () => ({ statusCode: 404, message: 'API connection not found' }),
+			}),
+		);
+
+		await expect(getSyncStatus('missing')).rejects.toMatchObject({
+			name: 'AdminApiError',
+			statusCode: 404,
+		});
 	});
 });

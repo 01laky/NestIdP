@@ -1,6 +1,6 @@
 # Development guide
 
-Companion to [proposal.MD](./proposal.MD) for local setup (**v0.4.0** — admin bootstrap, authentication, API connection CRUD).
+Companion to [proposal.MD](./proposal.MD) for local setup (**v0.5.0** — admin bootstrap, authentication, API connection CRUD, identity sync).
 
 Database selection: **[database.md](./database.md)** — SQLite for local dev, PostgreSQL (or SQLite) at deploy time.
 
@@ -55,6 +55,7 @@ This syncs `schema.prisma` with `DATABASE_PROVIDER`. Root `pnpm install` runs `p
 | `/api/admin/auth/logout`     | Clears session cookie (CSRF when session present)  |
 | `/api/admin/auth/me`         | Current admin session + `csrfToken` (protected)    |
 | `/api/admin/api-connections` | API connection CRUD + connectivity test            |
+| `/api/admin/sync/*`          | Identity sync trigger, status, logs                |
 | `/api/auth/*`                | End-user auth REST API (stub)                      |
 | `/saml/*`                    | SAML protocol (stub, HTTP 501)                     |
 | `/health`                    | Liveness — always OK, no database                  |
@@ -65,32 +66,73 @@ This syncs `schema.prisma` with `DATABASE_PROVIDER`. Root `pnpm install` runs `p
 
 ![Admin login sequence](./img/admin-auth-flow.svg)
 
-### Admin REST API (v0.4.0)
+### Admin REST API (v0.5.0)
 
 Full operator surface:
 
-| Method | Path                                  | Auth    | CSRF  | Description                                        |
-| ------ | ------------------------------------- | ------- | ----- | -------------------------------------------------- |
-| POST   | `/api/admin/auth/login`               | —       | —     | Operator login                                     |
-| POST   | `/api/admin/auth/logout`              | session | yes\* | Logout (\*when session cookie present)             |
-| GET    | `/api/admin/auth/me`                  | session | —     | Session + `csrfToken`                              |
-| GET    | `/api/admin`                          | session | —     | Dashboard stats stub                               |
-| GET    | `/api/admin/api-connections`          | session | —     | List API connections                               |
-| POST   | `/api/admin/api-connections`          | session | yes   | Create connection (**v1: max 1**)                  |
-| GET    | `/api/admin/api-connections/:id`      | session | —     | Get connection                                     |
-| PATCH  | `/api/admin/api-connections/:id`      | session | yes   | Update connection                                  |
-| DELETE | `/api/admin/api-connections/:id`      | session | yes   | Delete connection                                  |
-| POST   | `/api/admin/api-connections/:id/test` | session | yes   | Connectivity probe (`GET {baseUrl}/users?limit=1`) |
+| Method | Path                                   | Auth    | CSRF  | Description                                           |
+| ------ | -------------------------------------- | ------- | ----- | ----------------------------------------------------- |
+| POST   | `/api/admin/auth/login`                | —       | —     | Operator login                                        |
+| POST   | `/api/admin/auth/logout`               | session | yes\* | Logout (\*when session cookie present)                |
+| GET    | `/api/admin/auth/me`                   | session | —     | Session + `csrfToken`                                 |
+| GET    | `/api/admin`                           | session | —     | Dashboard stats stub                                  |
+| GET    | `/api/admin/api-connections`           | session | —     | List API connections                                  |
+| POST   | `/api/admin/api-connections`           | session | yes   | Create connection (**v1: max 1**)                     |
+| GET    | `/api/admin/api-connections/:id`       | session | —     | Get connection                                        |
+| PATCH  | `/api/admin/api-connections/:id`       | session | yes   | Update connection                                     |
+| DELETE | `/api/admin/api-connections/:id`       | session | yes   | Delete connection                                     |
+| POST   | `/api/admin/api-connections/:id/test`  | session | yes   | Connectivity probe (`GET {baseUrl}/users?limit=1`)    |
+| POST   | `/api/admin/sync/:connectionId`        | session | yes   | Trigger identity sync (optional `{ "dryRun": true }`) |
+| GET    | `/api/admin/sync/:connectionId/status` | session | —     | Sync status + latest log                              |
+| GET    | `/api/admin/sync/:connectionId/logs`   | session | —     | List sync logs (`?limit=`, default 20, max 100)       |
+| GET    | `/api/admin/sync/logs/:syncLogId`      | session | —     | Get sync log detail                                   |
 
 Constants in `@nestidp/shared`:
 
 - **`API_CONNECTIONS_API_PATH`** — REST base (`/api/admin/api-connections`)
+- **`SYNC_API_PATH`** — identity sync REST base (`/api/admin/sync`)
 - **`API_CONNECTION_ROUTE_PREFIX`** — future React UI route (`/admin/api-connections`, Prompt 08)
 - **`ADMIN_CSRF_HEADER_NAME`** — `X-CSRF-Token` on mutating admin calls
 
 ![API connection CRUD flow](./img/api-connection-crud.svg)
 
+![Identity sync flow](./img/sync-flow.svg)
+
 Bearer tokens are encrypted at rest (AES-256-GCM via `ENCRYPTION_KEY`); API responses expose `hasBearerToken: true` but **never** the plaintext token.
+
+### Identity sync semantics (v1)
+
+- **Full snapshot sync** per run — no incremental/delta filter on `GET /users` (proposal §14 Q1 resolved)
+- **Soft-deactivate** users missing from the latest snapshot (`active: false`, memberships cleared) — never hard-delete (§14 Q2)
+- **bcrypt-only** `passwordHashAlgorithm` from external API (§14 Q5)
+- **Email normalization** — trim + lowercase before persist
+- **`SYNC_MAX_USERS_PER_RUN`** (default 10000) caps snapshot size
+- **`durationMs`** on `SyncLogDto` is computed in API responses (not a DB column)
+- **`dryRun: true`** — fetches external API, writes `SyncLog`, but does **not** mutate `User`/`Group`/`Role` or `lastSyncAt`
+- **Concurrency** — only one real sync per connection; stale `IN_PROGRESS` runs auto-fail after `SYNC_STALE_RUN_MINUTES` (default 30)
+- **Partial errors** — per-user failures go to `SyncLog.errors[]`; run completes with `SUCCESS` unless fetch/decrypt fails
+- **Upsert failure** skips groups/roles fetch for that user
+- External contract: [proposal.MD §7.2](./proposal.MD)
+
+Optional env:
+
+| Variable                 | Default | Purpose                                |
+| ------------------------ | ------- | -------------------------------------- |
+| `SYNC_HTTP_TIMEOUT_MS`   | `30000` | Outbound HTTP timeout per request      |
+| `SYNC_STALE_RUN_MINUTES` | `30`    | Stale sync recovery threshold          |
+| `SYNC_MAX_USERS_PER_RUN` | `10000` | Max users in one `GET /users` response |
+
+### Local mock identity API (dev / CI)
+
+```bash
+# Terminal 1
+node docs/examples/mock-identity-api.mjs
+
+# Terminal 2 — create connection with baseUrl http://localhost:4001, bearerToken test-token
+# Then POST /api/admin/sync/:connectionId
+```
+
+See [docs/examples/mock-identity-api.mjs](./examples/mock-identity-api.mjs).
 
 ### Admin session cookies and CSRF
 
@@ -136,7 +178,34 @@ curl -s -b "$COOKIE_JAR" http://localhost:3000/api/admin/api-connections
 # Connectivity test (replace CONNECTION_ID)
 curl -s -b "$COOKIE_JAR" -X POST "http://localhost:3000/api/admin/api-connections/CONNECTION_ID/test" \
   -H "X-CSRF-Token: $CSRF"
+
+# Trigger identity sync (replace CONNECTION_ID)
+curl -s -b "$COOKIE_JAR" -X POST "http://localhost:3000/api/admin/sync/CONNECTION_ID" \
+  -H "Content-Type: application/json" \
+  -H "X-CSRF-Token: $CSRF" \
+  -d '{}'
+
+# Dry run (no DB changes)
+curl -s -b "$COOKIE_JAR" -X POST "http://localhost:3000/api/admin/sync/CONNECTION_ID" \
+  -H "Content-Type: application/json" \
+  -H "X-CSRF-Token: $CSRF" \
+  -d '{"dryRun":true}'
+
+# Poll sync status
+curl -s -b "$COOKIE_JAR" "http://localhost:3000/api/admin/sync/CONNECTION_ID/status"
+
+# List sync logs
+curl -s -b "$COOKIE_JAR" "http://localhost:3000/api/admin/sync/CONNECTION_ID/logs?limit=10"
 ```
+
+### Upgrading from v0.4.0
+
+| Change              | Action                                                                 |
+| ------------------- | ---------------------------------------------------------------------- |
+| New sync endpoints  | No migration; configure API connection then `POST /api/admin/sync/:id` |
+| External API        | Must implement fixed v1 contract ([§7.2](./proposal.MD))               |
+| Stuck `IN_PROGRESS` | Wait `SYNC_STALE_RUN_MINUTES` or trigger sync after stale recovery     |
+| Large directories   | Tune `SYNC_MAX_USERS_PER_RUN` and `SYNC_HTTP_TIMEOUT_MS`               |
 
 ### Upgrading from v0.3.0
 
@@ -202,7 +271,7 @@ This sets `core.hooksPath=.githooks`. Hooks run on `prepare-commit-msg` and `com
 
 1. ~~Admin bootstrap seed + authentication (Prompt 03)~~
 2. ~~API connection CRUD (baseUrl + Bearer token) (Prompt 04)~~
-3. Identity sync (fixed v1 REST contract) — Prompt 05
+3. ~~Identity sync (fixed v1 REST contract) — Prompt 05~~
 4. End-user login + password verification
 5. Custom SamlModule XML implementation
 6. Admin SPA pages

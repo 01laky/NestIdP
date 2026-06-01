@@ -151,4 +151,27 @@ describe('validateEnv', () => {
 	it('rejects invalid ADMIN_SESSION_TTL_SECONDS', () => {
 		expect(() => validateEnv({ ...validConfig, ADMIN_SESSION_TTL_SECONDS: '0' })).toThrow();
 	});
+
+	it('accepts optional SYNC_HTTP_TIMEOUT_MS within range', () => {
+		const result = validateEnv({ ...validConfig, SYNC_HTTP_TIMEOUT_MS: '15000' });
+		expect(result.SYNC_HTTP_TIMEOUT_MS).toBe(15_000);
+	});
+
+	it('rejects SYNC_HTTP_TIMEOUT_MS below minimum', () => {
+		expect(() => validateEnv({ ...validConfig, SYNC_HTTP_TIMEOUT_MS: '500' })).toThrow();
+	});
+
+	it('accepts optional SYNC_STALE_RUN_MINUTES and SYNC_MAX_USERS_PER_RUN', () => {
+		const result = validateEnv({
+			...validConfig,
+			SYNC_STALE_RUN_MINUTES: '60',
+			SYNC_MAX_USERS_PER_RUN: '5000',
+		});
+		expect(result.SYNC_STALE_RUN_MINUTES).toBe(60);
+		expect(result.SYNC_MAX_USERS_PER_RUN).toBe(5000);
+	});
+
+	it('rejects invalid SYNC_MAX_USERS_PER_RUN', () => {
+		expect(() => validateEnv({ ...validConfig, SYNC_MAX_USERS_PER_RUN: '0' })).toThrow();
+	});
 });

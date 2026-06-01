@@ -4,6 +4,39 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.5.0]
+
+### Added
+
+- **`SyncModule`** — v1 identity sync engine (fixed REST contract per proposal §7.2)
+- **`POST /api/admin/sync/:connectionId`** — manual sync trigger with optional **`dryRun`**
+- **`GET /api/admin/sync/:connectionId/status`** — lightweight sync status for dashboard prep
+- **`GET /api/admin/sync/:connectionId/logs`**, **`GET /api/admin/sync/logs/:syncLogId`**
+- **`IdentitySyncClientService`** — outbound Bearer-authenticated fetch to external identity API
+- External API validators; email normalization; **`SYNC_MAX_USERS_PER_RUN`** safety cap (default 10000)
+- **`SyncLogDto.durationMs`** — computed run duration in API responses
+- **`IdentityRepository`** upsert/deactivate/orphan cleanup methods
+- **`SyncLog`** writes with structured **`errors`** JSON
+- Shared DTOs: **`SyncLogDto`**, **`TriggerSyncRequestDto`**, **`SyncStatusResponseDto`**, **`SYNC_API_PATH`**
+- `adminApi.ts`: **`triggerIdentitySync`**, **`getSyncStatus`**, **`listSyncLogs`**, **`getSyncLog`**
+- Env: **`SYNC_HTTP_TIMEOUT_MS`**, **`SYNC_STALE_RUN_MINUTES`**, **`SYNC_MAX_USERS_PER_RUN`**
+- **`docs/examples/mock-identity-api.mjs`** — local mock identity source for dev/CI
+- Integration + PostgreSQL smoke + static routing regression tests
+- Docs: identity sync semantics, curl examples, upgrade guide from v0.4.0
+
+### Changed
+
+- **`AdminStubResponseDto`** adds **`syncApiPath`**
+- **`IdentityRepository`** expanded beyond count-only stubs
+- Proposal §13: manual sync + upsert checkboxes checked; §14 Q1/Q2/Q5 documented as resolved
+- Expanded edge-case tests for v0.5.0 — **601** total tests (8 PostgreSQL smoke skipped locally)
+
+### Security
+
+- Password hashes stored only as returned by external API; never logged in sync errors
+- Sync trigger protected by admin session + CSRF
+- Bearer token decrypt only in server-side sync client
+
 ## [0.4.0]
 
 ### Added

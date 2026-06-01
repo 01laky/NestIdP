@@ -38,6 +38,15 @@ The `authCredentialsEncrypted` column stores **AES-256-GCM** ciphertext of the B
 - **`ENCRYPTION_KEY`** must be at least 16 characters and **stable across restarts** — rotating it invalidates stored tokens (re-create connections or PATCH with a new `bearerToken`)
 - API JSON never includes `authCredentialsEncrypted` or decrypted tokens — only `hasBearerToken: boolean`
 
+### Identity sync (v0.5.0)
+
+- **`User.passwordHash`** — synced verbatim from external API (bcrypt); never plaintext
+- **`User.email`** — stored normalized (trim + lowercase)
+- **`ApiConnection.lastSyncAt`** / **`lastSyncStatus`** — updated by sync engine (not updated on `dryRun`)
+- **`SyncLog.errors`** — JSON array of structured entries (`phase`, `message`, optional `httpStatus`, external ids)
+- Phases include `dry_run_summary`, `user_limit`, `fetch_users`, `upsert_user`, etc.
+- **`durationMs`** appears on API `SyncLogDto` only (computed from timestamps, not persisted)
+
 ## Local development (SQLite)
 
 No Docker required:

@@ -12,5 +12,7 @@ export interface AdminStubResponseDto {
 	note: string;
 	apiConnectionsRoute: string;
 	apiConnectionsApiPath: string;
+	/** Admin REST path for manual identity sync (Prompt 05). */
+	syncApiPath: string;
 	counts: AdminStatsDto;
 }

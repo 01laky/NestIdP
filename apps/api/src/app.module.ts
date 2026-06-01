@@ -18,7 +18,6 @@ import { IdentityModule } from './identity/identity.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { SamlModule } from './saml/saml.module';
 import { SpaModule } from './spa/spa.module';
-import { SyncModule } from './sync/sync.module';
 import { EncryptionModule } from './encryption/encryption.module';
 
 const webDistPath = getWebDistPath(__dirname);
@@ -52,7 +51,6 @@ const enableStaticServing = shouldEnableStaticServing(
 		AdminAuthModule,
 		AdminModule,
 		AuthModule,
-		SyncModule,
 		IdentityModule,
 		SamlModule,
 		SpaModule,
