@@ -8,10 +8,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { ADMIN_SESSION_COOKIE_NAME } from '@nestidp/shared';
+import { ADMIN_CSRF_HEADER_NAME, ADMIN_SESSION_COOKIE_NAME } from '@nestidp/shared';
 import { AdminModule } from '../admin/admin.module';
 import { AdminAuthModule } from '../admin-auth/admin-auth.module';
 import { LoginRateLimiterService } from '../admin-auth/login-rate-limiter.service';
+import { AdminSessionService } from '../admin-auth/admin-session.service';
 import { IdentityModule } from '../identity/identity.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { PrismaService } from '../prisma/prisma.service';
@@ -73,8 +74,10 @@ describe('admin-auth integration (SQLite)', () => {
 		await createTestAdminUserWithPassword(prisma, 'admin', adminPassword);
 	});
 
-	beforeEach(() => {
+	beforeEach(async () => {
 		app.get(LoginRateLimiterService).clear();
+		await prisma.user.deleteMany();
+		await prisma.apiConnection.deleteMany();
 	});
 
 	afterAll(async () => {
@@ -118,11 +121,14 @@ describe('admin-auth integration (SQLite)', () => {
 
 	it('API-AUTH-INT-04: Login → logout → GET /api/admin → 401', async () => {
 		const agent = request.agent(app.getHttpServer() as App);
-		await agent
+		const login = await agent
 			.post('/api/admin/auth/login')
 			.send({ username: 'admin', password: adminPassword })
 			.expect(200);
-		await agent.post('/api/admin/auth/logout').expect(200);
+		await agent
+			.post('/api/admin/auth/logout')
+			.set(ADMIN_CSRF_HEADER_NAME, login.body.csrfToken)
+			.expect(200);
 		await agent.get('/api/admin').expect(401);
 	});
 
@@ -313,6 +319,7 @@ describe('admin-auth integration (SQLite)', () => {
 		expect(response.body).toMatchObject({
 			ok: true,
 			admin: { id: expect.any(String), username: 'admin' },
+			csrfToken: expect.any(String),
 		});
 	});
 
@@ -330,5 +337,144 @@ describe('admin-auth integration (SQLite)', () => {
 			.post('/api/admin/auth/login')
 			.send({ username: 'fixture-user', password: 'fixture-known-pass' })
 			.expect(200);
+	});
+
+	it('API-CSRF-03: GET list connections without CSRF → 200 when authenticated', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		await agent
+			.post('/api/admin/auth/login')
+			.send({ username: 'admin', password: adminPassword })
+			.expect(200);
+		await agent.get('/api/admin/api-connections').expect(200);
+	});
+
+	it('API-CSRF-04: Login response includes csrfToken; cookie payload contains same value', async () => {
+		const response = await request(app.getHttpServer() as App)
+			.post('/api/admin/auth/login')
+			.send({ username: 'admin', password: adminPassword })
+			.expect(200);
+
+		expect(response.body.csrfToken).toEqual(expect.any(String));
+		expect(response.body.csrfToken.length).toBeGreaterThan(0);
+
+		const setCookie = response.headers['set-cookie'];
+		const cookies = Array.isArray(setCookie) ? setCookie : setCookie ? [setCookie] : [];
+		const sessionLine = cookies.find((value) => value.includes(ADMIN_SESSION_COOKIE_NAME));
+		const match = sessionLine?.match(new RegExp(`${ADMIN_SESSION_COOKIE_NAME}=([^;]+)`));
+		expect(match).toBeDefined();
+
+		const { AdminSessionService } = await import('./admin-session.service');
+		const sessionService = app.get(AdminSessionService);
+		const payload = sessionService.verify(match![1]);
+		expect(payload?.csrfToken).toBe(response.body.csrfToken);
+	});
+
+	it('API-CSRF-05: Logout requires valid CSRF when session present', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		await agent
+			.post('/api/admin/auth/login')
+			.send({ username: 'admin', password: adminPassword })
+			.expect(200);
+
+		await agent.post('/api/admin/auth/logout').expect(403);
+	});
+
+	it('API-CSRF-07: GET /me returns same csrfToken as login (no rotation)', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const login = await agent
+			.post('/api/admin/auth/login')
+			.send({ username: 'admin', password: adminPassword })
+			.expect(200);
+
+		const me = await agent.get('/api/admin/auth/me').expect(200);
+		expect(me.body.csrfToken).toBe(login.body.csrfToken);
+	});
+
+	it('API-CSRF-08: Login → logout → login → old CSRF header on PATCH → 403; new CSRF succeeds', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const firstLogin = await agent
+			.post('/api/admin/auth/login')
+			.send({ username: 'admin', password: adminPassword })
+			.expect(200);
+		const staleCsrf = firstLogin.body.csrfToken as string;
+
+		await agent.post('/api/admin/auth/logout').set(ADMIN_CSRF_HEADER_NAME, staleCsrf).expect(200);
+
+		const secondLogin = await agent
+			.post('/api/admin/auth/login')
+			.send({ username: 'admin', password: adminPassword })
+			.expect(200);
+		const freshCsrf = secondLogin.body.csrfToken as string;
+
+		await agent
+			.post('/api/admin/api-connections')
+			.set(ADMIN_CSRF_HEADER_NAME, staleCsrf)
+			.send({
+				name: 'Should fail',
+				baseUrl: 'https://identity.example.com',
+				bearerToken: 'secret',
+			})
+			.expect(403);
+
+		await agent
+			.post('/api/admin/api-connections')
+			.set(ADMIN_CSRF_HEADER_NAME, freshCsrf)
+			.send({
+				name: 'Corp API',
+				baseUrl: 'https://identity.example.com',
+				bearerToken: 'secret',
+			})
+			.expect(201);
+	});
+
+	it('API-CSRF-06: legacy session without csrfToken → GET /me ok, mutating POST 403', async () => {
+		const sessionService = app.get(AdminSessionService);
+		const admin = await prisma.adminUser.findUnique({ where: { username: 'admin' } });
+		expect(admin).not.toBeNull();
+
+		const now = Math.floor(Date.now() / 1000);
+		const legacyToken = sessionService.sign({
+			adminUserId: admin!.id,
+			username: admin!.username,
+			iat: now,
+			exp: now + 3600,
+		} as Parameters<AdminSessionService['sign']>[0]);
+
+		const agent = request.agent(app.getHttpServer() as App);
+		const me = await agent
+			.get('/api/admin/auth/me')
+			.set('Cookie', `${ADMIN_SESSION_COOKIE_NAME}=${legacyToken}`)
+			.expect(200);
+
+		expect(me.body.admin.username).toBe('admin');
+		expect(me.body.csrfToken).toBe('');
+
+		await agent
+			.post('/api/admin/api-connections')
+			.set('Cookie', `${ADMIN_SESSION_COOKIE_NAME}=${legacyToken}`)
+			.send({
+				name: 'Legacy CSRF test',
+				baseUrl: 'https://identity.example.com',
+				bearerToken: 'secret',
+			})
+			.expect(403);
+	});
+
+	it('API-CSRF-02: wrong CSRF header on POST create → 403', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		await agent
+			.post('/api/admin/auth/login')
+			.send({ username: 'admin', password: adminPassword })
+			.expect(200);
+
+		await agent
+			.post('/api/admin/api-connections')
+			.set(ADMIN_CSRF_HEADER_NAME, 'definitely-wrong-csrf')
+			.send({
+				name: 'Corp',
+				baseUrl: 'https://identity.example.com',
+				bearerToken: 'secret',
+			})
+			.expect(403);
 	});
 });

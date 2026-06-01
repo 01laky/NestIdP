@@ -72,6 +72,7 @@ describe('AdminLayout', () => {
 	it('renders admin heading when authenticated', async () => {
 		vi.spyOn(adminApi, 'getAdminMe').mockResolvedValue({
 			admin: { id: '1', username: 'admin' },
+			csrfToken: 'test-csrf-token',
 		});
 
 		renderAdminAt('/admin');
@@ -84,6 +85,7 @@ describe('AdminLayout', () => {
 	it('WEB-ADM-05: logout button calls logout endpoint', async () => {
 		vi.spyOn(adminApi, 'getAdminMe').mockResolvedValue({
 			admin: { id: '1', username: 'admin' },
+			csrfToken: 'test-csrf-token',
 		});
 		const logoutSpy = vi.spyOn(adminApi, 'logoutAdmin').mockResolvedValue({ ok: true });
 
@@ -100,6 +102,7 @@ describe('AdminLayout', () => {
 	it('shows separate API and SP connection route prefixes when authenticated', async () => {
 		vi.spyOn(adminApi, 'getAdminMe').mockResolvedValue({
 			admin: { id: '1', username: 'admin' },
+			csrfToken: 'test-csrf-token',
 		});
 
 		renderAdminAt('/admin');
@@ -113,6 +116,7 @@ describe('AdminLayout', () => {
 	it('renders sub-route placeholder for nested admin paths when authenticated', async () => {
 		vi.spyOn(adminApi, 'getAdminMe').mockResolvedValue({
 			admin: { id: '1', username: 'admin' },
+			csrfToken: 'test-csrf-token',
 		});
 
 		renderAdminAt('/admin/api-connections');
@@ -124,6 +128,7 @@ describe('AdminLayout', () => {
 	it('links to SAML login page when authenticated', async () => {
 		vi.spyOn(adminApi, 'getAdminMe').mockResolvedValue({
 			admin: { id: '1', username: 'admin' },
+			csrfToken: 'test-csrf-token',
 		});
 
 		renderAdminAt('/admin');

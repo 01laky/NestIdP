@@ -65,7 +65,7 @@ export function AdminLayout() {
 			<div className="card">
 				<h1>NestIdP Admin</h1>
 				<p className="muted">
-					Operator console scaffold — configuration UI comes in a later prompt.
+					API connection CRUD is available via REST; configuration UI comes in a later prompt.
 				</p>
 				<button type="button" onClick={() => void handleLogout()}>
 					Logout

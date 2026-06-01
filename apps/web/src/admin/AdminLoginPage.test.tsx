@@ -45,6 +45,7 @@ describe('AdminLoginPage', () => {
 		const loginSpy = vi.spyOn(adminApi, 'loginAdmin').mockResolvedValue({
 			ok: true,
 			admin: { id: '1', username: 'admin' },
+			csrfToken: 'test-csrf-token',
 		});
 
 		render(
@@ -67,6 +68,7 @@ describe('AdminLoginPage', () => {
 	it('WEB-ADM-06: authenticated user redirects to /admin', async () => {
 		vi.spyOn(adminApi, 'getAdminMe').mockResolvedValue({
 			admin: { id: '1', username: 'admin' },
+			csrfToken: 'test-csrf-token',
 		});
 
 		render(
@@ -87,7 +89,15 @@ describe('AdminLoginPage', () => {
 		vi.spyOn(adminApi, 'loginAdmin').mockImplementation(
 			() =>
 				new Promise((resolve) => {
-					setTimeout(() => resolve({ ok: true, admin: { id: '1', username: 'admin' } }), 100);
+					setTimeout(
+						() =>
+							resolve({
+								ok: true,
+								admin: { id: '1', username: 'admin' },
+								csrfToken: 'test-csrf-token',
+							}),
+						100,
+					);
 				}),
 		);
 

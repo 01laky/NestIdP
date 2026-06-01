@@ -25,6 +25,7 @@ export class AdminAuthGuard implements CanActivate {
 		try {
 			const admin = await this.adminAuthService.resolveAuthenticatedAdmin(payload.adminUserId);
 			request.adminUser = admin;
+			request.adminSession = payload;
 			return true;
 		} catch {
 			this.adminSessionService.clearCookie(response);

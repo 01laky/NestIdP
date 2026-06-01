@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AdminStatsDto, AdminStubResponseDto } from './admin-types.js';
-import { API_CONNECTION_ROUTE_PREFIX } from './connections.js';
+import { API_CONNECTION_ROUTE_PREFIX, API_CONNECTIONS_API_PATH } from './connections.js';
 
 describe('AdminStatsDto', () => {
 	it('SH-ADM-01: requires all five count fields', () => {
@@ -39,6 +39,7 @@ describe('AdminStubResponseDto', () => {
 			module: 'admin',
 			note: 'pending',
 			apiConnectionsRoute: API_CONNECTION_ROUTE_PREFIX,
+			apiConnectionsApiPath: API_CONNECTIONS_API_PATH,
 			counts: {
 				users: 0,
 				groups: 0,
@@ -57,6 +58,7 @@ describe('AdminStubResponseDto', () => {
 			module: 'admin',
 			note: '',
 			apiConnectionsRoute: API_CONNECTION_ROUTE_PREFIX,
+			apiConnectionsApiPath: API_CONNECTIONS_API_PATH,
 			counts: {
 				users: 0,
 				groups: 0,

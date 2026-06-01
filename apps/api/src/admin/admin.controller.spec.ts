@@ -1,4 +1,4 @@
-import { API_CONNECTION_ROUTE_PREFIX } from '@nestidp/shared';
+import { API_CONNECTION_ROUTE_PREFIX, API_CONNECTIONS_API_PATH } from '@nestidp/shared';
 import { AdminController } from './admin.controller';
 import { AdminStatsService } from './admin-stats.service';
 
@@ -56,6 +56,7 @@ describe('AdminController', () => {
 			module: 'admin',
 			note: expect.any(String),
 			apiConnectionsRoute: API_CONNECTION_ROUTE_PREFIX,
+			apiConnectionsApiPath: API_CONNECTIONS_API_PATH,
 			counts: expect.objectContaining({
 				users: expect.any(Number),
 				groups: expect.any(Number),
@@ -71,9 +72,10 @@ describe('AdminController', () => {
 		await expect(controller.getStub()).rejects.toThrow('stats unavailable');
 	});
 
-	it('API-ADM-13: note still mentions deferred CRUD work', async () => {
+	it('API-ADM-13: note mentions REST CRUD and deferred UI', async () => {
 		const result = await controller.getStub();
-		expect(result.note.toLowerCase()).toContain('later prompt');
+		expect(result.note.toLowerCase()).toContain('rest');
+		expect(result.note.toLowerCase()).toContain('later');
 	});
 
 	it('API-ADM-14: counts reflect service return values exactly', async () => {

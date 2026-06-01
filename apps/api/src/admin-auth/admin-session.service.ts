@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Response } from 'express';
@@ -10,6 +10,7 @@ export interface AdminSessionPayload {
 	username: string;
 	iat: number;
 	exp: number;
+	csrfToken: string;
 }
 
 const DEFAULT_SESSION_TTL_SECONDS = 28_800;
@@ -76,7 +77,7 @@ export class AdminSessionService {
 		return payload;
 	}
 
-	createPayload(adminUserId: string, username: string): AdminSessionPayload {
+	createPayload(adminUserId: string, username: string, csrfToken?: string): AdminSessionPayload {
 		const now = Math.floor(Date.now() / 1000);
 		const ttl = this.getSessionTtlSeconds();
 		return {
@@ -84,6 +85,7 @@ export class AdminSessionService {
 			username,
 			iat: now,
 			exp: now + ttl,
+			csrfToken: csrfToken ?? randomBytes(32).toString('hex'),
 		};
 	}
 

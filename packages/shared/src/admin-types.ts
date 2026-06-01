@@ -11,5 +11,6 @@ export interface AdminStubResponseDto {
 	module: 'admin';
 	note: string;
 	apiConnectionsRoute: string;
+	apiConnectionsApiPath: string;
 	counts: AdminStatsDto;
 }

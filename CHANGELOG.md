@@ -4,6 +4,42 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.4.0]
+
+### Added
+
+- `EncryptionService` + **`CredentialsEncryptionPort`** — AES-256-GCM for API Bearer tokens at rest (`ENCRYPTION_KEY`)
+- `redactBearerToken()` log helper
+- `ApiConnectionsModule` — CRUD at **`API_CONNECTIONS_API_PATH`**
+- **`POST /api/admin/api-connections/:id/test`** — lightweight connectivity probe (`GET /users?limit=1`)
+- `base-url.util.ts` — URL parse, normalize, harden (no embedded credentials)
+- `AdminCsrfGuard` + CSRF token in login/me responses; `ADMIN_CSRF_HEADER_NAME` header on mutating admin calls
+- Shared DTOs: `ApiConnectionDto`, test response, create/update/list/delete types
+- Shared **`API_CONNECTIONS_API_PATH`** constant
+- `adminApi.ts` helpers: list/get/create/update/delete/**test** API connections
+- v1 enforcement: max one `ApiConnection` per deployment; duplicate `name` guard
+- `ParseCuidPipe` for route params
+- Integration + PostgreSQL smoke tests; **`API-ADM-08`** stats count wiring
+- Diagram `docs/img/api-connection-crud.mmd` + SVG
+
+### Changed
+
+- `AdminLoginResponseDto` / `AdminMeResponseDto` include `csrfToken`
+- `AdminStubResponseDto` adds required **`apiConnectionsApiPath`**
+- `createTestApiConnection` supports real encryption via optional `bearerToken`
+- `GET /api/admin` stub note updated
+- `docs/development.md` — full admin route table, curl examples, **Upgrading from v0.3.0**
+- `docs/database.md`, README, `.env.example` — encryption + API connection docs
+- Proposal §13: split checklist — CRUD checked, sync still open
+- **Breaking:** v0.3.0 admin sessions must re-login after upgrade (CSRF in session payload)
+- Expanded edge-case tests for v0.4.0 — **492** tests (6 PostgreSQL smoke skipped locally)
+
+### Security
+
+- Bearer tokens encrypted at rest; never returned in API JSON
+- CSRF on admin mutating endpoints
+- HTTPS-only `baseUrl` in production
+
 ## [0.3.0]
 
 ### Added

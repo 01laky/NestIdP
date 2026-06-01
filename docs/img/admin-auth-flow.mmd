@@ -10,11 +10,12 @@ sequenceDiagram
     DB-->>API: passwordHash (or null)
     API->>API: verifyPasswordTimingSafe (bcrypt)
     alt valid credentials
-        API->>API: Sign session cookie (HMAC + SESSION_SECRET)
-        API-->>Web: Set-Cookie nestidp_admin_session + { ok, admin }
-        Web->>Web: navigate /admin
+        API->>API: Sign session cookie (HMAC + SESSION_SECRET, csrfToken in payload)
+        API-->>Web: Set-Cookie + ok, admin, csrfToken
+        Web->>Web: store csrfToken in memory
+        Web->>Web: navigate to /admin
         Web->>API: GET /api/admin/auth/me (credentials)
-        API-->>Web: { admin }
+        API-->>Web: { admin, csrfToken }
         Web->>API: GET /api/admin (credentials)
         API-->>Web: dashboard stub + counts
     else invalid credentials
@@ -22,5 +23,5 @@ sequenceDiagram
     end
 
     Op->>Web: Logout
-    Web->>API: POST /api/admin/auth/logout
+    Web->>API: POST /api/admin/auth/logout (X-CSRF-Token when session present)
     API-->>Web: Clear cookie + { ok: true }

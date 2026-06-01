@@ -13,11 +13,15 @@ import type {
 } from '@prisma/client';
 import { DEFAULT_PASSWORD_HASH_ALGORITHM } from '@nestidp/shared';
 import { hashPassword } from '../admin-auth/password.util';
+import { encrypt } from '../encryption/encryption.util';
 
 export const TEST_ENCRYPTED_CREDENTIALS = 'test-encrypted-token';
+export const TEST_ENCRYPTION_KEY = 'test-encryption-key-32chars!!';
 export const TEST_PASSWORD_HASH = '$2b$12$test.hash.for.integration.tests.only';
 
-type ApiConnectionOverrides = Partial<Omit<ApiConnection, 'id' | 'createdAt' | 'updatedAt'>>;
+type ApiConnectionOverrides = Partial<Omit<ApiConnection, 'id' | 'createdAt' | 'updatedAt'>> & {
+	bearerToken?: string;
+};
 type UserOverrides = Partial<Omit<User, 'id' | 'createdAt' | 'updatedAt'>>;
 type GroupOverrides = Partial<Omit<Group, 'id' | 'createdAt' | 'updatedAt'>>;
 type RoleOverrides = Partial<Omit<Role, 'id' | 'createdAt' | 'updatedAt'>>;
@@ -39,12 +43,19 @@ export async function createTestApiConnection(
 	prisma: PrismaClient,
 	overrides: ApiConnectionOverrides = {},
 ): Promise<ApiConnection> {
+	const { bearerToken, ...rest } = overrides;
+	const authCredentialsEncrypted =
+		rest.authCredentialsEncrypted ??
+		(bearerToken !== undefined
+			? encrypt(bearerToken, TEST_ENCRYPTION_KEY)
+			: TEST_ENCRYPTED_CREDENTIALS);
+
 	return prisma.apiConnection.create({
 		data: {
 			name: 'Test API',
 			baseUrl: 'https://identity.example.com',
-			authCredentialsEncrypted: TEST_ENCRYPTED_CREDENTIALS,
-			...overrides,
+			authCredentialsEncrypted,
+			...rest,
 		},
 	});
 }

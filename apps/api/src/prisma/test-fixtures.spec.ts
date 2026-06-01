@@ -204,4 +204,26 @@ describe('test-fixtures', () => {
 		expect(await verifyPassword('super-secret-pass', capturedHash)).toBe(true);
 		expect(await verifyPassword('wrong', capturedHash)).toBe(false);
 	});
+
+	it('API-FIX-14: bearerToken override encrypts with TEST_ENCRYPTION_KEY', async () => {
+		const { decrypt } = await import('../encryption/encryption.util');
+		const { TEST_ENCRYPTION_KEY } = await import('./test-fixtures');
+
+		let stored = '';
+		const prisma = {
+			apiConnection: {
+				create: jest.fn().mockImplementation(({ data }) => {
+					stored = data.authCredentialsEncrypted;
+					return { id: 'conn-1', ...data };
+				}),
+			},
+		};
+
+		await createTestApiConnection(prisma as unknown as PrismaClient, {
+			bearerToken: 'fixture-plain-token',
+		});
+
+		expect(stored.startsWith('v1:')).toBe(true);
+		expect(decrypt(stored, TEST_ENCRYPTION_KEY)).toBe('fixture-plain-token');
+	});
 });

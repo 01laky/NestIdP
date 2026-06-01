@@ -41,7 +41,7 @@ describe('Routing (e2e)', () => {
 							DATABASE_PROVIDER: 'sqlite',
 							DATABASE_URL: 'file:../data/nestidp.db',
 							SESSION_SECRET: 'test-session-secret',
-							ENCRYPTION_KEY: 'test-encryption-key',
+							ENCRYPTION_KEY: 'test-encryption-key-32chars!!',
 							IDP_BASE_URL: 'http://localhost:3000',
 							NODE_ENV: 'test',
 						}),
@@ -50,6 +50,7 @@ describe('Routing (e2e)', () => {
 				HealthModule,
 				PrismaModule,
 				IdentityModule,
+				(await import('../src/encryption/encryption.module')).EncryptionModule,
 				AdminAuthModule,
 				AdminModule,
 				AuthModule,
@@ -121,6 +122,12 @@ describe('Routing (e2e)', () => {
 	it('GET /api/admin without session returns 401', async () => {
 		await request(app.getHttpServer() as App)
 			.get('/api/admin')
+			.expect(401);
+	});
+
+	it('GET /api/admin/api-connections without session returns 401', async () => {
+		await request(app.getHttpServer() as App)
+			.get('/api/admin/api-connections')
 			.expect(401);
 	});
 

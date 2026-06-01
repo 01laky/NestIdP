@@ -1,5 +1,9 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
-import { API_CONNECTION_ROUTE_PREFIX, type AdminStubResponseDto } from '@nestidp/shared';
+import {
+	API_CONNECTION_ROUTE_PREFIX,
+	API_CONNECTIONS_API_PATH,
+	type AdminStubResponseDto,
+} from '@nestidp/shared';
 import { AdminAuthGuard } from '../admin-auth/admin-auth.guard';
 import { AdminStatsService } from './admin-stats.service';
 
@@ -15,8 +19,9 @@ export class AdminController {
 		return {
 			status: 'stub',
 			module: 'admin',
-			note: 'API connection and SP connection CRUD will be implemented in a later prompt.',
+			note: 'API connection CRUD and connectivity test available via REST; admin UI pages in a later release.',
 			apiConnectionsRoute: API_CONNECTION_ROUTE_PREFIX,
+			apiConnectionsApiPath: API_CONNECTIONS_API_PATH,
 			counts,
 		};
 	}

@@ -30,6 +30,14 @@ Additional providers (MySQL, etc.) can be added later if the Prisma schema stays
 
 See [proposal.MD](./proposal.MD) §9 and the ER diagram above.
 
+### ApiConnection credentials (v0.4.0)
+
+The `authCredentialsEncrypted` column stores **AES-256-GCM** ciphertext of the Bearer token (format `v1:` + base64 payload). Plaintext tokens are never persisted.
+
+- Key material: `SHA-256(ENCRYPTION_KEY)` — see `apps/api/src/encryption/encryption.util.ts`
+- **`ENCRYPTION_KEY`** must be at least 16 characters and **stable across restarts** — rotating it invalidates stored tokens (re-create connections or PATCH with a new `bearerToken`)
+- API JSON never includes `authCredentialsEncrypted` or decrypted tokens — only `hasBearerToken: boolean`
+
 ## Local development (SQLite)
 
 No Docker required:

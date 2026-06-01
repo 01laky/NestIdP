@@ -1,5 +1,7 @@
 export const ADMIN_SESSION_COOKIE_NAME = 'nestidp_admin_session';
 
+export const ADMIN_CSRF_HEADER_NAME = 'X-CSRF-Token';
+
 export interface AdminLoginRequestDto {
 	username: string;
 	password: string;
@@ -13,6 +15,7 @@ export interface AdminMeDto {
 export interface AdminLoginResponseDto {
 	ok: true;
 	admin: AdminMeDto;
+	csrfToken: string;
 }
 
 export interface AdminLogoutResponseDto {
@@ -21,4 +24,5 @@ export interface AdminLogoutResponseDto {
 
 export interface AdminMeResponseDto {
 	admin: AdminMeDto;
+	csrfToken: string;
 }

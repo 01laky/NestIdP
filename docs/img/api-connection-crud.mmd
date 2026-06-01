@@ -1,0 +1,20 @@
+sequenceDiagram
+    participant Op as Operator / adminApi.ts
+    participant API as NestJS ApiConnectionsModule
+    participant Enc as EncryptionService
+    participant DB as ApiConnection table
+
+    Op->>API: POST /api/admin/api-connections (session + CSRF)
+    API->>API: validate baseUrl, v1 limit (max 1)
+    API->>Enc: encrypt(bearerToken)
+    Enc-->>API: v1:... ciphertext
+    API->>DB: INSERT name, baseUrl, authCredentialsEncrypted
+    DB-->>API: row (no plaintext token)
+    API-->>Op: ApiConnectionDto (hasBearerToken: true)
+
+    Op->>API: POST /api/admin/api-connections/:id/test
+    API->>DB: load connection
+    API->>Enc: decrypt(authCredentialsEncrypted)
+    Enc-->>API: bearer token (server only)
+    API->>API: GET {baseUrl}/users?limit=1
+    API-->>Op: connectivity result (no token in response)

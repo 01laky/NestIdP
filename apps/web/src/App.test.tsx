@@ -36,6 +36,7 @@ describe('App routing', () => {
 	it('renders admin placeholder at /admin when authenticated', async () => {
 		vi.mocked(adminApi.getAdminMe).mockResolvedValue({
 			admin: { id: '1', username: 'admin' },
+			csrfToken: 'test-csrf-token',
 		});
 		renderAt('/admin');
 		await waitFor(() => {
@@ -83,6 +84,7 @@ describe('App routing', () => {
 	it('keeps admin and login as separate surfaces', async () => {
 		vi.mocked(adminApi.getAdminMe).mockResolvedValue({
 			admin: { id: '1', username: 'admin' },
+			csrfToken: 'test-csrf-token',
 		});
 		const { unmount } = renderAt('/admin');
 		await waitFor(() => screen.getByRole('heading', { name: 'NestIdP Admin' }));
@@ -95,6 +97,7 @@ describe('App routing', () => {
 	it('renders nested admin sub-routes when authenticated', async () => {
 		vi.mocked(adminApi.getAdminMe).mockResolvedValue({
 			admin: { id: '1', username: 'admin' },
+			csrfToken: 'test-csrf-token',
 		});
 		renderAt('/admin/api-connections');
 		await waitFor(() => {
@@ -106,6 +109,7 @@ describe('App routing', () => {
 	it('does not expose API stub JSON in the UI', async () => {
 		vi.mocked(adminApi.getAdminMe).mockResolvedValue({
 			admin: { id: '1', username: 'admin' },
+			csrfToken: 'test-csrf-token',
 		});
 		renderAt('/admin');
 		await waitFor(() => screen.getByRole('heading', { name: 'NestIdP Admin' }));

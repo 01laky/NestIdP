@@ -17,6 +17,8 @@ describe('AdminSessionService', () => {
 
 	it('API-SES-01: sign + verify round-trip', () => {
 		const payload = service.createPayload('admin-1', 'admin');
+		expect(payload.csrfToken).toEqual(expect.any(String));
+		expect(payload.csrfToken.length).toBeGreaterThan(0);
 		const token = service.sign(payload);
 		expect(service.verify(token)).toEqual(payload);
 	});
@@ -34,6 +36,7 @@ describe('AdminSessionService', () => {
 			username: 'admin',
 			iat: now - 7200,
 			exp: now - 3600,
+			csrfToken: 'expired-session-csrf',
 		});
 		expect(service.verify(token)).toBeNull();
 	});
@@ -133,7 +136,22 @@ describe('AdminSessionService', () => {
 		expect(service.verify(undefined)).toBeNull();
 	});
 
-	it('API-SES-13: empty string token returns null', () => {
-		expect(service.verify('')).toBeNull();
+	it('API-SES-14: legacy payload without csrfToken still verifies for read-only session', () => {
+		const now = Math.floor(Date.now() / 1000);
+		const token = service.sign({
+			adminUserId: 'admin-1',
+			username: 'admin',
+			iat: now,
+			exp: now + 3600,
+		} as Parameters<AdminSessionService['sign']>[0]);
+		const payload = service.verify(token);
+		expect(payload).not.toBeNull();
+		expect(payload?.csrfToken).toBeUndefined();
+	});
+
+	it('API-SES-15: createPayload generates unique csrfToken per call', () => {
+		const a = service.createPayload('a1', 'admin');
+		const b = service.createPayload('a1', 'admin');
+		expect(a.csrfToken).not.toBe(b.csrfToken);
 	});
 });

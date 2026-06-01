@@ -26,29 +26,26 @@ describe('connection route prefixes', () => {
 });
 
 describe('ApiConnectionStubDto', () => {
-	it('accepts minimal required fields', () => {
-		const dto: ApiConnectionStubDto = {
-			name: 'HR System',
-			baseUrl: 'https://hr.example.com/api',
-		};
-		expect(dto.name).toBe('HR System');
-		expect(dto.id).toBeUndefined();
-	});
+	const fullDto: ApiConnectionStubDto = {
+		id: 'conn-1',
+		name: 'HR System',
+		baseUrl: 'https://hr.example.com/api',
+		authType: 'BEARER',
+		hasBearerToken: true,
+		lastSyncAt: null,
+		lastSyncStatus: 'NEVER',
+		createdAt: '2026-01-01T00:00:00.000Z',
+		updatedAt: '2026-01-01T00:00:00.000Z',
+	};
 
-	it('accepts optional id', () => {
-		const dto: ApiConnectionStubDto = {
-			id: 'conn-1',
-			name: 'HR System',
-			baseUrl: 'https://hr.example.com/api',
-		};
-		expect(dto.id).toBe('conn-1');
+	it('accepts full ApiConnectionDto shape', () => {
+		expect(fullDto.name).toBe('HR System');
+		expect(fullDto.id).toBe('conn-1');
 	});
 
 	it('accepts sync metadata fields aligned with schema', () => {
 		const dto: ApiConnectionStubDto = {
-			name: 'HR',
-			baseUrl: 'https://hr.example.com',
-			authType: 'BEARER',
+			...fullDto,
 			lastSyncStatus: 'SUCCESS',
 			lastSyncAt: '2026-01-01T00:00:00.000Z',
 		};
@@ -58,12 +55,7 @@ describe('ApiConnectionStubDto', () => {
 	});
 
 	it('allows null lastSyncAt before first sync', () => {
-		const dto: ApiConnectionStubDto = {
-			name: 'HR',
-			baseUrl: 'https://hr.example.com',
-			lastSyncAt: null,
-		};
-		expect(dto.lastSyncAt).toBeNull();
+		expect(fullDto.lastSyncAt).toBeNull();
 	});
 });
 

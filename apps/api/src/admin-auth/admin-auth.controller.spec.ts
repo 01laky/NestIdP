@@ -14,6 +14,7 @@ describe('AdminAuthController', () => {
 		createPayload: jest.fn(),
 		setCookie: jest.fn(),
 		clearCookie: jest.fn(),
+		verify: jest.fn(),
 	};
 	const loginRateLimiter = {
 		isLimited: jest.fn(),
@@ -40,6 +41,7 @@ describe('AdminAuthController', () => {
 			username: 'admin',
 			iat: 1,
 			exp: 2,
+			csrfToken: 'csrf-token-value',
 		});
 
 		const result = await controller.login(
@@ -48,12 +50,22 @@ describe('AdminAuthController', () => {
 			res,
 		);
 
-		expect(result).toEqual({ ok: true, admin: { id: 'a1', username: 'admin' } });
+		expect(result).toEqual({
+			ok: true,
+			admin: { id: 'a1', username: 'admin' },
+			csrfToken: 'csrf-token-value',
+		});
 		expect(result.admin).not.toHaveProperty('passwordHash');
 	});
 
 	it('API-CTL-02: login sets session cookie on success', async () => {
-		const payload = { adminUserId: 'a1', username: 'admin', iat: 1, exp: 2 };
+		const payload = {
+			adminUserId: 'a1',
+			username: 'admin',
+			iat: 1,
+			exp: 2,
+			csrfToken: 'csrf-token-value',
+		};
 		adminAuthService.login.mockResolvedValue({ id: 'a1', username: 'admin' });
 		adminSessionService.createPayload.mockReturnValue(payload);
 
@@ -96,9 +108,26 @@ describe('AdminAuthController', () => {
 		expect(adminAuthService.login).not.toHaveBeenCalled();
 	});
 
-	it('API-CTL-05: logout clears cookie and returns ok', () => {
-		expect(controller.logout(res)).toEqual({ ok: true });
+	it('API-CTL-05: logout clears cookie and returns ok when no session', () => {
+		adminSessionService.verify.mockReturnValue(null);
+		expect(controller.logout({ cookies: {} } as AdminAuthenticatedRequest, res)).toEqual({
+			ok: true,
+		});
 		expect(adminSessionService.clearCookie).toHaveBeenCalledWith(res);
+	});
+
+	it('API-CTL-09: logout with session requires matching CSRF header', () => {
+		adminSessionService.verify.mockReturnValue({
+			adminUserId: 'a1',
+			username: 'admin',
+			iat: 1,
+			exp: 2,
+			csrfToken: 'expected-csrf',
+		});
+
+		expect(() =>
+			controller.logout({ cookies: {}, headers: {} } as AdminAuthenticatedRequest, res),
+		).toThrow('Invalid CSRF token');
 	});
 
 	it('API-CTL-06: me throws when adminUser missing on request', () => {
@@ -112,6 +141,7 @@ describe('AdminAuthController', () => {
 			username: 'admin',
 			iat: 1,
 			exp: 2,
+			csrfToken: 'csrf-token-value',
 		});
 
 		await controller.login(

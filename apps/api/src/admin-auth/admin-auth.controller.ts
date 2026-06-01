@@ -1,6 +1,7 @@
 import {
 	Body,
 	Controller,
+	ForbiddenException,
 	Get,
 	HttpCode,
 	HttpException,
@@ -18,6 +19,7 @@ import type {
 	AdminLogoutResponseDto,
 	AdminMeResponseDto,
 } from '@nestidp/shared';
+import { ADMIN_CSRF_HEADER_NAME, ADMIN_SESSION_COOKIE_NAME } from '@nestidp/shared';
 import { AdminAuthGuard } from './admin-auth.guard';
 import { AdminAuthService } from './admin-auth.service';
 import { AdminAuthenticatedRequest, toAdminMeDto } from './admin-auth.types';
@@ -52,7 +54,7 @@ export class AdminAuthController {
 			const payload = this.adminSessionService.createPayload(admin.id, admin.username);
 			this.adminSessionService.setCookie(res, payload);
 			this.loginRateLimiter.reset(clientIp);
-			return { ok: true, admin };
+			return { ok: true, admin, csrfToken: payload.csrfToken };
 		} catch (error) {
 			if (error instanceof UnauthorizedException) {
 				this.loginRateLimiter.recordFailure(clientIp);
@@ -63,7 +65,23 @@ export class AdminAuthController {
 
 	@Post('logout')
 	@HttpCode(HttpStatus.OK)
-	logout(@Res({ passthrough: true }) res: Response): AdminLogoutResponseDto {
+	logout(
+		@Req() req: AdminAuthenticatedRequest,
+		@Res({ passthrough: true }) res: Response,
+	): AdminLogoutResponseDto {
+		const token = req.cookies?.[ADMIN_SESSION_COOKIE_NAME] as string | undefined;
+		const payload = this.adminSessionService.verify(token);
+		if (payload) {
+			const header = req.headers?.[ADMIN_CSRF_HEADER_NAME.toLowerCase()];
+			const headerValue = Array.isArray(header) ? header[0] : header;
+			if (
+				!headerValue ||
+				headerValue !== payload.csrfToken ||
+				typeof payload.csrfToken !== 'string'
+			) {
+				throw new ForbiddenException('Invalid CSRF token');
+			}
+		}
 		this.adminSessionService.clearCookie(res);
 		return { ok: true };
 	}
@@ -74,6 +92,9 @@ export class AdminAuthController {
 		if (!req.adminUser) {
 			throw new UnauthorizedException('Unauthorized');
 		}
-		return { admin: toAdminMeDto(req.adminUser) };
+		return {
+			admin: toAdminMeDto(req.adminUser),
+			csrfToken: req.adminSession?.csrfToken ?? '',
+		};
 	}
 }

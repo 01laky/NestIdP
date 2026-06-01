@@ -78,3 +78,5 @@ Optional bootstrap (first admin + IdpSettings on API start when tables are empty
 - `ADMIN_SESSION_TTL_SECONDS` — operator session lifetime (default 8h)
 
 Operator login: **http://localhost:5173/admin/login** (separate from end-user SAML `/login`).
+
+Configure identity source API connections via admin REST at **`/api/admin/api-connections`** (see [development.md](docs/development.md)). **`ENCRYPTION_KEY` must stay stable** — changing it invalidates stored Bearer tokens.
