@@ -1,5 +1,6 @@
 import type { ApiConnectionDto } from './connections.js';
 import type { LastSyncStatus } from './schema-enums.js';
+import type { AdminDashboardIdpCertStatus } from './idp-settings.js';
 
 export interface AdminStatsDto {
 	users: number;
@@ -7,6 +8,14 @@ export interface AdminStatsDto {
 	roles: number;
 	apiConnections: number;
 	spConnections: number;
+}
+
+export interface AdminDashboardIdpStatusDto {
+	idpSettingsRoute: string;
+	hasSigningCertificate: boolean;
+	rotationActive: boolean;
+	signingCertNotAfter: string | null;
+	certStatus: AdminDashboardIdpCertStatus;
 }
 
 export interface AdminDashboardResponseDto {
@@ -20,6 +29,7 @@ export interface AdminDashboardResponseDto {
 	metadataUrl: string;
 	entityId: string;
 	ssoUrl: string;
+	idp: AdminDashboardIdpStatusDto;
 	apiConnection: ApiConnectionDto | null;
 	lastSyncStatus: LastSyncStatus | null;
 	lastSyncAt: string | null;

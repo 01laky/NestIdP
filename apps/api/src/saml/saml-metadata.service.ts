@@ -19,10 +19,9 @@ export class SamlMetadataService {
 			throw new Error('IdP settings not configured');
 		}
 
-		const material = await this.idpSigning.ensureSigningMaterial();
+		const certPems = await this.idpSigning.getMetadataSigningCertificates();
 		const baseUrl = (this.configService.get<string>('IDP_BASE_URL') ?? '').replace(/\/+$/, '');
 		const ssoUrl = `${baseUrl}${SAML_SSO_PATH}`;
-		const certBody = this.idpSigning.extractX509CertificatePem(material.certPem);
 
 		const doc = create({ version: '1.0', encoding: 'UTF-8' }).ele('md:EntityDescriptor', {
 			'xmlns:md': 'urn:oasis:names:tc:SAML:2.0:metadata',
@@ -34,12 +33,15 @@ export class SamlMetadataService {
 			wantAuthnRequestsSigned: 'false',
 		});
 
-		idp
-			.ele('md:KeyDescriptor', { use: 'signing' })
-			.ele('ds:KeyInfo', { 'xmlns:ds': 'http://www.w3.org/2000/09/xmldsig#' })
-			.ele('ds:X509Data')
-			.ele('ds:X509Certificate')
-			.txt(certBody);
+		for (const certPem of certPems) {
+			const certBody = this.idpSigning.extractX509CertificatePem(certPem);
+			idp
+				.ele('md:KeyDescriptor', { use: 'signing' })
+				.ele('ds:KeyInfo', { 'xmlns:ds': 'http://www.w3.org/2000/09/xmldsig#' })
+				.ele('ds:X509Data')
+				.ele('ds:X509Certificate')
+				.txt(certBody);
+		}
 
 		idp.ele('md:NameIDFormat').txt(settings.nameIdFormat);
 		idp.ele('md:NameIDFormat').txt('urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified');

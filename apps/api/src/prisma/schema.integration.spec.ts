@@ -13,6 +13,7 @@ import {
 	createTestSpConnection,
 	createTestSyncLog,
 	createTestUser,
+	getTestSigningMaterial,
 } from './test-fixtures';
 import { runMigrationsOnTestDb } from './test-db.helper';
 
@@ -417,5 +418,42 @@ describe('schema integration (SQLite)', () => {
 			data: { status: 'SUCCESS', finishedAt: new Date() },
 		});
 		expect(finished.finishedAt).not.toBeNull();
+	});
+
+	it('API-IDP-SCH-01: IdpSettings rotation columns exist after migration', async () => {
+		const settings = await createTestIdpSettings(prisma, {
+			pendingSigningCertPem: null,
+			pendingSigningKeyEncrypted: null,
+			rotationStartedAt: null,
+		});
+		expect(settings.pendingSigningCertPem).toBeNull();
+		expect(settings.pendingSigningKeyEncrypted).toBeNull();
+		expect(settings.rotationStartedAt).toBeNull();
+	});
+
+	it('API-IDP-SCH-02: existing IdpSettings rows backfill nullable pending columns', async () => {
+		const settings = await prisma.idpSettings.findUnique({ where: { id: 'default' } });
+		expect(settings?.pendingSigningCertPem ?? null).toBeNull();
+		expect(settings?.pendingSigningKeyEncrypted ?? null).toBeNull();
+	});
+
+	it('API-IDP-SCH-03: pending rotation columns persist round-trip', async () => {
+		const { certPem, privateKeyPem } = getTestSigningMaterial(
+			'https://pending-roundtrip.example.com',
+		);
+		const { encrypt } = await import('../encryption/encryption.util');
+		const started = new Date('2026-03-01T10:00:00.000Z');
+		await prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: {
+				pendingSigningCertPem: certPem,
+				pendingSigningKeyEncrypted: encrypt(privateKeyPem, 'test-encryption-key-32chars!!'),
+				rotationStartedAt: started,
+			},
+		});
+		const loaded = await prisma.idpSettings.findUnique({ where: { id: 'default' } });
+		expect(loaded?.pendingSigningCertPem).toBe(certPem);
+		expect(loaded?.pendingSigningKeyEncrypted).toContain('v1:');
+		expect(loaded?.rotationStartedAt?.toISOString()).toBe(started.toISOString());
 	});
 });

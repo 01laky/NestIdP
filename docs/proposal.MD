@@ -640,7 +640,7 @@ Any platform supporting Docker containers and a SQL database (SQLite or PostgreS
 ### Phase 1 — MVP
 
 - [ ] NestJS monolith scaffold (API + static serving)
-- [ ] React Admin SPA (API connections, SP connections, IdP settings)
+- [x] React Admin SPA (API connections, SP connections, IdP settings)
 - [ ] React SAML login page
 - [x] Prisma schema and migrations (portable across sqlite/postgresql)
 - [x] API connection CRUD (baseUrl + Bearer token)

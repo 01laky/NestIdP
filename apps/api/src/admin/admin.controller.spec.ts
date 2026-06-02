@@ -1,6 +1,7 @@
 import {
 	API_CONNECTION_ROUTE_PREFIX,
 	API_CONNECTIONS_API_PATH,
+	IDP_SETTINGS_ROUTE_PREFIX,
 	SP_CONNECTION_ROUTE_PREFIX,
 	SYNC_API_PATH,
 } from '@nestidp/shared';
@@ -32,6 +33,13 @@ describe('AdminController', () => {
 			metadataUrl: 'http://localhost:3000/saml/metadata',
 			entityId: 'http://localhost:3000',
 			ssoUrl: 'http://localhost:3000/saml/sso',
+			idp: {
+				idpSettingsRoute: IDP_SETTINGS_ROUTE_PREFIX,
+				hasSigningCertificate: true,
+				rotationActive: false,
+				signingCertNotAfter: '2030-01-01T00:00:00.000Z',
+				certStatus: 'ok',
+			},
 			apiConnection: null,
 			lastSyncStatus: null,
 			lastSyncAt: null,
@@ -78,6 +86,10 @@ describe('AdminController', () => {
 			metadataUrl: expect.any(String),
 			entityId: expect.any(String),
 			ssoUrl: expect.any(String),
+			idp: expect.objectContaining({
+				idpSettingsRoute: IDP_SETTINGS_ROUTE_PREFIX,
+				certStatus: expect.any(String),
+			}),
 			counts: expect.objectContaining({
 				users: expect.any(Number),
 				groups: expect.any(Number),
@@ -116,6 +128,13 @@ describe('AdminController', () => {
 			metadataUrl: 'http://localhost:3000/saml/metadata',
 			entityId: 'http://localhost:3000',
 			ssoUrl: 'http://localhost:3000/saml/sso',
+			idp: {
+				idpSettingsRoute: IDP_SETTINGS_ROUTE_PREFIX,
+				hasSigningCertificate: false,
+				rotationActive: true,
+				signingCertNotAfter: null,
+				certStatus: 'rotation_active',
+			},
 			apiConnection: null,
 			lastSyncStatus: 'SUCCESS',
 			lastSyncAt: '2026-01-01T00:00:00.000Z',

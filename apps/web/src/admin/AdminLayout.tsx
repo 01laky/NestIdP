@@ -3,6 +3,7 @@ import { Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import {
 	API_CONNECTION_ROUTE_PREFIX,
 	IDENTITY_ROUTE_PREFIX,
+	IDP_SETTINGS_ROUTE_PREFIX,
 	SP_CONNECTION_ROUTE_PREFIX,
 } from '@nestidp/shared';
 import { AdminApiError, getAdminMe, logoutAdmin } from './adminApi';
@@ -16,6 +17,7 @@ import { IdentityUserDetailPage } from './pages/IdentityUserDetailPage';
 import { IdentityUsersPage } from './pages/IdentityUsersPage';
 import { SpConnectionFormPage } from './pages/SpConnectionFormPage';
 import { SpConnectionTestSsoPage } from './pages/SpConnectionTestSsoPage';
+import { IdpSettingsPage } from './pages/IdpSettingsPage';
 import { SpConnectionsListPage } from './pages/SpConnectionsListPage';
 import { SyncLogDetailPage } from './pages/SyncLogDetailPage';
 
@@ -85,6 +87,7 @@ export function AdminLayout() {
 					<Link to={`${IDENTITY_ROUTE_PREFIX}/users`}>Users</Link>
 					<Link to={`${IDENTITY_ROUTE_PREFIX}/groups`}>Groups</Link>
 					<Link to={`${IDENTITY_ROUTE_PREFIX}/roles`}>Roles</Link>
+					<Link to={IDP_SETTINGS_ROUTE_PREFIX}>IdP Settings</Link>
 					<Link to="/login">SAML login</Link>
 				</nav>
 				<button type="button" className="admin-logout" onClick={() => void handleLogout()}>
@@ -107,6 +110,8 @@ export function AdminLayout() {
 					<Route path="identity/users/:id" element={<IdentityUserDetailPage />} />
 					<Route path="identity/groups" element={<IdentityGroupsPage />} />
 					<Route path="identity/roles" element={<IdentityRolesPage />} />
+					<Route path="settings" element={<Navigate to={IDP_SETTINGS_ROUTE_PREFIX} replace />} />
+					<Route path="settings/idp" element={<IdpSettingsPage />} />
 					<Route path="*" element={<p className="muted">Page not found.</p>} />
 				</Routes>
 			</main>

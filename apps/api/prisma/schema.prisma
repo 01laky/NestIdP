@@ -172,11 +172,14 @@ model SamlSession {
 }
 
 model IdpSettings {
-	id                  String   @id @default("default")
-	entityId            String
-	signingCertPem      String?
-	signingKeyEncrypted String?
-	nameIdFormat        String   @default("urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress")
-	createdAt           DateTime @default(now())
-	updatedAt           DateTime @updatedAt
+	id                          String    @id @default("default")
+	entityId                    String
+	signingCertPem              String?
+	signingKeyEncrypted         String?
+	pendingSigningCertPem       String?
+	pendingSigningKeyEncrypted  String?
+	rotationStartedAt           DateTime?
+	nameIdFormat                String    @default("urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress")
+	createdAt                   DateTime  @default(now())
+	updatedAt                   DateTime  @updatedAt
 }

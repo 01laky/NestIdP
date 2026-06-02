@@ -301,4 +301,23 @@ describe('bootstrap integration (SQLite)', () => {
 		const admin = await prisma.adminUser.findFirst();
 		expect(admin?.username).toBe('trimmed-admin');
 	});
+
+	it('API-BST-IDP-01: bootstrap does not overwrite existing entityId when IDP_BASE_URL changes', async () => {
+		await runBootstrap(prisma, { idpBaseUrl: 'https://original-idp.example.com' }, logger);
+		const original = await prisma.idpSettings.findUnique({ where: { id: 'default' } });
+		await runBootstrap(prisma, { idpBaseUrl: 'https://changed-idp.example.com' }, logger);
+		const after = await prisma.idpSettings.findUnique({ where: { id: 'default' } });
+		expect(after?.entityId).toBe(original?.entityId);
+		expect(after?.entityId).toBe('https://original-idp.example.com');
+	});
+
+	it('API-BST-IDP-02: fresh bootstrap creates IdpSettings without signing cert fields', async () => {
+		await runBootstrap(prisma, { idpBaseUrl: 'https://fresh-idp.example.com' }, logger);
+		const settings = await prisma.idpSettings.findUnique({ where: { id: 'default' } });
+		expect(settings?.entityId).toBe('https://fresh-idp.example.com');
+		expect(settings?.signingCertPem).toBeNull();
+		expect(settings?.signingKeyEncrypted).toBeNull();
+		expect(settings?.pendingSigningCertPem).toBeNull();
+		expect(settings?.pendingSigningKeyEncrypted).toBeNull();
+	});
 });

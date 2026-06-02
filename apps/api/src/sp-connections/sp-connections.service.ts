@@ -15,9 +15,10 @@ import type {
 	SpConnectionResponseDto,
 	UpdateSpConnectionRequestDto,
 } from '@nestidp/shared';
-import { SAML_METADATA_PATH, SAML_NAME_ID_FORMATS, SAML_SSO_PATH } from '@nestidp/shared';
+import { SAML_NAME_ID_FORMATS } from '@nestidp/shared';
 import { assertValidAcsUrl, AcsUrlValidationError } from '../common/acs-url.util';
 import { PrismaService } from '../prisma/prisma.service';
+import { IdpSettingsService } from '../idp-settings/idp-settings.service';
 import {
 	assertValidSpAttributeMapping,
 	SpAttributeMappingValidationError,
@@ -32,6 +33,7 @@ export class SpConnectionsService {
 		private readonly prisma: PrismaService,
 		private readonly configService: ConfigService,
 		private readonly audit: SpConnectionsAuditService,
+		private readonly idpSettingsService: IdpSettingsService,
 	) {}
 
 	async list(): Promise<SpConnectionListResponseDto> {
@@ -141,16 +143,7 @@ export class SpConnectionsService {
 	}
 
 	async getMetadataUrl(): Promise<IdpMetadataUrlResponseDto> {
-		const settings = await this.prisma.idpSettings.findUnique({ where: { id: 'default' } });
-		if (!settings) {
-			throw new NotFoundException('IdP settings not configured');
-		}
-		const base = (this.configService.get<string>('IDP_BASE_URL') ?? '').replace(/\/+$/, '');
-		return {
-			metadataUrl: `${base}${SAML_METADATA_PATH}`,
-			entityId: settings.entityId,
-			ssoUrl: `${base}${SAML_SSO_PATH}`,
-		};
+		return this.idpSettingsService.getMetadataUrlResponse();
 	}
 
 	private async findOrThrow(id: string) {

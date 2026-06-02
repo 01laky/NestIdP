@@ -4,16 +4,22 @@ import {
 	API_CONNECTIONS_API_PATH,
 	IDENTITY_USERS_API_PATH,
 	IDP_METADATA_URL_API_PATH,
+	IDP_SETTINGS_API_PATH,
 	SP_CONNECTIONS_API_PATH,
 	SYNC_API_PATH,
 } from '@nestidp/shared';
 import {
 	AdminApiError,
 	adminFetch,
+	cancelIdpCertRotation,
+	completeIdpCertRotation,
 	createApiConnection,
 	deleteApiConnection,
+	generateIdpSigningCert,
 	getApiConnection,
 	getCsrfToken,
+	getIdpMetadataPreview,
+	getIdpSettings,
 	getSyncLog,
 	getSyncStatus,
 	listApiConnections,
@@ -21,9 +27,12 @@ import {
 	loginAdmin,
 	logoutAdmin,
 	setCsrfToken,
+	startIdpCertRotation,
 	testApiConnection,
 	triggerIdentitySync,
 	updateApiConnection,
+	updateIdpSettings,
+	uploadIdpSigningCert,
 	getAdminMe,
 	getIdpMetadataUrl,
 	getSpConnection,
@@ -576,5 +585,142 @@ describe('adminApi', () => {
 		vi.stubGlobal('fetch', fetchMock);
 		await getIdentityUser('u1');
 		expect(fetchMock).toHaveBeenCalledWith(`${IDENTITY_USERS_API_PATH}/u1`, expect.any(Object));
+	});
+
+	it('WEB-IDP-API-01: getIdpSettings GETs IDP_SETTINGS_API_PATH', async () => {
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ entityId: 'http://localhost:3000' }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		await getIdpSettings();
+		expect(fetchMock).toHaveBeenCalledWith(IDP_SETTINGS_API_PATH, expect.any(Object));
+	});
+
+	it('WEB-IDP-API-02: updateIdpSettings PATCHes with CSRF', async () => {
+		setCsrfToken('csrf-idp-patch');
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ entityId: 'https://idp.example.com' }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		await updateIdpSettings({ entityId: 'https://idp.example.com' });
+		expect(fetchMock).toHaveBeenCalledWith(
+			IDP_SETTINGS_API_PATH,
+			expect.objectContaining({
+				method: 'PATCH',
+				headers: expect.objectContaining({ [ADMIN_CSRF_HEADER_NAME]: 'csrf-idp-patch' }),
+			}),
+		);
+	});
+
+	it('WEB-IDP-API-03: generateIdpSigningCert POSTs generate endpoint with CSRF', async () => {
+		setCsrfToken('csrf-idp-gen');
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ hasSigningCertificate: true }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		await generateIdpSigningCert();
+		expect(fetchMock).toHaveBeenCalledWith(
+			`${IDP_SETTINGS_API_PATH}/signing-cert/generate`,
+			expect.objectContaining({
+				method: 'POST',
+				headers: expect.objectContaining({ [ADMIN_CSRF_HEADER_NAME]: 'csrf-idp-gen' }),
+			}),
+		);
+	});
+
+	it('WEB-IDP-API-04: uploadIdpSigningCert POSTs upload endpoint with CSRF', async () => {
+		setCsrfToken('csrf-idp-upload');
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ hasSigningCertificate: true }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		await uploadIdpSigningCert({
+			signingCertPem: 'cert',
+			signingPrivateKeyPem: 'key',
+		});
+		expect(fetchMock).toHaveBeenCalledWith(
+			`${IDP_SETTINGS_API_PATH}/signing-cert/upload`,
+			expect.objectContaining({
+				method: 'POST',
+				headers: expect.objectContaining({ [ADMIN_CSRF_HEADER_NAME]: 'csrf-idp-upload' }),
+			}),
+		);
+	});
+
+	it('WEB-IDP-API-05: startIdpCertRotation POSTs rotation start with CSRF', async () => {
+		setCsrfToken('csrf-idp-rotate');
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ rotation: { active: true } }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		await startIdpCertRotation({ mode: 'generate' });
+		expect(fetchMock).toHaveBeenCalledWith(
+			`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/start`,
+			expect.objectContaining({
+				method: 'POST',
+				body: JSON.stringify({ mode: 'generate' }),
+				headers: expect.objectContaining({ [ADMIN_CSRF_HEADER_NAME]: 'csrf-idp-rotate' }),
+			}),
+		);
+	});
+
+	it('WEB-IDP-API-06: completeIdpCertRotation POSTs complete endpoint with CSRF', async () => {
+		setCsrfToken('csrf-idp-complete');
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ rotation: { active: false } }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		await completeIdpCertRotation();
+		expect(fetchMock).toHaveBeenCalledWith(
+			`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/complete`,
+			expect.objectContaining({
+				method: 'POST',
+				headers: expect.objectContaining({ [ADMIN_CSRF_HEADER_NAME]: 'csrf-idp-complete' }),
+			}),
+		);
+	});
+
+	it('WEB-IDP-API-07: cancelIdpCertRotation POSTs cancel endpoint with CSRF', async () => {
+		setCsrfToken('csrf-idp-cancel');
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ rotation: { active: false } }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		await cancelIdpCertRotation();
+		expect(fetchMock).toHaveBeenCalledWith(
+			`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/cancel`,
+			expect.objectContaining({
+				method: 'POST',
+				headers: expect.objectContaining({ [ADMIN_CSRF_HEADER_NAME]: 'csrf-idp-cancel' }),
+			}),
+		);
+	});
+
+	it('WEB-IDP-API-08: getIdpMetadataPreview GETs metadata-preview path', async () => {
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ xml: '<EntityDescriptor/>', contentType: 'application/xml' }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		await getIdpMetadataPreview();
+		expect(fetchMock).toHaveBeenCalledWith(
+			`${IDP_SETTINGS_API_PATH}/metadata-preview`,
+			expect.any(Object),
+		);
 	});
 });

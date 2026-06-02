@@ -265,7 +265,17 @@ export function getTestSigningMaterial(entityId = 'http://localhost:3000'): {
 	return generateTestRsaCert(entityId);
 }
 
-function generateTestRsaCert(entityId: string): { privateKeyPem: string; certPem: string } {
+export function getTestSigningMaterialWithDays(
+	entityId: string,
+	days: number,
+): { privateKeyPem: string; certPem: string } {
+	return generateTestRsaCert(entityId, days);
+}
+
+function generateTestRsaCert(
+	entityId: string,
+	days = 365,
+): { privateKeyPem: string; certPem: string } {
 	const { privateKey } = generateKeyPairSync('rsa', {
 		modulusLength: 2048,
 		privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
@@ -278,7 +288,7 @@ function generateTestRsaCert(entityId: string): { privateKeyPem: string; certPem
 		writeFileSync(keyPath, privateKey);
 		const cn = entityId.replace(/^https?:\/\//, '').slice(0, 64) || 'nestidp';
 		execSync(
-			`openssl req -new -x509 -key "${keyPath}" -out "${certPath}" -days 365 -subj "/CN=${cn}" -nodes`,
+			`openssl req -new -x509 -key "${keyPath}" -out "${certPath}" -days ${days} -subj "/CN=${cn}" -nodes`,
 			{ stdio: 'pipe' },
 		);
 		return { privateKeyPem: privateKey, certPem: readFileSync(certPath, 'utf8') };

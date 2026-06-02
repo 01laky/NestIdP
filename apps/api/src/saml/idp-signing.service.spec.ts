@@ -170,4 +170,58 @@ describe('IdpSigningService (SQLite)', () => {
 		expect(signed).toContain('Signature');
 		expect(signed).toContain('SignatureValue');
 	});
+
+	it('API-SAML-SIGN-13: ensureSigningMaterial throws when only pending cert exists (rotation)', async () => {
+		const { certPem, privateKeyPem } = getTestSigningMaterial('http://localhost:3000');
+		await prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: {
+				signingCertPem: null,
+				signingKeyEncrypted: null,
+				pendingSigningCertPem: certPem,
+				pendingSigningKeyEncrypted: encrypt(privateKeyPem, TEST_ENCRYPTION_KEY),
+				rotationStartedAt: new Date(),
+			},
+		});
+		await expect(service.ensureSigningMaterial()).rejects.toThrow(
+			'IdP signing certificate not configured',
+		);
+	});
+
+	it('API-SAML-SIGN-14: getMetadataSigningCertificates returns primary then pending during rotation', async () => {
+		const primary = getTestSigningMaterial('http://localhost:3000');
+		const pending = getTestSigningMaterial('http://pending.example.com');
+		await prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: {
+				signingCertPem: primary.certPem,
+				signingKeyEncrypted: encrypt(primary.privateKeyPem, TEST_ENCRYPTION_KEY),
+				pendingSigningCertPem: pending.certPem,
+				pendingSigningKeyEncrypted: encrypt(pending.privateKeyPem, TEST_ENCRYPTION_KEY),
+				rotationStartedAt: new Date(),
+			},
+		});
+		const certs = await service.getMetadataSigningCertificates();
+		expect(certs).toHaveLength(2);
+		expect(certs[0]).toBe(primary.certPem);
+		expect(certs[1]).toBe(pending.certPem);
+	});
+
+	it('API-SAML-SIGN-15: getMetadataSigningCertificates lazy-generates when no certs at all', async () => {
+		await prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: {
+				signingCertPem: null,
+				signingKeyEncrypted: null,
+				pendingSigningCertPem: null,
+				pendingSigningKeyEncrypted: null,
+				rotationStartedAt: null,
+			},
+		});
+		const certs = await service.getMetadataSigningCertificates();
+		expect(certs).toHaveLength(1);
+		expect(certs[0]).toContain('BEGIN CERTIFICATE');
+		const row = await prisma.idpSettings.findUnique({ where: { id: 'default' } });
+		expect(row?.signingCertPem).toBe(certs[0]);
+	});
 });

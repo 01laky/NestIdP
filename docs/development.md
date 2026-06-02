@@ -48,45 +48,50 @@ This syncs `schema.prisma` with `DATABASE_PROVIDER`. Root `pnpm install` runs `p
 
 ![Production routing](./img/routing.svg)
 
-| Path                         | Handler                                            |
-| ---------------------------- | -------------------------------------------------- |
-| `/api/admin/*`               | Admin REST API (requires session except auth)      |
-| `/api/admin/auth/login`      | Operator login (public)                            |
-| `/api/admin/auth/logout`     | Clears session cookie (CSRF when session present)  |
-| `/api/admin/auth/me`         | Current admin session + `csrfToken` (protected)    |
-| `/api/admin/api-connections` | API connection CRUD + connectivity test            |
-| `/api/admin/sync/*`          | Identity sync trigger, status, logs                |
-| `/api/auth/*`                | End-user login API (synced credentials)            |
-| `/saml/*`                    | SAML protocol (stub, HTTP 501)                     |
-| `/health`                    | Liveness — always OK, no database                  |
-| `/ready`                     | Readiness — Prisma ping                            |
-| `/admin/login`               | React operator login (separate from SAML `/login`) |
-| `/admin/*`                   | React admin SPA (session gate)                     |
-| `/login`                     | React SAML login page                              |
+| Path                         | Handler                                                   |
+| ---------------------------- | --------------------------------------------------------- |
+| `/api/admin/*`               | Admin REST API (requires session except auth)             |
+| `/api/admin/auth/login`      | Operator login (public)                                   |
+| `/api/admin/auth/logout`     | Clears session cookie (CSRF when session present)         |
+| `/api/admin/auth/me`         | Current admin session + `csrfToken` (protected)           |
+| `/api/admin/api-connections` | API connection CRUD + connectivity test                   |
+| `/api/admin/sync/*`          | Identity sync trigger, status, logs                       |
+| `/api/auth/*`                | End-user login API (synced credentials)                   |
+| `/saml/*`                    | SAML protocol (stub, HTTP 501)                            |
+| `/health`                    | Liveness — always OK, no database                         |
+| `/ready`                     | Readiness — Prisma ping                                   |
+| `/admin/login`               | React operator login (separate from SAML `/login`)        |
+| `/admin/settings/idp`        | IdP settings — entity ID, cert lifecycle, rotation wizard |
+| `/admin/*`                   | React admin SPA (session gate)                            |
+| `/login`                     | React SAML login page                                     |
 
 ![Admin login sequence](./img/admin-auth-flow.svg)
 
 ### End-user auth API (v0.6.0)
 
-| Method | Path                                     | Auth                          | Description                                                                                          |
-| ------ | ---------------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------- |
-| POST   | `/api/auth/login`                        | —                             | Username + password against synced `User`; optional `{ "samlSessionId" }` binds pending SAML session |
-| GET    | `/api/auth/me`                           | `nestidp_user_session` cookie | Profile with group/role names (no secrets)                                                           |
-| GET    | `/api/auth/session`                      | —                             | Read-only: `authenticated` + optional `?samlSessionId=` pending SAML state                           |
-| POST   | `/api/auth/logout`                       | cookie optional               | Clears end-user session (idempotent)                                                                 |
-| POST   | `/api/auth/login/complete-sso`           | end-user session              | Signed SAMLResponse as **text/html** auto-post form to SP ACS                                        |
-| GET    | `/saml/metadata`                         | —                             | IdP SAML metadata XML                                                                                |
-| GET    | `/saml/sso`                              | —                             | SP-initiated SSO (HTTP-Redirect `SAMLRequest`) → redirect `/login?samlSessionId=`                    |
-| GET    | `/api/admin/sp-connections`              | admin session                 | List SP connections                                                                                  |
-| POST   | `/api/admin/sp-connections`              | admin session                 | Create SP (CSRF)                                                                                     |
-| PATCH  | `/api/admin/sp-connections/:id`          | admin session                 | Update SP (CSRF)                                                                                     |
-| DELETE | `/api/admin/sp-connections/:id`          | admin session                 | Delete SP (CSRF)                                                                                     |
-| POST   | `/api/admin/sp-connections/:id/test-acs` | admin session                 | ACS reachability probe (CSRF)                                                                        |
-| GET    | `/api/admin/idp/metadata-url`            | admin session                 | Public metadata + SSO URLs for operators                                                             |
-| GET    | `/api/admin/identity/users`              | admin session                 | Browse synced users (`?search=`, `limit`, `offset`)                                                  |
-| GET    | `/api/admin/identity/users/:id`          | admin session                 | User detail with groups and roles                                                                    |
-| GET    | `/api/admin/identity/groups`             | admin session                 | Browse groups                                                                                        |
-| GET    | `/api/admin/identity/roles`              | admin session                 | Browse roles                                                                                         |
+| Method | Path                                       | Auth                          | Description                                                                                          |
+| ------ | ------------------------------------------ | ----------------------------- | ---------------------------------------------------------------------------------------------------- |
+| POST   | `/api/auth/login`                          | —                             | Username + password against synced `User`; optional `{ "samlSessionId" }` binds pending SAML session |
+| GET    | `/api/auth/me`                             | `nestidp_user_session` cookie | Profile with group/role names (no secrets)                                                           |
+| GET    | `/api/auth/session`                        | —                             | Read-only: `authenticated` + optional `?samlSessionId=` pending SAML state                           |
+| POST   | `/api/auth/logout`                         | cookie optional               | Clears end-user session (idempotent)                                                                 |
+| POST   | `/api/auth/login/complete-sso`             | end-user session              | Signed SAMLResponse as **text/html** auto-post form to SP ACS                                        |
+| GET    | `/saml/metadata`                           | —                             | IdP SAML metadata XML                                                                                |
+| GET    | `/saml/sso`                                | —                             | SP-initiated SSO (HTTP-Redirect `SAMLRequest`) → redirect `/login?samlSessionId=`                    |
+| GET    | `/api/admin/sp-connections`                | admin session                 | List SP connections                                                                                  |
+| POST   | `/api/admin/sp-connections`                | admin session                 | Create SP (CSRF)                                                                                     |
+| PATCH  | `/api/admin/sp-connections/:id`            | admin session                 | Update SP (CSRF)                                                                                     |
+| DELETE | `/api/admin/sp-connections/:id`            | admin session                 | Delete SP (CSRF)                                                                                     |
+| POST   | `/api/admin/sp-connections/:id/test-acs`   | admin session                 | ACS reachability probe (CSRF)                                                                        |
+| GET    | `/api/admin/idp/metadata-url`              | admin session                 | Public metadata + SSO URLs for operators                                                             |
+| GET    | `/api/admin/idp/settings`                  | admin session                 | IdP settings (fingerprints, rotation status, derived URLs)                                           |
+| PATCH  | `/api/admin/idp/settings`                  | admin session                 | Update entity ID / default NameID format (CSRF)                                                      |
+| POST   | `/api/admin/idp/settings/signing-cert/*`   | admin session                 | Generate/upload primary cert; rotation start/complete/cancel (CSRF)                                  |
+| GET    | `/api/admin/idp/settings/metadata-preview` | admin session                 | Same SAML metadata XML as public `/saml/metadata` (for operator preview)                             |
+| GET    | `/api/admin/identity/users`                | admin session                 | Browse synced users (`?search=`, `limit`, `offset`)                                                  |
+| GET    | `/api/admin/identity/users/:id`            | admin session                 | User detail with groups and roles                                                                    |
+| GET    | `/api/admin/identity/groups`               | admin session                 | Browse groups                                                                                        |
+| GET    | `/api/admin/identity/roles`                | admin session                 | Browse roles                                                                                         |
 
 Constants:
 
@@ -156,7 +161,32 @@ SP_ENTITY_ID=urn:test:sp node docs/examples/saml-sp-initiated-redirect.mjs
 
 Inject `@Inject(SAML_SESSION_BIND_PORT)` from `AuthModule` — do not duplicate bind SQL in `SamlModule`.
 
-**Prompt 09:** IdP cert upload/rotation UI (admin settings). **Prompt 10:** Docker packaging.
+**Prompt 10:** Docker packaging.
+
+#### IdP settings and certificate rotation (v0.9.0)
+
+Operator UI: **`/admin/settings/idp`** (sidebar **IdP Settings**). Dashboard shows **`idp.certStatus`** (`missing` | `ok` | `expiring_soon` | `rotation_active`) without a second API call.
+
+**Certificate lifecycle:**
+
+1. **Generate** or **upload** primary signing cert (replaces existing primary when no rotation pending).
+2. **Start rotation** — stores pending cert+key; public metadata publishes **two** signing `KeyDescriptor` entries; assertions still sign with **primary** only.
+3. **Update SP trust** — distribute metadata; test SSO.
+4. **Complete rotation** — pending becomes primary; metadata returns to one cert.
+5. **Cancel rotation** — drops pending fields only.
+
+Shared constants: **`IDP_SETTINGS_API_PATH`**, **`IDP_SETTINGS_ROUTE_PREFIX`**, **`IDP_CERT_EXPIRY_WARNING_DAYS`** (30), **`IDP_ROTATION_STALE_WARNING_DAYS`** (7).
+
+Private keys encrypted at rest (`EncryptionService`); admin JSON exposes fingerprints and `notAfter` only — never PEM private keys.
+
+**Rotation runbook (in-page checklist mirrors docs):**
+
+- Verify metadata preview shows two certs during rotation
+- Update every SP’s IdP metadata / trust store
+- Run at least one SP-initiated login
+- Complete rotation only after the above
+
+`IdpSettings.nameIdFormat` affects **metadata only**; assertion NameID still comes from each **`SpConnection.nameIdFormat`**.
 
 ### Admin REST API (v0.5.0)
 
@@ -186,6 +216,8 @@ Constants in `@nestidp/shared`:
 - **`API_CONNECTION_ROUTE_PREFIX`** — React UI route (`/admin/api-connections`)
 - **`SP_CONNECTION_ROUTE_PREFIX`** — React UI route (`/admin/sp-connections`)
 - **`IDENTITY_ROUTE_PREFIX`** — React UI route (`/admin/identity`)
+- **`IDP_SETTINGS_ROUTE_PREFIX`** — React UI route (`/admin/settings/idp`)
+- **`IDP_SETTINGS_API_PATH`** — REST base (`/api/admin/idp/settings`)
 - **`ADMIN_CSRF_HEADER_NAME`** — `X-CSRF-Token` on mutating admin calls
 
 ![API connection CRUD flow](./img/api-connection-crud.svg)
@@ -367,5 +399,6 @@ This sets `core.hooksPath=.githooks`. Hooks run on `prepare-commit-msg` and `com
 2. ~~API connection CRUD (baseUrl + Bearer token) (Prompt 04)~~
 3. ~~Identity sync (fixed v1 REST contract) — Prompt 05~~
 4. ~~End-user login + password verification — Prompt 06~~
-5. Custom SamlModule XML implementation (Prompt 07)
-6. Admin SPA pages
+5. ~~Custom SamlModule XML implementation (Prompt 07)~~
+6. ~~Admin SPA pages (Prompt 08–09)~~
+7. Docker packaging (Prompt 10)

@@ -4,6 +4,32 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.9.0]
+
+### Added
+
+- **IdP settings admin API** — `GET/PATCH /api/admin/idp/settings`, cert generate/upload, rotation start/complete/cancel, metadata preview
+- **`/admin/settings/idp`** React page — entity ID, default NameID format (metadata only), signing cert fingerprints, rotation wizard with in-page checklist, expiry/stale warnings
+- **Dashboard IdP status card** — `AdminDashboardResponseDto.idp` with `certStatus`, link to settings (no extra fetch)
+- **Dual-cert rotation** — Prisma columns `pendingSigningCertPem`, `pendingSigningKeyEncrypted`, `rotationStartedAt`; metadata publishes two signing certs during rotation; assertions sign with primary until complete
+- **`packages/shared/src/idp-settings.ts`** — DTOs, route/API constants, expiry/stale day thresholds
+- **`IdpSettingsModule`** — validators, audit service (`API-IDP-AUDIT-01`…`08`), mapper, integration + SAML regression tests (`API-IDP-ADM-01`…`50`, `API-IDP-SAML-01`…`19`, `API-BST-IDP-01`…`02`, `API-SAML-SIGN-13`…`15`)
+- Web tests **`WEB-ADM-39`…`69`**, E2E **`E2E-IDP-09-01`…`05`**, shared **`SH-IDP-*`**, **`SH-ADM-DASH-IDP-*`**
+
+### Changed
+
+- `SamlMetadataService` emits multiple signing `KeyDescriptor` elements during rotation
+- `IdpSigningService` — `getMetadataSigningCertificates()`, public `generateKeyPairAndCert()`; skip lazy auto-generate when rotation pending
+- `GET /api/admin` includes nested **`idp`** summary (backward-compatible additive field)
+- `SpConnectionsService.getMetadataUrl()` delegates to `IdpSettingsService`
+
+### Security
+
+- Admin IdP settings API never returns private keys or full cert PEM in JSON
+- CSRF on all IdP settings mutations (`POST` / `PATCH`)
+
+**Tests:** 1303 total via `pnpm test` (1066 API Jest + 36 e2e + 123 web Vitest + 78 shared; PG smoke skipped locally).
+
 ## [0.8.0]
 
 ### Added

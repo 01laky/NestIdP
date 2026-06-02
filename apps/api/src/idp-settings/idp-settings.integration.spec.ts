@@ -1,0 +1,716 @@
+import { randomUUID } from 'node:crypto';
+import { unlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { INestApplication } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { Test, TestingModule } from '@nestjs/testing';
+import cookieParser from 'cookie-parser';
+import request from 'supertest';
+import { App } from 'supertest/types';
+import {
+	ADMIN_CSRF_HEADER_NAME,
+	IDP_METADATA_URL_API_PATH,
+	IDP_SETTINGS_API_PATH,
+} from '@nestidp/shared';
+import { AdminAuthModule } from '../admin-auth/admin-auth.module';
+import { AdminModule } from '../admin/admin.module';
+import { EncryptionModule } from '../encryption/encryption.module';
+import { SamlModule } from '../saml/saml.module';
+import { SpConnectionsModule } from '../sp-connections/sp-connections.module';
+import { IdpSettingsModule } from './idp-settings.module';
+import { IdpSigningService } from '../saml/idp-signing.service';
+import { fingerprintSha256Hex } from './idp-cert.util';
+import { PrismaModule } from '../prisma/prisma.module';
+import { PrismaService } from '../prisma/prisma.service';
+import {
+	createTestAdminUserWithPassword,
+	createTestIdpSettings,
+	createTestIdpSettingsWithSigningKey,
+	getTestSigningMaterial,
+} from '../prisma/test-fixtures';
+import { runMigrationsOnTestDb } from '../prisma/test-db.helper';
+
+jest.setTimeout(60_000);
+
+describe('IdP settings admin API (SQLite)', () => {
+	let app: INestApplication;
+	let prisma: PrismaService;
+	let databaseUrl: string;
+	const adminPassword = 'idp-admin-pass';
+
+	beforeAll(async () => {
+		const tmpDb = join(tmpdir(), `nestidp-idp-admin-${randomUUID()}.db`);
+		databaseUrl = `file:${tmpDb}`;
+		runMigrationsOnTestDb(databaseUrl, 'sqlite');
+		const prismaService = new PrismaService({ datasources: { db: { url: databaseUrl } } });
+		const moduleFixture: TestingModule = await Test.createTestingModule({
+			imports: [
+				ConfigModule.forRoot({
+					isGlobal: true,
+					ignoreEnvFile: true,
+					load: [
+						() => ({
+							DATABASE_PROVIDER: 'sqlite',
+							DATABASE_URL: databaseUrl,
+							SESSION_SECRET: 'test-session-secret-min-16',
+							ENCRYPTION_KEY: 'test-encryption-key-32chars!!',
+							IDP_BASE_URL: 'http://localhost:3000',
+							NODE_ENV: 'test',
+							SAML_SESSION_CLEANUP_INTERVAL_MS: 0,
+						}),
+					],
+				}),
+				PrismaModule,
+				EncryptionModule,
+				AdminAuthModule,
+				SamlModule,
+				IdpSettingsModule,
+				SpConnectionsModule,
+				AdminModule,
+			],
+		})
+			.overrideProvider(PrismaService)
+			.useValue(prismaService)
+			.compile();
+		app = moduleFixture.createNestApplication();
+		app.use(cookieParser());
+		await app.init();
+		prisma = app.get(PrismaService);
+		await createTestIdpSettingsWithSigningKey(prisma, { entityId: 'http://localhost:3000' });
+		await createTestAdminUserWithPassword(prisma, 'admin', adminPassword);
+	});
+
+	afterEach(async () => {
+		await prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: {
+				pendingSigningCertPem: null,
+				pendingSigningKeyEncrypted: null,
+				rotationStartedAt: null,
+			},
+		});
+	});
+
+	afterAll(async () => {
+		await app.close();
+		try {
+			unlinkSync(databaseUrl.replace(/^file:/, ''));
+		} catch {
+			// ignore
+		}
+	});
+
+	async function loginCsrf(agent: request.Agent): Promise<string> {
+		const login = await agent
+			.post('/api/admin/auth/login')
+			.send({ username: 'admin', password: adminPassword })
+			.expect(200);
+		return login.body.csrfToken as string;
+	}
+
+	async function adminAgent(): Promise<request.Agent> {
+		const agent = request.agent(app.getHttpServer() as App);
+		await loginCsrf(agent);
+		return agent;
+	}
+
+	function csrfHeader(token: string) {
+		return { [ADMIN_CSRF_HEADER_NAME]: token };
+	}
+
+	it('API-IDP-ADM-01: GET without admin session → 401', async () => {
+		await request(app.getHttpServer() as App)
+			.get(IDP_SETTINGS_API_PATH)
+			.expect(401);
+	});
+
+	it('API-IDP-ADM-02: GET returns settings with URLs and cert summary', async () => {
+		const agent = await adminAgent();
+		const res = await agent.get(IDP_SETTINGS_API_PATH).expect(200);
+		expect(res.body.entityId).toBeTruthy();
+		expect(res.body.metadataUrl).toBe('http://localhost:3000/saml/metadata');
+		expect(res.body.ssoUrl).toBe('http://localhost:3000/saml/sso');
+		expect(res.body.hasSigningCertificate).toBe(true);
+		expect(res.body.signingCertFingerprintSha256).toMatch(/^[a-f0-9]{64}$/);
+	});
+
+	it('API-IDP-ADM-03: GET never exposes private key or encrypted blob', async () => {
+		const agent = await adminAgent();
+		const res = await agent.get(IDP_SETTINGS_API_PATH).expect(200);
+		expect(res.body.signingPrivateKeyPem).toBeUndefined();
+		expect(res.body.signingKeyEncrypted).toBeUndefined();
+		expect(JSON.stringify(res.body)).not.toContain('BEGIN PRIVATE KEY');
+	});
+
+	it('API-IDP-ADM-04: GET returns JSON not HTML', async () => {
+		const agent = await adminAgent();
+		const res = await agent.get(IDP_SETTINGS_API_PATH);
+		expect(res.headers['content-type']).toMatch(/application\/json/);
+		expect(res.text).not.toContain('<!DOCTYPE html>');
+	});
+
+	it('API-IDP-ADM-05: rotation block inactive by default', async () => {
+		const agent = await adminAgent();
+		const res = await agent.get(IDP_SETTINGS_API_PATH).expect(200);
+		expect(res.body.rotation.active).toBe(false);
+		expect(res.body.rotation.hasPendingCertificate).toBe(false);
+	});
+
+	it('API-IDP-ADM-06: PATCH without CSRF → 403', async () => {
+		const agent = await adminAgent();
+		await agent
+			.patch(IDP_SETTINGS_API_PATH)
+			.send({ entityId: 'https://idp-patched.example.com' })
+			.expect(403);
+	});
+
+	it('API-IDP-ADM-07: PATCH updates entityId', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		const res = await agent
+			.patch(IDP_SETTINGS_API_PATH)
+			.set(csrfHeader(csrf))
+			.send({ entityId: 'https://idp-updated.example.com' })
+			.expect(200);
+		expect(res.body.entityId).toBe('https://idp-updated.example.com');
+	});
+
+	it('API-IDP-ADM-08: PATCH updates nameIdFormat', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		const format = 'urn:oasis:names:tc:SAML:2.0:nameid-format:persistent';
+		const res = await agent
+			.patch(IDP_SETTINGS_API_PATH)
+			.set(csrfHeader(csrf))
+			.send({ nameIdFormat: format })
+			.expect(200);
+		expect(res.body.nameIdFormat).toBe(format);
+	});
+
+	it('API-IDP-ADM-09: PATCH empty body → 400', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent.patch(IDP_SETTINGS_API_PATH).set(csrfHeader(csrf)).send({}).expect(400);
+	});
+
+	it('API-IDP-ADM-10: PATCH invalid entityId → 400', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent
+			.patch(IDP_SETTINGS_API_PATH)
+			.set(csrfHeader(csrf))
+			.send({ entityId: 'not-valid' })
+			.expect(400);
+	});
+
+	it('API-IDP-ADM-11: PATCH invalid nameIdFormat → 400', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent
+			.patch(IDP_SETTINGS_API_PATH)
+			.set(csrfHeader(csrf))
+			.send({ nameIdFormat: 'bad-format' })
+			.expect(400);
+	});
+
+	it('API-IDP-ADM-12: PATCH without admin session → 401', async () => {
+		await request(app.getHttpServer() as App)
+			.patch(IDP_SETTINGS_API_PATH)
+			.send({ entityId: 'https://no-session.example.com' })
+			.expect(401);
+	});
+
+	it('API-IDP-ADM-13: POST generate signing cert without CSRF → 403', async () => {
+		const agent = await adminAgent();
+		await agent.post(`${IDP_SETTINGS_API_PATH}/signing-cert/generate`).expect(403);
+	});
+
+	it('API-IDP-ADM-14: POST generate signing cert replaces primary', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		const before = await agent.get(IDP_SETTINGS_API_PATH).expect(200);
+		const res = await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/generate`)
+			.set(csrfHeader(csrf))
+			.expect(201);
+		expect(res.body.hasSigningCertificate).toBe(true);
+		expect(res.body.signingCertFingerprintSha256).not.toBe(
+			before.body.signingCertFingerprintSha256,
+		);
+	});
+
+	it('API-IDP-ADM-15: POST generate blocked during active rotation → 409', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/start`)
+			.set(csrfHeader(csrf))
+			.send({ mode: 'generate' })
+			.expect(201);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/generate`)
+			.set(csrfHeader(csrf))
+			.expect(409);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/cancel`)
+			.set(csrfHeader(csrf))
+			.expect(201);
+	});
+
+	it('API-IDP-ADM-16: POST upload signing cert with valid pair', async () => {
+		const idpSigning = app.get(IdpSigningService);
+		const { certPem, privateKeyPem } = idpSigning.generateKeyPairAndCert(
+			'https://upload-idp.example.com',
+		);
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		const res = await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/upload`)
+			.set(csrfHeader(csrf))
+			.send({ signingCertPem: certPem, signingPrivateKeyPem: privateKeyPem })
+			.expect(201);
+		expect(res.body.hasSigningCertificate).toBe(true);
+	});
+
+	it('API-IDP-ADM-17: POST upload mismatched cert and key → 400', async () => {
+		const primary = getTestSigningMaterial('https://primary.example.com');
+		const other = getTestSigningMaterial('https://other.example.com');
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/upload`)
+			.set(csrfHeader(csrf))
+			.send({
+				signingCertPem: primary.certPem,
+				signingPrivateKeyPem: other.privateKeyPem,
+			})
+			.expect(400);
+	});
+
+	it('API-IDP-ADM-18: POST upload invalid PEM → 400', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/upload`)
+			.set(csrfHeader(csrf))
+			.send({ signingCertPem: 'not-pem', signingPrivateKeyPem: 'not-pem' })
+			.expect(400);
+	});
+
+	it('API-IDP-ADM-19: POST upload without CSRF → 403', async () => {
+		const { certPem, privateKeyPem } = getTestSigningMaterial('https://csrf-upload.example.com');
+		const agent = await adminAgent();
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/upload`)
+			.send({ signingCertPem: certPem, signingPrivateKeyPem: privateKeyPem })
+			.expect(403);
+	});
+
+	it('API-IDP-ADM-20: POST rotation start generate mode', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		const res = await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/start`)
+			.set(csrfHeader(csrf))
+			.send({ mode: 'generate' })
+			.expect(201);
+		expect(res.body.rotation.active).toBe(true);
+		expect(res.body.rotation.hasPendingCertificate).toBe(true);
+		expect(res.body.rotation.startedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+	});
+
+	it('API-IDP-ADM-21: POST rotation start upload mode', async () => {
+		await prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: {
+				pendingSigningCertPem: null,
+				pendingSigningKeyEncrypted: null,
+				rotationStartedAt: null,
+			},
+		});
+		const idpSigning = app.get(IdpSigningService);
+		const { certPem, privateKeyPem } = idpSigning.generateKeyPairAndCert(
+			'https://rotation-upload.example.com',
+		);
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		const res = await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/start`)
+			.set(csrfHeader(csrf))
+			.send({ mode: 'upload', signingCertPem: certPem, signingPrivateKeyPem: privateKeyPem })
+			.expect(201);
+		expect(res.body.rotation.active).toBe(true);
+		expect(res.body.rotation.pendingCertFingerprintSha256).toMatch(/^[a-f0-9]{64}$/);
+	});
+
+	it('API-IDP-ADM-22: POST rotation start without primary cert → 409', async () => {
+		await prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: {
+				signingCertPem: null,
+				signingKeyEncrypted: null,
+				pendingSigningCertPem: null,
+				pendingSigningKeyEncrypted: null,
+				rotationStartedAt: null,
+			},
+		});
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/start`)
+			.set(csrfHeader(csrf))
+			.send({ mode: 'generate' })
+			.expect(409);
+		await createTestIdpSettingsWithSigningKey(prisma, {
+			entityId: 'https://idp-updated.example.com',
+		});
+	});
+
+	it('API-IDP-ADM-23: POST rotation start when already active → 409', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/start`)
+			.set(csrfHeader(csrf))
+			.send({ mode: 'generate' })
+			.expect(201);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/start`)
+			.set(csrfHeader(csrf))
+			.send({ mode: 'generate' })
+			.expect(409);
+	});
+
+	it('API-IDP-ADM-24: POST rotation complete promotes pending cert', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/start`)
+			.set(csrfHeader(csrf))
+			.send({ mode: 'generate' })
+			.expect(201);
+		const pendingFp = (await agent.get(IDP_SETTINGS_API_PATH).expect(200)).body.rotation
+			.pendingCertFingerprintSha256;
+		const res = await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/complete`)
+			.set(csrfHeader(csrf))
+			.expect(201);
+		expect(res.body.rotation.active).toBe(false);
+		expect(res.body.signingCertFingerprintSha256).toBe(pendingFp);
+	});
+
+	it('API-IDP-ADM-25: POST rotation complete when none active → 409', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/complete`)
+			.set(csrfHeader(csrf))
+			.expect(409);
+	});
+
+	it('API-IDP-ADM-26: POST rotation cancel clears pending', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/start`)
+			.set(csrfHeader(csrf))
+			.send({ mode: 'generate' })
+			.expect(201);
+		const res = await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/cancel`)
+			.set(csrfHeader(csrf))
+			.expect(201);
+		expect(res.body.rotation.active).toBe(false);
+		expect(res.body.rotation.hasPendingCertificate).toBe(false);
+	});
+
+	it('API-IDP-ADM-27: POST rotation cancel when none active → 409', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/cancel`)
+			.set(csrfHeader(csrf))
+			.expect(409);
+	});
+
+	it('API-IDP-ADM-28: GET metadata-preview returns SAML XML', async () => {
+		const agent = await adminAgent();
+		const res = await agent.get(`${IDP_SETTINGS_API_PATH}/metadata-preview`).expect(200);
+		expect(res.body.contentType).toBe('application/samlmetadata+xml');
+		expect(res.body.xml).toContain('EntityDescriptor');
+		expect(res.body.xml).toContain('X509Certificate');
+		expect(res.body.xml).not.toContain('BEGIN PRIVATE KEY');
+	});
+
+	it('API-IDP-ADM-29: PATCH forbidNonWhitelisted field → 400', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent
+			.patch(IDP_SETTINGS_API_PATH)
+			.set(csrfHeader(csrf))
+			.send({ entityId: 'https://ok.example.com', unknownField: true })
+			.expect(400);
+	});
+
+	it('API-IDP-ADM-30: entityId trim applied on PATCH', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		const res = await agent
+			.patch(IDP_SETTINGS_API_PATH)
+			.set(csrfHeader(csrf))
+			.send({ entityId: '  https://trimmed-idp.example.com  ' })
+			.expect(200);
+		expect(res.body.entityId).toBe('https://trimmed-idp.example.com');
+	});
+
+	it('API-IDP-ADM-31: POST rotation start without CSRF → 403', async () => {
+		const agent = await adminAgent();
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/start`)
+			.send({ mode: 'generate' })
+			.expect(403);
+	});
+
+	it('API-IDP-ADM-32: GET when settings row missing → 404', async () => {
+		await prisma.idpSettings.delete({ where: { id: 'default' } });
+		const agent = await adminAgent();
+		await agent.get(IDP_SETTINGS_API_PATH).expect(404);
+		await createTestIdpSettings(prisma, { entityId: 'https://restored-idp.example.com' });
+		await createTestIdpSettingsWithSigningKey(prisma, {
+			entityId: 'https://restored-idp.example.com',
+		});
+	});
+
+	it('API-IDP-ADM-33: settings without cert report hasSigningCertificate false', async () => {
+		await prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: { signingCertPem: null, signingKeyEncrypted: null },
+		});
+		const agent = await adminAgent();
+		const res = await agent.get(IDP_SETTINGS_API_PATH).expect(200);
+		expect(res.body.hasSigningCertificate).toBe(false);
+		expect(res.body.signingCertFingerprintSha256).toBeNull();
+		await createTestIdpSettingsWithSigningKey(prisma, {
+			entityId: 'https://restored-idp.example.com',
+		});
+	});
+
+	it('API-IDP-ADM-34: updatedAt changes after PATCH', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		const before = await agent.get(IDP_SETTINGS_API_PATH).expect(200);
+		const res = await agent
+			.patch(IDP_SETTINGS_API_PATH)
+			.set(csrfHeader(csrf))
+			.send({ nameIdFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified' })
+			.expect(200);
+		expect(new Date(res.body.updatedAt).getTime()).toBeGreaterThanOrEqual(
+			new Date(before.body.updatedAt).getTime(),
+		);
+	});
+
+	it('API-IDP-ADM-35: metadata-url helper returns updated entityId after PATCH', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		const newEntityId = 'https://metadata-url-updated.example.com';
+		await agent
+			.patch(IDP_SETTINGS_API_PATH)
+			.set(csrfHeader(csrf))
+			.send({ entityId: newEntityId })
+			.expect(200);
+		const meta = await agent.get(IDP_METADATA_URL_API_PATH).expect(200);
+		expect(meta.body.entityId).toBe(newEntityId);
+	});
+
+	it('API-IDP-ADM-36: metadata preview matches public metadata entity block', async () => {
+		const agent = await adminAgent();
+		const preview = await agent.get(`${IDP_SETTINGS_API_PATH}/metadata-preview`).expect(200);
+		const publicMeta = await request(app.getHttpServer() as App)
+			.get('/saml/metadata')
+			.expect(200);
+		const normalize = (xml: string) => xml.replace(/\s+/g, '');
+		expect(normalize(preview.body.xml)).toBe(normalize(publicMeta.text));
+	});
+
+	it('API-IDP-ADM-37: POST upload primary during active rotation → 409', async () => {
+		const { certPem, privateKeyPem } = getTestSigningMaterial('https://upload-blocked.example.com');
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/start`)
+			.set(csrfHeader(csrf))
+			.send({ mode: 'generate' })
+			.expect(201);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/upload`)
+			.set(csrfHeader(csrf))
+			.send({ signingCertPem: certPem, signingPrivateKeyPem: privateKeyPem })
+			.expect(409);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/cancel`)
+			.set(csrfHeader(csrf))
+			.expect(201);
+	});
+
+	it('API-IDP-ADM-38: POST rotation complete without CSRF → 403', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/start`)
+			.set(csrfHeader(csrf))
+			.send({ mode: 'generate' })
+			.expect(201);
+		const agentNoCsrf = await adminAgent();
+		await agentNoCsrf.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/complete`).expect(403);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/cancel`)
+			.set(csrfHeader(csrf))
+			.expect(201);
+	});
+
+	it('API-IDP-ADM-39: GET metadata-preview without session → 401', async () => {
+		await request(app.getHttpServer() as App)
+			.get(`${IDP_SETTINGS_API_PATH}/metadata-preview`)
+			.expect(401);
+	});
+
+	it('API-IDP-ADM-40: fingerprint in DTO matches actual primary cert', async () => {
+		const row = await prisma.idpSettings.findUnique({ where: { id: 'default' } });
+		const agent = await adminAgent();
+		const res = await agent.get(IDP_SETTINGS_API_PATH).expect(200);
+		expect(res.body.signingCertFingerprintSha256).toBe(fingerprintSha256Hex(row!.signingCertPem!));
+	});
+
+	it('API-IDP-ADM-41: GET never returns signingCertPem or pending PEM fields', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/start`)
+			.set(csrfHeader(csrf))
+			.send({ mode: 'generate' })
+			.expect(201);
+		const res = await agent.get(IDP_SETTINGS_API_PATH).expect(200);
+		expect(res.body.signingCertPem).toBeUndefined();
+		expect(res.body.pendingSigningCertPem).toBeUndefined();
+		expect(JSON.stringify(res.body)).not.toContain('BEGIN CERTIFICATE');
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/cancel`)
+			.set(csrfHeader(csrf))
+			.expect(201);
+	});
+
+	it('API-IDP-ADM-42: two sequential rotation starts blocked until complete', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/start`)
+			.set(csrfHeader(csrf))
+			.send({ mode: 'generate' })
+			.expect(201);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/start`)
+			.set(csrfHeader(csrf))
+			.send({ mode: 'generate' })
+			.expect(409);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/cancel`)
+			.set(csrfHeader(csrf))
+			.expect(201);
+	});
+
+	it('API-IDP-ADM-43: primary fingerprint stable across consecutive GETs', async () => {
+		const agent = await adminAgent();
+		const first = await agent.get(IDP_SETTINGS_API_PATH).expect(200);
+		const second = await agent.get(IDP_SETTINGS_API_PATH).expect(200);
+		expect(second.body.signingCertFingerprintSha256).toBe(first.body.signingCertFingerprintSha256);
+	});
+
+	it('API-IDP-ADM-44: PATCH entityId and nameIdFormat together', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		const format = 'urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified';
+		const res = await agent
+			.patch(IDP_SETTINGS_API_PATH)
+			.set(csrfHeader(csrf))
+			.send({ entityId: 'https://dual-patch.example.com', nameIdFormat: format })
+			.expect(200);
+		expect(res.body.entityId).toBe('https://dual-patch.example.com');
+		expect(res.body.nameIdFormat).toBe(format);
+	});
+
+	it('API-IDP-ADM-45: POST generate without admin session → 401', async () => {
+		await request(app.getHttpServer() as App)
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/generate`)
+			.expect(401);
+	});
+
+	it('API-IDP-ADM-46: pending fingerprint differs from primary during rotation', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		const before = await agent.get(IDP_SETTINGS_API_PATH).expect(200);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/start`)
+			.set(csrfHeader(csrf))
+			.send({ mode: 'generate' })
+			.expect(201);
+		const after = await agent.get(IDP_SETTINGS_API_PATH).expect(200);
+		expect(after.body.rotation.pendingCertFingerprintSha256).not.toBe(
+			before.body.signingCertFingerprintSha256,
+		);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/cancel`)
+			.set(csrfHeader(csrf))
+			.expect(201);
+	});
+
+	it('API-IDP-ADM-47: GET /api/admin dashboard still works alongside settings API', async () => {
+		const agent = await adminAgent();
+		const dash = await agent.get('/api/admin').expect(200);
+		const settings = await agent.get(IDP_SETTINGS_API_PATH).expect(200);
+		expect(dash.body.idp).toBeDefined();
+		expect(settings.body.entityId).toBeTruthy();
+	});
+
+	it('API-IDP-ADM-48: POST rotation cancel without CSRF → 403', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/start`)
+			.set(csrfHeader(csrf))
+			.send({ mode: 'generate' })
+			.expect(201);
+		const agentNoCsrf = await adminAgent();
+		await agentNoCsrf.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/cancel`).expect(403);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/cancel`)
+			.set(csrfHeader(csrf))
+			.expect(201);
+	});
+
+	it('API-IDP-ADM-49: rotation start upload mode missing PEM fields → 400', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/start`)
+			.set(csrfHeader(csrf))
+			.send({ mode: 'upload' })
+			.expect(400);
+	});
+
+	it('API-IDP-ADM-50: complete rotation clears rotationStartedAt in DTO', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/start`)
+			.set(csrfHeader(csrf))
+			.send({ mode: 'generate' })
+			.expect(201);
+		const res = await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/complete`)
+			.set(csrfHeader(csrf))
+			.expect(201);
+		expect(res.body.rotation.active).toBe(false);
+		expect(res.body.rotation.startedAt).toBeNull();
+	});
+});

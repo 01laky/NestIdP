@@ -10,3 +10,4 @@ export * from './sync.js';
 export * from './end-user-auth.js';
 export * from './saml.js';
 export * from './identity-admin.js';
+export * from './idp-settings.js';

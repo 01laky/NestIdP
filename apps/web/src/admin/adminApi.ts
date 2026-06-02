@@ -12,6 +12,8 @@ import type {
 	CreateSpConnectionRequestDto,
 	DeleteApiConnectionResponseDto,
 	DeleteSpConnectionResponseDto,
+	IdpMetadataPreviewResponseDto,
+	IdpSettingsPublicDto,
 	IdentityGroupListResponseDto,
 	IdentityRoleListResponseDto,
 	IdentityUserDetailResponseDto,
@@ -19,13 +21,16 @@ import type {
 	SpConnectionPublicDto,
 	SpConnectionResponseDto,
 	SpConnectionTestAcsResponseDto,
+	StartIdpCertRotationRequestDto,
 	SyncLogListResponseDto,
 	SyncLogResponseDto,
 	SyncStatusResponseDto,
 	TriggerSyncRequestDto,
 	TriggerSyncResponseDto,
 	UpdateApiConnectionRequestDto,
+	UpdateIdpSettingsRequestDto,
 	UpdateSpConnectionRequestDto,
+	UploadIdpSigningCertRequestDto,
 } from '@nestidp/shared';
 import type { IdpMetadataUrlResponseDto, SpConnectionListResponseDto } from '@nestidp/shared';
 import {
@@ -35,6 +40,7 @@ import {
 	IDENTITY_ROLES_API_PATH,
 	IDENTITY_USERS_API_PATH,
 	IDP_METADATA_URL_API_PATH,
+	IDP_SETTINGS_API_PATH,
 	SP_CONNECTIONS_API_PATH,
 	SYNC_API_PATH,
 } from '@nestidp/shared';
@@ -294,6 +300,62 @@ export function listIdentityRoles(
 	}
 	const suffix = query.size > 0 ? `?${query.toString()}` : '';
 	return adminFetch<IdentityRoleListResponseDto>(`${IDENTITY_ROLES_API_PATH}${suffix}`);
+}
+
+export function getIdpSettings(): Promise<IdpSettingsPublicDto> {
+	return adminFetch<IdpSettingsPublicDto>(IDP_SETTINGS_API_PATH);
+}
+
+export function updateIdpSettings(
+	body: UpdateIdpSettingsRequestDto,
+): Promise<IdpSettingsPublicDto> {
+	return adminFetch<IdpSettingsPublicDto>(IDP_SETTINGS_API_PATH, {
+		method: 'PATCH',
+		body: JSON.stringify(body),
+	});
+}
+
+export function generateIdpSigningCert(): Promise<IdpSettingsPublicDto> {
+	return adminFetch<IdpSettingsPublicDto>(`${IDP_SETTINGS_API_PATH}/signing-cert/generate`, {
+		method: 'POST',
+	});
+}
+
+export function uploadIdpSigningCert(
+	body: UploadIdpSigningCertRequestDto,
+): Promise<IdpSettingsPublicDto> {
+	return adminFetch<IdpSettingsPublicDto>(`${IDP_SETTINGS_API_PATH}/signing-cert/upload`, {
+		method: 'POST',
+		body: JSON.stringify(body),
+	});
+}
+
+export function startIdpCertRotation(
+	body: StartIdpCertRotationRequestDto,
+): Promise<IdpSettingsPublicDto> {
+	return adminFetch<IdpSettingsPublicDto>(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/start`, {
+		method: 'POST',
+		body: JSON.stringify(body),
+	});
+}
+
+export function completeIdpCertRotation(): Promise<IdpSettingsPublicDto> {
+	return adminFetch<IdpSettingsPublicDto>(
+		`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/complete`,
+		{
+			method: 'POST',
+		},
+	);
+}
+
+export function cancelIdpCertRotation(): Promise<IdpSettingsPublicDto> {
+	return adminFetch<IdpSettingsPublicDto>(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/cancel`, {
+		method: 'POST',
+	});
+}
+
+export function getIdpMetadataPreview(): Promise<IdpMetadataPreviewResponseDto> {
+	return adminFetch<IdpMetadataPreviewResponseDto>(`${IDP_SETTINGS_API_PATH}/metadata-preview`);
 }
 
 export type { SpConnectionPublicDto };

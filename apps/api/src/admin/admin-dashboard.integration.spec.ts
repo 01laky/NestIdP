@@ -19,6 +19,7 @@ import {
 	createTestIdpSettingsWithSigningKey,
 	createTestSpConnection,
 	createTestUser,
+	getTestSigningMaterialWithDays,
 } from '../prisma/test-fixtures';
 import { runMigrationsOnTestDb } from '../prisma/test-db.helper';
 
@@ -152,5 +153,102 @@ describe('Admin dashboard API (SQLite)', () => {
 		expect(res.body.ssoUrl).toBe('http://localhost:3000/saml/sso');
 		expect(res.body.syncApiPath).toBe('/api/admin/sync');
 		expect(res.body.spConnectionsApiPath).toContain('sp-connections');
+	});
+
+	it('API-ADM-DASH-09: dashboard includes idp status object', async () => {
+		const agent = await adminAgent();
+		const res = await agent.get('/api/admin').expect(200);
+		expect(res.body.idp).toMatchObject({
+			idpSettingsRoute: '/admin/settings/idp',
+			hasSigningCertificate: true,
+			rotationActive: false,
+			certStatus: expect.stringMatching(/^(missing|ok|expiring_soon|rotation_active)$/),
+		});
+	});
+
+	it('API-ADM-DASH-10: idp.certStatus ok when signing cert configured', async () => {
+		const agent = await adminAgent();
+		const res = await agent.get('/api/admin').expect(200);
+		expect(res.body.idp.certStatus).toBe('ok');
+		expect(res.body.idp.hasSigningCertificate).toBe(true);
+	});
+
+	it('API-ADM-DASH-11: idp.signingCertNotAfter is ISO string or null', async () => {
+		const agent = await adminAgent();
+		const res = await agent.get('/api/admin').expect(200);
+		if (res.body.idp.signingCertNotAfter) {
+			expect(res.body.idp.signingCertNotAfter).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+		} else {
+			expect(res.body.idp.signingCertNotAfter).toBeNull();
+		}
+	});
+
+	it('API-ADM-DASH-12: dashboard JSON never exposes signing key material', async () => {
+		const agent = await adminAgent();
+		const res = await agent.get('/api/admin').expect(200);
+		const serialized = JSON.stringify(res.body);
+		expect(serialized).not.toContain('BEGIN PRIVATE KEY');
+		expect(serialized).not.toContain('signingKeyEncrypted');
+	});
+
+	it('API-ADM-DASH-13: idp.rotationActive true when pending cert exists', async () => {
+		const settings = await prisma.idpSettings.findUnique({ where: { id: 'default' } });
+		await prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: {
+				pendingSigningCertPem: settings!.signingCertPem,
+				pendingSigningKeyEncrypted: settings!.signingKeyEncrypted,
+				rotationStartedAt: new Date(),
+			},
+		});
+		const agent = await adminAgent();
+		const res = await agent.get('/api/admin').expect(200);
+		expect(res.body.idp.rotationActive).toBe(true);
+		expect(res.body.idp.certStatus).toBe('rotation_active');
+		await prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: {
+				pendingSigningCertPem: null,
+				pendingSigningKeyEncrypted: null,
+				rotationStartedAt: null,
+			},
+		});
+	});
+
+	it('API-ADM-DASH-14: idp.certStatus missing when no primary cert configured', async () => {
+		await prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: {
+				signingCertPem: null,
+				signingKeyEncrypted: null,
+				pendingSigningCertPem: null,
+				pendingSigningKeyEncrypted: null,
+				rotationStartedAt: null,
+			},
+		});
+		const agent = await adminAgent();
+		const res = await agent.get('/api/admin').expect(200);
+		expect(res.body.idp.certStatus).toBe('missing');
+		expect(res.body.idp.hasSigningCertificate).toBe(false);
+		await createTestIdpSettingsWithSigningKey(prisma, { entityId: 'http://localhost:3000' });
+	});
+
+	it('API-ADM-DASH-15: idp.certStatus expiring_soon when cert notAfter within 30 days', async () => {
+		const { certPem, privateKeyPem } = getTestSigningMaterialWithDays('http://localhost:3000', 15);
+		const { encrypt } = await import('../encryption/encryption.util');
+		await prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: {
+				signingCertPem: certPem,
+				signingKeyEncrypted: encrypt(privateKeyPem, 'test-encryption-key-32chars!!'),
+				pendingSigningCertPem: null,
+				pendingSigningKeyEncrypted: null,
+				rotationStartedAt: null,
+			},
+		});
+		const agent = await adminAgent();
+		const res = await agent.get('/api/admin').expect(200);
+		expect(res.body.idp.certStatus).toBe('expiring_soon');
+		await createTestIdpSettingsWithSigningKey(prisma, { entityId: 'http://localhost:3000' });
 	});
 });

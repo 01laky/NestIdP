@@ -54,6 +54,20 @@ The `authCredentialsEncrypted` column stores **AES-256-GCM** ciphertext of the B
 - Admin uses **`nestidp_admin_session`** — separate cookie and session payload (includes CSRF)
 - **`SamlSession.userId`** — set after successful login when `samlSessionId` is provided (SSO bind)
 
+### IdpSettings and certificate rotation (v0.9.0)
+
+Singleton row `id = default`. Bootstrap creates **`entityId`** only (from `IDP_BASE_URL`); signing certs are operator-managed or lazy-generated on first SSO/metadata (dev fallback).
+
+| Column                                                 | Purpose                                                  |
+| ------------------------------------------------------ | -------------------------------------------------------- |
+| `signingCertPem` / `signingKeyEncrypted`               | Primary signing material (assertions + metadata)         |
+| `pendingSigningCertPem` / `pendingSigningKeyEncrypted` | Next cert during rotation (metadata only until complete) |
+| `rotationStartedAt`                                    | UI / audit timestamp when rotation started               |
+
+**Invariants:** pending cert and key must both be set or both null; `complete` promotes pending → primary; `cancel` clears pending + `rotationStartedAt`. Private keys encrypted with `EncryptionService` (`v1:` prefix).
+
+Deploy: `pnpm db:migrate:deploy` applies migration `20260602120000_idp_settings_rotation` on both SQLite and PostgreSQL.
+
 ## Local development (SQLite)
 
 No Docker required:

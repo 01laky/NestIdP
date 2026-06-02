@@ -1,5 +1,6 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { IDP_SETTINGS_ROUTE_PREFIX } from '@nestidp/shared';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AppRoutes } from './AppRoutes';
 import * as adminApi from './admin/adminApi';
@@ -15,6 +16,13 @@ const dashboardStub = {
 	metadataUrl: 'http://localhost:3000/saml/metadata',
 	entityId: 'http://localhost:3000',
 	ssoUrl: 'http://localhost:3000/saml/sso',
+	idp: {
+		idpSettingsRoute: IDP_SETTINGS_ROUTE_PREFIX,
+		hasSigningCertificate: true,
+		rotationActive: false,
+		signingCertNotAfter: '2030-01-01T00:00:00.000Z',
+		certStatus: 'ok' as const,
+	},
 	apiConnection: null,
 	lastSyncStatus: null,
 	lastSyncAt: null,

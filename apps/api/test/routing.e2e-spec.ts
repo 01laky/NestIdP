@@ -4,7 +4,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { AUTH_API_PATH, SP_CONNECTIONS_API_PATH } from '@nestidp/shared';
+import { AUTH_API_PATH, IDP_SETTINGS_API_PATH, SP_CONNECTIONS_API_PATH } from '@nestidp/shared';
 import { AdminModule } from '../src/admin/admin.module';
 import { AdminAuthModule } from '../src/admin-auth/admin-auth.module';
 import { AuthModule } from '../src/auth/auth.module';
@@ -62,6 +62,11 @@ describe('Routing (e2e)', () => {
 			nameIdFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
 			signingCertPem: certPem,
 			signingKeyEncrypted,
+			pendingSigningCertPem: null,
+			pendingSigningKeyEncrypted: null,
+			rotationStartedAt: null,
+			createdAt: new Date(),
+			updatedAt: new Date(),
 		});
 		prismaMock.idpSettings.update.mockImplementation(
 			async (args: { data: Record<string, unknown> }) => ({
@@ -254,6 +259,8 @@ describe('Routing (e2e)', () => {
 		expect(response.body.syncApiPath).toBe('/api/admin/sync');
 		expect(response.body.entityId).toBe('http://localhost:3000');
 		expect(response.body.metadataUrl).toContain('/saml/metadata');
+		expect(response.body.idp).toBeDefined();
+		expect(response.body.idp.idpSettingsRoute).toBe('/admin/settings/idp');
 	});
 
 	it('E2E-ADM-08-02: GET /api/admin/sp-connections returns JSON with admin cookie', async () => {
@@ -410,6 +417,56 @@ describe('Routing (e2e)', () => {
 
 	it('GET /admin/api-connections returns SPA fallback for nested admin route', async () => {
 		const response = await request(app.getHttpServer() as App).get('/admin/api-connections');
+		expect(response.body?.module).not.toBe('admin');
+	});
+
+	it('E2E-IDP-09-01: GET /api/admin/idp/settings without session returns 401 JSON', async () => {
+		const response = await request(app.getHttpServer() as App).get(IDP_SETTINGS_API_PATH);
+		expect(response.status).toBe(401);
+		expect(response.headers['content-type']).toMatch(/application\/json/);
+	});
+
+	it('E2E-IDP-09-02: GET /api/admin/idp/settings with admin cookie returns JSON DTO', async () => {
+		const password = 'e2e-idp-settings-pass';
+		const { hashPassword } = await import('../src/admin-auth/password.util');
+		const passwordHash = await hashPassword(password);
+		prismaMock.adminUser.findUnique.mockImplementation(
+			async (args: { where: { username?: string; id?: string } }) => {
+				if (args.where.username === 'idpadmin') {
+					return { id: 'admin-idp', username: 'idpadmin', passwordHash };
+				}
+				if (args.where.id === 'admin-idp') {
+					return { id: 'admin-idp', username: 'idpadmin', passwordHash };
+				}
+				return null;
+			},
+		);
+
+		const agent = request.agent(app.getHttpServer() as App);
+		await agent.post('/api/admin/auth/login').send({ username: 'idpadmin', password }).expect(200);
+
+		const response = await agent.get(IDP_SETTINGS_API_PATH).expect(200);
+		expect(response.headers['content-type']).toMatch(/application\/json/);
+		expect(response.body.entityId).toBe('http://localhost:3000');
+		expect(response.body.rotation).toBeDefined();
+		expect(response.text).not.toContain('<!DOCTYPE html>');
+	});
+
+	it('E2E-IDP-09-03: GET /admin/settings/idp returns SPA fallback not admin API JSON', async () => {
+		const response = await request(app.getHttpServer() as App).get('/admin/settings/idp');
+		expect(response.body?.module).not.toBe('admin');
+		expect(response.text).not.toContain('"entityId"');
+	});
+
+	it('E2E-IDP-09-04: GET /saml/metadata still public without admin session', async () => {
+		const response = await request(app.getHttpServer() as App)
+			.get('/saml/metadata')
+			.expect(200);
+		expect(response.headers['content-type']).toMatch(/xml/);
+	});
+
+	it('E2E-IDP-09-05: GET /admin/settings/unknown returns SPA fallback for nested settings route', async () => {
+		const response = await request(app.getHttpServer() as App).get('/admin/settings/unknown');
 		expect(response.body?.module).not.toBe('admin');
 	});
 

@@ -1,4 +1,5 @@
 import { ConfigService } from '@nestjs/config';
+import { IDP_SETTINGS_ROUTE_PREFIX } from '@nestidp/shared';
 import { AdminDashboardService } from './admin-dashboard.service';
 import { AdminStatsService } from './admin-stats.service';
 
@@ -12,11 +13,20 @@ describe('AdminDashboardService', () => {
 		apiConnection: { findFirst: jest.fn() },
 	};
 
+	const idpSettingsService = {
+		buildDashboardIdpStatus: jest.fn(),
+	};
+
 	const configService = {
 		get: jest.fn(() => 'http://localhost:3000'),
 	} as unknown as ConfigService;
 
-	const service = new AdminDashboardService(adminStatsService, prisma as never, configService);
+	const service = new AdminDashboardService(
+		adminStatsService,
+		prisma as never,
+		configService,
+		idpSettingsService as never,
+	);
 
 	beforeEach(() => {
 		jest.clearAllMocks();
@@ -29,6 +39,13 @@ describe('AdminDashboardService', () => {
 		});
 		prisma.idpSettings.findUnique.mockResolvedValue({ entityId: 'http://localhost:3000' });
 		prisma.apiConnection.findFirst.mockResolvedValue(null);
+		idpSettingsService.buildDashboardIdpStatus.mockResolvedValue({
+			idpSettingsRoute: IDP_SETTINGS_ROUTE_PREFIX,
+			hasSigningCertificate: true,
+			rotationActive: false,
+			signingCertNotAfter: '2030-01-01T00:00:00.000Z',
+			certStatus: 'ok',
+		});
 	});
 
 	it('API-ADM-DASH-SVC-01: builds dashboard with null apiConnection', async () => {
@@ -69,5 +86,33 @@ describe('AdminDashboardService', () => {
 		const result = await service.getDashboard();
 
 		expect(result.entityId).toBe('http://localhost:3000');
+	});
+
+	it('API-ADM-DASH-SVC-04: includes idp block from IdpSettingsService', async () => {
+		const result = await service.getDashboard();
+
+		expect(idpSettingsService.buildDashboardIdpStatus).toHaveBeenCalled();
+		expect(result.idp).toEqual({
+			idpSettingsRoute: IDP_SETTINGS_ROUTE_PREFIX,
+			hasSigningCertificate: true,
+			rotationActive: false,
+			signingCertNotAfter: '2030-01-01T00:00:00.000Z',
+			certStatus: 'ok',
+		});
+	});
+
+	it('API-ADM-DASH-SVC-05: idp missing cert defaults when settings row absent', async () => {
+		prisma.idpSettings.findUnique.mockResolvedValue(null);
+
+		const result = await service.getDashboard();
+
+		expect(idpSettingsService.buildDashboardIdpStatus).not.toHaveBeenCalled();
+		expect(result.idp).toEqual({
+			idpSettingsRoute: IDP_SETTINGS_ROUTE_PREFIX,
+			hasSigningCertificate: false,
+			rotationActive: false,
+			signingCertNotAfter: null,
+			certStatus: 'missing',
+		});
 	});
 });

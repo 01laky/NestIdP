@@ -5,14 +5,15 @@ import {
 	API_CONNECTION_ROUTE_PREFIX,
 	API_CONNECTIONS_API_PATH,
 	IDENTITY_ROUTE_PREFIX,
-	SAML_METADATA_PATH,
-	SAML_SSO_PATH,
+	IDP_SETTINGS_ROUTE_PREFIX,
+	SYNC_API_PATH,
 	SP_CONNECTION_ROUTE_PREFIX,
 	SP_CONNECTIONS_API_PATH,
-	SYNC_API_PATH,
 } from '@nestidp/shared';
 import { toApiConnectionDto } from '../api-connections/api-connections.mapper';
+import { IdpSettingsService } from '../idp-settings/idp-settings.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { buildIdpUrls } from '../idp-settings/idp-settings.mapper';
 import { AdminStatsService } from './admin-stats.service';
 
 @Injectable()
@@ -21,6 +22,7 @@ export class AdminDashboardService {
 		private readonly adminStatsService: AdminStatsService,
 		private readonly prisma: PrismaService,
 		private readonly configService: ConfigService,
+		private readonly idpSettingsService: IdpSettingsService,
 	) {}
 
 	async getDashboard(): Promise<AdminDashboardResponseDto> {
@@ -32,6 +34,16 @@ export class AdminDashboardService {
 		});
 
 		const entityId = settings?.entityId ?? base;
+		const urls = buildIdpUrls(base);
+		const idp = settings
+			? await this.idpSettingsService.buildDashboardIdpStatus()
+			: {
+					idpSettingsRoute: IDP_SETTINGS_ROUTE_PREFIX,
+					hasSigningCertificate: false,
+					rotationActive: false,
+					signingCertNotAfter: null,
+					certStatus: 'missing' as const,
+				};
 
 		return {
 			counts,
@@ -41,9 +53,10 @@ export class AdminDashboardService {
 			apiConnectionsApiPath: API_CONNECTIONS_API_PATH,
 			syncApiPath: SYNC_API_PATH,
 			spConnectionsApiPath: SP_CONNECTIONS_API_PATH,
-			metadataUrl: `${base}${SAML_METADATA_PATH}`,
+			metadataUrl: urls.metadataUrl,
 			entityId,
-			ssoUrl: `${base}${SAML_SSO_PATH}`,
+			ssoUrl: urls.ssoUrl,
+			idp,
 			apiConnection: connectionRow ? toApiConnectionDto(connectionRow) : null,
 			lastSyncStatus: connectionRow?.lastSyncStatus ?? null,
 			lastSyncAt: connectionRow?.lastSyncAt?.toISOString() ?? null,

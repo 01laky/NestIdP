@@ -17,9 +17,10 @@ describe('SpConnectionsService', () => {
 			update: jest.fn(),
 			delete: jest.fn(),
 		},
-		idpSettings: {
-			findUnique: jest.fn(),
-		},
+	};
+
+	const idpSettingsService = {
+		getMetadataUrlResponse: jest.fn(),
 	};
 
 	const configService = {
@@ -34,7 +35,12 @@ describe('SpConnectionsService', () => {
 		}),
 	} as unknown as ConfigService;
 
-	const service = new SpConnectionsService(prisma as never, configService, audit as never);
+	const service = new SpConnectionsService(
+		prisma as never,
+		configService,
+		audit as never,
+		idpSettingsService as never,
+	);
 
 	const sampleRow = {
 		id: 'c1234567890123456789012345',
@@ -185,18 +191,23 @@ describe('SpConnectionsService', () => {
 	});
 
 	it('API-SPC-SVC-12: getMetadataUrl when settings missing → NotFoundException', async () => {
-		prisma.idpSettings.findUnique.mockResolvedValue(null);
+		idpSettingsService.getMetadataUrlResponse.mockRejectedValue(
+			new NotFoundException('IdP settings not configured'),
+		);
 
 		await expect(service.getMetadataUrl()).rejects.toThrow('IdP settings not configured');
 	});
 
-	it('API-SPC-SVC-13: getMetadataUrl builds URLs from config', async () => {
-		prisma.idpSettings.findUnique.mockResolvedValue({
+	it('API-SPC-SVC-13: getMetadataUrl delegates to IdpSettingsService', async () => {
+		idpSettingsService.getMetadataUrlResponse.mockResolvedValue({
+			metadataUrl: 'http://localhost:3000/saml/metadata',
 			entityId: 'http://localhost:3000',
+			ssoUrl: 'http://localhost:3000/saml/sso',
 		});
 
 		const result = await service.getMetadataUrl();
 
+		expect(idpSettingsService.getMetadataUrlResponse).toHaveBeenCalled();
 		expect(result).toEqual({
 			metadataUrl: 'http://localhost:3000/saml/metadata',
 			entityId: 'http://localhost:3000',

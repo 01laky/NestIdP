@@ -1,0 +1,88 @@
+import {
+	assertMatchingKeyPair,
+	assertValidSigningCertPem,
+	assertValidSigningPrivateKeyPem,
+	fingerprintSha256Hex,
+	isCertExpiringSoon,
+	parseCertNotAfterIso,
+	validateSigningCertPair,
+	IdpCertValidationError,
+} from './idp-cert.util';
+import { getTestSigningMaterial } from '../prisma/test-fixtures';
+
+describe('idp-cert.util', () => {
+	let certPem: string;
+	let privateKeyPem: string;
+
+	beforeAll(() => {
+		const material = getTestSigningMaterial('http://localhost:3000');
+		certPem = material.certPem;
+		privateKeyPem = material.privateKeyPem;
+	});
+
+	it('API-IDP-VAL-01: assertValidSigningCertPem accepts PEM', () => {
+		expect(assertValidSigningCertPem(certPem)).toBe(certPem.trim());
+	});
+
+	it('API-IDP-VAL-02: assertValidSigningCertPem rejects empty', () => {
+		expect(() => assertValidSigningCertPem('   ')).toThrow(IdpCertValidationError);
+	});
+
+	it('API-IDP-VAL-03: assertValidSigningCertPem rejects non-PEM', () => {
+		expect(() => assertValidSigningCertPem('not-pem')).toThrow('valid PEM certificate');
+	});
+
+	it('API-IDP-VAL-04: assertValidSigningPrivateKeyPem accepts key', () => {
+		expect(assertValidSigningPrivateKeyPem(privateKeyPem)).toBe(privateKeyPem.trim());
+	});
+
+	it('API-IDP-VAL-05: assertValidSigningPrivateKeyPem rejects garbage', () => {
+		expect(() => assertValidSigningPrivateKeyPem('nope')).toThrow('valid PEM private key');
+	});
+
+	it('API-IDP-VAL-06: assertMatchingKeyPair accepts matching pair', () => {
+		expect(() => assertMatchingKeyPair(certPem, privateKeyPem)).not.toThrow();
+	});
+
+	it('API-IDP-VAL-07: assertMatchingKeyPair rejects mismatched key', () => {
+		const other = getTestSigningMaterial('https://other-key.example.com');
+		expect(() => assertMatchingKeyPair(certPem, other.privateKeyPem)).toThrow('do not match');
+	});
+
+	it('API-IDP-VAL-08: validateSigningCertPair returns trimmed PEMs', () => {
+		const result = validateSigningCertPair(`  ${certPem}  `, `  ${privateKeyPem}  `);
+		expect(result.certPem).toBe(certPem.trim());
+		expect(result.privateKeyPem).toBe(privateKeyPem.trim());
+	});
+
+	it('API-IDP-VAL-09: fingerprintSha256Hex is stable hex', () => {
+		const fp = fingerprintSha256Hex(certPem);
+		expect(fp).toMatch(/^[a-f0-9]{64}$/);
+		expect(fingerprintSha256Hex(certPem)).toBe(fp);
+	});
+
+	it('API-IDP-VAL-10: parseCertNotAfterIso returns ISO string', () => {
+		const iso = parseCertNotAfterIso(certPem);
+		expect(iso).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+	});
+
+	it('API-IDP-VAL-11: parseCertNotAfterIso null for missing cert', () => {
+		expect(parseCertNotAfterIso(null)).toBeNull();
+		expect(parseCertNotAfterIso(undefined)).toBeNull();
+	});
+
+	it('API-IDP-VAL-12: isCertExpiringSoon true within window', () => {
+		const soon = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString();
+		expect(isCertExpiringSoon(soon, 30)).toBe(true);
+	});
+
+	it('API-IDP-VAL-13: isCertExpiringSoon false for distant expiry', () => {
+		const far = new Date(Date.now() + 400 * 24 * 60 * 60 * 1000).toISOString();
+		expect(isCertExpiringSoon(far, 30)).toBe(false);
+	});
+
+	it('API-IDP-VAL-14: rejects oversized PEM', () => {
+		const huge = `-----BEGIN CERTIFICATE-----\n${'A'.repeat(20_000)}\n-----END CERTIFICATE-----`;
+		expect(() => assertValidSigningCertPem(huge)).toThrow('too large');
+	});
+});

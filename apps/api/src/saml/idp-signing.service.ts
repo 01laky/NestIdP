@@ -37,6 +37,10 @@ export class IdpSigningService {
 			};
 		}
 
+		if (settings.pendingSigningCertPem || settings.pendingSigningKeyEncrypted) {
+			throw new Error('IdP signing certificate not configured');
+		}
+
 		const { privateKeyPem, certPem } = this.generateKeyPairAndCert(settings.entityId);
 		await this.prisma.idpSettings.update({
 			where: { id: 'default' },
@@ -78,6 +82,31 @@ export class IdpSigningService {
 		return Boolean(settings?.signingCertPem && settings?.signingKeyEncrypted);
 	}
 
+	async getMetadataSigningCertificates(): Promise<string[]> {
+		const settings = await this.prisma.idpSettings.findUnique({ where: { id: 'default' } });
+		if (!settings) {
+			throw new Error('IdP settings not configured');
+		}
+
+		const certs: string[] = [];
+		if (settings.signingCertPem) {
+			certs.push(settings.signingCertPem);
+		}
+		if (settings.pendingSigningCertPem) {
+			certs.push(settings.pendingSigningCertPem);
+		}
+		if (certs.length > 0) {
+			return certs;
+		}
+
+		const material = await this.ensureSigningMaterial();
+		return [material.certPem];
+	}
+
+	generateKeyPairAndCert(entityId: string): { privateKeyPem: string; certPem: string } {
+		return this.createKeyPairAndCert(entityId);
+	}
+
 	extractX509CertificatePem(certPem: string): string {
 		return certPem
 			.replace(/-----BEGIN CERTIFICATE-----/g, '')
@@ -100,7 +129,7 @@ export class IdpSigningService {
 		return fragment;
 	}
 
-	private generateKeyPairAndCert(entityId: string): { privateKeyPem: string; certPem: string } {
+	private createKeyPairAndCert(entityId: string): { privateKeyPem: string; certPem: string } {
 		const { privateKey } = generateKeyPairSync('rsa', {
 			modulusLength: 2048,
 			privateKeyEncoding: { type: 'pkcs8', format: 'pem' },

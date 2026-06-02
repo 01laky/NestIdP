@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import type { AdminDashboardIdpCertStatus } from '@nestidp/shared';
 import {
 	API_CONNECTION_ROUTE_PREFIX,
 	IDENTITY_ROUTE_PREFIX,
@@ -10,6 +11,19 @@ import { AdminPageHeader } from '../components/AdminPageHeader';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
 import { useDocumentTitle } from '../components/useDocumentTitle';
+
+function idpCertStatusLabel(certStatus: AdminDashboardIdpCertStatus): string {
+	switch (certStatus) {
+		case 'missing':
+			return 'No signing cert';
+		case 'expiring_soon':
+			return 'Expires soon';
+		case 'rotation_active':
+			return 'Rotation in progress';
+		default:
+			return 'Certificate OK';
+	}
+}
 
 export function DashboardPage() {
 	useDocumentTitle('Dashboard — NestIdP Admin');
@@ -101,7 +115,21 @@ export function DashboardPage() {
 				</p>
 			)}
 			<div className="admin-panel">
-				<h3>IdP endpoints</h3>
+				<h3>IdP configuration</h3>
+				<p>
+					<span className="admin-badge">{idpCertStatusLabel(dashboard.idp.certStatus)}</span>
+				</p>
+				<p>
+					<Link to={dashboard.idp.idpSettingsRoute}>Configure IdP settings</Link>
+				</p>
+				{dashboard.idp.rotationActive ? (
+					<p className="muted">Complete or cancel certificate rotation in IdP settings.</p>
+				) : null}
+				{dashboard.idp.certStatus === 'expiring_soon' && dashboard.idp.signingCertNotAfter ? (
+					<p className="muted">
+						Signing certificate expires on {dashboard.idp.signingCertNotAfter}.
+					</p>
+				) : null}
 				<ul className="admin-kv-list">
 					<li>
 						<span>Entity ID</span>

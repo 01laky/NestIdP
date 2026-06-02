@@ -113,6 +113,10 @@ describe('AdminLoginPage', () => {
 		fireEvent.click(screen.getByRole('button', { name: /Sign in/i }));
 
 		expect(screen.getByRole('button', { name: /Signing in/i }).hasAttribute('disabled')).toBe(true);
+
+		await waitFor(() => {
+			expect(screen.getByRole('button', { name: /Sign in/i }).hasAttribute('disabled')).toBe(false);
+		});
 	});
 
 	it('WEB-ADM-10: shows generic error message on 401 login', async () => {
