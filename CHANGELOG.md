@@ -16,7 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - **`ApiConnectionsAuditService`** / **`SpConnectionsAuditService`** — structured stdout audit on CRUD/test
 - Shared: `identity-admin.ts`, SP CRUD DTOs, `AdminDashboardResponseDto`, `SAML_NAME_ID_FORMATS`
 - Web: `adminApi` CRUD/dashboard/identity helpers; reusable admin UI components (breadcrumbs, mapping editor, presets, empty/loading/error states)
-- Integration tests: `API-SPC-*`, `API-IDN-ADM-*`, `API-ADM-DASH-*`; web `WEB-ADM-20`…`26`
+- Integration tests: `API-SPC-*`, `API-SPC-TACS-*`, `API-IDN-ADM-*`, `API-ADM-DASH-*`, `E2E-ADM-08-*`; web `WEB-ADM-20`…`38`
 
 ### Changed
 
