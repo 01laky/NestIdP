@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { renderWithUi } from '../../test/renderWithUi';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as adminApi from '../adminApi';
@@ -21,7 +22,7 @@ afterEach(() => {
 });
 
 function renderNew() {
-	return render(
+	return renderWithUi(
 		<MemoryRouter initialEntries={['/admin/sp-connections/new']}>
 			<Routes>
 				<Route path="/admin/sp-connections/new" element={<SpConnectionFormPage />} />

@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
+import { renderWithUi } from '../../test/renderWithUi';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { ADMIN_USERS_ROUTE_PREFIX } from '@nestidp/shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -8,7 +9,7 @@ import { AdminUsersPage } from './AdminUsersPage';
 const confirmMock = vi.fn();
 
 function renderPage() {
-	return render(
+	return renderWithUi(
 		<MemoryRouter initialEntries={[ADMIN_USERS_ROUTE_PREFIX]}>
 			<Routes>
 				<Route path={ADMIN_USERS_ROUTE_PREFIX} element={<AdminUsersPage />} />

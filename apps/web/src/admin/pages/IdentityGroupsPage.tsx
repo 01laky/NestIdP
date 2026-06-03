@@ -49,10 +49,10 @@ export function IdentityGroupsPage() {
 			{loading ? <LoadingState /> : null}
 			{error ? <ErrorBanner message={error} /> : null}
 			{!loading && !error ? (
-				<ul className="admin-list">
+				<ul className="evg-list">
 					{items.map((group) => (
 						<li key={group.id}>
-							{group.name} <span className="muted">({group.externalId})</span>
+							{group.name} <span className="evg-muted">({group.externalId})</span>
 						</li>
 					))}
 				</ul>

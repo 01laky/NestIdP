@@ -62,7 +62,7 @@ export function SyncLogDetailPage() {
 					{ label: log.id },
 				]}
 			/>
-			<ul className="admin-kv-list">
+			<ul className="evg-dl">
 				<li>
 					<span>Status</span>
 					<strong>{log.status}</strong>
@@ -81,9 +81,9 @@ export function SyncLogDetailPage() {
 				</li>
 			</ul>
 			{log.errors && log.errors.length > 0 ? (
-				<pre className="admin-pre">{JSON.stringify(log.errors, null, 2)}</pre>
+				<pre className="evg-code-block">{JSON.stringify(log.errors, null, 2)}</pre>
 			) : (
-				<p className="muted">No errors recorded.</p>
+				<p className="evg-muted">No errors recorded.</p>
 			)}
 			<p>
 				<Link to={API_CONNECTION_ROUTE_PREFIX}>Back to API connections</Link>

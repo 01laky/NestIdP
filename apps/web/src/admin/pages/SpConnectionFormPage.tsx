@@ -15,6 +15,7 @@ import { AttributeMappingEditor } from '../components/AttributeMappingEditor';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
 import { useDocumentTitle } from '../components/useDocumentTitle';
+import { useToast } from '../../ui';
 
 export function SpConnectionFormPage() {
 	const { id } = useParams();
@@ -32,6 +33,7 @@ export function SpConnectionFormPage() {
 	const [attributeMapping, setAttributeMapping] = useState<SpAttributeMappingConfig | null>(null);
 	const [spCertificate, setSpCertificate] = useState('');
 	const [acsTestMessage, setAcsTestMessage] = useState<string | null>(null);
+	const { showToast } = useToast();
 	const [saving, setSaving] = useState(false);
 
 	useEffect(() => {
@@ -81,9 +83,11 @@ export function SpConnectionFormPage() {
 		try {
 			if (isNew) {
 				const created = await createSpConnection(body);
+				showToast('SP connection saved');
 				navigate(`${SP_CONNECTION_ROUTE_PREFIX}/${created.item.id}`);
 			} else if (id) {
 				await updateSpConnection(id, body);
+				showToast('SP connection saved');
 			}
 		} catch (err) {
 			setError(err instanceof AdminApiError ? err.message : 'Save failed');
@@ -183,10 +187,14 @@ export function SpConnectionFormPage() {
 					<button type="button" onClick={() => void handleTestAcs()}>
 						Test ACS reachability
 					</button>{' '}
-					<button type="button" className="danger" onClick={() => void handleDeactivateAndDelete()}>
+					<button
+						type="button"
+						className="evg-btn evg-btn--danger"
+						onClick={() => void handleDeactivateAndDelete()}
+					>
 						Deactivate & delete
 					</button>
-					{acsTestMessage ? <span className="muted"> — {acsTestMessage}</span> : null}
+					{acsTestMessage ? <span className="evg-muted"> — {acsTestMessage}</span> : null}
 				</p>
 			) : null}
 			<p>

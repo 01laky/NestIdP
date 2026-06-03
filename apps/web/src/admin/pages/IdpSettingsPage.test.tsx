@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
+import { renderWithUi } from '../../test/renderWithUi';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { IdpSettingsPublicDto } from '@nestidp/shared';
 import { IDP_SETTINGS_ROUTE_PREFIX } from '@nestidp/shared';
@@ -30,7 +31,7 @@ function baseSettings(overrides: Partial<IdpSettingsPublicDto> = {}): IdpSetting
 }
 
 function renderPage() {
-	return render(
+	return renderWithUi(
 		<MemoryRouter initialEntries={[IDP_SETTINGS_ROUTE_PREFIX]}>
 			<Routes>
 				<Route path={IDP_SETTINGS_ROUTE_PREFIX} element={<IdpSettingsPage />} />
@@ -326,7 +327,7 @@ describe('IdpSettingsPage', () => {
 
 		await waitFor(() => {
 			expect(completeSpy).toHaveBeenCalledTimes(1);
-			expect(screen.getByText(/Certificate rotation completed/i)).toBeDefined();
+			expect(screen.getAllByText(/Certificate rotation completed/i).length).toBeGreaterThan(0);
 		});
 	});
 
@@ -452,7 +453,7 @@ describe('IdpSettingsPage', () => {
 		renderPage();
 
 		await waitFor(() => {
-			const checklist = document.querySelector('.admin-checklist');
+			const checklist = document.querySelector('.evg-checklist');
 			expect(checklist).not.toBeNull();
 			expect(checklist!.querySelectorAll('li').length).toBe(4);
 		});

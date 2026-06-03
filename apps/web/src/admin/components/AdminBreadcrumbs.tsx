@@ -1,30 +1,14 @@
 import { Link } from 'react-router-dom';
 
-export type BreadcrumbItem = {
-	label: string;
-	to?: string;
-};
-
-type AdminBreadcrumbsProps = {
-	items: BreadcrumbItem[];
-};
-
-export function AdminBreadcrumbs({ items }: AdminBreadcrumbsProps) {
+export function AdminBreadcrumbs({ items }: { items: Array<{ label: string; to?: string }> }) {
 	return (
-		<nav className="admin-breadcrumbs" aria-label="Breadcrumb">
+		<nav className="evg-breadcrumbs" aria-label="Breadcrumb">
 			<ol>
-				{items.map((item, index) => {
-					const isLast = index === items.length - 1;
-					return (
-						<li key={`${item.label}-${index}`}>
-							{!isLast && item.to ? (
-								<Link to={item.to}>{item.label}</Link>
-							) : (
-								<span>{item.label}</span>
-							)}
-						</li>
-					);
-				})}
+				{items.map((item, index) => (
+					<li key={`${item.label}-${index}`}>
+						{item.to ? <Link to={item.to}>{item.label}</Link> : item.label}
+					</li>
+				))}
 			</ol>
 		</nav>
 	);

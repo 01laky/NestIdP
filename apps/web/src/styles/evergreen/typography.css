@@ -1,0 +1,59 @@
+@font-face {
+	font-family: 'Source Sans 3';
+	font-style: normal;
+	font-weight: 400;
+	font-display: swap;
+	src: url('/fonts/source-sans-3-latin-400.woff2') format('woff2');
+}
+
+@font-face {
+	font-family: 'Source Sans 3';
+	font-style: normal;
+	font-weight: 600;
+	font-display: swap;
+	src: url('/fonts/source-sans-3-latin-600.woff2') format('woff2');
+}
+
+@font-face {
+	font-family: 'IBM Plex Mono';
+	font-style: normal;
+	font-weight: 400;
+	font-display: swap;
+	src: url('/fonts/ibm-plex-mono-latin-400.woff2') format('woff2');
+}
+
+h1,
+h2,
+h3,
+h4 {
+	line-height: var(--evg-line-tight);
+	color: var(--evg-color-brand-900);
+}
+
+h1 {
+	font-size: var(--evg-text-2xl);
+}
+h2 {
+	font-size: var(--evg-text-xl);
+}
+h3 {
+	font-size: var(--evg-text-lg);
+}
+
+a {
+	color: var(--evg-color-link);
+}
+
+a:hover {
+	color: var(--evg-color-brand-700);
+}
+
+.evg-muted {
+	color: var(--evg-color-text-muted);
+	font-size: var(--evg-text-sm);
+}
+
+code,
+pre {
+	font-family: var(--evg-font-mono);
+}

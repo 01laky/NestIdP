@@ -1,6 +1,6 @@
 # NestIdP
 
-Deployable SAML Identity Provider monolith (NestJS + React + SQL via Prisma). **v1.0.0** — Phase 1 MVP (SAML SSO, admin console, identity sync, Docker deploy).
+Deployable SAML Identity Provider monolith (NestJS + React + SQL via Prisma). **v1.1.0** — Phase 1 MVP plus responsive Evergreen operator UI (SAML SSO, admin console, identity sync, Docker deploy).
 
 Architecture and product scope: [docs/proposal.MD](docs/proposal.MD)
 

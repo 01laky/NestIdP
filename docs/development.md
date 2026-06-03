@@ -1,6 +1,6 @@
 # Development guide
 
-Companion to [proposal.MD](./proposal.MD) for local setup (**v1.0.0** — Phase 1 complete: SAML SSO, admin console, Docker deploy, persistent audit log, admin account management).
+Companion to [proposal.MD](./proposal.MD) for local setup (**v1.1.0** — Phase 1 complete plus Evergreen operator UI: SAML SSO, admin console, Docker deploy, persistent audit log, admin account management).
 
 Integration guide: [integration-api.md](./integration-api.md) · Deploy: [deployment.md](./deployment.md) · Go-live: [RELEASE.md](./RELEASE.md)
 
@@ -383,6 +383,72 @@ curl -s -b "$COOKIE_JAR" "http://localhost:3000/api/admin/sync/CONNECTION_ID/log
 
 Custom NestJS `SamlModule` (xmlbuilder2 + xml-crypto) — SP-initiated SSO, signed assertions, metadata. Flow: [sso-flow.svg](./img/sso-flow.svg) (see [proposal.MD](./proposal.MD) §6.2). `/saml/slo` remains unimplemented (501).
 
+## Evergreen UI (v1.1.0+)
+
+Operator console and SAML login use the **Evergreen** design system: CSS tokens under `apps/web/src/styles/evergreen/`, React primitives under `apps/web/src/ui/` (import from `ui/index.ts` barrel). No Tailwind or runtime CSS-in-JS.
+
+![Evergreen UI layering](./img/evergreen-ui.svg)
+
+| Topic                                  | Location                                                                         |
+| -------------------------------------- | -------------------------------------------------------------------------------- |
+| Design tokens, breakpoints, components | `apps/web/src/styles/evergreen/`                                                 |
+| Reusable UI                            | `apps/web/src/ui/`                                                               |
+| Status colours                         | `apps/web/src/admin/status-badge.ts` → `Badge`                                   |
+| Self-hosted fonts                      | `apps/web/public/fonts/*.woff2` (preloaded in `index.html`; no Google Fonts CDN) |
+| Print (audit export preview)           | `styles/evergreen/print.css` — hides sidebar/topbar                              |
+
+Breakpoints: mobile-first; sidebar drawer below **768px** (`AppShell` + menu button); content max-width via `.evg-container`.
+
+### Component chooser
+
+| Need                 | Component                   | Notes                                                         |
+| -------------------- | --------------------------- | ------------------------------------------------------------- |
+| Page title + actions | `PageHeader`                | Actions slot right; wrap on mobile                            |
+| Section grouping     | `Panel`                     | Bordered; optional `id` for anchors (e.g. `#change-password`) |
+| Highlight metric     | `StatCard`                  | Dashboard stat grid                                           |
+| Floating feedback    | `Toast` via `useToast()`    | Success after POST; not for field validation                  |
+| Inline page errors   | `ErrorBanner`               | Top of form; persists until fixed                             |
+| Empty list           | `EmptyState`                | Optional CTA                                                  |
+| Loading list/page    | `LoadingState`              | Centred spinner + message                                     |
+| Tabular data         | `Table`                     | Horizontal scroll wrapper; wide tables on small viewports     |
+| PEM / JSON / logs    | `CodeBlock`                 | Scrollable monospace                                          |
+| Sync/cert/API status | `Badge` + `status-badge.ts` | Do not hand-pick colours per page                             |
+| Destructive action   | `Button variant="danger"`   | Confirm in copy only (no modal in 1.1.0)                      |
+| Operator identity    | `OperatorSessionBar`        | Admin shell only, not login pages                             |
+
+Dark mode is deferred to v1.2.0 (light theme only in 1.1.0).
+
+### Web tests and visual baselines
+
+Vitest IDs **`WEB-EVG-01`–`72`** cover primitives, styles, conventions (static grep), toast
+mutation flows, Login SSO UI states, dashboard badge mappers, and infra checks. Baseline registry
+**`WEB-EVG-01`–`23`**; extended edge cases **`WEB-EVG-24`–`72`**. Existing **`WEB-ADM-*`** /
+**`WEB-AUTH-*`** must stay green.
+
+| Range           | Focus                                                                                 |
+| --------------- | ------------------------------------------------------------------------------------- |
+| `01`–`23`       | Core Evergreen acceptance (AppShell, primitives, styles, Playwright/bundle infra)     |
+| `24`–`37`       | UI primitive edge cases (all `Button`/`Badge` variants, form errors, `Panel` anchors) |
+| `38`–`40`       | Static conventions (no legacy CSS classes, barrel imports, `main.tsx` entry)          |
+| `41`–`46`       | Toast on six admin mutation flows (API/SP/sync/admins/IdP/audit export)               |
+| `47`–`50`       | `status-badge.ts` unknown/fallback/active-flag edges                                  |
+| `51`–`53`, `15` | `ToastProvider` queue max 3, `aria-live`, `useToast` guard                            |
+| `54`–`57`, `70` | `AppShell` drawer scrim, logout, a11y, `OperatorSessionBar` deep link                 |
+| `58`–`60`       | `print.css` + dark-theme deferral                                                     |
+| `61`–`72`       | Barrel exports, bundle script, Playwright PNGs, Login SSO, Dashboard badges           |
+
+```bash
+pnpm --filter @nestidp/web test
+pnpm --filter @nestidp/web build
+node scripts/check-web-bundle-size.mjs   # main index-*.js ≤ 500 KB raw
+pnpm --filter @nestidp/web exec playwright install chromium
+pnpm --filter @nestidp/web test:e2e:visual
+# Intentional UI changes:
+pnpm --filter @nestidp/web test:e2e:visual:update
+```
+
+Committed screenshots: `apps/web/e2e/screenshots/*.png` (four baselines: admin login and dashboard at 375px and 1280px).
+
 ## Testing
 
 ```bash
@@ -392,11 +458,11 @@ pnpm diagrams:check
 
 - `@nestidp/shared` — schema enums, password hash constants, route prefixes, database validation
 - `@nestidp/api` — unit tests, schema integration tests (SQLite temp DB), optional PostgreSQL smoke (`POSTGRES_TEST_URL`), e2e routing (mocked Prisma)
-- `@nestidp/web` — React route tests (admin vs login separation)
+- `@nestidp/web` — React route tests (admin vs login separation), Evergreen `WEB-EVG-*` registry
 
 Integration tests live under `apps/api/src/prisma/*.integration.spec.ts` and run as part of `pnpm test`.
 
-CI (`.github/workflows/ci.yml`) runs lint, test (with Postgres service), build, and `diagrams:check` on push/PR to `main`.
+CI (`.github/workflows/ci.yml`) runs lint, test (with Postgres service), build, web bundle size check, Playwright visual baselines, and `diagrams:check` on push/PR to `main`.
 
 ## Git hooks
 

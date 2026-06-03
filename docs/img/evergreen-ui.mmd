@@ -1,0 +1,14 @@
+flowchart TB
+	subgraph web["apps/web"]
+		tokens["styles/evergreen/*.css"]
+		ui["src/ui — AppShell, Toast, Table, …"]
+		pages["admin + login pages"]
+	end
+	subgraph assets["Self-hosted assets"]
+		fonts["public/fonts/*.woff2"]
+	end
+	tokens --> ui
+	fonts --> tokens
+	ui --> pages
+	pages --> api["/api/admin/* REST"]
+	pages --> saml["/login SAML UI"]

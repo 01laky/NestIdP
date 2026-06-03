@@ -32,6 +32,12 @@ function renderLogin(initialPath = '/login') {
 	);
 }
 
+async function waitForLoginForm() {
+	await waitFor(() => {
+		expect(screen.getByRole('heading', { name: 'SAML Login' })).toBeDefined();
+	});
+}
+
 describe('LoginPage', () => {
 	beforeEach(() => {
 		vi.spyOn(document, 'open').mockImplementation(() => window);
@@ -45,13 +51,14 @@ describe('LoginPage', () => {
 		});
 	});
 
-	it('WEB-AUTH-01: renders SAML login heading', () => {
+	it('WEB-AUTH-01: renders SAML login heading', async () => {
 		renderLogin();
-		expect(screen.getByRole('heading', { name: 'SAML Login' })).toBeDefined();
+		await waitForLoginForm();
 	});
 
-	it('WEB-AUTH-02: renders enabled username and password fields', () => {
+	it('WEB-AUTH-02: renders enabled username and password fields', async () => {
 		renderLogin();
+		await waitForLoginForm();
 		const username = screen.getByLabelText(/Username/i) as HTMLInputElement;
 		const password = screen.getByLabelText(/Password/i) as HTMLInputElement;
 		expect(username.disabled).toBe(false);
@@ -74,12 +81,13 @@ describe('LoginPage', () => {
 		});
 
 		renderLogin();
+		await waitForLoginForm();
 		fireEvent.change(screen.getByLabelText(/Username/i), { target: { value: 'alice' } });
 		fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: 'secret' } });
 		fireEvent.click(screen.getByRole('button', { name: /Sign in/i }));
 
 		await waitFor(() => {
-			expect(screen.getByText(/Signed in as alice/i)).toBeDefined();
+			expect(screen.getByRole('status').textContent).toContain('Signed in as alice');
 		});
 		expect(authApi.loginEndUser).toHaveBeenCalledWith({
 			username: 'alice',
@@ -94,6 +102,7 @@ describe('LoginPage', () => {
 		);
 
 		renderLogin();
+		await waitForLoginForm();
 		fireEvent.change(screen.getByLabelText(/Username/i), { target: { value: 'alice' } });
 		fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: 'wrong' } });
 		fireEvent.click(screen.getByRole('button', { name: /Sign in/i }));
@@ -119,6 +128,7 @@ describe('LoginPage', () => {
 		});
 
 		renderLogin(`/login?samlSessionId=${sessionId}`);
+		await waitForLoginForm();
 		fireEvent.change(screen.getByLabelText(/Username/i), { target: { value: 'alice' } });
 		fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: 'secret' } });
 		fireEvent.click(screen.getByRole('button', { name: /Sign in/i }));
@@ -148,7 +158,7 @@ describe('LoginPage', () => {
 
 		renderLogin();
 		await waitFor(() => {
-			expect(screen.getByText(/Signed in as alice/i)).toBeDefined();
+			expect(screen.getByRole('status').textContent).toContain('Signed in as alice');
 		});
 	});
 
@@ -158,6 +168,7 @@ describe('LoginPage', () => {
 		);
 
 		renderLogin();
+		await waitForLoginForm();
 		fireEvent.change(screen.getByLabelText(/Username/i), { target: { value: 'alice' } });
 		fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: 'secret' } });
 		fireEvent.click(screen.getByRole('button', { name: /Sign in/i }));
@@ -205,6 +216,7 @@ describe('LoginPage', () => {
 		);
 
 		renderLogin(`/login?samlSessionId=${sessionId}`);
+		await waitForLoginForm();
 		fireEvent.change(screen.getByLabelText(/Username/i), { target: { value: 'alice' } });
 		fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: 'secret' } });
 		fireEvent.click(screen.getByRole('button', { name: /Sign in/i }));
@@ -231,6 +243,7 @@ describe('LoginPage', () => {
 		});
 
 		renderLogin(`/login?samlSessionId=${sessionId}`);
+		await waitForLoginForm();
 		fireEvent.change(screen.getByLabelText(/Username/i), { target: { value: 'alice' } });
 		fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: 'secret' } });
 		fireEvent.click(screen.getByRole('button', { name: /Sign in/i }));
@@ -286,6 +299,7 @@ describe('LoginPage', () => {
 		);
 
 		renderLogin(`/login?samlSessionId=${sessionId}`);
+		await waitForLoginForm();
 		fireEvent.change(screen.getByLabelText(/Username/i), { target: { value: 'alice' } });
 		fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: 'secret' } });
 		fireEvent.click(screen.getByRole('button', { name: /Sign in/i }));
@@ -306,6 +320,7 @@ describe('LoginPage', () => {
 		);
 
 		renderLogin();
+		await waitForLoginForm();
 		fireEvent.change(screen.getByLabelText(/Username/i), { target: { value: 'alice' } });
 		fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: 'secret' } });
 		fireEvent.click(screen.getByRole('button', { name: /Sign in/i }));
@@ -329,9 +344,36 @@ describe('LoginPage', () => {
 		});
 	});
 
-	it('WEB-AUTH-07: links back to admin console', () => {
+	it('WEB-AUTH-07: links back to admin console', async () => {
 		renderLogin();
+		await waitForLoginForm();
 		const link = screen.getByRole('link', { name: 'Back to admin' });
 		expect(link.getAttribute('href')).toBe('/admin');
+	});
+
+	it('WEB-EVG-07: renders Back to admin link (alias)', async () => {
+		renderLogin();
+		await waitForLoginForm();
+		expect(screen.getByRole('link', { name: 'Back to admin' }).getAttribute('href')).toBe('/admin');
+	});
+
+	it('WEB-EVG-16: renders Callout with status role when session banner is set', async () => {
+		vi.mocked(authApi.getEndUserSession).mockResolvedValue({
+			authenticated: true,
+			user: {
+				id: 'u1',
+				username: 'alice',
+				email: null,
+				displayName: null,
+				groups: [],
+				roles: [],
+			},
+			samlSession: null,
+		});
+
+		renderLogin();
+		await waitFor(() => {
+			expect(screen.getByRole('status').textContent).toContain('Signed in as alice');
+		});
 	});
 });

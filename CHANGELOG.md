@@ -4,6 +4,48 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.1.1]
+
+### Added
+
+- Extended Evergreen edge-case Vitest registry **`WEB-EVG-24`–`72`**: UI primitive variants,
+  static convention guards (no legacy classes, barrel-only imports), print.css rules, full barrel
+  export list, toast queue/dismiss/provider errors, six mutation-flow toast integrations,
+  LoginPage SSO/Callout/Spinner states, Dashboard badge mapper edges, and infra baseline checks.
+
+## [1.1.0]
+
+### Added
+
+- **Evergreen design system** for the operator console and SAML login: CSS tokens and layout under
+  `apps/web/src/styles/evergreen/`, reusable React primitives in `apps/web/src/ui/` (barrel
+  `index.ts`), responsive `AppShell` with mobile drawer, `OperatorSessionBar`, and `ToastProvider`
+  for post-save feedback.
+- **Self-hosted fonts** (`Source Sans 3`, `IBM Plex Mono` woff2 under `public/fonts/`) with preload
+  in `index.html` — no Google Fonts CDN (CSP-friendly Docker deploys).
+- **`status-badge.ts`** mappers (`syncLogStatusToBadge`, `lastSyncStatusToBadge`, `certStatusToBadge`)
+  so list and dashboard badges stay consistent.
+- **`print.css`** for audit-friendly print preview (hides sidebar and topbar).
+- Vitest registry **`WEB-EVG-01`–`23`** (primitives, styles, admin/login integration, infra checks).
+- Playwright visual baselines (`apps/web/e2e/screenshots/`, four viewports) and CI job
+  `test:e2e:visual` with mocked admin API routes.
+- **`scripts/check-web-bundle-size.mjs`** — fails CI if main Vite `index-*.js` exceeds **500 KB**
+  raw (fonts excluded).
+- Diagram `docs/img/evergreen-ui.mmd` / `.svg` and **Evergreen UI** section in `docs/development.md`
+  (component chooser table, test commands).
+
+### Changed
+
+- Complete admin SPA and `/login` visual redesign: Evergreen `Card`, `Callout`, `Spinner`, `Table`,
+  `Panel`, and form controls; dashboard `StatCard` grid; list pages use scroll-wrapped tables.
+- Toasts on successful saves: API/SP connections, IdP settings mutations, identity sync, audit
+  export, admin user create/password change.
+- `AdminUsersPage` exposes `id="change-password"` panel for operator session deep links.
+
+### Removed
+
+- Legacy monolithic `apps/web/src/index.css` and `admin-*` / `layout` / `card` class palette.
+
 ## [1.0.2]
 
 ### Fixed

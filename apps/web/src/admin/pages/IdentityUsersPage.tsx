@@ -7,6 +7,7 @@ import { EmptyState } from '../components/EmptyState';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
 import { useDocumentTitle } from '../components/useDocumentTitle';
+import { Table } from '../../ui';
 
 export function IdentityUsersPage() {
 	useDocumentTitle('Users — NestIdP Admin');
@@ -50,7 +51,7 @@ export function IdentityUsersPage() {
 					{ label: 'Users' },
 				]}
 			/>
-			<form className="admin-inline-form" onSubmit={handleSearch}>
+			<form className="evg-inline-form" onSubmit={handleSearch}>
 				<input
 					placeholder="Search username or email"
 					value={search}
@@ -64,7 +65,7 @@ export function IdentityUsersPage() {
 				<EmptyState title="No users" description="Run identity sync first." />
 			) : null}
 			{!loading && !error && items.length > 0 ? (
-				<table className="admin-table">
+				<Table>
 					<thead>
 						<tr>
 							<th>Username</th>
@@ -85,7 +86,7 @@ export function IdentityUsersPage() {
 							</tr>
 						))}
 					</tbody>
-				</table>
+				</Table>
 			) : null}
 			<p>
 				<Link to={`${IDENTITY_ROUTE_PREFIX}/groups`}>Groups</Link> ·{' '}

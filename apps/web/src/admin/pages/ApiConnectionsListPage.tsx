@@ -7,6 +7,7 @@ import { EmptyState } from '../components/EmptyState';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
 import { useDocumentTitle } from '../components/useDocumentTitle';
+import { Table } from '../../ui';
 
 export function ApiConnectionsListPage() {
 	useDocumentTitle('API connections — NestIdP Admin');
@@ -46,7 +47,7 @@ export function ApiConnectionsListPage() {
 				subtitle="External identity API (Bearer)"
 				breadcrumbs={[{ label: 'Dashboard', to: '/admin' }, { label: 'API connections' }]}
 				actions={
-					<Link className="button-link" to={`${API_CONNECTION_ROUTE_PREFIX}/new`}>
+					<Link className="evg-btn evg-btn--link" to={`${API_CONNECTION_ROUTE_PREFIX}/new`}>
 						New connection
 					</Link>
 				}
@@ -58,14 +59,14 @@ export function ApiConnectionsListPage() {
 					title="No API connections"
 					description="Create one to sync users, groups, and roles."
 					action={
-						<Link className="button-link" to={`${API_CONNECTION_ROUTE_PREFIX}/new`}>
+						<Link className="evg-btn evg-btn--link" to={`${API_CONNECTION_ROUTE_PREFIX}/new`}>
 							Create connection
 						</Link>
 					}
 				/>
 			) : null}
 			{!loading && !error && connections.length > 0 ? (
-				<table className="admin-table">
+				<Table>
 					<thead>
 						<tr>
 							<th>Name</th>
@@ -89,7 +90,7 @@ export function ApiConnectionsListPage() {
 							</tr>
 						))}
 					</tbody>
-				</table>
+				</Table>
 			) : null}
 		</section>
 	);

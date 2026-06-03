@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
+import { renderWithUi } from '../../test/renderWithUi';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { AUDIT_ROUTE_PREFIX } from '@nestidp/shared';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -6,7 +7,7 @@ import * as adminApi from '../adminApi';
 import { AuditLogPage } from './AuditLogPage';
 
 function renderPage() {
-	return render(
+	return renderWithUi(
 		<MemoryRouter initialEntries={[AUDIT_ROUTE_PREFIX]}>
 			<Routes>
 				<Route path={AUDIT_ROUTE_PREFIX} element={<AuditLogPage />} />

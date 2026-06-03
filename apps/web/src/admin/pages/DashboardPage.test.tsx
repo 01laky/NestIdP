@@ -60,8 +60,24 @@ describe('DashboardPage', () => {
 		expect(screen.getByText(/Loading dashboard/i)).toBeDefined();
 		await waitFor(() => {
 			expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeDefined();
-			const values = document.querySelectorAll('.admin-stat-value');
+			expect(document.querySelector('.evg-stats-grid')).toBeDefined();
+			const values = document.querySelectorAll('.evg-stat__value');
 			expect(values[0]?.textContent).toBe('3');
+		});
+	});
+
+	it('WEB-EVG-08: dashboard renders stat grid with evg-stat', async () => {
+		vi.spyOn(adminApi, 'getAdminDashboard').mockResolvedValue(dashboardStub());
+
+		render(
+			<MemoryRouter>
+				<DashboardPage />
+			</MemoryRouter>,
+		);
+
+		await waitFor(() => {
+			expect(document.querySelector('.evg-stats-grid.evg-stats-grid--dashboard')).toBeDefined();
+			expect(document.querySelectorAll('.evg-stat').length).toBeGreaterThan(0);
 		});
 	});
 
@@ -178,7 +194,7 @@ describe('DashboardPage', () => {
 			expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeDefined();
 			expect(screen.getByRole('heading', { name: 'IdP configuration' })).toBeDefined();
 			expect(screen.getByText('http://localhost:3000/saml/metadata')).toBeDefined();
-			expect(document.querySelectorAll('.admin-stat-value').length).toBe(5);
+			expect(document.querySelectorAll('.evg-stat__value').length).toBe(5);
 		});
 	});
 });

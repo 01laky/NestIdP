@@ -67,11 +67,11 @@ export function SpConnectionTestSsoPage() {
 				]}
 			/>
 			{error ? <ErrorBanner message={error} /> : null}
-			<p className="muted">
+			<p className="evg-muted">
 				Use the example script to build a signed AuthnRequest redirect URL. Open the printed URL in
 				a browser after syncing a test user.
 			</p>
-			<ul className="admin-kv-list">
+			<ul className="evg-dl">
 				<li>
 					<span>SP Entity ID</span>
 					<code>{entityId}</code>

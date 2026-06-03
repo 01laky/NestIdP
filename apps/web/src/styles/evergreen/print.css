@@ -1,0 +1,25 @@
+@media print {
+	.evg-sidebar,
+	.evg-mobile-nav-toggle,
+	.evg-drawer-scrim,
+	.evg-topbar,
+	.evg-operator-bar,
+	.evg-toast-region,
+	.evg-skip-link {
+		display: none !important;
+	}
+
+	.evg-main {
+		max-width: none;
+		padding: 0;
+	}
+
+	.evg-table-wrap {
+		overflow: visible;
+	}
+
+	body {
+		background: #fff;
+		color: #000;
+	}
+}

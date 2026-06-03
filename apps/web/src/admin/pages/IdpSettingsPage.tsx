@@ -23,6 +23,7 @@ import { AdminPageHeader } from '../components/AdminPageHeader';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
 import { useDocumentTitle } from '../components/useDocumentTitle';
+import { useToast } from '../../ui';
 
 function copyText(label: string, value: string): void {
 	void (async () => {
@@ -84,6 +85,7 @@ export function IdpSettingsPage() {
 	const [uploadCert, setUploadCert] = useState('');
 	const [uploadKey, setUploadKey] = useState('');
 	const [busy, setBusy] = useState(false);
+	const { showToast } = useToast();
 
 	async function reload(): Promise<IdpSettingsPublicDto> {
 		const data = await getIdpSettings();
@@ -132,6 +134,7 @@ export function IdpSettingsPage() {
 			await updateIdpSettings({ entityId });
 			await reload();
 			setSuccess('Entity ID updated.');
+			showToast('Entity ID updated');
 		});
 	}
 
@@ -141,6 +144,7 @@ export function IdpSettingsPage() {
 			await updateIdpSettings({ nameIdFormat });
 			await reload();
 			setSuccess('Default NameID format updated.');
+			showToast('Default NameID format updated');
 		});
 	}
 
@@ -156,6 +160,7 @@ export function IdpSettingsPage() {
 			await generateIdpSigningCert();
 			await reload();
 			setSuccess('Primary signing certificate generated.');
+			showToast('Primary signing certificate generated');
 		});
 	}
 
@@ -176,6 +181,7 @@ export function IdpSettingsPage() {
 			setUploadKey('');
 			await reload();
 			setSuccess('Primary signing certificate uploaded.');
+			showToast('Primary signing certificate uploaded');
 		});
 	}
 
@@ -189,6 +195,7 @@ export function IdpSettingsPage() {
 			await startIdpCertRotation({ mode: 'generate' });
 			await reload();
 			setSuccess('Rotation started with a newly generated pending certificate.');
+			showToast('Certificate rotation started');
 		});
 	}
 
@@ -204,6 +211,7 @@ export function IdpSettingsPage() {
 			await completeIdpCertRotation();
 			await reload();
 			setSuccess('Certificate rotation completed.');
+			showToast('Certificate rotation completed');
 		});
 	}
 
@@ -215,6 +223,7 @@ export function IdpSettingsPage() {
 			await cancelIdpCertRotation();
 			await reload();
 			setSuccess('Certificate rotation cancelled.');
+			showToast('Certificate rotation cancelled');
 		});
 	}
 
@@ -241,17 +250,17 @@ export function IdpSettingsPage() {
 				subtitle="Global SAML Identity Provider configuration"
 			/>
 			{error ? <ErrorBanner message={error} /> : null}
-			{success ? <p className="admin-success">{success}</p> : null}
+			{success ? <p className="evg-success-text">{success}</p> : null}
 
-			<div className="admin-panel">
+			<div className="evg-panel">
 				<h3>Overview</h3>
-				<ul className="admin-kv-list">
+				<ul className="evg-dl">
 					<li>
 						<span>Metadata URL</span>
 						<code>{settings.metadataUrl}</code>
 						<button
 							type="button"
-							className="admin-inline-button"
+							className="evg-btn evg-btn--link evg-btn--sm"
 							onClick={() => copyText('metadata URL', settings.metadataUrl)}
 						>
 							Copy
@@ -262,7 +271,7 @@ export function IdpSettingsPage() {
 						<code>{settings.ssoUrl}</code>
 						<button
 							type="button"
-							className="admin-inline-button"
+							className="evg-btn evg-btn--link evg-btn--sm"
 							onClick={() => copyText('SSO URL', settings.ssoUrl)}
 						>
 							Copy
@@ -280,12 +289,12 @@ export function IdpSettingsPage() {
 			) : null}
 
 			{isExpiringSoon(settings.signingCertNotAfter) ? (
-				<p className="admin-callout-warn">
+				<p className="evg-callout evg-callout--warning">
 					Signing certificate expires on {settings.signingCertNotAfter} — plan renewal or rotation.
 				</p>
 			) : null}
 
-			<form className="admin-panel admin-form" onSubmit={(event) => void handleSaveEntityId(event)}>
+			<form className="evg-panel evg-stack" onSubmit={(event) => void handleSaveEntityId(event)}>
 				<h3>Entity ID</h3>
 				<label>
 					Entity ID
@@ -297,11 +306,11 @@ export function IdpSettingsPage() {
 			</form>
 
 			<form
-				className="admin-panel admin-form"
+				className="evg-panel evg-stack"
 				onSubmit={(event) => void handleSaveNameIdFormat(event)}
 			>
 				<h3>Default NameID format</h3>
-				<p className="muted">
+				<p className="evg-muted">
 					Used in IdP metadata only. Assertion NameID still comes from each SP connection.
 				</p>
 				<label>
@@ -319,12 +328,12 @@ export function IdpSettingsPage() {
 				</button>
 			</form>
 
-			<div className="admin-panel">
+			<div className="evg-panel">
 				<h3>Signing certificate</h3>
 				<p>
-					<span className="admin-badge">{certStatusLabel(settings)}</span>
+					<span className="evg-badge evg-badge--info">{certStatusLabel(settings)}</span>
 				</p>
-				<ul className="admin-kv-list">
+				<ul className="evg-dl">
 					<li>
 						<span>Fingerprint (SHA-256)</span>
 						<code>{settings.signingCertFingerprintSha256 ?? '—'}</code>
@@ -334,7 +343,7 @@ export function IdpSettingsPage() {
 						<code>{settings.signingCertNotAfter ?? '—'}</code>
 					</li>
 				</ul>
-				<div className="admin-actions-row">
+				<div className="evg-actions-row">
 					<button
 						type="button"
 						disabled={busy || settings.rotation.active}
@@ -360,10 +369,7 @@ export function IdpSettingsPage() {
 			</div>
 
 			{showUpload ? (
-				<form
-					className="admin-panel admin-form"
-					onSubmit={(event) => void handleUploadPrimary(event)}
-				>
+				<form className="evg-panel evg-stack" onSubmit={(event) => void handleUploadPrimary(event)}>
 					<h3>Upload primary certificate</h3>
 					<label>
 						Signing certificate PEM
@@ -381,7 +387,7 @@ export function IdpSettingsPage() {
 							onChange={(event) => setUploadKey(event.target.value)}
 						/>
 					</label>
-					<div className="admin-actions-row">
+					<div className="evg-actions-row">
 						<button type="submit" disabled={busy}>
 							Upload
 						</button>
@@ -393,18 +399,18 @@ export function IdpSettingsPage() {
 			) : null}
 
 			{settings.rotation.active ? (
-				<div className="admin-panel">
+				<div className="evg-panel">
 					<h3>Certificate rotation</h3>
 					{isStaleRotation(settings.rotation.startedAt) ? (
-						<p className="admin-callout-info">
+						<p className="evg-callout evg-callout--info">
 							Rotation started {settings.rotation.startedAt} — complete cutover or cancel to avoid
 							prolonged dual-cert metadata.
 						</p>
 					) : null}
-					<p className="muted">
+					<p className="evg-muted">
 						Pending fingerprint: {settings.rotation.pendingCertFingerprintSha256 ?? '—'}
 					</p>
-					<ol className="admin-checklist">
+					<ol className="evg-checklist">
 						<li>
 							Verify metadata preview shows two signing KeyDescriptor entries (primary + pending).
 						</li>
@@ -415,7 +421,7 @@ export function IdpSettingsPage() {
 						<li>Test SSO with at least one SP-initiated login before completing rotation.</li>
 						<li>Complete rotation only after steps 1–3.</li>
 					</ol>
-					<div className="admin-actions-row">
+					<div className="evg-actions-row">
 						<button type="button" disabled={busy} onClick={() => void handleCompleteRotation()}>
 							Complete rotation
 						</button>
@@ -426,15 +432,15 @@ export function IdpSettingsPage() {
 				</div>
 			) : null}
 
-			<div className="admin-panel">
+			<div className="evg-panel">
 				<h3>Metadata preview</h3>
 				<button type="button" disabled={busy} onClick={() => void handleRefreshMetadataPreview()}>
 					Refresh preview
 				</button>
-				{metadataPreview ? <pre className="admin-code-block">{metadataPreview}</pre> : null}
+				{metadataPreview ? <pre className="evg-code-block">{metadataPreview}</pre> : null}
 			</div>
 
-			<p className="admin-callout-info">
+			<p className="evg-callout evg-callout--info">
 				Lazy auto-generation still exists as a dev/test fallback when no certificate is configured,
 				but operators should configure signing material explicitly in production.
 			</p>

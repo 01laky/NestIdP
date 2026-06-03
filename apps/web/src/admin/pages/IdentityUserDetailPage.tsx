@@ -64,7 +64,7 @@ export function IdentityUserDetailPage() {
 					{ label: user.username },
 				]}
 			/>
-			<ul className="admin-kv-list">
+			<ul className="evg-dl">
 				<li>
 					<span>Email</span>
 					<code>{user.email ?? '—'}</code>
@@ -83,13 +83,13 @@ export function IdentityUserDetailPage() {
 				</li>
 			</ul>
 			<h3>Groups ({groups.length})</h3>
-			<ul className="admin-list">
+			<ul className="evg-list">
 				{groups.map((group) => (
 					<li key={group.id}>{group.name}</li>
 				))}
 			</ul>
 			<h3>Roles ({roles.length})</h3>
-			<ul className="admin-list">
+			<ul className="evg-list">
 				{roles.map((role) => (
 					<li key={role.id}>{role.name}</li>
 				))}

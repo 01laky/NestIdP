@@ -14,9 +14,9 @@ export function AttributeMappingEditor({ value, onChange }: AttributeMappingEdit
 	}
 
 	return (
-		<fieldset className="admin-fieldset">
+		<fieldset className="evg-fieldset">
 			<legend>Attribute mapping</legend>
-			<div className="admin-preset-row">
+			<div className="evg-code-blockset-row">
 				<label htmlFor="mapping-preset">Preset</label>
 				<select
 					id="mapping-preset"

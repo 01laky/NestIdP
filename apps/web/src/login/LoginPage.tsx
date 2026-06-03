@@ -2,6 +2,7 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { SAML_SESSION_QUERY_PARAM } from '@nestidp/shared';
 import { AuthApiError, completeSsoLogin, getEndUserSession, loginEndUser } from '../auth/authApi';
+import { Button, Callout, Card, LoadingState, Spinner, TextInput } from '../ui';
 
 export function LoginPage() {
 	const [searchParams] = useSearchParams();
@@ -10,6 +11,7 @@ export function LoginPage() {
 	const [username, setUsername] = useState('');
 	const [password, setPassword] = useState('');
 	const [loading, setLoading] = useState(false);
+	const [checkingSession, setCheckingSession] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [success, setSuccess] = useState<string | null>(null);
 	const [ssoError, setSsoError] = useState<string | null>(null);
@@ -70,6 +72,10 @@ export function LoginPage() {
 				}
 			} catch {
 				// ignore probe errors on mount
+			} finally {
+				if (!cancelled) {
+					setCheckingSession(false);
+				}
 			}
 		})();
 		return () => {
@@ -106,63 +112,67 @@ export function LoginPage() {
 		}
 	}
 
+	if (checkingSession) {
+		return (
+			<div className="evg-auth-layout">
+				<Card>
+					<LoadingState message="Checking session…" />
+				</Card>
+			</div>
+		);
+	}
+
 	return (
-		<div className="layout">
-			<div className="card">
+		<div className="evg-auth-layout">
+			<Card>
 				<h1>SAML Login</h1>
-				<p className="muted">Sign in with credentials synced from your identity API.</p>
-				{sessionBanner ? <p className="muted">{sessionBanner}</p> : null}
-				{ssoRedirecting ? <p className="muted">Redirecting to application…</p> : null}
-				<form onSubmit={handleSubmit}>
-					<p>
-						<label>
-							Username
-							<br />
-							<input
-								name="username"
-								autoComplete="username"
-								value={username}
-								onChange={(e) => setUsername(e.target.value)}
-								disabled={loading || ssoRedirecting}
-							/>
-						</label>
-					</p>
-					<p>
-						<label>
-							Password
-							<br />
-							<input
-								name="password"
-								type="password"
-								autoComplete="current-password"
-								value={password}
-								onChange={(e) => setPassword(e.target.value)}
-								disabled={loading || ssoRedirecting}
-							/>
-						</label>
-					</p>
-					<button type="submit" disabled={loading || ssoRedirecting}>
+				<p className="evg-muted">Sign in with credentials synced from your identity API.</p>
+				{sessionBanner ? <Callout variant="info">{sessionBanner}</Callout> : null}
+				{ssoRedirecting ? <Spinner label="Redirecting to application…" /> : null}
+				<form onSubmit={(event) => void handleSubmit(event)}>
+					<TextInput
+						label="Username"
+						name="username"
+						autoComplete="username"
+						value={username}
+						onChange={(e) => setUsername(e.target.value)}
+						disabled={loading || ssoRedirecting}
+						required
+						requiredMark
+					/>
+					<TextInput
+						label="Password"
+						name="password"
+						type="password"
+						autoComplete="current-password"
+						value={password}
+						onChange={(e) => setPassword(e.target.value)}
+						disabled={loading || ssoRedirecting}
+						required
+						requiredMark
+					/>
+					<Button type="submit" variant="primary" block disabled={loading || ssoRedirecting}>
 						{loading ? 'Signing in…' : 'Sign in'}
-					</button>
+					</Button>
 				</form>
-				{error ? <p role="alert">{error}</p> : null}
-				{success ? <p>{success}</p> : null}
+				{error ? <Callout variant="danger">{error}</Callout> : null}
+				{success ? <Callout variant="success">{success}</Callout> : null}
 				{(samlSessionBound || readyToComplete) && samlSessionId ? (
-					<p>
-						<button
-							type="button"
-							disabled={ssoRedirecting}
-							onClick={() => void runCompleteSso(samlSessionId)}
-						>
-							Continue to application
-						</button>
-					</p>
+					<Button
+						type="button"
+						variant="secondary"
+						block
+						disabled={ssoRedirecting}
+						onClick={() => void runCompleteSso(samlSessionId)}
+					>
+						Continue to application
+					</Button>
 				) : null}
-				{ssoError ? <p role="alert">{ssoError}</p> : null}
+				{ssoError ? <Callout variant="danger">{ssoError}</Callout> : null}
 				<p>
 					<Link to="/admin">Back to admin</Link>
 				</p>
-			</div>
+			</Card>
 		</div>
 	);
 }

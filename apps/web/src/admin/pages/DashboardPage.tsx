@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import type { AdminDashboardIdpCertStatus } from '@nestidp/shared';
 import {
 	API_CONNECTION_ROUTE_PREFIX,
 	IDENTITY_ROUTE_PREFIX,
@@ -11,19 +10,8 @@ import { AdminPageHeader } from '../components/AdminPageHeader';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
 import { useDocumentTitle } from '../components/useDocumentTitle';
-
-function idpCertStatusLabel(certStatus: AdminDashboardIdpCertStatus): string {
-	switch (certStatus) {
-		case 'missing':
-			return 'No signing cert';
-		case 'expiring_soon':
-			return 'Expires soon';
-		case 'rotation_active':
-			return 'Rotation in progress';
-		default:
-			return 'Certificate OK';
-	}
-}
+import { Badge, Panel, StatCard } from '../../ui';
+import { certStatusLabel, certStatusToBadge, lastSyncStatusToBadge } from '../status-badge';
 
 export function DashboardPage() {
 	useDocumentTitle('Dashboard — NestIdP Admin');
@@ -73,91 +61,106 @@ export function DashboardPage() {
 	return (
 		<section>
 			<AdminPageHeader title="Dashboard" subtitle="Identity sync and SAML service providers" />
-			<div className="admin-stats-grid">
-				<div className="admin-stat">
-					<span className="admin-stat-value">{counts.users}</span>
-					<span className="muted">Users</span>
-				</div>
-				<div className="admin-stat">
-					<span className="admin-stat-value">{counts.groups}</span>
-					<span className="muted">Groups</span>
-				</div>
-				<div className="admin-stat">
-					<span className="admin-stat-value">{counts.roles}</span>
-					<span className="muted">Roles</span>
-				</div>
-				<div className="admin-stat">
-					<span className="admin-stat-value">{counts.apiConnections}</span>
-					<span className="muted">API connections</span>
-				</div>
-				<div className="admin-stat">
-					<span className="admin-stat-value">{counts.spConnections}</span>
-					<span className="muted">SP connections</span>
-				</div>
+			<div className="evg-stats-grid evg-stats-grid--dashboard">
+				<StatCard label="Users" value={counts.users} />
+				<StatCard label="Groups" value={counts.groups} />
+				<StatCard label="Roles" value={counts.roles} />
+				<StatCard label="API connections" value={counts.apiConnections} />
+				<StatCard label="SP connections" value={counts.spConnections} />
 			</div>
 			{dashboard.apiConnection ? (
-				<div className="admin-panel">
-					<h3>Identity source</h3>
+				<Panel title="Identity source">
 					<p>
 						<strong>{dashboard.apiConnection.name}</strong> — last sync{' '}
-						{dashboard.lastSyncStatus ?? 'NEVER'}
-						{dashboard.lastSyncAt ? ` at ${dashboard.lastSyncAt}` : ''}
+						<Badge variant={lastSyncStatusToBadge(dashboard.lastSyncStatus ?? 'NEVER')}>
+							{dashboard.lastSyncStatus ?? 'NEVER'}
+						</Badge>
+						{dashboard.lastSyncAt ? (
+							<span className="evg-muted"> at {dashboard.lastSyncAt}</span>
+						) : null}
 					</p>
 					<p>
-						<Link to={`${API_CONNECTION_ROUTE_PREFIX}/${dashboard.apiConnection.id}/sync`}>
+						<Link
+							className="evg-btn evg-btn--link"
+							to={`${API_CONNECTION_ROUTE_PREFIX}/${dashboard.apiConnection.id}/sync`}
+						>
 							Open sync
 						</Link>
 					</p>
-				</div>
+				</Panel>
 			) : (
-				<p className="muted">
-					No API connection yet. <Link to={`${API_CONNECTION_ROUTE_PREFIX}/new`}>Create one</Link>.
+				<p className="evg-muted">
+					No API connection yet.{' '}
+					<Link className="evg-btn evg-btn--link" to={`${API_CONNECTION_ROUTE_PREFIX}/new`}>
+						Create one
+					</Link>
+					.
 				</p>
 			)}
-			<div className="admin-panel">
-				<h3>IdP configuration</h3>
+			<Panel title="IdP configuration">
 				<p>
-					<span className="admin-badge">{idpCertStatusLabel(dashboard.idp.certStatus)}</span>
+					<Badge variant={certStatusToBadge(dashboard.idp.certStatus)}>
+						{certStatusLabel(dashboard.idp.certStatus)}
+					</Badge>
 				</p>
 				<p>
-					<Link to={dashboard.idp.idpSettingsRoute}>Configure IdP settings</Link>
+					<Link className="evg-btn evg-btn--link" to={dashboard.idp.idpSettingsRoute}>
+						Configure IdP settings
+					</Link>
 				</p>
 				{dashboard.idp.rotationActive ? (
-					<p className="muted">Complete or cancel certificate rotation in IdP settings.</p>
+					<p className="evg-muted">Complete or cancel certificate rotation in IdP settings.</p>
 				) : null}
 				{dashboard.idp.certStatus === 'expiring_soon' && dashboard.idp.signingCertNotAfter ? (
-					<p className="muted">
+					<p className="evg-muted">
 						Signing certificate expires on {dashboard.idp.signingCertNotAfter}.
 					</p>
 				) : null}
-				<ul className="admin-kv-list">
-					<li>
-						<span>Entity ID</span>
-						<code>{dashboard.entityId}</code>
-					</li>
-					<li>
-						<span>Metadata</span>
-						<a href={dashboard.metadataUrl} target="_blank" rel="noreferrer">
-							{dashboard.metadataUrl}
-						</a>
-					</li>
-					<li>
-						<span>SSO</span>
-						<code>{dashboard.ssoUrl}</code>
-					</li>
-				</ul>
-			</div>
-			<div className="admin-panel">
-				<h3>Operations</h3>
+				<dl className="evg-dl">
+					<div className="evg-dl__row">
+						<dt>Entity ID</dt>
+						<dd>
+							<code>{dashboard.entityId}</code>
+						</dd>
+					</div>
+					<div className="evg-dl__row">
+						<dt>Metadata</dt>
+						<dd>
+							<a href={dashboard.metadataUrl} target="_blank" rel="noreferrer">
+								{dashboard.metadataUrl}
+							</a>
+						</dd>
+					</div>
+					<div className="evg-dl__row">
+						<dt>SSO</dt>
+						<dd>
+							<code>{dashboard.ssoUrl}</code>
+						</dd>
+					</div>
+				</dl>
+			</Panel>
+			<Panel title="Operations">
 				<p>
-					<Link to={dashboard.auditEventsRoute}>Audit log</Link> ·{' '}
-					<Link to={dashboard.adminUsersRoute}>Admin accounts</Link>
+					<Link className="evg-btn evg-btn--link" to={dashboard.auditEventsRoute}>
+						Audit log
+					</Link>{' '}
+					·{' '}
+					<Link className="evg-btn evg-btn--link" to={dashboard.adminUsersRoute}>
+						Admin accounts
+					</Link>
 				</p>
-				<p className="muted">See docs/RELEASE.md in the repository before production go-live.</p>
-			</div>
-			<p className="muted">
-				<Link to={`${IDENTITY_ROUTE_PREFIX}/users`}>Browse users</Link> ·{' '}
-				<Link to={SP_CONNECTION_ROUTE_PREFIX}>SP connections</Link>
+				<p className="evg-muted">
+					See docs/RELEASE.md in the repository before production go-live.
+				</p>
+			</Panel>
+			<p className="evg-muted">
+				<Link className="evg-btn evg-btn--link" to={`${IDENTITY_ROUTE_PREFIX}/users`}>
+					Browse users
+				</Link>{' '}
+				·{' '}
+				<Link className="evg-btn evg-btn--link" to={SP_CONNECTION_ROUTE_PREFIX}>
+					SP connections
+				</Link>
 			</p>
 		</section>
 	);

@@ -50,6 +50,12 @@ jobs:
 
 			- run: pnpm build
 
+			- run: node scripts/check-web-bundle-size.mjs
+
+			- run: pnpm --filter @nestidp/web exec playwright install chromium --with-deps
+
+			- run: pnpm --filter @nestidp/web test:e2e:visual
+
 			- run: pnpm diagrams:check
 
 	docker-smoke:

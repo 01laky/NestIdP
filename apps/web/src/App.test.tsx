@@ -78,7 +78,7 @@ describe('App routing', () => {
 		mockAuthenticatedAdmin();
 		renderAt('/admin');
 		await waitFor(() => {
-			expect(screen.getByRole('heading', { name: 'NestIdP' })).toBeDefined();
+			expect(screen.getByRole('link', { name: /NestIdP/i })).toBeDefined();
 			expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeDefined();
 		});
 	});
@@ -104,9 +104,11 @@ describe('App routing', () => {
 		expect(screen.queryByRole('heading', { name: 'SAML Login' })).toBeNull();
 	});
 
-	it('renders login placeholder at /login', () => {
+	it('renders login placeholder at /login', async () => {
 		renderAt('/login');
-		expect(screen.getByRole('heading', { name: 'SAML Login' })).toBeDefined();
+		await waitFor(() => {
+			expect(screen.getByRole('heading', { name: 'SAML Login' })).toBeDefined();
+		});
 	});
 
 	it('redirects unauthenticated /admin to login page', async () => {
@@ -123,11 +125,14 @@ describe('App routing', () => {
 	it('keeps admin and login as separate surfaces', async () => {
 		mockAuthenticatedAdmin();
 		const { unmount } = renderAt('/admin');
-		await waitFor(() => screen.getByRole('heading', { name: 'NestIdP' }));
+		await waitFor(() => screen.getByRole('link', { name: /NestIdP/i }));
 		expect(screen.queryByRole('heading', { name: 'SAML Login' })).toBeNull();
 		unmount();
 		renderAt('/login');
-		expect(screen.queryByRole('heading', { name: 'NestIdP' })).toBeNull();
+		await waitFor(() => {
+			expect(screen.getByRole('heading', { name: 'SAML Login' })).toBeDefined();
+		});
+		expect(screen.queryByRole('link', { name: /NestIdP/i })).toBeNull();
 	});
 
 	it('renders nested admin sub-routes when authenticated', async () => {

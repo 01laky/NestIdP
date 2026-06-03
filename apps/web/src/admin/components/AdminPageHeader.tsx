@@ -1,24 +1,26 @@
 import type { ReactNode } from 'react';
-import { AdminBreadcrumbs, type BreadcrumbItem } from './AdminBreadcrumbs';
+import { PageHeader } from '../../ui';
+import { AdminBreadcrumbs } from './AdminBreadcrumbs';
 
-type AdminPageHeaderProps = {
+export function AdminPageHeader({
+	title,
+	subtitle,
+	breadcrumbs,
+	actions,
+}: {
 	title: string;
 	subtitle?: string;
-	breadcrumbs?: BreadcrumbItem[];
+	breadcrumbs?: Array<{ label: string; to?: string }>;
 	actions?: ReactNode;
-};
-
-export function AdminPageHeader({ title, subtitle, breadcrumbs, actions }: AdminPageHeaderProps) {
+}) {
 	return (
-		<header className="admin-page-header">
-			{breadcrumbs && breadcrumbs.length > 0 ? <AdminBreadcrumbs items={breadcrumbs} /> : null}
-			<div className="admin-page-header-row">
-				<div>
-					<h2>{title}</h2>
-					{subtitle ? <p className="muted">{subtitle}</p> : null}
-				</div>
-				{actions ? <div className="admin-page-actions">{actions}</div> : null}
-			</div>
-		</header>
+		<PageHeader
+			title={title}
+			subtitle={subtitle}
+			actions={actions}
+			breadcrumbs={
+				breadcrumbs && breadcrumbs.length > 0 ? <AdminBreadcrumbs items={breadcrumbs} /> : undefined
+			}
+		/>
 	);
 }

@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Card, Callout, LoadingState, TextInput, Button } from '../ui';
 import { AdminApiError, getAdminMe, loginAdmin } from './adminApi';
 
 export function AdminLoginPage() {
@@ -52,53 +53,50 @@ export function AdminLoginPage() {
 
 	if (checkingSession) {
 		return (
-			<div className="layout">
-				<div className="card">
-					<p className="muted">Checking session…</p>
-				</div>
+			<div className="evg-auth-layout">
+				<Card>
+					<LoadingState message="Checking session…" />
+				</Card>
 			</div>
 		);
 	}
 
 	return (
-		<div className="layout">
-			<div className="card">
+		<div className="evg-auth-layout">
+			<Card>
 				<h1>Admin Login</h1>
-				<p className="muted">Operator console — separate from end-user SAML SSO.</p>
+				<p className="evg-muted">Operator console — separate from end-user SAML SSO.</p>
 				<form onSubmit={(event) => void handleSubmit(event)}>
-					<label>
-						Username
-						<input
-							type="text"
-							name="username"
-							autoComplete="username"
-							value={username}
-							onChange={(event) => setUsername(event.target.value)}
-							disabled={loading}
-							required
-						/>
-					</label>
-					<label>
-						Password
-						<input
-							type="password"
-							name="password"
-							autoComplete="current-password"
-							value={password}
-							onChange={(event) => setPassword(event.target.value)}
-							disabled={loading}
-							required
-						/>
-					</label>
-					{error ? <p className="error">{error}</p> : null}
-					<button type="submit" disabled={loading}>
+					<TextInput
+						label="Username"
+						name="username"
+						autoComplete="username"
+						value={username}
+						onChange={(event) => setUsername(event.target.value)}
+						disabled={loading}
+						required
+						requiredMark
+					/>
+					<TextInput
+						label="Password"
+						name="password"
+						type="password"
+						autoComplete="current-password"
+						value={password}
+						onChange={(event) => setPassword(event.target.value)}
+						disabled={loading}
+						required
+						requiredMark
+					/>
+					{error ? <Callout variant="danger">{error}</Callout> : null}
+					<Button type="submit" variant="primary" block disabled={loading}>
 						{loading ? 'Signing in…' : 'Sign in'}
-					</button>
+					</Button>
 				</form>
 				<p>
 					<Link to="/login">End-user SAML SSO login</Link>
 				</p>
-			</div>
+			</Card>
 		</div>
 	);
 }

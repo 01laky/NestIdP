@@ -111,7 +111,7 @@ describe('AdminLayout', () => {
 		renderAdminAt('/admin');
 
 		await waitFor(() => {
-			expect(screen.getByRole('heading', { name: 'NestIdP' })).toBeDefined();
+			expect(screen.getByRole('link', { name: /NestIdP/i })).toBeDefined();
 		});
 	});
 

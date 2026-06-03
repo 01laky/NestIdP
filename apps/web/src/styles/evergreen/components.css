@@ -1,0 +1,422 @@
+/* Buttons */
+.evg-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 44px;
+	padding: var(--evg-space-2) var(--evg-space-4);
+	font: inherit;
+	font-size: var(--evg-text-sm);
+	font-weight: 600;
+	border-radius: var(--evg-radius-sm);
+	border: 1px solid transparent;
+	cursor: pointer;
+	text-decoration: none;
+	transition:
+		background var(--evg-duration-fast) var(--evg-ease-standard),
+		border-color var(--evg-duration-fast) var(--evg-ease-standard);
+}
+
+.evg-btn:focus-visible {
+	outline: 2px solid var(--evg-color-focus-ring);
+	outline-offset: 2px;
+}
+
+.evg-btn:disabled {
+	opacity: 0.55;
+	cursor: not-allowed;
+}
+
+.evg-btn--primary {
+	background: var(--evg-color-brand-700);
+	color: var(--evg-color-text-inverse);
+}
+
+.evg-btn--primary:hover:not(:disabled) {
+	background: var(--evg-color-brand-600);
+}
+
+.evg-btn--secondary {
+	background: var(--evg-color-surface-1);
+	border-color: var(--evg-color-border);
+	color: var(--evg-color-text);
+}
+
+.evg-btn--ghost {
+	background: transparent;
+	color: var(--evg-color-link);
+}
+
+.evg-btn--danger {
+	background: var(--evg-color-danger);
+	color: var(--evg-color-text-inverse);
+}
+
+.evg-btn--link {
+	background: transparent;
+	color: var(--evg-color-link);
+	min-height: auto;
+	padding: var(--evg-space-1) var(--evg-space-2);
+	font-weight: 500;
+}
+
+.evg-btn--sm {
+	min-height: 36px;
+	padding: var(--evg-space-1) var(--evg-space-3);
+}
+
+.evg-btn--block {
+	width: 100%;
+}
+
+/* Card / Panel */
+.evg-card {
+	width: 100%;
+	max-width: 400px;
+	padding: var(--evg-space-6);
+	background: var(--evg-color-surface-1);
+	border: 1px solid var(--evg-color-border);
+	border-radius: var(--evg-radius-lg);
+	box-shadow: var(--evg-shadow-md);
+}
+
+.evg-panel {
+	margin: var(--evg-space-4) 0;
+	padding: var(--evg-space-4);
+	background: var(--evg-color-surface-1);
+	border: 1px solid var(--evg-color-border);
+	border-radius: var(--evg-radius-md);
+}
+
+.evg-panel__title {
+	margin: 0 0 var(--evg-space-3);
+	font-size: var(--evg-text-lg);
+}
+
+/* Form */
+.evg-field {
+	display: block;
+	margin-bottom: var(--evg-space-4);
+}
+
+.evg-field__label {
+	display: block;
+	margin-bottom: var(--evg-space-1);
+	font-size: var(--evg-text-sm);
+	font-weight: 600;
+}
+
+.evg-field__hint {
+	font-size: var(--evg-text-xs);
+	color: var(--evg-color-text-muted);
+}
+
+.evg-field__error {
+	font-size: var(--evg-text-sm);
+	color: var(--evg-color-danger);
+	margin-top: var(--evg-space-1);
+}
+
+.evg-input,
+.evg-select,
+.evg-textarea {
+	display: block;
+	width: 100%;
+	margin-top: var(--evg-space-1);
+	padding: var(--evg-space-2) var(--evg-space-3);
+	font: inherit;
+	font-size: var(--evg-text-base);
+	border: 1px solid var(--evg-color-border);
+	border-radius: var(--evg-radius-sm);
+	background: var(--evg-color-surface-1);
+	color: var(--evg-color-text);
+}
+
+.evg-input:focus-visible,
+.evg-select:focus-visible,
+.evg-textarea:focus-visible {
+	outline: 2px solid var(--evg-color-focus-ring);
+	outline-offset: 0;
+	border-color: var(--evg-color-brand-600);
+}
+
+.evg-textarea {
+	font-family: var(--evg-font-mono);
+	font-size: var(--evg-text-sm);
+	min-height: 8rem;
+	resize: vertical;
+}
+
+.evg-fieldset {
+	border: 1px solid var(--evg-color-border);
+	border-radius: var(--evg-radius-md);
+	padding: var(--evg-space-4);
+	margin: var(--evg-space-4) 0;
+}
+
+.evg-inline-form {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--evg-space-2);
+	margin-bottom: var(--evg-space-4);
+}
+
+.evg-inline-form .evg-input {
+	flex: 1;
+	min-width: 12rem;
+	margin-top: 0;
+}
+
+/* Table */
+.evg-table-wrap {
+	overflow-x: auto;
+	margin-top: var(--evg-space-4);
+	-webkit-overflow-scrolling: touch;
+}
+
+.evg-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: var(--evg-text-sm);
+}
+
+.evg-table th,
+.evg-table td {
+	text-align: left;
+	padding: var(--evg-space-2) var(--evg-space-3);
+	border-bottom: 1px solid var(--evg-color-border);
+}
+
+.evg-table th {
+	font-weight: 600;
+	color: var(--evg-color-brand-900);
+	background: var(--evg-color-surface-2);
+}
+
+/* Badge */
+.evg-badge {
+	display: inline-block;
+	padding: var(--evg-space-1) var(--evg-space-2);
+	border-radius: var(--evg-radius-full);
+	font-size: var(--evg-text-xs);
+	font-weight: 600;
+}
+
+.evg-badge--success {
+	background: var(--evg-color-success-bg);
+	color: var(--evg-color-success);
+}
+
+.evg-badge--danger {
+	background: var(--evg-color-danger-bg);
+	color: var(--evg-color-danger);
+}
+
+.evg-badge--warning {
+	background: var(--evg-color-warning-bg);
+	color: var(--evg-color-warning);
+}
+
+.evg-badge--info {
+	background: var(--evg-color-info-bg);
+	color: var(--evg-color-info);
+}
+
+.evg-badge--neutral {
+	background: var(--evg-color-surface-2);
+	color: var(--evg-color-text-muted);
+}
+
+/* Callout */
+.evg-callout {
+	padding: var(--evg-space-3) var(--evg-space-4);
+	border-radius: var(--evg-radius-md);
+	border-left: 4px solid;
+	margin: var(--evg-space-3) 0;
+	font-size: var(--evg-text-sm);
+}
+
+.evg-callout--info {
+	background: var(--evg-color-info-bg);
+	border-color: var(--evg-color-info);
+	color: var(--evg-color-text);
+}
+
+.evg-callout--warning {
+	background: var(--evg-color-warning-bg);
+	border-color: var(--evg-color-warning);
+}
+
+.evg-callout--danger {
+	background: var(--evg-color-danger-bg);
+	border-color: var(--evg-color-danger);
+}
+
+.evg-callout--success {
+	background: var(--evg-color-success-bg);
+	border-color: var(--evg-color-success);
+}
+
+/* Stat */
+.evg-stat {
+	padding: var(--evg-space-4);
+	background: var(--evg-color-surface-1);
+	border: 1px solid var(--evg-color-border);
+	border-radius: var(--evg-radius-md);
+}
+
+.evg-stat__value {
+	display: block;
+	font-size: var(--evg-text-2xl);
+	font-weight: 700;
+	color: var(--evg-color-brand-900);
+}
+
+/* Empty / loading / error */
+.evg-empty {
+	padding: var(--evg-space-8);
+	text-align: center;
+	border: 1px dashed var(--evg-color-border);
+	border-radius: var(--evg-radius-md);
+	background: var(--evg-color-surface-1);
+}
+
+.evg-loading {
+	display: flex;
+	align-items: center;
+	gap: var(--evg-space-3);
+	color: var(--evg-color-text-muted);
+	padding: var(--evg-space-6);
+}
+
+.evg-error-banner {
+	padding: var(--evg-space-3) var(--evg-space-4);
+	background: var(--evg-color-danger-bg);
+	color: var(--evg-color-danger);
+	border-radius: var(--evg-radius-md);
+	margin-bottom: var(--evg-space-4);
+}
+
+/* Page header */
+.evg-page-header {
+	margin-bottom: var(--evg-space-6);
+}
+
+.evg-page-header__row {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	align-items: flex-start;
+	gap: var(--evg-space-4);
+}
+
+.evg-page-header__title {
+	margin: var(--evg-space-1) 0 0;
+}
+
+.evg-breadcrumbs ol {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--evg-space-1);
+	list-style: none;
+	padding: 0;
+	margin: 0 0 var(--evg-space-2);
+	font-size: var(--evg-text-sm);
+	color: var(--evg-color-text-muted);
+}
+
+.evg-breadcrumbs li:not(:last-child)::after {
+	content: '›';
+	margin-left: var(--evg-space-1);
+}
+
+/* Code */
+.evg-code-block {
+	overflow: auto;
+	max-height: 24rem;
+	padding: var(--evg-space-4);
+	margin-top: var(--evg-space-3);
+	background: var(--evg-color-surface-2);
+	border: 1px solid var(--evg-color-border);
+	border-radius: var(--evg-radius-md);
+	font-family: var(--evg-font-mono);
+	font-size: var(--evg-text-xs);
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+/* Spinner */
+.evg-spinner {
+	width: 1.25rem;
+	height: 1.25rem;
+	border: 2px solid var(--evg-color-border);
+	border-top-color: var(--evg-color-brand-700);
+	border-radius: 50%;
+	animation: evg-spin 0.7s linear infinite;
+}
+
+@keyframes evg-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+/* Toast */
+.evg-toast-region {
+	position: fixed;
+	bottom: var(--evg-space-4);
+	right: var(--evg-space-4);
+	left: var(--evg-space-4);
+	z-index: var(--evg-z-toast);
+	display: flex;
+	flex-direction: column;
+	gap: var(--evg-space-2);
+	pointer-events: none;
+}
+
+@media (min-width: 768px) {
+	.evg-toast-region {
+		left: auto;
+		max-width: 22rem;
+	}
+}
+
+.evg-toast {
+	pointer-events: auto;
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: var(--evg-space-3);
+	padding: var(--evg-space-3) var(--evg-space-4);
+	background: var(--evg-color-brand-900);
+	color: var(--evg-color-text-inverse);
+	border-radius: var(--evg-radius-md);
+	box-shadow: var(--evg-shadow-lg);
+	font-size: var(--evg-text-sm);
+}
+
+.evg-list {
+	padding-left: var(--evg-space-5);
+	margin: var(--evg-space-3) 0;
+}
+
+.evg-checklist {
+	padding-left: var(--evg-space-5);
+	margin: var(--evg-space-3) 0;
+}
+
+.evg-checklist li {
+	margin-bottom: var(--evg-space-2);
+}
+
+.evg-filters-panel--collapsible summary {
+	cursor: pointer;
+	font-weight: 600;
+	margin-bottom: var(--evg-space-3);
+}
+
+@media (min-width: 768px) {
+	.evg-filters-panel--collapsible summary {
+		display: none;
+	}
+}

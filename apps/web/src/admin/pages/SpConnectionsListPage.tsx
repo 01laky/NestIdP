@@ -7,6 +7,7 @@ import { EmptyState } from '../components/EmptyState';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
 import { useDocumentTitle } from '../components/useDocumentTitle';
+import { Table } from '../../ui';
 
 export function SpConnectionsListPage() {
 	useDocumentTitle('SP connections — NestIdP Admin');
@@ -44,7 +45,7 @@ export function SpConnectionsListPage() {
 				subtitle="SAML service providers"
 				breadcrumbs={[{ label: 'Dashboard', to: '/admin' }, { label: 'SP connections' }]}
 				actions={
-					<Link className="button-link" to={`${SP_CONNECTION_ROUTE_PREFIX}/new`}>
+					<Link className="evg-btn evg-btn--link" to={`${SP_CONNECTION_ROUTE_PREFIX}/new`}>
 						New SP
 					</Link>
 				}
@@ -56,14 +57,14 @@ export function SpConnectionsListPage() {
 					title="No SP connections"
 					description="Register a SAML application to enable SSO."
 					action={
-						<Link className="button-link" to={`${SP_CONNECTION_ROUTE_PREFIX}/new`}>
+						<Link className="evg-btn evg-btn--link" to={`${SP_CONNECTION_ROUTE_PREFIX}/new`}>
 							Create SP
 						</Link>
 					}
 				/>
 			) : null}
 			{!loading && !error && items.length > 0 ? (
-				<table className="admin-table">
+				<Table>
 					<thead>
 						<tr>
 							<th>Name</th>
@@ -87,7 +88,7 @@ export function SpConnectionsListPage() {
 							</tr>
 						))}
 					</tbody>
-				</table>
+				</Table>
 			) : null}
 		</section>
 	);

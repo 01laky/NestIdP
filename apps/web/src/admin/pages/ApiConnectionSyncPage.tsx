@@ -12,6 +12,7 @@ import { AdminPageHeader } from '../components/AdminPageHeader';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
 import { useDocumentTitle } from '../components/useDocumentTitle';
+import { useToast } from '../../ui';
 
 export function ApiConnectionSyncPage() {
 	const { id } = useParams<{ id: string }>();
@@ -24,6 +25,7 @@ export function ApiConnectionSyncPage() {
 	const [dryRun, setDryRun] = useState(true);
 	const [syncing, setSyncing] = useState(false);
 	const [message, setMessage] = useState<string | null>(null);
+	const { showToast } = useToast();
 
 	async function reload() {
 		if (!id) {
@@ -76,6 +78,7 @@ export function ApiConnectionSyncPage() {
 			setMessage(
 				dryRun ? `Dry run finished (${result.syncLog.id})` : `Sync finished (${result.syncLog.id})`,
 			);
+			showToast(dryRun ? 'Dry run finished' : 'Sync finished');
 			await reload();
 		} catch (err) {
 			setError(err instanceof AdminApiError ? err.message : 'Sync failed');
@@ -100,7 +103,7 @@ export function ApiConnectionSyncPage() {
 				]}
 			/>
 			{error ? <ErrorBanner message={error} /> : null}
-			<p className="muted">Current status: {status}</p>
+			<p className="evg-muted">Current status: {status}</p>
 			<form onSubmit={(event) => void handleSync(event)}>
 				<label>
 					<input
@@ -114,12 +117,12 @@ export function ApiConnectionSyncPage() {
 					{syncing ? 'Running…' : dryRun ? 'Run dry sync' : 'Run full sync'}
 				</button>
 			</form>
-			{message ? <p className="muted">{message}</p> : null}
+			{message ? <p className="evg-muted">{message}</p> : null}
 			<h3>Recent logs</h3>
 			{logs.length === 0 ? (
-				<p className="muted">No sync logs yet.</p>
+				<p className="evg-muted">No sync logs yet.</p>
 			) : (
-				<ul className="admin-list">
+				<ul className="evg-list">
 					{logs.map((log) => (
 						<li key={log.id}>
 							<Link to={`/admin/sync-logs/${log.id}`}>

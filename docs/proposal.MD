@@ -547,6 +547,8 @@ Admin accounts and end-user accounts are stored in separate tables with separate
 
 ## 11. Admin UI — Page Structure
 
+From **v1.1.0**, the operator console and SAML login page use the **Evergreen** responsive design system (CSS tokens + `apps/web/src/ui` components). See [development.md § Evergreen UI](./development.md#evergreen-ui-v110).
+
 ```
 /admin
 ├── /login                        Admin authentication

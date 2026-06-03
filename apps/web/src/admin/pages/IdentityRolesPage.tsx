@@ -49,10 +49,10 @@ export function IdentityRolesPage() {
 			{loading ? <LoadingState /> : null}
 			{error ? <ErrorBanner message={error} /> : null}
 			{!loading && !error ? (
-				<ul className="admin-list">
+				<ul className="evg-list">
 					{items.map((role) => (
 						<li key={role.id}>
-							{role.name} <span className="muted">({role.externalId})</span>
+							{role.name} <span className="evg-muted">({role.externalId})</span>
 						</li>
 					))}
 				</ul>

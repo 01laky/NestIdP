@@ -1,13 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
-import {
-	API_CONNECTION_ROUTE_PREFIX,
-	IDENTITY_ROUTE_PREFIX,
-	IDP_SETTINGS_ROUTE_PREFIX,
-	AUDIT_ROUTE_PREFIX,
-	ADMIN_USERS_ROUTE_PREFIX,
-	SP_CONNECTION_ROUTE_PREFIX,
-} from '@nestidp/shared';
+import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { IDP_SETTINGS_ROUTE_PREFIX } from '@nestidp/shared';
 import { AdminApiError, getAdminMe, logoutAdmin } from './adminApi';
 import { ApiConnectionFormPage } from './pages/ApiConnectionFormPage';
 import { ApiConnectionSyncPage } from './pages/ApiConnectionSyncPage';
@@ -24,20 +17,23 @@ import { AdminUsersPage } from './pages/AdminUsersPage';
 import { AuditLogPage } from './pages/AuditLogPage';
 import { SpConnectionsListPage } from './pages/SpConnectionsListPage';
 import { SyncLogDetailPage } from './pages/SyncLogDetailPage';
+import { AppShell, EmptyState, LoadingState, ToastProvider } from '../ui';
 
 export function AdminLayout() {
 	const navigate = useNavigate();
 	const [authState, setAuthState] = useState<'loading' | 'authenticated' | 'unauthenticated'>(
 		'loading',
 	);
+	const [operatorUsername, setOperatorUsername] = useState<string | null>(null);
 
 	useEffect(() => {
 		let cancelled = false;
 
 		void (async () => {
 			try {
-				await getAdminMe();
+				const me = await getAdminMe();
 				if (!cancelled) {
+					setOperatorUsername(me.admin.username);
 					setAuthState('authenticated');
 				}
 			} catch (err) {
@@ -51,6 +47,7 @@ export function AdminLayout() {
 						// ignore logout errors when clearing stale cookie
 					}
 				}
+				setOperatorUsername(null);
 				setAuthState('unauthenticated');
 			}
 		})();
@@ -70,8 +67,8 @@ export function AdminLayout() {
 
 	if (authState === 'loading') {
 		return (
-			<div className="admin-shell">
-				<p className="muted admin-loading">Loading admin session…</p>
+			<div className="evg-auth-layout">
+				<LoadingState message="Loading admin session…" />
 			</div>
 		);
 	}
@@ -81,26 +78,8 @@ export function AdminLayout() {
 	}
 
 	return (
-		<div className="admin-shell">
-			<aside className="admin-sidebar">
-				<h1 className="admin-brand">NestIdP</h1>
-				<nav className="admin-nav">
-					<Link to="/admin">Dashboard</Link>
-					<Link to={API_CONNECTION_ROUTE_PREFIX}>API connections</Link>
-					<Link to={SP_CONNECTION_ROUTE_PREFIX}>SP connections</Link>
-					<Link to={`${IDENTITY_ROUTE_PREFIX}/users`}>Users</Link>
-					<Link to={`${IDENTITY_ROUTE_PREFIX}/groups`}>Groups</Link>
-					<Link to={`${IDENTITY_ROUTE_PREFIX}/roles`}>Roles</Link>
-					<Link to={IDP_SETTINGS_ROUTE_PREFIX}>IdP Settings</Link>
-					<Link to={ADMIN_USERS_ROUTE_PREFIX}>Admin accounts</Link>
-					<Link to={AUDIT_ROUTE_PREFIX}>Audit log</Link>
-					<Link to="/login">SAML login</Link>
-				</nav>
-				<button type="button" className="admin-logout" onClick={() => void handleLogout()}>
-					Logout
-				</button>
-			</aside>
-			<main className="admin-main">
+		<ToastProvider>
+			<AppShell operatorUsername={operatorUsername} onLogout={() => void handleLogout()}>
 				<Routes>
 					<Route index element={<DashboardPage />} />
 					<Route path="api-connections" element={<ApiConnectionsListPage />} />
@@ -120,9 +99,22 @@ export function AdminLayout() {
 					<Route path="settings/idp" element={<IdpSettingsPage />} />
 					<Route path="settings/admins" element={<AdminUsersPage />} />
 					<Route path="audit" element={<AuditLogPage />} />
-					<Route path="*" element={<p className="muted">Page not found.</p>} />
+					<Route
+						path="*"
+						element={
+							<EmptyState
+								title="Page not found"
+								description="This admin route does not exist."
+								action={
+									<a className="evg-btn evg-btn--link" href="/admin">
+										Back to dashboard
+									</a>
+								}
+							/>
+						}
+					/>
 				</Routes>
-			</main>
-		</div>
+			</AppShell>
+		</ToastProvider>
 	);
 }

@@ -13,6 +13,7 @@ import { AdminPageHeader } from '../components/AdminPageHeader';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
 import { useDocumentTitle } from '../components/useDocumentTitle';
+import { Panel, Table, useToast } from '../../ui';
 
 export function AdminUsersPage() {
 	useDocumentTitle('Admin accounts — NestIdP Admin');
@@ -26,6 +27,7 @@ export function AdminUsersPage() {
 	const [currentPassword, setCurrentPassword] = useState('');
 	const [newPassword, setNewPassword] = useState('');
 	const [newPasswordConfirm, setNewPasswordConfirm] = useState('');
+	const { showToast } = useToast();
 
 	async function reload() {
 		const [users, me] = await Promise.all([listAdminUsers(), getAdminMe()]);
@@ -66,6 +68,7 @@ export function AdminUsersPage() {
 			setPassword('');
 			setConfirmPassword('');
 			await reload();
+			showToast('Admin account created');
 		} catch (err) {
 			setError(err instanceof AdminApiError ? err.message : 'Create failed');
 		}
@@ -83,6 +86,7 @@ export function AdminUsersPage() {
 			setCurrentPassword('');
 			setNewPassword('');
 			setNewPasswordConfirm('');
+			showToast('Password changed');
 		} catch (err) {
 			setError(err instanceof AdminApiError ? err.message : 'Password change failed');
 		}
@@ -99,7 +103,7 @@ export function AdminUsersPage() {
 			{error ? <ErrorBanner message={error} /> : null}
 			{!loading ? (
 				<>
-					<table className="admin-table">
+					<Table>
 						<thead>
 							<tr>
 								<th>Username</th>
@@ -111,12 +115,12 @@ export function AdminUsersPage() {
 							{admins.map((admin) => (
 								<tr key={admin.id}>
 									<td>{admin.username}</td>
-									<td className="muted">{new Date(admin.createdAt).toLocaleString()}</td>
+									<td className="evg-muted">{new Date(admin.createdAt).toLocaleString()}</td>
 									<td>
 										{admin.id !== meId && admins.length > 1 ? (
 											<button
 												type="button"
-												className="button-link danger"
+												className="evg-btn evg-btn--link evg-btn--danger"
 												onClick={() => {
 													if (window.confirm(`Delete admin "${admin.username}"?`)) {
 														void deleteAdminUser(admin.id).then(() => reload());
@@ -126,79 +130,86 @@ export function AdminUsersPage() {
 												Delete
 											</button>
 										) : (
-											<span className="muted">—</span>
+											<span className="evg-muted">—</span>
 										)}
 									</td>
 								</tr>
 							))}
 						</tbody>
-					</table>
+					</Table>
 
-					<form className="admin-form" onSubmit={(e) => void handleCreate(e)}>
-						<h2>Create admin</h2>
-						<label>
-							Username
-							<input value={username} onChange={(e) => setUsername(e.target.value)} required />
-						</label>
-						<label>
-							Password
-							<input
-								type="password"
-								value={password}
-								onChange={(e) => setPassword(e.target.value)}
-								required
-							/>
-						</label>
-						<label>
-							Confirm password
-							<input
-								type="password"
-								value={confirmPassword}
-								onChange={(e) => setConfirmPassword(e.target.value)}
-								required
-							/>
-						</label>
-						<button type="submit">Create admin</button>
-					</form>
+					<Panel title="Create admin">
+						<form className="evg-stack" onSubmit={(e) => void handleCreate(e)}>
+							<h2>Create admin</h2>
+							<label>
+								Username
+								<input value={username} onChange={(e) => setUsername(e.target.value)} required />
+							</label>
+							<label>
+								Password
+								<input
+									type="password"
+									value={password}
+									onChange={(e) => setPassword(e.target.value)}
+									required
+								/>
+							</label>
+							<label>
+								Confirm password
+								<input
+									type="password"
+									value={confirmPassword}
+									onChange={(e) => setConfirmPassword(e.target.value)}
+									required
+								/>
+							</label>
+							<button type="submit" className="evg-btn evg-btn--primary">
+								Create admin
+							</button>
+						</form>
+					</Panel>
 
-					<form className="admin-form" onSubmit={(e) => void handleChangeMyPassword(e)}>
-						<h2>Change my password</h2>
-						<p className="muted">
-							Uses a separate endpoint; other admins can reset your password via PATCH without
-							knowing your current password.
-						</p>
-						<label>
-							Current password
-							<input
-								type="password"
-								value={currentPassword}
-								onChange={(e) => setCurrentPassword(e.target.value)}
-								required
-							/>
-						</label>
-						<label>
-							New password
-							<input
-								type="password"
-								value={newPassword}
-								onChange={(e) => setNewPassword(e.target.value)}
-								required
-							/>
-						</label>
-						<label>
-							Confirm new password
-							<input
-								type="password"
-								value={newPasswordConfirm}
-								onChange={(e) => setNewPasswordConfirm(e.target.value)}
-								required
-							/>
-						</label>
-						<button type="submit">Update my password</button>
-					</form>
+					<Panel title="Change my password" id="change-password">
+						<form className="evg-stack" onSubmit={(e) => void handleChangeMyPassword(e)}>
+							<p className="evg-muted">
+								Uses a separate endpoint; other admins can reset your password via PATCH without
+								knowing your current password.
+							</p>
+							<label>
+								Current password
+								<input
+									type="password"
+									value={currentPassword}
+									onChange={(e) => setCurrentPassword(e.target.value)}
+									required
+								/>
+							</label>
+							<label>
+								New password
+								<input
+									type="password"
+									value={newPassword}
+									onChange={(e) => setNewPassword(e.target.value)}
+									required
+								/>
+							</label>
+							<label>
+								Confirm new password
+								<input
+									type="password"
+									value={newPasswordConfirm}
+									onChange={(e) => setNewPasswordConfirm(e.target.value)}
+									required
+								/>
+							</label>
+							<button type="submit" className="evg-btn evg-btn--primary">
+								Update my password
+							</button>
+						</form>
+					</Panel>
 				</>
 			) : null}
-			<p className="muted">
+			<p className="evg-muted">
 				<Link to={ADMIN_USERS_ROUTE_PREFIX}>Refresh</Link>
 			</p>
 		</section>

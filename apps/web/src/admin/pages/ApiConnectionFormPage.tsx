@@ -13,6 +13,7 @@ import { AdminPageHeader } from '../components/AdminPageHeader';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
 import { useDocumentTitle } from '../components/useDocumentTitle';
+import { useToast } from '../../ui';
 
 export function ApiConnectionFormPage() {
 	const { id } = useParams();
@@ -29,6 +30,7 @@ export function ApiConnectionFormPage() {
 	const [bearerToken, setBearerToken] = useState('');
 	const [testMessage, setTestMessage] = useState<string | null>(null);
 	const [saving, setSaving] = useState(false);
+	const { showToast } = useToast();
 
 	useEffect(() => {
 		if (isNew || !id) {
@@ -68,6 +70,7 @@ export function ApiConnectionFormPage() {
 					baseUrl,
 					bearerToken,
 				});
+				showToast('Connection saved');
 				navigate(`${API_CONNECTION_ROUTE_PREFIX}/${created.connection.id}`);
 			} else if (id) {
 				await updateApiConnection(id, {
@@ -75,6 +78,7 @@ export function ApiConnectionFormPage() {
 					baseUrl,
 					...(bearerToken ? { bearerToken } : {}),
 				});
+				showToast('Connection saved');
 			}
 		} catch (err) {
 			setError(err instanceof AdminApiError ? err.message : 'Save failed');
@@ -153,10 +157,14 @@ export function ApiConnectionFormPage() {
 					<button type="button" onClick={() => void handleTest()}>
 						Test connectivity
 					</button>{' '}
-					<button type="button" className="danger" onClick={() => void handleDelete()}>
+					<button
+						type="button"
+						className="evg-btn evg-btn--danger"
+						onClick={() => void handleDelete()}
+					>
 						Delete
 					</button>
-					{testMessage ? <span className="muted"> — {testMessage}</span> : null}
+					{testMessage ? <span className="evg-muted"> — {testMessage}</span> : null}
 				</p>
 			) : null}
 			<p>

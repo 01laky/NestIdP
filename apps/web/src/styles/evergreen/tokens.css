@@ -1,0 +1,66 @@
+:root {
+	--evg-color-brand-900: #1b3d2f;
+	--evg-color-brand-700: #2d6a4f;
+	--evg-color-brand-600: #40916c;
+	--evg-color-brand-100: #d8f3dc;
+	--evg-color-surface-0: #f6f8f4;
+	--evg-color-surface-1: #ffffff;
+	--evg-color-surface-2: #eef2eb;
+	--evg-color-border: #c9d4c5;
+	--evg-color-border-strong: #9fb09a;
+	--evg-color-text: #1a2e1f;
+	--evg-color-text-muted: #5c6f62;
+	--evg-color-text-inverse: #ffffff;
+	--evg-color-link: #1b6b52;
+	--evg-color-danger: #b42318;
+	--evg-color-danger-bg: #fef3f2;
+	--evg-color-warning: #b54708;
+	--evg-color-warning-bg: #fffaeb;
+	--evg-color-info: #175cd3;
+	--evg-color-info-bg: #eff8ff;
+	--evg-color-success: #067647;
+	--evg-color-success-bg: #ecfdf3;
+	--evg-color-focus-ring: #40916c;
+
+	--evg-font-sans: 'Source Sans 3', system-ui, -apple-system, sans-serif;
+	--evg-font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+	--evg-text-xs: 0.75rem;
+	--evg-text-sm: 0.875rem;
+	--evg-text-base: 1rem;
+	--evg-text-lg: 1.125rem;
+	--evg-text-xl: 1.25rem;
+	--evg-text-2xl: 1.5rem;
+	--evg-text-3xl: 1.875rem;
+	--evg-line-tight: 1.25;
+	--evg-line-normal: 1.5;
+
+	--evg-space-1: 0.25rem;
+	--evg-space-2: 0.5rem;
+	--evg-space-3: 0.75rem;
+	--evg-space-4: 1rem;
+	--evg-space-5: 1.25rem;
+	--evg-space-6: 1.5rem;
+	--evg-space-8: 2rem;
+	--evg-space-10: 2.5rem;
+	--evg-space-12: 3rem;
+
+	--evg-radius-sm: 6px;
+	--evg-radius-md: 10px;
+	--evg-radius-lg: 14px;
+	--evg-radius-full: 9999px;
+
+	--evg-shadow-sm: 0 1px 2px rgba(27, 61, 47, 0.06);
+	--evg-shadow-md: 0 4px 12px rgba(27, 61, 47, 0.08);
+	--evg-shadow-lg: 0 8px 24px rgba(27, 61, 47, 0.1);
+
+	--evg-duration-fast: 120ms;
+	--evg-duration-normal: 200ms;
+	--evg-ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+
+	--evg-sidebar-width: 240px;
+	--evg-z-drawer: 40;
+	--evg-z-toast: 50;
+}
+
+/* v1.2.0: dark theme tokens (--evg-color-surface-0 dark, etc.) */
