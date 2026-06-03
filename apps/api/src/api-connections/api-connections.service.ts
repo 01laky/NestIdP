@@ -1,6 +1,7 @@
 import {
 	BadRequestException,
 	ConflictException,
+	ForbiddenException,
 	Inject,
 	Injectable,
 	Logger,
@@ -39,6 +40,7 @@ export class ApiConnectionsService {
 
 	async list(): Promise<ApiConnectionListResponseDto> {
 		const rows = await this.prisma.apiConnection.findMany({
+			where: { isLocalDirectory: false },
 			orderBy: { createdAt: 'asc' },
 		});
 		return { connections: rows.map(toApiConnectionDto) };
@@ -130,6 +132,9 @@ export class ApiConnectionsService {
 		const row = await this.prisma.apiConnection.findUnique({ where: { id } });
 		if (!row) {
 			throw new NotFoundException('API connection not found');
+		}
+		if (row.isLocalDirectory) {
+			throw new ForbiddenException('Local directory connection cannot be modified');
 		}
 		return row;
 	}

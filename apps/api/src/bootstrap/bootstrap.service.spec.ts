@@ -11,6 +11,7 @@ describe('BootstrapService', () => {
 	let logSpy: jest.SpyInstance;
 	let errorSpy: jest.SpyInstance;
 	const prisma = {} as never;
+	const encryption = { encrypt: jest.fn((v: string) => `enc:${v}`) } as never;
 
 	beforeEach(() => {
 		jest.clearAllMocks();
@@ -34,7 +35,7 @@ describe('BootstrapService', () => {
 			}),
 		} as unknown as ConfigService;
 
-		const service = new BootstrapService(config, prisma);
+		const service = new BootstrapService(config, prisma, encryption);
 		await service.onModuleInit();
 
 		expect(runBootstrap).toHaveBeenCalledWith(
@@ -43,6 +44,7 @@ describe('BootstrapService', () => {
 				adminUsername: 'admin',
 				adminPassword: 'strong-password-123',
 				idpBaseUrl: 'https://idp.example.com',
+				encryptCredential: expect.any(Function),
 			}),
 			expect.any(Object),
 		);
@@ -58,7 +60,7 @@ describe('BootstrapService', () => {
 			}),
 		} as unknown as ConfigService;
 
-		const service = new BootstrapService(config, prisma);
+		const service = new BootstrapService(config, prisma, encryption);
 		await expect(service.onModuleInit()).rejects.toThrow('bootstrap failed');
 		expect(errorSpy).toHaveBeenCalled();
 	});
@@ -72,7 +74,7 @@ describe('BootstrapService', () => {
 			}),
 		} as unknown as ConfigService;
 
-		const service = new BootstrapService(config, prisma);
+		const service = new BootstrapService(config, prisma, encryption);
 		await service.onModuleInit();
 
 		expect(runBootstrap).toHaveBeenCalledWith(

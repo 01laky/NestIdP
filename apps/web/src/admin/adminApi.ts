@@ -21,10 +21,18 @@ import type {
 	DeleteSpConnectionResponseDto,
 	IdpMetadataPreviewResponseDto,
 	IdpSettingsPublicDto,
+	CreateManualIdentityGroupDto,
+	CreateManualIdentityRoleDto,
+	CreateManualIdentityUserDto,
+	IdentityGroupDetailResponseDto,
 	IdentityGroupListResponseDto,
+	IdentityRoleDetailResponseDto,
 	IdentityRoleListResponseDto,
 	IdentityUserDetailResponseDto,
 	IdentityUserListResponseDto,
+	UpdateManualIdentityGroupDto,
+	UpdateManualIdentityRoleDto,
+	UpdateManualIdentityUserDto,
 	SpConnectionPublicDto,
 	SpConnectionResponseDto,
 	SpConnectionTestAcsResponseDto,
@@ -262,53 +270,124 @@ export function testSpConnectionAcs(id: string): Promise<SpConnectionTestAcsResp
 	});
 }
 
-export function listIdentityUsers(
-	params: { limit?: number; offset?: number; search?: string } = {},
-): Promise<IdentityUserListResponseDto> {
+function identityQuery(params: Record<string, string | number | undefined>): string {
 	const query = new URLSearchParams();
-	if (params.limit != null) {
-		query.set('limit', String(params.limit));
+	for (const [key, value] of Object.entries(params)) {
+		if (value !== undefined && value !== '') {
+			query.set(key, String(value));
+		}
 	}
-	if (params.offset != null) {
-		query.set('offset', String(params.offset));
-	}
-	if (params.search) {
-		query.set('search', params.search);
-	}
-	const suffix = query.size > 0 ? `?${query.toString()}` : '';
-	return adminFetch<IdentityUserListResponseDto>(`${IDENTITY_USERS_API_PATH}${suffix}`);
+	return query.size > 0 ? `?${query.toString()}` : '';
 }
 
-export function getIdentityUser(id: string): Promise<IdentityUserDetailResponseDto> {
-	return adminFetch<IdentityUserDetailResponseDto>(`${IDENTITY_USERS_API_PATH}/${id}`);
+export function listIdentityUsers(
+	params: { limit?: number; offset?: number; search?: string; origin?: string } = {},
+): Promise<IdentityUserListResponseDto> {
+	return adminFetch<IdentityUserListResponseDto>(
+		`${IDENTITY_USERS_API_PATH}${identityQuery(params)}`,
+	);
+}
+
+export function getIdentityUser(
+	id: string,
+	params: { auditLimit?: number } = {},
+): Promise<IdentityUserDetailResponseDto> {
+	return adminFetch<IdentityUserDetailResponseDto>(
+		`${IDENTITY_USERS_API_PATH}/${id}${identityQuery(params)}`,
+	);
+}
+
+export function createIdentityUser(
+	body: CreateManualIdentityUserDto,
+): Promise<IdentityUserDetailResponseDto> {
+	return adminFetch<IdentityUserDetailResponseDto>(IDENTITY_USERS_API_PATH, {
+		method: 'POST',
+		body: JSON.stringify(body),
+	});
+}
+
+export function updateIdentityUser(
+	id: string,
+	body: UpdateManualIdentityUserDto,
+): Promise<IdentityUserDetailResponseDto> {
+	return adminFetch<IdentityUserDetailResponseDto>(`${IDENTITY_USERS_API_PATH}/${id}`, {
+		method: 'PATCH',
+		body: JSON.stringify(body),
+	});
+}
+
+export function deleteIdentityUser(id: string): Promise<void> {
+	return adminFetch<void>(`${IDENTITY_USERS_API_PATH}/${id}`, { method: 'DELETE' });
 }
 
 export function listIdentityGroups(
-	params: { limit?: number; offset?: number } = {},
+	params: { limit?: number; offset?: number; origin?: string } = {},
 ): Promise<IdentityGroupListResponseDto> {
-	const query = new URLSearchParams();
-	if (params.limit != null) {
-		query.set('limit', String(params.limit));
-	}
-	if (params.offset != null) {
-		query.set('offset', String(params.offset));
-	}
-	const suffix = query.size > 0 ? `?${query.toString()}` : '';
-	return adminFetch<IdentityGroupListResponseDto>(`${IDENTITY_GROUPS_API_PATH}${suffix}`);
+	return adminFetch<IdentityGroupListResponseDto>(
+		`${IDENTITY_GROUPS_API_PATH}${identityQuery(params)}`,
+	);
+}
+
+export function getIdentityGroup(id: string): Promise<IdentityGroupDetailResponseDto> {
+	return adminFetch<IdentityGroupDetailResponseDto>(`${IDENTITY_GROUPS_API_PATH}/${id}`);
+}
+
+export function createIdentityGroup(
+	body: CreateManualIdentityGroupDto,
+): Promise<IdentityGroupDetailResponseDto> {
+	return adminFetch<IdentityGroupDetailResponseDto>(IDENTITY_GROUPS_API_PATH, {
+		method: 'POST',
+		body: JSON.stringify(body),
+	});
+}
+
+export function updateIdentityGroup(
+	id: string,
+	body: UpdateManualIdentityGroupDto,
+): Promise<IdentityGroupDetailResponseDto> {
+	return adminFetch<IdentityGroupDetailResponseDto>(`${IDENTITY_GROUPS_API_PATH}/${id}`, {
+		method: 'PATCH',
+		body: JSON.stringify(body),
+	});
+}
+
+export function deleteIdentityGroup(id: string): Promise<void> {
+	return adminFetch<void>(`${IDENTITY_GROUPS_API_PATH}/${id}`, { method: 'DELETE' });
 }
 
 export function listIdentityRoles(
-	params: { limit?: number; offset?: number } = {},
+	params: { limit?: number; offset?: number; origin?: string } = {},
 ): Promise<IdentityRoleListResponseDto> {
-	const query = new URLSearchParams();
-	if (params.limit != null) {
-		query.set('limit', String(params.limit));
-	}
-	if (params.offset != null) {
-		query.set('offset', String(params.offset));
-	}
-	const suffix = query.size > 0 ? `?${query.toString()}` : '';
-	return adminFetch<IdentityRoleListResponseDto>(`${IDENTITY_ROLES_API_PATH}${suffix}`);
+	return adminFetch<IdentityRoleListResponseDto>(
+		`${IDENTITY_ROLES_API_PATH}${identityQuery(params)}`,
+	);
+}
+
+export function getIdentityRole(id: string): Promise<IdentityRoleDetailResponseDto> {
+	return adminFetch<IdentityRoleDetailResponseDto>(`${IDENTITY_ROLES_API_PATH}/${id}`);
+}
+
+export function createIdentityRole(
+	body: CreateManualIdentityRoleDto,
+): Promise<IdentityRoleDetailResponseDto> {
+	return adminFetch<IdentityRoleDetailResponseDto>(IDENTITY_ROLES_API_PATH, {
+		method: 'POST',
+		body: JSON.stringify(body),
+	});
+}
+
+export function updateIdentityRole(
+	id: string,
+	body: UpdateManualIdentityRoleDto,
+): Promise<IdentityRoleDetailResponseDto> {
+	return adminFetch<IdentityRoleDetailResponseDto>(`${IDENTITY_ROLES_API_PATH}/${id}`, {
+		method: 'PATCH',
+		body: JSON.stringify(body),
+	});
+}
+
+export function deleteIdentityRole(id: string): Promise<void> {
+	return adminFetch<void>(`${IDENTITY_ROLES_API_PATH}/${id}`, { method: 'DELETE' });
 }
 
 export function getIdpSettings(): Promise<IdpSettingsPublicDto> {

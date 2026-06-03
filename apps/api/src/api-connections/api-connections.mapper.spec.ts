@@ -8,6 +8,7 @@ describe('toApiConnectionDto', () => {
 		baseUrl: 'https://identity.example.com',
 		authType: 'BEARER',
 		authCredentialsEncrypted: 'v1:encrypted',
+		isLocalDirectory: false,
 		lastSyncAt: new Date('2026-02-01T12:00:00.000Z'),
 		lastSyncStatus: 'SUCCESS',
 		createdAt: new Date('2026-01-01T00:00:00.000Z'),

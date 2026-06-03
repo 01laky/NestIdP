@@ -3,6 +3,8 @@ import {
 	activeFlagToBadge,
 	certStatusLabel,
 	certStatusToBadge,
+	identityOriginLabel,
+	identityOriginToBadge,
 	lastSyncStatusToBadge,
 	syncLogStatusToBadge,
 } from './status-badge';
@@ -56,5 +58,12 @@ describe('status-badge', () => {
 	it('WEB-EVG-50: certStatusLabel falls back to raw string for unknown status', () => {
 		expect(certStatusLabel('custom_status')).toBe('custom_status');
 		expect(certStatusToBadge('custom_status')).toBe('neutral');
+	});
+
+	it('WEB-IDN-MAN-10: identityOriginToBadge and label for manual vs synced', () => {
+		expect(identityOriginToBadge('manual')).toBe('info');
+		expect(identityOriginToBadge('synced')).toBe('neutral');
+		expect(identityOriginLabel('manual')).toBe('Manual');
+		expect(identityOriginLabel('synced')).toBe('Synced');
 	});
 });

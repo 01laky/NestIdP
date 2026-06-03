@@ -1,5 +1,6 @@
 import type { PrismaClient } from '@prisma/client';
 import { hashPassword } from '../admin-auth/password.util';
+import { ensureLocalDirectoryConnection } from '../identity/local-directory.util';
 import {
 	assertProductionBootstrapPassword,
 	isWeakBootstrapPassword,
@@ -11,6 +12,7 @@ export interface BootstrapConfig {
 	adminPassword?: string;
 	idpBaseUrl: string;
 	nodeEnv?: string;
+	encryptCredential?: (plaintext: string) => string;
 }
 
 export interface BootstrapResult {
@@ -81,6 +83,11 @@ export async function runBootstrap(
 		});
 		idpSettingsCreated = true;
 		logger.log(`Bootstrap: created IdpSettings with entityId "${config.idpBaseUrl}"`);
+	}
+
+	if (config.encryptCredential) {
+		await ensureLocalDirectoryConnection(prisma, config.encryptCredential);
+		logger.log('Bootstrap: local directory API connection ready');
 	}
 
 	return { adminCreated, idpSettingsCreated };

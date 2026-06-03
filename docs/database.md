@@ -17,17 +17,17 @@ Additional providers (MySQL, etc.) can be added later if the Prisma schema stays
 
 ## Domain tables (v1.0.0)
 
-| Model                   | Purpose                                  |
-| ----------------------- | ---------------------------------------- |
-| `ApiConnection`         | External identity API (sync source)      |
-| `User`, `Group`, `Role` | Synced identity store                    |
-| `UserGroup`, `UserRole` | Membership join tables                   |
-| `SpConnection`          | SAML Service Provider config             |
-| `AdminUser`             | Operator accounts (separate from `User`) |
-| `SyncLog`               | Sync run history (detailed sync errors)  |
-| `AuditEvent`            | Persistent security/config audit trail   |
-| `SamlSession`           | In-flight SP-initiated SSO state         |
-| `IdpSettings`           | Global IdP singleton (entity ID, certs)  |
+| Model                   | Purpose                                                              |
+| ----------------------- | -------------------------------------------------------------------- |
+| `ApiConnection`         | External identity API (sync source) + hidden **local directory** row |
+| `User`, `Group`, `Role` | Identity store (`origin`: `SYNCED` or `MANUAL`)                      |
+| `UserGroup`, `UserRole` | Membership join tables                                               |
+| `SpConnection`          | SAML Service Provider config                                         |
+| `AdminUser`             | Operator accounts (separate from `User`)                             |
+| `SyncLog`               | Sync run history (detailed sync errors)                              |
+| `AuditEvent`            | Persistent security/config audit trail                               |
+| `SamlSession`           | In-flight SP-initiated SSO state                                     |
+| `IdpSettings`           | Global IdP singleton (entity ID, certs)                              |
 
 See [proposal.MD](./proposal.MD) §9 and the ER diagram above.
 
@@ -38,6 +38,16 @@ The `authCredentialsEncrypted` column stores **AES-256-GCM** ciphertext of the B
 - Key material: `SHA-256(ENCRYPTION_KEY)` — see `apps/api/src/encryption/encryption.util.ts`
 - **`ENCRYPTION_KEY`** must be at least 16 characters and **stable across restarts** — rotating it invalidates stored tokens (re-create connections or PATCH with a new `bearerToken`)
 - API JSON never includes `authCredentialsEncrypted` or decrypted tokens — only `hasBearerToken: boolean`
+
+### Manual identity (v1.2.0)
+
+| Field / model                                | Purpose                                                                                                  |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `ApiConnection.isLocalDirectory`             | Bootstrap **Local directory** row (`name` constant in shared); excluded from operator list; not syncable |
+| `User.origin`, `Group.origin`, `Role.origin` | `SYNCED` (API sync) or `MANUAL` (admin CRUD); sync never deactivates/deletes/overwrites `MANUAL`         |
+| Manual `externalId`                          | Server-generated `manual:user:<id>`, `manual:group:<id>`, `manual:role:<id>`                             |
+
+Migration: `20260604120000_identity_manual_crud` (SQLite + PostgreSQL histories under `prisma/migrations-sqlite` and `prisma/migrations-postgresql`).
 
 ### Identity sync (v0.5.0)
 
@@ -73,16 +83,16 @@ Deploy: `pnpm db:migrate:deploy` applies migration `20260602120000_idp_settings_
 
 Operator and security events are stored in **`AuditEvent`** (separate from **`SyncLog`**).
 
-| Column                      | Purpose                                                             |
-| --------------------------- | ------------------------------------------------------------------- |
-| `category`                  | `admin_auth`, `admin_config`, `end_user_auth`, `saml`, `sync`       |
-| `event`                     | Stable machine name (e.g. `admin_login_success`, `sync_completed`)  |
-| `actorType`                 | `admin`, `end_user`, or `system`                                    |
-| `actorId` / `actorLabel`    | Who performed the action (username in label; never passwords)       |
-| `subjectType` / `subjectId` | Optional target entity (e.g. `ApiConnection`, `AdminUser`)          |
-| `clientIp`                  | Client IP when available (`TRUST_PROXY` affects accuracy behind LB) |
-| `metadata`                  | Small JSON extras (sanitized; max ~4 KB; no secrets)                |
-| `createdAt`                 | Event timestamp                                                     |
+| Column                      | Purpose                                                                            |
+| --------------------------- | ---------------------------------------------------------------------------------- |
+| `category`                  | `admin_auth`, `admin_config`, `end_user_auth`, `saml`, `sync`, `identity` (v1.2.0) |
+| `event`                     | Stable machine name (e.g. `admin_login_success`, `sync_completed`)                 |
+| `actorType`                 | `admin`, `end_user`, or `system`                                                   |
+| `actorId` / `actorLabel`    | Who performed the action (username in label; never passwords)                      |
+| `subjectType` / `subjectId` | Optional target entity (e.g. `ApiConnection`, `AdminUser`)                         |
+| `clientIp`                  | Client IP when available (`TRUST_PROXY` affects accuracy behind LB)                |
+| `metadata`                  | Small JSON extras (sanitized; max ~4 KB; no secrets)                               |
+| `createdAt`                 | Event timestamp                                                                    |
 
 **Retention:** `AuditRetentionCleanupService` deletes rows older than `AUDIT_RETENTION_DAYS` (default 90). **`SyncLog`** is not purged by this job.
 

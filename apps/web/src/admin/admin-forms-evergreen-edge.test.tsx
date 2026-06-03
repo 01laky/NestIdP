@@ -798,10 +798,17 @@ describe('Admin forms Evergreen — extended edge cases', () => {
 					displayName: 'Alice',
 					externalId: 'ext-1',
 					apiConnectionId: 'c1',
+					origin: 'synced',
 					active: true,
 				},
 				groups: [{ id: 'g1', name: 'Admins' }],
 				roles: [{ id: 'r1', name: 'User' }],
+				source: {
+					kind: 'api_connection',
+					label: 'HR',
+					apiConnectionId: 'c1',
+					apiConnectionRoute: '/admin/api-connections/c1',
+				},
 			});
 			renderWithUi(
 				<MemoryRouter initialEntries={[`${IDENTITY_ROUTE_PREFIX}/users/u1`]}>
@@ -860,6 +867,11 @@ describe('Admin forms static conventions — edge cases', () => {
 			'AdminUsersPage.tsx': ['TextInput', 'Button'],
 			'AuditLogPage.tsx': ['Button'],
 			'IdentityUsersPage.tsx': ['TextInput', 'Button'],
+			'IdentityUserFormPage.tsx': ['TextInput', 'Button', 'Panel'],
+			'IdentityGroupFormPage.tsx': ['TextInput', 'Button', 'Panel'],
+			'IdentityRoleFormPage.tsx': ['TextInput', 'Button', 'Panel'],
+			'IdentityGroupDetailPage.tsx': ['Button', 'Panel', 'Table'],
+			'IdentityRoleDetailPage.tsx': ['Button', 'Panel', 'Table'],
 		};
 		const missing: string[] = [];
 		for (const file of formPages) {
@@ -919,5 +931,21 @@ describe('Admin forms static conventions — edge cases', () => {
 		const text = readFileSync(join(webSrc, 'admin/pages/SyncLogDetailPage.tsx'), 'utf8');
 		expect(text).toContain('syncLogStatusToBadge');
 		expect(text).toContain('Badge');
+	});
+
+	it('WEB-EVG-171: admin pages regression — no raw input/button (identity forms included)', () => {
+		const pagesDir = join(webSrc, 'admin/pages');
+		const forbidden = [/<input[\s>/]/, /<button[\s>/]/, /<select[\s>/]/, /<textarea[\s>/]/];
+		const hits: string[] = [];
+		for (const file of walkTsx(pagesDir)) {
+			const text = readFileSync(file, 'utf8');
+			for (const re of forbidden) {
+				if (re.test(text)) {
+					hits.push(file);
+					break;
+				}
+			}
+		}
+		expect(hits).toEqual([]);
 	});
 });

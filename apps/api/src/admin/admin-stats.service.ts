@@ -15,7 +15,7 @@ export class AdminStatsService {
 			this.identityService.countUsers(),
 			this.identityService.countGroups(),
 			this.identityService.countRoles(),
-			this.prisma.apiConnection.count(),
+			this.prisma.apiConnection.count({ where: { isLocalDirectory: false } }),
 			this.prisma.spConnection.count(),
 		]);
 

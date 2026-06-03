@@ -1,5 +1,9 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import {
+	CREDENTIALS_ENCRYPTION,
+	type CredentialsEncryptionPort,
+} from '../encryption/credentials-encryption.port';
 import { PrismaService } from '../prisma/prisma.service';
 import { runBootstrap } from './run-bootstrap';
 
@@ -10,6 +14,8 @@ export class BootstrapService implements OnModuleInit {
 	constructor(
 		private readonly configService: ConfigService,
 		private readonly prisma: PrismaService,
+		@Inject(CREDENTIALS_ENCRYPTION)
+		private readonly encryption: CredentialsEncryptionPort,
 	) {}
 
 	async onModuleInit(): Promise<void> {
@@ -21,6 +27,7 @@ export class BootstrapService implements OnModuleInit {
 					adminPassword: this.configService.get<string>('ADMIN_PASSWORD'),
 					idpBaseUrl: this.configService.get<string>('IDP_BASE_URL') ?? '',
 					nodeEnv: this.configService.get<string>('NODE_ENV'),
+					encryptCredential: (plain) => this.encryption.encrypt(plain),
 				},
 				this.logger,
 			);

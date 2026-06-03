@@ -32,6 +32,7 @@ export class AdminDashboardService {
 		const base = (this.configService.get<string>('IDP_BASE_URL') ?? '').replace(/\/+$/, '');
 		const settings = await this.prisma.idpSettings.findUnique({ where: { id: 'default' } });
 		const connectionRow = await this.prisma.apiConnection.findFirst({
+			where: { isLocalDirectory: false },
 			orderBy: { createdAt: 'asc' },
 		});
 

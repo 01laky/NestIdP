@@ -64,3 +64,11 @@ export function certStatusLabel(status: AdminDashboardIdpCertStatus | string): s
 export function activeFlagToBadge(active: boolean): BadgeVariant {
 	return active ? 'success' : 'danger';
 }
+
+export function identityOriginToBadge(origin: 'manual' | 'synced'): BadgeVariant {
+	return origin === 'manual' ? 'info' : 'neutral';
+}
+
+export function identityOriginLabel(origin: 'manual' | 'synced'): string {
+	return origin === 'manual' ? 'Manual' : 'Synced';
+}

@@ -1,12 +1,15 @@
 import { Module } from '@nestjs/common';
 import { AdminAuthModule } from '../admin-auth/admin-auth.module';
+import { EncryptionModule } from '../encryption/encryption.module';
+import { IdentityModule } from '../identity/identity.module';
 import { PrismaModule } from '../prisma/prisma.module';
+import { IdentityAdminAuditService } from './identity-admin-audit.service';
 import { IdentityAdminController } from './identity-admin.controller';
 import { IdentityAdminService } from './identity-admin.service';
 
 @Module({
-	imports: [PrismaModule, AdminAuthModule],
+	imports: [PrismaModule, AdminAuthModule, EncryptionModule, IdentityModule],
 	controllers: [IdentityAdminController],
-	providers: [IdentityAdminService],
+	providers: [IdentityAdminService, IdentityAdminAuditService],
 })
 export class IdentityAdminModule {}

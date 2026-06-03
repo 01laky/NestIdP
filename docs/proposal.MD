@@ -564,9 +564,18 @@ From **v1.1.0**, the operator console and SAML login page use the **Evergreen** 
 │   ├── /new                      Create SP connection
 │   └── /:id                      Edit SP + attribute mapping
 ├── /identity
-│   ├── /users                    Browse synced users (read-only)
-│   ├── /groups                   Browse synced groups (read-only)
-│   └── /roles                    Browse synced roles (read-only)
+│   ├── /users                    Browse users; manual CRUD via /new and /:id/edit (synced read-only)
+│   ├── /users/new                Create manual user (password + memberships)
+│   ├── /users/:id                User detail (source, groups, roles, recent audit)
+│   ├── /users/:id/edit           Edit manual user (synced → read-only message)
+│   ├── /groups                   Browse groups with origin filter; link to detail
+│   ├── /groups/new               Create manual group
+│   ├── /groups/:id               Group detail + members (synced: read-only + callout)
+│   ├── /groups/:id/edit          Edit manual group
+│   ├── /roles                    Browse roles with origin filter
+│   ├── /roles/new                Create manual role
+│   ├── /roles/:id                Role detail + members
+│   └── /roles/:id/edit           Edit manual role
 └── /settings
     ├── /idp                      IdP entity ID, certificates, metadata URL
     └── /admins                   Manage admin accounts
@@ -649,6 +658,7 @@ _Phase 1 complete in **v1.0.0** (Prompt 10 — Docker, persistent audit, admin a
 - [x] Prisma schema and migrations (portable across sqlite/postgresql)
 - [x] API connection CRUD (baseUrl + Bearer token)
 - [x] Manual identity sync from one active source
+- [x] Manual identity CRUD in admin (local directory; synced records read-only) — v1.2.0
 - [x] User/group/role upsert via **fixed** v1 REST contract (with password hash)
 - [x] End-user login against synced credentials
 - [x] **Custom `SamlModule`** — parse SAMLRequest, build/sign SAMLResponse, metadata, POST binding (xmlbuilder2 + xml-crypto)

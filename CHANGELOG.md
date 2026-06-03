@@ -4,6 +4,46 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.1]
+
+### Added
+
+- Extended identity manual CRUD test coverage: **`API-IDN-MAN-09`–`15`** (CRUD happy paths),
+  **`API-IDN-MAN-38`–`55`** (validation, filters, audit, CSRF, password change, local connection
+  guard), **`WEB-IDN-MAN-01`–`19`** (forms, read-only synced UX, delete confirm, aria-busy, list
+  filters), plus service unit tests **`API-IDN-SVC-11`–`12`**.
+
+## [1.2.0]
+
+### Added
+
+- **Manual identity CRUD** in admin: create, edit, and delete local users (password + bcrypt,
+  group/role membership), groups, and roles under a bootstrap **Local directory** API connection
+  (`isLocalDirectory`, hidden from operator API connection list).
+- Prisma **`IdentityOrigin`** (`MANUAL` | `SYNCED`) on `User`, `Group`, and `Role`; synced rows
+  stay read-only in admin (`403 managed_by_sync`).
+- Identity admin REST: `POST` / `PATCH` / `DELETE` on users, groups, roles; `GET` group/role detail
+  with members; `origin` list filter; `confirmPassword` on user create; optional `auditLimit` on
+  user detail for recent **`identity`** audit events.
+- React pages: user/group/role forms and detail views, **`IdentityMembershipPicker`** (client filter,
+  100-item cap), users list callout, origin badges/filters, password confirmation on create.
+- Audit category **`identity`** (Prisma enum + shared `AUDIT_CATEGORIES`).
+- Test registries **`API-IDN-MAN-01`–`37`**, **`API-IDN-MAN-SAML-01`**, **`WEB-IDN-MAN-20`–`28`**,
+  **`WEB-EVG-169`–`171`**.
+
+### Changed
+
+- v1 “one API connection” rule counts only **non-local** rows; dashboard and stats exclude local
+  directory; identity sync rejects local connection (`400`).
+- **Sync isolation**: deactivate/orphan cleanup and upsert skip **`MANUAL`** records; username
+  collisions log `manual_conflict` without aborting sync.
+- `docs/proposal.MD` §11 identity route tree; `docs/development.md` REST and test tables;
+  `docs/database.md` schema notes.
+
+### Fixed
+
+- Nested Prisma transaction when updating manual user memberships (PATCH no longer 500).
+
 ## [1.1.4]
 
 ### Added

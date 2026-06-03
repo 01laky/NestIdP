@@ -6,9 +6,14 @@ import { ApiConnectionFormPage } from './pages/ApiConnectionFormPage';
 import { ApiConnectionSyncPage } from './pages/ApiConnectionSyncPage';
 import { ApiConnectionsListPage } from './pages/ApiConnectionsListPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { IdentityGroupDetailPage } from './pages/IdentityGroupDetailPage';
+import { IdentityGroupFormPage } from './pages/IdentityGroupFormPage';
 import { IdentityGroupsPage } from './pages/IdentityGroupsPage';
+import { IdentityRoleDetailPage } from './pages/IdentityRoleDetailPage';
+import { IdentityRoleFormPage } from './pages/IdentityRoleFormPage';
 import { IdentityRolesPage } from './pages/IdentityRolesPage';
 import { IdentityUserDetailPage } from './pages/IdentityUserDetailPage';
+import { IdentityUserFormPage } from './pages/IdentityUserFormPage';
 import { IdentityUsersPage } from './pages/IdentityUsersPage';
 import { SpConnectionFormPage } from './pages/SpConnectionFormPage';
 import { SpConnectionTestSsoPage } from './pages/SpConnectionTestSsoPage';
@@ -92,9 +97,17 @@ export function AdminLayout() {
 					<Route path="sp-connections/:id" element={<SpConnectionFormPage />} />
 					<Route path="sp-connections/:id/test-sso" element={<SpConnectionTestSsoPage />} />
 					<Route path="identity/users" element={<IdentityUsersPage />} />
+					<Route path="identity/users/new" element={<IdentityUserFormPage />} />
+					<Route path="identity/users/:id/edit" element={<IdentityUserFormPage />} />
 					<Route path="identity/users/:id" element={<IdentityUserDetailPage />} />
 					<Route path="identity/groups" element={<IdentityGroupsPage />} />
+					<Route path="identity/groups/new" element={<IdentityGroupFormPage />} />
+					<Route path="identity/groups/:id/edit" element={<IdentityGroupFormPage />} />
+					<Route path="identity/groups/:id" element={<IdentityGroupDetailPage />} />
 					<Route path="identity/roles" element={<IdentityRolesPage />} />
+					<Route path="identity/roles/new" element={<IdentityRoleFormPage />} />
+					<Route path="identity/roles/:id/edit" element={<IdentityRoleFormPage />} />
+					<Route path="identity/roles/:id" element={<IdentityRoleDetailPage />} />
 					<Route path="settings" element={<Navigate to={IDP_SETTINGS_ROUTE_PREFIX} replace />} />
 					<Route path="settings/idp" element={<IdpSettingsPage />} />
 					<Route path="settings/admins" element={<AdminUsersPage />} />

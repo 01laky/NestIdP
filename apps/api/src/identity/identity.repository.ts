@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Group, Prisma, Role, User } from '@prisma/client';
+import { Group, IdentityOrigin, Prisma, Role, User } from '@prisma/client';
 import { normalizeSyncedEmail } from './normalize-synced-email.util';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -125,6 +125,18 @@ export class IdentityRepository {
 			}
 		}
 
+		const existing = await this.prisma.user.findUnique({
+			where: {
+				apiConnectionId_externalId: {
+					apiConnectionId: connectionId,
+					externalId: user.externalId,
+				},
+			},
+		});
+		if (existing?.origin === IdentityOrigin.MANUAL) {
+			throw new UsernameCollisionError(user.externalId, user.username);
+		}
+
 		return this.prisma.user.upsert({
 			where: {
 				apiConnectionId_externalId: {
@@ -134,6 +146,7 @@ export class IdentityRepository {
 			},
 			create: {
 				apiConnectionId: connectionId,
+				origin: IdentityOrigin.SYNCED,
 				externalId: user.externalId,
 				username: user.username,
 				email,
@@ -189,6 +202,7 @@ export class IdentityRepository {
 				},
 				create: {
 					apiConnectionId: connectionId,
+					origin: IdentityOrigin.SYNCED,
 					externalId: externalGroup.id,
 					name: externalGroup.name,
 				},
@@ -218,6 +232,7 @@ export class IdentityRepository {
 				},
 				create: {
 					apiConnectionId: connectionId,
+					origin: IdentityOrigin.SYNCED,
 					externalId: externalRole.id,
 					name: externalRole.name,
 				},
@@ -240,6 +255,7 @@ export class IdentityRepository {
 		const usersToDeactivate = await this.prisma.user.findMany({
 			where: {
 				apiConnectionId: connectionId,
+				origin: IdentityOrigin.SYNCED,
 				externalId: { notIn: Array.from(externalIds) },
 				active: true,
 			},
@@ -263,6 +279,7 @@ export class IdentityRepository {
 		const result = await this.prisma.group.deleteMany({
 			where: {
 				apiConnectionId: connectionId,
+				origin: IdentityOrigin.SYNCED,
 				externalId: { notIn: Array.from(seenExternalIds) },
 			},
 		});
@@ -273,6 +290,7 @@ export class IdentityRepository {
 		const result = await this.prisma.role.deleteMany({
 			where: {
 				apiConnectionId: connectionId,
+				origin: IdentityOrigin.SYNCED,
 				externalId: { notIn: Array.from(seenExternalIds) },
 			},
 		});

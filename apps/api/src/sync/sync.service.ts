@@ -1,4 +1,10 @@
-import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+	BadRequestException,
+	ConflictException,
+	Inject,
+	Injectable,
+	NotFoundException,
+} from '@nestjs/common';
 import type {
 	SyncLogErrorEntryDto,
 	SyncLogListResponseDto,
@@ -56,6 +62,9 @@ export class SyncService {
 		const connection = await this.prisma.apiConnection.findUnique({ where: { id: connectionId } });
 		if (!connection) {
 			throw new NotFoundException('API connection not found');
+		}
+		if (connection.isLocalDirectory) {
+			throw new BadRequestException('Local directory is not syncable');
 		}
 		const connectionBefore = { ...connection };
 

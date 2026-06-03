@@ -1,14 +1,33 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { IdentityOrigin } from '@prisma/client';
+import { IdentityAdminAuditService } from './identity-admin-audit.service';
 import { IdentityAdminService } from './identity-admin.service';
+import { IdentityRepository } from '../identity/identity.repository';
 
 describe('IdentityAdminService', () => {
 	const prisma = {
 		user: { findMany: jest.fn(), count: jest.fn(), findUnique: jest.fn() },
 		group: { findMany: jest.fn(), count: jest.fn() },
 		role: { findMany: jest.fn(), count: jest.fn() },
+		apiConnection: { findFirst: jest.fn() },
+		auditEvent: { findMany: jest.fn() },
 	};
 
-	const service = new IdentityAdminService(prisma as never);
+	const identityRepository = {} as IdentityRepository;
+	const encryption = { encrypt: jest.fn() } as never;
+	const audit = {
+		logUserCreated: jest.fn(),
+		logUserUpdated: jest.fn(),
+		logUserDeleted: jest.fn(),
+		logGroupCreated: jest.fn(),
+		logGroupUpdated: jest.fn(),
+		logGroupDeleted: jest.fn(),
+		logRoleCreated: jest.fn(),
+		logRoleUpdated: jest.fn(),
+		logRoleDeleted: jest.fn(),
+	} as unknown as IdentityAdminAuditService;
+
+	const service = new IdentityAdminService(prisma as never, identityRepository, encryption, audit);
 
 	beforeEach(() => {
 		jest.clearAllMocks();
@@ -77,8 +96,16 @@ describe('IdentityAdminService', () => {
 			active: true,
 			externalId: 'ext-1',
 			apiConnectionId: 'conn-1',
-			groups: [{ group: { id: 'g2', name: 'zeta' } }, { group: { id: 'g1', name: 'alpha' } }],
-			roles: [{ role: { id: 'r2', name: 'viewer' } }, { role: { id: 'r1', name: 'admin' } }],
+			origin: IdentityOrigin.SYNCED,
+			groups: [
+				{ group: { id: 'g2', name: 'zeta', origin: IdentityOrigin.SYNCED } },
+				{ group: { id: 'g1', name: 'alpha', origin: IdentityOrigin.SYNCED } },
+			],
+			roles: [
+				{ role: { id: 'r2', name: 'viewer', origin: IdentityOrigin.SYNCED } },
+				{ role: { id: 'r1', name: 'admin', origin: IdentityOrigin.SYNCED } },
+			],
+			apiConnection: { id: 'conn-1', name: 'HR', isLocalDirectory: false },
 		});
 
 		const result = await service.getUserById('u1');
@@ -89,7 +116,14 @@ describe('IdentityAdminService', () => {
 
 	it('API-IDN-SVC-08: listGroups returns total count', async () => {
 		prisma.group.findMany.mockResolvedValue([
-			{ id: 'g1', name: 'a', externalId: 'e', apiConnectionId: 'c' },
+			{
+				id: 'g1',
+				name: 'a',
+				externalId: 'e',
+				apiConnectionId: 'c',
+				origin: IdentityOrigin.SYNCED,
+				_count: { users: 0 },
+			},
 		]);
 		prisma.group.count.mockResolvedValue(1);
 
@@ -109,6 +143,34 @@ describe('IdentityAdminService', () => {
 		expect(select.passwordHashAlgorithm).toBeUndefined();
 	});
 
+	it('API-IDN-SVC-11: listUsers origin=manual adds where clause', async () => {
+		prisma.user.findMany.mockResolvedValue([]);
+		prisma.user.count.mockResolvedValue(0);
+		await service.listUsers(undefined, undefined, undefined, 'manual');
+		expect(prisma.user.findMany).toHaveBeenCalledWith(
+			expect.objectContaining({
+				where: expect.objectContaining({ origin: IdentityOrigin.MANUAL }),
+			}),
+		);
+	});
+
+	it('API-IDN-SVC-12: parseAuditLimit rejects value above max', async () => {
+		prisma.user.findUnique.mockResolvedValue({
+			id: 'u1',
+			username: 'alice',
+			email: null,
+			displayName: null,
+			active: true,
+			externalId: 'ext-1',
+			apiConnectionId: 'conn-1',
+			origin: IdentityOrigin.MANUAL,
+			groups: [],
+			roles: [],
+			apiConnection: { id: 'conn-1', name: 'Local directory', isLocalDirectory: true },
+		});
+		await expect(service.getUserById('u1', 25)).rejects.toThrow(BadRequestException);
+	});
+
 	it('API-IDN-SVC-10: getUserById select omits password fields', async () => {
 		prisma.user.findUnique.mockResolvedValue({
 			id: 'u1',
@@ -118,8 +180,10 @@ describe('IdentityAdminService', () => {
 			active: true,
 			externalId: 'ext-1',
 			apiConnectionId: 'conn-1',
+			origin: IdentityOrigin.SYNCED,
 			groups: [],
 			roles: [],
+			apiConnection: { id: 'conn-1', name: 'HR', isLocalDirectory: false },
 		});
 
 		await service.getUserById('u1');

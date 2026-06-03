@@ -257,6 +257,7 @@ describe('ApiConnectionsService', () => {
 		prisma.apiConnection.findMany.mockResolvedValue([sampleRow]);
 		await service.list();
 		expect(prisma.apiConnection.findMany).toHaveBeenCalledWith({
+			where: { isLocalDirectory: false },
 			orderBy: { createdAt: 'asc' },
 		});
 	});

@@ -36,6 +36,12 @@ enum AuditCategory {
 	end_user_auth
 	saml
 	sync
+	identity
+}
+
+enum IdentityOrigin {
+	SYNCED
+	MANUAL
 }
 
 model ApiConnection {
@@ -44,6 +50,7 @@ model ApiConnection {
 	baseUrl                  String
 	authType                 AuthType       @default(BEARER)
 	authCredentialsEncrypted String
+	isLocalDirectory         Boolean        @default(false)
 	lastSyncAt               DateTime?
 	lastSyncStatus           LastSyncStatus @default(NEVER)
 	createdAt                DateTime       @default(now())
@@ -56,15 +63,16 @@ model ApiConnection {
 }
 
 model User {
-	id                      String   @id @default(cuid())
+	id                      String         @id @default(cuid())
 	externalId              String
 	apiConnectionId         String
-	username                String   @unique
+	origin                  IdentityOrigin @default(SYNCED)
+	username                String         @unique
 	email                   String?
 	displayName             String?
 	passwordHash            String
-	passwordHashAlgorithm   String   @default("bcrypt")
-	active                  Boolean  @default(true)
+	passwordHashAlgorithm   String         @default("bcrypt")
+	active                  Boolean        @default(true)
 	createdAt               DateTime @default(now())
 	updatedAt               DateTime @updatedAt
 
@@ -78,9 +86,10 @@ model User {
 }
 
 model Group {
-	id              String   @id @default(cuid())
+	id              String         @id @default(cuid())
 	externalId      String
 	apiConnectionId String
+	origin          IdentityOrigin @default(SYNCED)
 	name            String
 	createdAt       DateTime @default(now())
 	updatedAt       DateTime @updatedAt
@@ -94,9 +103,10 @@ model Group {
 }
 
 model Role {
-	id              String   @id @default(cuid())
+	id              String         @id @default(cuid())
 	externalId      String
 	apiConnectionId String
+	origin          IdentityOrigin @default(SYNCED)
 	name            String
 	createdAt       DateTime @default(now())
 	updatedAt       DateTime @updatedAt

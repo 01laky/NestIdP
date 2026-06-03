@@ -32,7 +32,8 @@ describe('audit-events shared types', () => {
 		expect(AUDIT_CATEGORIES).toContain('end_user_auth');
 		expect(AUDIT_CATEGORIES).toContain('saml');
 		expect(AUDIT_CATEGORIES).toContain('sync');
-		expect(AUDIT_CATEGORIES).toHaveLength(5);
+		expect(AUDIT_CATEGORIES).toContain('identity');
+		expect(AUDIT_CATEGORIES).toHaveLength(6);
 	});
 
 	it('SH-AUD-05: AUDIT_ACTOR_TYPES includes admin, end_user, system', () => {

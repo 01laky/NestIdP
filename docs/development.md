@@ -94,10 +94,21 @@ This syncs `schema.prisma` with `DATABASE_PROVIDER`. Root `pnpm install` runs `p
 | PATCH  | `/api/admin/idp/settings`                  | admin session                 | Update entity ID / default NameID format (CSRF)                                                      |
 | POST   | `/api/admin/idp/settings/signing-cert/*`   | admin session                 | Generate/upload primary cert; rotation start/complete/cancel (CSRF)                                  |
 | GET    | `/api/admin/idp/settings/metadata-preview` | admin session                 | Same SAML metadata XML as public `/saml/metadata` (for operator preview)                             |
-| GET    | `/api/admin/identity/users`                | admin session                 | Browse synced users (`?search=`, `limit`, `offset`)                                                  |
-| GET    | `/api/admin/identity/users/:id`            | admin session                 | User detail with groups and roles                                                                    |
-| GET    | `/api/admin/identity/groups`               | admin session                 | Browse groups                                                                                        |
-| GET    | `/api/admin/identity/roles`                | admin session                 | Browse roles                                                                                         |
+| GET    | `/api/admin/identity/users`                | admin session                 | Browse users (`?search=`, `?origin=manual\|synced`, `limit`, `offset`)                               |
+| POST   | `/api/admin/identity/users`                | admin session + CSRF          | Create **manual** user (`password`, `confirmPassword`, optional `groupIds` / `roleIds`)              |
+| GET    | `/api/admin/identity/users/:id`            | admin session                 | User detail (`source`, groups, roles; optional `?auditLimit=1..20`)                                  |
+| PATCH  | `/api/admin/identity/users/:id`            | admin session + CSRF          | Update manual user (synced → `403 managed_by_sync`)                                                  |
+| DELETE | `/api/admin/identity/users/:id`            | admin session + CSRF          | Delete manual user                                                                                   |
+| GET    | `/api/admin/identity/groups`               | admin session                 | Browse groups (`?origin=`, `limit`, `offset`; `memberCount` in items)                                |
+| POST   | `/api/admin/identity/groups`               | admin session + CSRF          | Create manual group                                                                                  |
+| GET    | `/api/admin/identity/groups/:id`           | admin session                 | Group detail + member usernames                                                                      |
+| PATCH  | `/api/admin/identity/groups/:id`           | admin session + CSRF          | Rename manual group                                                                                  |
+| DELETE | `/api/admin/identity/groups/:id`           | admin session + CSRF          | Delete manual group (`409` if members)                                                               |
+| GET    | `/api/admin/identity/roles`                | admin session                 | Browse roles (`?origin=`, `memberCount`)                                                             |
+| POST   | `/api/admin/identity/roles`                | admin session + CSRF          | Create manual role                                                                                   |
+| GET    | `/api/admin/identity/roles/:id`            | admin session                 | Role detail + members                                                                                |
+| PATCH  | `/api/admin/identity/roles/:id`            | admin session + CSRF          | Rename manual role                                                                                   |
+| DELETE | `/api/admin/identity/roles/:id`            | admin session + CSRF          | Delete manual role (`409` if members)                                                                |
 
 Constants:
 
@@ -431,7 +442,11 @@ Dark mode is deferred to v1.2.0 (light theme only in 1.1.0).
 
 ### Web tests and visual baselines
 
-Vitest IDs **`WEB-EVG-01`–`168`** cover primitives, styles, conventions (static grep), toast
+Vitest IDs **`WEB-EVG-01`–`171`** cover primitives, styles, conventions (static grep), toast,
+identity form pages (`WEB-EVG-169`–`171`), and **`WEB-IDN-MAN-20`–`28`** (manual CRUD UI). API Jest
+registry **`API-IDN-MAN-01`–`55`** and **`API-IDN-MAN-SAML-01`** cover manual CRUD, sync isolation,
+local directory, validation edge cases, and SAML login for manual users. Web registry
+**`WEB-IDN-MAN-01`–`28`** plus **`WEB-EVG-169`–`171`** cover identity forms and operator UX.
 mutation flows, Login SSO UI states, dashboard badge mappers, admin form migrations, extended admin
 form edge cases, and infra checks.
 Existing **`WEB-ADM-*`** / **`WEB-AUTH-*`** must stay green.

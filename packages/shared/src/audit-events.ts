@@ -10,6 +10,7 @@ export const AUDIT_CATEGORIES = [
 	'end_user_auth',
 	'saml',
 	'sync',
+	'identity',
 ] as const;
 
 export type AuditCategoryLiteral = (typeof AUDIT_CATEGORIES)[number];
