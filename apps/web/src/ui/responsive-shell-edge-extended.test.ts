@@ -208,14 +208,15 @@ describe('Responsive shell — extended CSS and static guards (WEB-RSP-50–99)'
 		expect(changelog).toMatch(/dev:docker|hot reload/i);
 	});
 
-	it('WEB-RSP-82: root package version 1.3.4', () => {
+	it('WEB-RSP-82: root package.json has semver version', () => {
 		const pkg = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'));
-		expect(pkg.version).toBe('1.3.4');
+		expect(pkg.version).toMatch(/^\d+\.\d+\.\d+$/);
 	});
 
-	it('WEB-RSP-83: web package version 1.3.4', () => {
-		const pkg = JSON.parse(readFileSync(join(webRoot, 'package.json'), 'utf8'));
-		expect(pkg.version).toBe('1.3.4');
+	it('WEB-RSP-83: web version matches monorepo root', () => {
+		const rootPkg = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'));
+		const webPkg = JSON.parse(readFileSync(join(webRoot, 'package.json'), 'utf8'));
+		expect(webPkg.version).toBe(rootPkg.version);
 	});
 
 	it('WEB-RSP-84: root package.json defines dev:docker scripts', () => {

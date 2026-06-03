@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.3.9]
+
+### Fixed
+
+- **WEB-RSP-82 / WEB-RSP-83**: stop pinning package version `1.3.4` in Vitest guards — assert semver
+  on root and version parity with `@nestidp/web` so CI does not fail on every release bump.
+
 ## [1.3.8]
 
 ### Fixed
