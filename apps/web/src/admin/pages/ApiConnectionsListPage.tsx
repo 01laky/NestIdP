@@ -80,36 +80,38 @@ export function ApiConnectionsListPage() {
 				/>
 			) : null}
 			{!loading && !error && connections.length > 0 ? (
-				<Table>
-					<thead>
-						<tr>
-							<th>{tCommon('name')}</th>
-							<th>{tCommon('baseUrl')}</th>
-							<th>{t('tableLastSync')}</th>
-							<th />
-						</tr>
-					</thead>
-					<tbody>
-						{connections.map((connection) => (
-							<tr key={connection.id}>
-								<td>{connection.name}</td>
-								<td>
-									<code>{connection.baseUrl}</code>
-								</td>
-								<td>{connection.lastSyncStatus}</td>
-								<td>
-									<Link to={`${API_CONNECTION_ROUTE_PREFIX}/${connection.id}`}>
-										{t('editLink')}
-									</Link>{' '}
-									·{' '}
-									<Link to={`${API_CONNECTION_ROUTE_PREFIX}/${connection.id}/sync`}>
-										{tCommon('sync')}
-									</Link>
-								</td>
+				<div className="evg-table-wrap">
+					<Table>
+						<thead>
+							<tr>
+								<th>{tCommon('name')}</th>
+								<th>{tCommon('baseUrl')}</th>
+								<th>{t('tableLastSync')}</th>
+								<th />
 							</tr>
-						))}
-					</tbody>
-				</Table>
+						</thead>
+						<tbody>
+							{connections.map((connection) => (
+								<tr key={connection.id}>
+									<td>{connection.name}</td>
+									<td>
+										<code>{connection.baseUrl}</code>
+									</td>
+									<td>{connection.lastSyncStatus}</td>
+									<td>
+										<Link to={`${API_CONNECTION_ROUTE_PREFIX}/${connection.id}`}>
+											{t('editLink')}
+										</Link>{' '}
+										·{' '}
+										<Link to={`${API_CONNECTION_ROUTE_PREFIX}/${connection.id}/sync`}>
+											{tCommon('sync')}
+										</Link>
+									</td>
+								</tr>
+							))}
+						</tbody>
+					</Table>
+				</div>
 			) : null}
 		</section>
 	);

@@ -143,28 +143,30 @@ export function IdentityGroupDetailPage() {
 				{members.length === 0 ? (
 					<p className="evg-muted">{t('noMembers')}</p>
 				) : (
-					<Table>
-						<thead>
-							<tr>
-								<th>{tCommon('username')}</th>
-								<th>{tCommon('origin')}</th>
-							</tr>
-						</thead>
-						<tbody>
-							{members.map((member) => (
-								<tr key={member.id}>
-									<td>
-										<Link to={identityUserDetailRoute(member.id)}>{member.username}</Link>
-									</td>
-									<td>
-										<Badge variant={identityOriginToBadge(member.origin)}>
-											{identityOriginLabel(member.origin)}
-										</Badge>
-									</td>
+					<div className="evg-table-wrap">
+						<Table>
+							<thead>
+								<tr>
+									<th>{tCommon('username')}</th>
+									<th>{tCommon('origin')}</th>
 								</tr>
-							))}
-						</tbody>
-					</Table>
+							</thead>
+							<tbody>
+								{members.map((member) => (
+									<tr key={member.id}>
+										<td>
+											<Link to={identityUserDetailRoute(member.id)}>{member.username}</Link>
+										</td>
+										<td>
+											<Badge variant={identityOriginToBadge(member.origin)}>
+												{identityOriginLabel(member.origin)}
+											</Badge>
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</Table>
+					</div>
 				)}
 			</Panel>
 			<p>

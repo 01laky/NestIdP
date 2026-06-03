@@ -119,43 +119,45 @@ export function AuditLogPage() {
 					<p className="evg-muted">
 						{t('showingEvents', { shown: data.items.length, total: data.total })}
 					</p>
-					<Table>
-						<thead>
-							<tr>
-								<th>{tCommon('time')}</th>
-								<th>{tCommon('category')}</th>
-								<th>{tCommon('event')}</th>
-								<th>{tCommon('actor')}</th>
-								<th>{tCommon('subject')}</th>
-							</tr>
-						</thead>
-						<tbody>
-							{data.items.map((row) => (
-								<tr key={row.id}>
-									<td className="evg-muted">{new Date(row.createdAt).toLocaleString()}</td>
-									<td>{auditCategoryLabel(row.category, resolveI18nKey)}</td>
-									<td>{row.event}</td>
-									<td>{row.actorLabel ?? row.actorType}</td>
-									<td>
-										{row.subjectType
-											? `${row.subjectType}:${row.subjectId ?? ''}`
-											: tCommon('emDash')}
-										{row.metadata &&
-										typeof row.metadata === 'object' &&
-										'syncLogId' in row.metadata &&
-										typeof row.metadata.syncLogId === 'string' ? (
-											<>
-												{' '}
-												<Link to={`/admin/sync-logs/${row.metadata.syncLogId}`}>
-													{t('syncLogLink')}
-												</Link>
-											</>
-										) : null}
-									</td>
+					<div className="evg-table-wrap">
+						<Table>
+							<thead>
+								<tr>
+									<th>{tCommon('time')}</th>
+									<th>{tCommon('category')}</th>
+									<th>{tCommon('event')}</th>
+									<th>{tCommon('actor')}</th>
+									<th>{tCommon('subject')}</th>
 								</tr>
-							))}
-						</tbody>
-					</Table>
+							</thead>
+							<tbody>
+								{data.items.map((row) => (
+									<tr key={row.id}>
+										<td className="evg-muted">{new Date(row.createdAt).toLocaleString()}</td>
+										<td>{auditCategoryLabel(row.category, resolveI18nKey)}</td>
+										<td>{row.event}</td>
+										<td>{row.actorLabel ?? row.actorType}</td>
+										<td>
+											{row.subjectType
+												? `${row.subjectType}:${row.subjectId ?? ''}`
+												: tCommon('emDash')}
+											{row.metadata &&
+											typeof row.metadata === 'object' &&
+											'syncLogId' in row.metadata &&
+											typeof row.metadata.syncLogId === 'string' ? (
+												<>
+													{' '}
+													<Link to={`/admin/sync-logs/${row.metadata.syncLogId}`}>
+														{t('syncLogLink')}
+													</Link>
+												</>
+											) : null}
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</Table>
+					</div>
 				</>
 			) : null}
 			{getCsrfToken() ? null : null}

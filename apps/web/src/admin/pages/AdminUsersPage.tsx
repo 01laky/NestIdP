@@ -144,43 +144,45 @@ export function AdminUsersPage() {
 			{error ? <ErrorBanner message={error} /> : null}
 			{!loading ? (
 				<>
-					<Table>
-						<thead>
-							<tr>
-								<th>{tCommon('username')}</th>
-								<th>{tCommon('created')}</th>
-								<th>{tCommon('actions')}</th>
-							</tr>
-						</thead>
-						<tbody>
-							{admins.map((admin) => (
-								<tr key={admin.id}>
-									<td>{admin.username}</td>
-									<td className="evg-muted">{new Date(admin.createdAt).toLocaleString()}</td>
-									<td>
-										{admin.id !== meId && admins.length > 1 ? (
-											<Button
-												type="button"
-												size="sm"
-												variant="danger"
-												onClick={() => {
-													if (
-														window.confirm(t('confirmDeleteAdmin', { username: admin.username }))
-													) {
-														void deleteAdminUser(admin.id).then(() => reload());
-													}
-												}}
-											>
-												{tCommon('delete')}
-											</Button>
-										) : (
-											<span className="evg-muted">{tCommon('emDash')}</span>
-										)}
-									</td>
+					<div className="evg-table-wrap">
+						<Table>
+							<thead>
+								<tr>
+									<th>{tCommon('username')}</th>
+									<th>{tCommon('created')}</th>
+									<th>{tCommon('actions')}</th>
 								</tr>
-							))}
-						</tbody>
-					</Table>
+							</thead>
+							<tbody>
+								{admins.map((admin) => (
+									<tr key={admin.id}>
+										<td>{admin.username}</td>
+										<td className="evg-muted">{new Date(admin.createdAt).toLocaleString()}</td>
+										<td>
+											{admin.id !== meId && admins.length > 1 ? (
+												<Button
+													type="button"
+													size="sm"
+													variant="danger"
+													onClick={() => {
+														if (
+															window.confirm(t('confirmDeleteAdmin', { username: admin.username }))
+														) {
+															void deleteAdminUser(admin.id).then(() => reload());
+														}
+													}}
+												>
+													{tCommon('delete')}
+												</Button>
+											) : (
+												<span className="evg-muted">{tCommon('emDash')}</span>
+											)}
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</Table>
+					</div>
 
 					<Panel title={t('createAdmin')}>
 						<form className="evg-stack" aria-busy={creating} onSubmit={(e) => void handleCreate(e)}>

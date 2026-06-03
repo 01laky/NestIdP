@@ -78,33 +78,35 @@ export function SpConnectionsListPage() {
 				/>
 			) : null}
 			{!loading && !error && items.length > 0 ? (
-				<Table>
-					<thead>
-						<tr>
-							<th>{tCommon('name')}</th>
-							<th>{t('tableEntityId')}</th>
-							<th>{t('tableActive')}</th>
-							<th />
-						</tr>
-					</thead>
-					<tbody>
-						{items.map((item) => (
-							<tr key={item.id}>
-								<td>{item.name}</td>
-								<td>
-									<code>{item.spEntityId}</code>
-								</td>
-								<td>{item.active ? tCommon('yes') : tCommon('no')}</td>
-								<td>
-									<Link to={`${SP_CONNECTION_ROUTE_PREFIX}/${item.id}`}>{tCommon('edit')}</Link> ·{' '}
-									<Link to={`${SP_CONNECTION_ROUTE_PREFIX}/${item.id}/test-sso`}>
-										{t('testSsoLink')}
-									</Link>
-								</td>
+				<div className="evg-table-wrap">
+					<Table>
+						<thead>
+							<tr>
+								<th>{tCommon('name')}</th>
+								<th>{t('tableEntityId')}</th>
+								<th>{t('tableActive')}</th>
+								<th />
 							</tr>
-						))}
-					</tbody>
-				</Table>
+						</thead>
+						<tbody>
+							{items.map((item) => (
+								<tr key={item.id}>
+									<td>{item.name}</td>
+									<td>
+										<code>{item.spEntityId}</code>
+									</td>
+									<td>{item.active ? tCommon('yes') : tCommon('no')}</td>
+									<td>
+										<Link to={`${SP_CONNECTION_ROUTE_PREFIX}/${item.id}`}>{tCommon('edit')}</Link> ·{' '}
+										<Link to={`${SP_CONNECTION_ROUTE_PREFIX}/${item.id}/test-sso`}>
+											{t('testSsoLink')}
+										</Link>
+									</td>
+								</tr>
+							))}
+						</tbody>
+					</Table>
+				</div>
 			) : null}
 		</section>
 	);

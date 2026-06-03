@@ -19,11 +19,24 @@
 .evg-shell--with-sidebar {
 	display: grid;
 	grid-template-columns: 1fr;
+	min-height: 100vh;
+	min-height: 100dvh;
 }
 
-@media (min-width: 768px) {
-	.evg-shell--with-sidebar {
-		grid-template-columns: var(--evg-sidebar-width) 1fr;
+.evg-shell-body {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	min-height: 0;
+}
+
+.evg-mobile-nav-toggle {
+	display: none !important;
+}
+
+@media (max-width: 767px) {
+	.evg-mobile-nav-toggle {
+		display: inline-flex !important;
 	}
 }
 
@@ -49,6 +62,44 @@
 
 	.evg-sidebar--open {
 		transform: translateX(0);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.evg-sidebar {
+		transition: none;
+	}
+}
+
+@media (min-width: 768px) {
+	.evg-shell--with-sidebar {
+		grid-template-columns: var(--evg-sidebar-width) 1fr;
+		height: 100vh;
+		height: 100dvh;
+		overflow: hidden;
+	}
+
+	.evg-sidebar {
+		position: sticky;
+		top: 0;
+		align-self: start;
+		height: 100vh;
+		height: 100dvh;
+		overflow-y: auto;
+		transform: none;
+		width: auto;
+		box-shadow: none;
+	}
+
+	.evg-shell-body {
+		overflow: hidden;
+	}
+
+	.evg-main {
+		flex: 1;
+		min-height: 0;
+		overflow-y: auto;
+		-webkit-overflow-scrolling: touch;
 	}
 }
 
@@ -118,11 +169,18 @@
 	gap: var(--evg-space-3);
 }
 
+.evg-sidebar-footer .evg-language-select {
+	width: 100%;
+}
+
 .evg-topbar {
 	display: flex;
+	flex-wrap: wrap;
 	align-items: center;
 	justify-content: space-between;
 	gap: var(--evg-space-4);
+	min-width: 0;
+	flex-shrink: 0;
 	padding: var(--evg-space-3) var(--evg-space-4);
 	background: var(--evg-color-surface-1);
 	border-bottom: 1px solid var(--evg-color-border);
@@ -137,6 +195,7 @@
 .evg-main {
 	padding: var(--evg-space-4);
 	flex: 1;
+	min-width: 0;
 }
 
 @media (min-width: 768px) {
@@ -171,6 +230,8 @@
 	flex-wrap: wrap;
 	align-items: center;
 	gap: var(--evg-space-2);
+	min-width: 0;
+	flex: 1;
 }
 
 @media (min-width: 768px) {

@@ -4,6 +4,36 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.3.2]
+
+### Added
+
+- Extended responsive shell Vitest registry **`WEB-RSP-40`–`115`** and infra **`WEB-EVG-177`**: drawer
+  scrim/inert/body-lock edge cases, CSS static guards (breakpoints, z-index, table-wrap order), admin
+  page integration inside `AppShell`, and committed screenshot baseline checks.
+
+### Fixed
+
+- Admin shell: left sidebar **stays fixed** on desktop (`≥768px`) while **only** `.evg-main` scrolls;
+  shell uses `100vh`/`100dvh` with `overflow: hidden` on the grid so the green nav no longer scrolls away
+  on long IdP settings or audit pages.
+- Mobile menu burger **visible only below 768px**; toggles off-canvas drawer with scrim, Escape, and nav
+  link close; **`inert`** and `aria-hidden` on `#evg-main` while open; **body scroll lock** during open.
+- Resize to desktop (`matchMedia` `min-width: 768px`) force-closes drawer and clears body lock.
+
+### Changed
+
+- **`.evg-shell-body`** wrapper in `AppShell`; flex **`min-width: 0`** on shell-body, topbar, and main;
+  page header actions stack below **639px**; mobile **toast region** inset below topbar (avoids burger overlap).
+- **`.evg-table-wrap`** on API/SP list, audit, admin users, identity group/role detail tables.
+- **`.evg-code-block`** `max-width: 100%` for sync log JSON on narrow viewports.
+- Vitest **`WEB-RSP-01`–`115`** (core + extended edge: shell behaviour, CSS contracts, admin route
+  integration inside `AppShell`, table-wrap guards, Playwright baseline presence); Playwright
+  **`e2e/responsive-shell.spec.ts`** (`WEB-RSP-30`–`34`); baseline **`admin-shell-375-drawer-open.png`**;
+  infra **`WEB-EVG-174`–`177`**.
+- **`docs/development.md`** responsive shell section; **`docs/proposal.MD`** v1.3.2 note; **`docs/img/evergreen-ui.mmd`**
+  / SVG shell scroll diagram.
+
 ## [1.3.1]
 
 ### Added

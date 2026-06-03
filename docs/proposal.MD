@@ -549,6 +549,8 @@ Admin accounts and end-user accounts are stored in separate tables with separate
 
 From **v1.1.0**, the operator console and SAML login page use the **Evergreen** responsive design system (CSS tokens + `apps/web/src/ui` components). See [development.md § Evergreen UI](./development.md#evergreen-ui-v110).
 
+**v1.3.2** — Admin app shell: fixed sidebar on desktop (`≥768px`), main-pane scroll only; mobile drawer and burger below 768px (`WEB-RSP-*` tests).
+
 ```
 /admin
 ├── /login                        Admin authentication
@@ -675,6 +677,7 @@ _Phase 1 complete in **v1.0.0** (Prompt 10 — Docker, persistent audit, admin a
 - [x] Docker + docker-compose for local dev and deployment
 - [x] Basic audit log — `SyncLog` for sync runs + persistent `AuditEvent` for admin/security/SAML events (dual-write to stdout)
 - [x] Web SPA i18n — 10 locales (`en`, `cs`, `sk`, `de`, `fr`, `es`, `pl`, `it`, `pt`, `nl`), browser language detection, English fallback — v1.3.0
+- [x] Responsive app shell — fixed sidebar, mobile drawer, `WEB-RSP` tests — v1.3.2
 
 ### Phase 2 — Hardening and Configurable API Contract
 

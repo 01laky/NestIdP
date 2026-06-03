@@ -412,6 +412,22 @@ Operator console and SAML login use the **Evergreen** design system: CSS tokens 
 
 Breakpoints: mobile-first; sidebar drawer below **768px** (`AppShell` + menu button); content max-width via `.evg-container`.
 
+### Responsive app shell (v1.3.2)
+
+Authenticated admin routes use **`AppShell`**: green sidebar + **`.evg-shell-body`** (topbar + **`.evg-main`**).
+
+| Viewport       | Behaviour                                                                                                                                                                            |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **≥768px**     | Shell `100dvh`, `overflow: hidden`. Sidebar **`position: sticky`**, `height: 100dvh`, scrolls inside if many nav links. **Only `.evg-main` scrolls.** Burger hidden.                 |
+| **≤767px**     | Sidebar off-canvas; burger opens **`evg-sidebar--open`**. Scrim + Escape close. **`document.body` scroll lock** while open. **`inert`** + `aria-hidden` on `#evg-main` behind scrim. |
+| **769px edge** | Same as desktop — Playwright **`WEB-RSP-34`** (burger hidden, sidebar visible).                                                                                                      |
+
+Manual QA widths: **320**, **375**, **639** (page header stack), **768**, **769**, **1280**.
+
+Vitest: **`WEB-RSP-01`–`115`** — core (`app-shell-responsive.test.tsx`, `responsive-layout-edge.test.ts`), extended (`responsive-shell-edge-extended.test.ts`, `responsive-shell-edge-extended.test.tsx`). Playwright: **`e2e/responsive-shell.spec.ts`** (`WEB-RSP-30`–`34`); baseline **`admin-shell-375-drawer-open.png`**. Infra: **`WEB-EVG-174`–`177`**.
+
+After shell layout changes, re-run **`pnpm --filter @nestidp/web test:e2e:visual:update`** if `dashboard-1280.png` / `idp-settings-1280.png` shift intentionally.
+
 ### Component chooser
 
 | Need                 | Component                   | Notes                                                              |

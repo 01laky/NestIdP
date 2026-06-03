@@ -73,4 +73,25 @@ describe('Evergreen infrastructure', () => {
 			expect(existsSync(join(i18nDir, name))).toBe(true);
 		}
 	});
+
+	it('WEB-EVG-174: responsive shell spec and vitest suites exist', () => {
+		expect(existsSync(join(webRoot, 'e2e/responsive-shell.spec.ts'))).toBe(true);
+		expect(existsSync(join(webRoot, 'src/ui/app-shell-responsive.test.tsx'))).toBe(true);
+		expect(existsSync(join(webRoot, 'src/ui/responsive-layout-edge.test.ts'))).toBe(true);
+	});
+
+	it('WEB-EVG-175: proposal documents v1.3.2 responsive shell', () => {
+		const proposal = readFileSync(join(repoRoot, 'docs/proposal.MD'), 'utf8');
+		expect(proposal).toContain('v1.3.2');
+		expect(proposal).toMatch(/responsive app shell|fixed sidebar/i);
+	});
+
+	it('WEB-EVG-176: admin-shell mobile drawer screenshot baseline', () => {
+		expect(existsSync(join(webRoot, 'e2e/screenshots/admin-shell-375-drawer-open.png'))).toBe(true);
+	});
+
+	it('WEB-EVG-177: extended responsive shell vitest suites exist', () => {
+		expect(existsSync(join(webRoot, 'src/ui/responsive-shell-edge-extended.test.ts'))).toBe(true);
+		expect(existsSync(join(webRoot, 'src/ui/responsive-shell-edge-extended.test.tsx'))).toBe(true);
+	});
 });

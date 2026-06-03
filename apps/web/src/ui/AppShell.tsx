@@ -4,6 +4,8 @@ import { SidebarNav } from './SidebarNav';
 import { MobileNavToggle } from './MobileNavToggle';
 import { OperatorSessionBar } from './OperatorSessionBar';
 
+const DESKTOP_MQ = '(min-width: 768px)';
+
 export function AppShell({
 	children,
 	operatorUsername,
@@ -24,6 +26,31 @@ export function AppShell({
 		};
 		window.addEventListener('keydown', onKeyDown);
 		return () => window.removeEventListener('keydown', onKeyDown);
+	}, []);
+
+	useEffect(() => {
+		if (!drawerOpen) {
+			return;
+		}
+		const prev = document.body.style.overflow;
+		document.body.style.overflow = 'hidden';
+		return () => {
+			document.body.style.overflow = prev;
+		};
+	}, [drawerOpen]);
+
+	useEffect(() => {
+		if (typeof window.matchMedia !== 'function') {
+			return;
+		}
+		const mq = window.matchMedia(DESKTOP_MQ);
+		const onChange = () => {
+			if (mq.matches) {
+				setDrawerOpen(false);
+			}
+		};
+		mq.addEventListener('change', onChange);
+		return () => mq.removeEventListener('change', onChange);
 	}, []);
 
 	return (
@@ -50,7 +77,7 @@ export function AppShell({
 					onNavigate={() => setDrawerOpen(false)}
 				/>
 			</aside>
-			<div>
+			<div className="evg-shell-body">
 				<header className="evg-topbar">
 					<MobileNavToggle expanded={drawerOpen} onClick={() => setDrawerOpen((v) => !v)} />
 					{operatorUsername ? (
@@ -59,7 +86,12 @@ export function AppShell({
 						<span className="evg-muted">{t('operatorConsole')}</span>
 					)}
 				</header>
-				<main id="evg-main" className="evg-main">
+				<main
+					id="evg-main"
+					className="evg-main"
+					aria-hidden={drawerOpen ? true : undefined}
+					{...(drawerOpen ? ({ inert: '' } as { inert: '' }) : {})}
+				>
 					<div className="evg-container">{children}</div>
 				</main>
 			</div>

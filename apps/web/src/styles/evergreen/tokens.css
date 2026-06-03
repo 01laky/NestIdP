@@ -61,6 +61,7 @@
 	--evg-control-height: 2.75rem;
 
 	--evg-sidebar-width: 240px;
+	--evg-topbar-min-height: 3.5rem;
 	--evg-z-drawer: 40;
 	--evg-z-toast: 50;
 }

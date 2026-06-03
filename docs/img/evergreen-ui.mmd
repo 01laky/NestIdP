@@ -5,6 +5,17 @@ flowchart TB
 		ui["src/ui — AppShell, Toast, Table, …"]
 		pages["admin + login pages"]
 	end
+	subgraph shell["App shell scroll model v1.3.2"]
+		sidebar["evg-sidebar — sticky 100dvh desktop; drawer &lt;768px"]
+		body["evg-shell-body — flex column min-width 0"]
+		topbar["evg-topbar — flex-shrink 0"]
+		main["evg-main — overflow-y auto only scroll pane"]
+	end
+	ui --> shell
+	sidebar --> body
+	body --> topbar
+	body --> main
+	main --> pages
 	subgraph assets["Self-hosted assets"]
 		fonts["public/fonts/*.woff2"]
 	end
