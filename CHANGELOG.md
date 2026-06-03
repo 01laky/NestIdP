@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.3.10]
+
+### Fixed
+
+- **`pnpm diagrams:build` on GitHub Actions**: pass Puppeteer `--no-sandbox` (and related flags)
+  via `scripts/mermaid-puppeteer-ci.json` when `CI`/`GITHUB_ACTIONS` is set, so mermaid-cli can
+  launch Chromium on Ubuntu runners with AppArmor user-namespace restrictions.
+
 ## [1.3.9]
 
 ### Fixed
