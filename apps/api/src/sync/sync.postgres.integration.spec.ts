@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { PrismaClient } from '@prisma/client';
 import { DEFAULT_PASSWORD_HASH_ALGORITHM, SYNC_API_PATH } from '@nestidp/shared';
-import { runMigrationsOnTestDb } from '../prisma/test-db.helper';
+import { clearApiConnectionScopedTestData, runMigrationsOnTestDb } from '../prisma/test-db.helper';
 import { createTestApiConnection, TEST_PASSWORD_HASH } from '../prisma/test-fixtures';
 import { SyncService } from './sync.service';
 import { SyncLogService } from './sync-log.service';
@@ -21,13 +21,7 @@ jest.setTimeout(60_000);
 	beforeAll(async () => {
 		runMigrationsOnTestDb(postgresTestUrl!, 'postgresql');
 		prisma = new PrismaClient({ datasources: { db: { url: postgresTestUrl } } });
-		await prisma.userGroup.deleteMany();
-		await prisma.userRole.deleteMany();
-		await prisma.user.deleteMany();
-		await prisma.group.deleteMany();
-		await prisma.role.deleteMany();
-		await prisma.syncLog.deleteMany();
-		await prisma.apiConnection.deleteMany();
+		await clearApiConnectionScopedTestData(prisma);
 	});
 
 	afterAll(async () => {

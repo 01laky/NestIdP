@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.3.8]
+
+### Fixed
+
+- **PostgreSQL integration tests**: `clearApiConnectionScopedTestData` deletes `SyncLog` (and
+  related identity rows) before `ApiConnection`, fixing FK violations when postgres specs share
+  the CI database after sync tests.
+
 ## [1.3.7]
 
 ### Fixed

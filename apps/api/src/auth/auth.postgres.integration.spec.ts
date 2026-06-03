@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { runMigrationsOnTestDb } from '../prisma/test-db.helper';
+import { clearApiConnectionScopedTestData, runMigrationsOnTestDb } from '../prisma/test-db.helper';
 import { createTestApiConnection, createTestUserWithPassword } from '../prisma/test-fixtures';
 
 const postgresTestUrl = process.env.POSTGRES_TEST_URL;
@@ -12,8 +12,7 @@ jest.setTimeout(60_000);
 	beforeAll(async () => {
 		runMigrationsOnTestDb(postgresTestUrl!, 'postgresql');
 		prisma = new PrismaClient({ datasources: { db: { url: postgresTestUrl } } });
-		await prisma.user.deleteMany();
-		await prisma.apiConnection.deleteMany();
+		await clearApiConnectionScopedTestData(prisma);
 	});
 
 	afterAll(async () => {
