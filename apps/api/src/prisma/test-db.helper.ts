@@ -23,4 +23,14 @@ export function runMigrationsOnTestDb(databaseUrl: string, provider = 'sqlite'):
 		},
 		stdio: 'pipe',
 	});
+
+	execFileSync('npx', ['prisma', 'generate'], {
+		cwd: apiRoot,
+		env: {
+			...process.env,
+			DATABASE_PROVIDER: provider,
+			DATABASE_URL: databaseUrl,
+		},
+		stdio: 'pipe',
+	});
 }

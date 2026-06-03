@@ -4,6 +4,15 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.3.7]
+
+### Fixed
+
+- **PostgreSQL integration tests on CI**: `runMigrationsOnTestDb` now runs `prisma generate` after
+  switching datasource provider; API Jest runs `*.postgres.integration.spec.ts` in a separate process
+  with a postgresql client generated before any spec imports `@prisma/client`, fixing
+  `the URL must start with the protocol file:` when `POSTGRES_TEST_URL` is set.
+
 ## [1.3.6]
 
 ### Fixed
