@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { API_CONNECTION_ROUTE_PREFIX } from '@nestidp/shared';
 import {
 	AdminApiError,
@@ -11,15 +12,20 @@ import {
 import { AdminPageHeader } from '../components/AdminPageHeader';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
-import { useDocumentTitle } from '../components/useDocumentTitle';
+import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
+import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
 import { Button, Checkbox, Panel, useToast } from '../../ui';
 
 export function ApiConnectionSyncPage() {
 	const { id } = useParams<{ id: string }>();
-	useDocumentTitle('Identity sync — NestIdP Admin');
+	const { t } = useTranslation('sync');
+	const { t: tNav } = useTranslation('nav');
+	const { t: tCommon } = useTranslation('common');
+	const { t: tApi } = useTranslation('apiConnections');
+	const [connectionName, setConnectionName] = useState('');
+	useAdminDocumentTitle(t('title', { name: connectionName || '…' }));
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
-	const [connectionName, setConnectionName] = useState('');
 	const [status, setStatus] = useState<string>('');
 	const [logs, setLogs] = useState<Awaited<ReturnType<typeof listSyncLogs>>['syncLogs']>([]);
 	const [dryRun, setDryRun] = useState(true);
@@ -51,7 +57,11 @@ export function ApiConnectionSyncPage() {
 				await reload();
 			} catch (err) {
 				if (!cancelled) {
-					setError(err instanceof AdminApiError ? err.message : 'Failed to load sync data');
+					setError(
+						err instanceof AdminApiError
+							? formatAdminApiError(err.statusCode, err.message, resolveI18nKey, 'sync.loadFailed')
+							: t('loadFailed'),
+					);
 				}
 			} finally {
 				if (!cancelled) {
@@ -76,12 +86,18 @@ export function ApiConnectionSyncPage() {
 		try {
 			const result = await triggerIdentitySync(id, { dryRun });
 			setMessage(
-				dryRun ? `Dry run finished (${result.syncLog.id})` : `Sync finished (${result.syncLog.id})`,
+				dryRun
+					? t('dryRunFinished', { id: result.syncLog.id })
+					: t('syncFinished', { id: result.syncLog.id }),
 			);
-			showToast(dryRun ? 'Dry run finished' : 'Sync finished');
+			showToast(dryRun ? t('toastDryRunFinished') : t('toastSyncFinished'));
 			await reload();
 		} catch (err) {
-			setError(err instanceof AdminApiError ? err.message : 'Sync failed');
+			setError(
+				err instanceof AdminApiError
+					? formatAdminApiError(err.statusCode, err.message, resolveI18nKey, 'sync.syncFailed')
+					: t('syncFailed'),
+			);
 		} finally {
 			setSyncing(false);
 		}
@@ -94,34 +110,34 @@ export function ApiConnectionSyncPage() {
 	return (
 		<section>
 			<AdminPageHeader
-				title={`Sync — ${connectionName}`}
+				title={t('title', { name: connectionName })}
 				breadcrumbs={[
-					{ label: 'Dashboard', to: '/admin' },
-					{ label: 'API connections', to: API_CONNECTION_ROUTE_PREFIX },
+					{ label: tNav('dashboard'), to: '/admin' },
+					{ label: tApi('listTitle'), to: API_CONNECTION_ROUTE_PREFIX },
 					{ label: connectionName, to: `${API_CONNECTION_ROUTE_PREFIX}/${id}` },
-					{ label: 'Sync' },
+					{ label: tCommon('sync') },
 				]}
 			/>
 			{error ? <ErrorBanner message={error} /> : null}
-			<p className="evg-muted">Current status: {status}</p>
-			<Panel title="Run sync">
+			<p className="evg-muted">{t('currentStatus', { status })}</p>
+			<Panel title={t('runSync')}>
 				<form
 					className="evg-stack"
 					aria-busy={syncing}
 					onSubmit={(event) => void handleSync(event)}
 				>
 					<fieldset className="evg-stack" disabled={syncing}>
-						<Checkbox label="Dry run (no DB writes)" checked={dryRun} onChange={setDryRun} />
+						<Checkbox label={t('dryRunLabel')} checked={dryRun} onChange={setDryRun} />
 						<Button type="submit" variant="primary" disabled={syncing}>
-							{syncing ? 'Running…' : dryRun ? 'Run dry sync' : 'Run full sync'}
+							{syncing ? tCommon('running') : dryRun ? t('runDrySync') : t('runFullSync')}
 						</Button>
 					</fieldset>
 				</form>
 			</Panel>
 			{message ? <p className="evg-muted">{message}</p> : null}
-			<h3>Recent logs</h3>
+			<h3>{t('recentLogs')}</h3>
 			{logs.length === 0 ? (
-				<p className="evg-muted">No sync logs yet.</p>
+				<p className="evg-muted">{t('noSyncLogs')}</p>
 			) : (
 				<ul className="evg-list">
 					{logs.map((log) => (

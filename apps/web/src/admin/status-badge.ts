@@ -1,4 +1,5 @@
 import type { AdminDashboardIdpCertStatus } from '@nestidp/shared';
+import { resolveI18nKey } from '../i18n/api-error-messages';
 import type { BadgeVariant } from '../ui/Badge';
 
 export type { BadgeVariant };
@@ -46,19 +47,18 @@ export function certStatusToBadge(status: AdminDashboardIdpCertStatus | string):
 	}
 }
 
+const KNOWN_CERT_STATUSES = new Set<AdminDashboardIdpCertStatus | string>([
+	'ok',
+	'missing',
+	'expiring_soon',
+	'rotation_active',
+]);
+
 export function certStatusLabel(status: AdminDashboardIdpCertStatus | string): string {
-	switch (status) {
-		case 'ok':
-			return 'Certificate OK';
-		case 'missing':
-			return 'No signing cert';
-		case 'expiring_soon':
-			return 'Expiring soon';
-		case 'rotation_active':
-			return 'Rotation in progress';
-		default:
-			return String(status);
+	if (!KNOWN_CERT_STATUSES.has(status)) {
+		return String(status);
 	}
+	return resolveI18nKey(`enums.certStatus.${status}`);
 }
 
 export function activeFlagToBadge(active: boolean): BadgeVariant {
@@ -70,5 +70,5 @@ export function identityOriginToBadge(origin: 'manual' | 'synced'): BadgeVariant
 }
 
 export function identityOriginLabel(origin: 'manual' | 'synced'): string {
-	return origin === 'manual' ? 'Manual' : 'Synced';
+	return resolveI18nKey(`enums.identityOrigin.${origin}`);
 }

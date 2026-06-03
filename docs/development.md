@@ -457,6 +457,36 @@ Future **`FileInput`** (v1.2): if operators need PEM file picker, use `evg-file-
 
 Dark mode is deferred to v1.2.0 (light theme only in 1.1.0).
 
+### Internationalization (v1.3.0)
+
+Operator console and SAML login use **i18next** + **react-i18next**. Catalog: `apps/web/src/i18n/locales/*.json` (14 namespaces per file). Constants: `@nestidp/shared` (`SUPPORTED_LOCALES`, `LOCALE_STORAGE_KEY`, `BROWSER_LOCALE_SENTINEL`).
+
+| Code                                     | Language                            |
+| ---------------------------------------- | ----------------------------------- |
+| `en`                                     | English (default + fallback)        |
+| `cs`                                     | Czech (`cz` browser tag → `cs`)     |
+| `sk`                                     | Slovak (distinct catalog from `cs`) |
+| `de`, `fr`, `es`, `pl`, `it`, `pt`, `nl` | EU locales                          |
+
+**Resolution order:** `localStorage` `nestidp.locale` (manual pick) → `navigator.languages` → `en`. **LanguageSelect** first option **Browser default** clears storage and re-detects from the browser.
+
+**Add a string:** edit `en.json` first, copy keys to all nine other locale files, run `pnpm check:i18n-keys`. Use `t('key', { ns: 'namespace' })` or `useTranslation('namespace')`. API errors: `formatAdminApiError` / `formatAuthApiError` in `api-error-messages.ts` plus `errors.*` keys. Enum Select labels: `enum-labels.ts` + `enums.*` (machine `value`, translated label).
+
+**Czech / Slovak review:** translations must not be copy-paste between `cs` and `sk`.
+
+**Tests:** `WEB-I18N-01`–`40` (`resolve-locale.test.ts`, `i18n.integration.test.tsx`, `i18n-edge.test.ts`); `API-I18N-01` in shared. Vitest setup: `apps/web/src/test/setup-i18n.ts` forces `en` so existing `WEB-EVG-*` / `WEB-IDN-*` stay stable.
+
+**Visual CI:** existing Playwright PNGs stay **English** (`addInitScript` sets `en`). Non-English smoke: `e2e/i18n-login-cs.spec.ts` (`WEB-I18N-37`).
+
+**Out of scope:** API `Accept-Language`, `hreflang`, RTL, server-stored operator locale.
+
+Regenerate locale JSON after editing `scripts/i18n-locale-catalog.mjs`:
+
+```bash
+node scripts/build-i18n-locale-json.mjs
+pnpm check:i18n-keys
+```
+
 ### Web tests and visual baselines
 
 Vitest IDs **`WEB-EVG-01`–`171`** cover primitives, styles, conventions (static grep), toast,
@@ -487,11 +517,20 @@ Existing **`WEB-ADM-*`** / **`WEB-AUTH-*`** must stay green.
 | `WEB-IDN-UI-25`–`52`       | Extended identity UI: static `evg-btn` guard, list/detail/form `ButtonLink`, filter busy/error, CSS (`identity-ui-edge-extended.test.tsx`)                                                                |
 | `WEB-IDN-UI-53`–`57`       | `ButtonLink` variants, sizes, class merge (`button-link.test.tsx`)                                                                                                                                        |
 | `WEB-IDN-UI-45`–`46`, `58` | `IdentitySectionNav` current-section omission and `aria-label` (`IdentitySectionNav.test.tsx`)                                                                                                            |
+| `WEB-I18N-01`–`40`         | i18n resolve, integration, key parity, bundle lazy chunks, `LanguageSelect` (`src/i18n/*.test.ts`)                                                                                                        |
+| `WEB-I18N-41`–`52`         | Extended locale resolution: regional tags, `normalizeBrowserTag`, `resolveDisplayLocale` (`resolve-locale.test.ts`)                                                                                       |
+| `WEB-I18N-53`–`64`         | `formatAdminApiError`, `formatAuthApiError`, `resolveI18nKey` (`api-error-messages.test.ts`)                                                                                                              |
+| `WEB-I18N-65`–`74`         | Enum Select labels and cert/origin badges (`enum-labels.test.ts`)                                                                                                                                         |
+| `WEB-I18N-75`–`78`         | Locale JSON namespace parity and mismatch detection (`i18n-key-parity.test.ts`)                                                                                                                           |
+| `WEB-I18N-79`–`98`         | Static guards, bootstrap, cs≠sk catalog (`i18n-edge-extended.test.ts`)                                                                                                                                    |
+| `WEB-I18N-99`–`115`        | Extended UI integration across admin pages (`i18n.integration.extended.test.tsx`)                                                                                                                         |
+| `API-I18N-01`–`05`         | Shared locale constants (`packages/shared/src/i18n.spec.ts`)                                                                                                                                              |
 
 ```bash
 pnpm --filter @nestidp/web test
+pnpm check:i18n-keys
 pnpm --filter @nestidp/web build
-node scripts/check-web-bundle-size.mjs   # main index-*.js ≤ 580 KB raw
+node scripts/check-web-bundle-size.mjs   # main index-*.js ≤ 650 KB raw; locale JSON in separate chunks
 pnpm --filter @nestidp/web exec playwright install chromium
 pnpm --filter @nestidp/web test:e2e:visual
 # Intentional UI changes:

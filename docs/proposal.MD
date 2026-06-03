@@ -674,6 +674,7 @@ _Phase 1 complete in **v1.0.0** (Prompt 10 — Docker, persistent audit, admin a
 - [x] Admin authentication (local)
 - [x] Docker + docker-compose for local dev and deployment
 - [x] Basic audit log — `SyncLog` for sync runs + persistent `AuditEvent` for admin/security/SAML events (dual-write to stdout)
+- [x] Web SPA i18n — 10 locales (`en`, `cs`, `sk`, `de`, `fr`, `es`, `pl`, `it`, `pt`, `nl`), browser language detection, English fallback — v1.3.0
 
 ### Phase 2 — Hardening and Configurable API Contract
 

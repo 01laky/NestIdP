@@ -1,17 +1,23 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { IDENTITY_GROUP_NEW_ROUTE, identityGroupDetailRoute } from '@nestidp/shared';
 import { AdminApiError, listIdentityGroups } from '../adminApi';
 import { AdminPageHeader } from '../components/AdminPageHeader';
 import { IdentitySectionNav } from '../components/IdentitySectionNav';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
-import { useDocumentTitle } from '../components/useDocumentTitle';
+import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
+import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
+import { identityOriginFilterLabel } from '../../i18n/enum-labels';
 import { identityOriginLabel, identityOriginToBadge } from '../status-badge';
 import { Badge, Button, ButtonLink, Select, Table } from '../../ui';
 
 export function IdentityGroupsPage() {
-	useDocumentTitle('Groups — NestIdP Admin');
+	const { t } = useTranslation('identity');
+	const { t: tNav } = useTranslation('nav');
+	const { t: tCommon } = useTranslation('common');
+	useAdminDocumentTitle(t('groupsTitle'));
 	const [loading, setLoading] = useState(true);
 	const [filterBusy, setFilterBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -31,7 +37,16 @@ export function IdentityGroupsPage() {
 			});
 			setItems(data.items);
 		} catch (err) {
-			setError(err instanceof AdminApiError ? err.message : 'Failed to load groups');
+			setError(
+				err instanceof AdminApiError
+					? formatAdminApiError(
+							err.statusCode,
+							err.message,
+							resolveI18nKey,
+							'identity.loadGroupsFailed',
+						)
+					: t('loadGroupsFailed'),
+			);
 		} finally {
 			setLoading(false);
 			setFilterBusy(false);
@@ -52,37 +67,37 @@ export function IdentityGroupsPage() {
 	return (
 		<section>
 			<AdminPageHeader
-				title="Groups"
+				title={t('groupsTitle')}
 				breadcrumbs={[
-					{ label: 'Dashboard', to: '/admin' },
-					{ label: 'Identity' },
-					{ label: 'Groups' },
+					{ label: tNav('dashboard'), to: '/admin' },
+					{ label: tCommon('identity') },
+					{ label: tNav('groups') },
 				]}
 				actions={
 					<ButtonLink to={IDENTITY_GROUP_NEW_ROUTE} variant="primary">
-						Create manual group
+						{t('createManualGroup')}
 					</ButtonLink>
 				}
 			/>
 			<form
 				className="evg-inline-form"
-				aria-label="Filter groups"
+				aria-label={t('filterGroups')}
 				aria-busy={filterBusy}
 				onSubmit={handleFilter}
 			>
 				<Select
-					label="Origin"
+					label={tCommon('origin')}
 					fieldClassName="evg-field--fixed"
 					value={origin}
 					onChange={(e) => setOrigin(e.target.value)}
 					disabled={filterDisabled}
 				>
-					<option value="">All</option>
-					<option value="manual">Manual</option>
-					<option value="synced">Synced</option>
+					<option value="">{identityOriginFilterLabel('', resolveI18nKey)}</option>
+					<option value="manual">{identityOriginFilterLabel('manual', resolveI18nKey)}</option>
+					<option value="synced">{identityOriginFilterLabel('synced', resolveI18nKey)}</option>
 				</Select>
 				<Button type="submit" variant="secondary" disabled={filterDisabled}>
-					Apply
+					{tCommon('apply')}
 				</Button>
 			</form>
 			{loading ? <LoadingState /> : null}
@@ -92,9 +107,9 @@ export function IdentityGroupsPage() {
 					<Table>
 						<thead>
 							<tr>
-								<th>Name</th>
-								<th>Origin</th>
-								<th>Members</th>
+								<th>{tCommon('name')}</th>
+								<th>{tCommon('origin')}</th>
+								<th>{tCommon('members')}</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -108,7 +123,7 @@ export function IdentityGroupsPage() {
 											{identityOriginLabel(group.origin)}
 										</Badge>
 									</td>
-									<td>{group.memberCount ?? '—'}</td>
+									<td>{group.memberCount ?? tCommon('emDash')}</td>
 								</tr>
 							))}
 						</tbody>

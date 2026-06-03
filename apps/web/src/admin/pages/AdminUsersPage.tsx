@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ADMIN_USERS_ROUTE_PREFIX } from '@nestidp/shared';
 import {
 	AdminApiError,
@@ -12,11 +13,16 @@ import {
 import { AdminPageHeader } from '../components/AdminPageHeader';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
-import { useDocumentTitle } from '../components/useDocumentTitle';
+import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
+import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
 import { Button, Panel, Table, TextInput, useToast } from '../../ui';
 
 export function AdminUsersPage() {
-	useDocumentTitle('Admin accounts — NestIdP Admin');
+	const { t } = useTranslation('adminUsers');
+	const { t: tNav } = useTranslation('nav');
+	const { t: tCommon } = useTranslation('common');
+	const { t: tErrors } = useTranslation('errors');
+	useAdminDocumentTitle(t('title'));
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [admins, setAdmins] = useState<Awaited<ReturnType<typeof listAdminUsers>>>([]);
@@ -44,7 +50,16 @@ export function AdminUsersPage() {
 				await reload();
 			} catch (err) {
 				if (!cancelled) {
-					setError(err instanceof AdminApiError ? err.message : 'Failed to load admins');
+					setError(
+						err instanceof AdminApiError
+							? formatAdminApiError(
+									err.statusCode,
+									err.message,
+									resolveI18nKey,
+									'adminUsers.loadFailed',
+								)
+							: t('loadFailed'),
+					);
 				}
 			} finally {
 				if (!cancelled) {
@@ -55,13 +70,13 @@ export function AdminUsersPage() {
 		return () => {
 			cancelled = true;
 		};
-	}, []);
+	}, [t]);
 
 	async function handleCreate(e: FormEvent) {
 		e.preventDefault();
 		setError(null);
 		if (password !== confirmPassword) {
-			setError('Passwords do not match');
+			setError(tErrors('passwordsDoNotMatch'));
 			return;
 		}
 		setCreating(true);
@@ -71,9 +86,18 @@ export function AdminUsersPage() {
 			setPassword('');
 			setConfirmPassword('');
 			await reload();
-			showToast('Admin account created');
+			showToast(t('toastAdminCreated'));
 		} catch (err) {
-			setError(err instanceof AdminApiError ? err.message : 'Create failed');
+			setError(
+				err instanceof AdminApiError
+					? formatAdminApiError(
+							err.statusCode,
+							err.message,
+							resolveI18nKey,
+							'adminUsers.createFailed',
+						)
+					: t('createFailed'),
+			);
 		} finally {
 			setCreating(false);
 		}
@@ -83,7 +107,7 @@ export function AdminUsersPage() {
 		e.preventDefault();
 		setError(null);
 		if (newPassword !== newPasswordConfirm) {
-			setError('New passwords do not match');
+			setError(tErrors('newPasswordsDoNotMatch'));
 			return;
 		}
 		setChangingPassword(true);
@@ -92,9 +116,18 @@ export function AdminUsersPage() {
 			setCurrentPassword('');
 			setNewPassword('');
 			setNewPasswordConfirm('');
-			showToast('Password changed');
+			showToast(t('toastPasswordChanged'));
 		} catch (err) {
-			setError(err instanceof AdminApiError ? err.message : 'Password change failed');
+			setError(
+				err instanceof AdminApiError
+					? formatAdminApiError(
+							err.statusCode,
+							err.message,
+							resolveI18nKey,
+							'adminUsers.passwordChangeFailed',
+						)
+					: t('passwordChangeFailed'),
+			);
 		} finally {
 			setChangingPassword(false);
 		}
@@ -103,9 +136,9 @@ export function AdminUsersPage() {
 	return (
 		<section>
 			<AdminPageHeader
-				title="Admin accounts"
-				subtitle="Operator accounts for this IdP (separate from synced SAML users)"
-				breadcrumbs={[{ label: 'Dashboard', to: '/admin' }, { label: 'Admin accounts' }]}
+				title={t('title')}
+				subtitle={t('subtitle')}
+				breadcrumbs={[{ label: tNav('dashboard'), to: '/admin' }, { label: t('title') }]}
 			/>
 			{loading ? <LoadingState /> : null}
 			{error ? <ErrorBanner message={error} /> : null}
@@ -114,9 +147,9 @@ export function AdminUsersPage() {
 					<Table>
 						<thead>
 							<tr>
-								<th>Username</th>
-								<th>Created</th>
-								<th>Actions</th>
+								<th>{tCommon('username')}</th>
+								<th>{tCommon('created')}</th>
+								<th>{tCommon('actions')}</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -131,15 +164,17 @@ export function AdminUsersPage() {
 												size="sm"
 												variant="danger"
 												onClick={() => {
-													if (window.confirm(`Delete admin "${admin.username}"?`)) {
+													if (
+														window.confirm(t('confirmDeleteAdmin', { username: admin.username }))
+													) {
 														void deleteAdminUser(admin.id).then(() => reload());
 													}
 												}}
 											>
-												Delete
+												{tCommon('delete')}
 											</Button>
 										) : (
-											<span className="evg-muted">—</span>
+											<span className="evg-muted">{tCommon('emDash')}</span>
 										)}
 									</td>
 								</tr>
@@ -147,11 +182,11 @@ export function AdminUsersPage() {
 						</tbody>
 					</Table>
 
-					<Panel title="Create admin">
+					<Panel title={t('createAdmin')}>
 						<form className="evg-stack" aria-busy={creating} onSubmit={(e) => void handleCreate(e)}>
 							<fieldset className="evg-stack" disabled={creating}>
 								<TextInput
-									label="Username"
+									label={tCommon('username')}
 									name="username"
 									value={username}
 									onChange={(e) => setUsername(e.target.value)}
@@ -159,7 +194,7 @@ export function AdminUsersPage() {
 									requiredMark
 								/>
 								<TextInput
-									label="Password"
+									label={tCommon('password')}
 									name="password"
 									type="password"
 									value={password}
@@ -168,7 +203,7 @@ export function AdminUsersPage() {
 									requiredMark
 								/>
 								<TextInput
-									label="Confirm password"
+									label={tCommon('confirmPassword')}
 									name="confirmPassword"
 									type="password"
 									value={confirmPassword}
@@ -177,25 +212,22 @@ export function AdminUsersPage() {
 									requiredMark
 								/>
 								<Button type="submit" variant="primary" disabled={creating}>
-									{creating ? 'Creating…' : 'Create admin'}
+									{creating ? tCommon('creating') : t('createAdmin')}
 								</Button>
 							</fieldset>
 						</form>
 					</Panel>
 
-					<Panel title="Change my password" id="change-password">
+					<Panel title={t('changeMyPassword')} id="change-password">
 						<form
 							className="evg-stack"
 							aria-busy={changingPassword}
 							onSubmit={(e) => void handleChangeMyPassword(e)}
 						>
-							<p className="evg-muted">
-								Uses a separate endpoint; other admins can reset your password via PATCH without
-								knowing your current password.
-							</p>
+							<p className="evg-muted">{t('changePasswordHint')}</p>
 							<fieldset className="evg-stack" disabled={changingPassword}>
 								<TextInput
-									label="Current password"
+									label={tCommon('currentPassword')}
 									name="currentPassword"
 									type="password"
 									value={currentPassword}
@@ -204,7 +236,7 @@ export function AdminUsersPage() {
 									requiredMark
 								/>
 								<TextInput
-									label="New password"
+									label={tCommon('newPassword')}
 									name="newPassword"
 									type="password"
 									value={newPassword}
@@ -213,7 +245,7 @@ export function AdminUsersPage() {
 									requiredMark
 								/>
 								<TextInput
-									label="Confirm new password"
+									label={tCommon('confirmNewPassword')}
 									name="newPasswordConfirm"
 									type="password"
 									value={newPasswordConfirm}
@@ -222,7 +254,7 @@ export function AdminUsersPage() {
 									requiredMark
 								/>
 								<Button type="submit" variant="primary" disabled={changingPassword}>
-									{changingPassword ? 'Updating…' : 'Update my password'}
+									{changingPassword ? tCommon('updating') : t('updateMyPassword')}
 								</Button>
 							</fieldset>
 						</form>
@@ -231,7 +263,7 @@ export function AdminUsersPage() {
 			) : null}
 			<p className="evg-muted">
 				<Link className="evg-btn evg-btn--link" to={ADMIN_USERS_ROUTE_PREFIX}>
-					Refresh
+					{tCommon('refresh')}
 				</Link>
 			</p>
 		</section>

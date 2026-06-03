@@ -1,16 +1,21 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { SP_CONNECTION_ROUTE_PREFIX } from '@nestidp/shared';
 import { AdminApiError, listSpConnections } from '../adminApi';
 import { AdminPageHeader } from '../components/AdminPageHeader';
 import { EmptyState } from '../components/EmptyState';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
-import { useDocumentTitle } from '../components/useDocumentTitle';
+import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
+import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
 import { Table } from '../../ui';
 
 export function SpConnectionsListPage() {
-	useDocumentTitle('SP connections — NestIdP Admin');
+	const { t } = useTranslation('spConnections');
+	const { t: tNav } = useTranslation('nav');
+	const { t: tCommon } = useTranslation('common');
+	useAdminDocumentTitle(t('listTitle'));
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [items, setItems] = useState<Awaited<ReturnType<typeof listSpConnections>>['items']>([]);
@@ -25,7 +30,16 @@ export function SpConnectionsListPage() {
 				}
 			} catch (err) {
 				if (!cancelled) {
-					setError(err instanceof AdminApiError ? err.message : 'Failed to load SP connections');
+					setError(
+						err instanceof AdminApiError
+							? formatAdminApiError(
+									err.statusCode,
+									err.message,
+									resolveI18nKey,
+									'spConnections.loadListFailed',
+								)
+							: t('loadListFailed'),
+					);
 				}
 			} finally {
 				if (!cancelled) {
@@ -36,17 +50,17 @@ export function SpConnectionsListPage() {
 		return () => {
 			cancelled = true;
 		};
-	}, []);
+	}, [t]);
 
 	return (
 		<section>
 			<AdminPageHeader
-				title="SP connections"
-				subtitle="SAML service providers"
-				breadcrumbs={[{ label: 'Dashboard', to: '/admin' }, { label: 'SP connections' }]}
+				title={t('listTitle')}
+				subtitle={t('listSubtitle')}
+				breadcrumbs={[{ label: tNav('dashboard'), to: '/admin' }, { label: t('listTitle') }]}
 				actions={
 					<Link className="evg-btn evg-btn--link" to={`${SP_CONNECTION_ROUTE_PREFIX}/new`}>
-						New SP
+						{t('newSp')}
 					</Link>
 				}
 			/>
@@ -54,11 +68,11 @@ export function SpConnectionsListPage() {
 			{error ? <ErrorBanner message={error} /> : null}
 			{!loading && !error && items.length === 0 ? (
 				<EmptyState
-					title="No SP connections"
-					description="Register a SAML application to enable SSO."
+					title={t('noConnections')}
+					description={t('noConnectionsDescription')}
 					action={
 						<Link className="evg-btn evg-btn--link" to={`${SP_CONNECTION_ROUTE_PREFIX}/new`}>
-							Create SP
+							{t('createSp')}
 						</Link>
 					}
 				/>
@@ -67,9 +81,9 @@ export function SpConnectionsListPage() {
 				<Table>
 					<thead>
 						<tr>
-							<th>Name</th>
-							<th>Entity ID</th>
-							<th>Active</th>
+							<th>{tCommon('name')}</th>
+							<th>{t('tableEntityId')}</th>
+							<th>{t('tableActive')}</th>
 							<th />
 						</tr>
 					</thead>
@@ -80,10 +94,12 @@ export function SpConnectionsListPage() {
 								<td>
 									<code>{item.spEntityId}</code>
 								</td>
-								<td>{item.active ? 'yes' : 'no'}</td>
+								<td>{item.active ? tCommon('yes') : tCommon('no')}</td>
 								<td>
-									<Link to={`${SP_CONNECTION_ROUTE_PREFIX}/${item.id}`}>Edit</Link> ·{' '}
-									<Link to={`${SP_CONNECTION_ROUTE_PREFIX}/${item.id}/test-sso`}>Test SSO</Link>
+									<Link to={`${SP_CONNECTION_ROUTE_PREFIX}/${item.id}`}>{tCommon('edit')}</Link> ·{' '}
+									<Link to={`${SP_CONNECTION_ROUTE_PREFIX}/${item.id}/test-sso`}>
+										{t('testSsoLink')}
+									</Link>
 								</td>
 							</tr>
 						))}

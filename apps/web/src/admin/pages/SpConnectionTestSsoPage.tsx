@@ -1,21 +1,26 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { SP_CONNECTION_ROUTE_PREFIX } from '@nestidp/shared';
 import { AdminApiError, getIdpMetadataUrl, getSpConnection } from '../adminApi';
 import { AdminPageHeader } from '../components/AdminPageHeader';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
-import { useDocumentTitle } from '../components/useDocumentTitle';
+import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
+import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
 import { Panel, TextArea } from '../../ui';
 
 const EXAMPLE_SCRIPT = 'docs/examples/saml-sp-initiated-redirect.mjs';
 
 export function SpConnectionTestSsoPage() {
 	const { id } = useParams<{ id: string }>();
-	useDocumentTitle('Test SSO — NestIdP Admin');
+	const { t } = useTranslation('spConnections');
+	const { t: tNav } = useTranslation('nav');
+	const { t: tCommon } = useTranslation('common');
+	const [spName, setSpName] = useState('');
+	useAdminDocumentTitle(t('testSsoTitle'));
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
-	const [spName, setSpName] = useState('');
 	const [entityId, setEntityId] = useState('');
 	const [ssoUrl, setSsoUrl] = useState('');
 	const [command, setCommand] = useState('');
@@ -38,7 +43,16 @@ export function SpConnectionTestSsoPage() {
 				}
 			} catch (err) {
 				if (!cancelled) {
-					setError(err instanceof AdminApiError ? err.message : 'Failed to load SSO helper');
+					setError(
+						err instanceof AdminApiError
+							? formatAdminApiError(
+									err.statusCode,
+									err.message,
+									resolveI18nKey,
+									'spConnections.loadSsoHelperFailed',
+								)
+							: t('loadSsoHelperFailed'),
+					);
 				}
 			} finally {
 				if (!cancelled) {
@@ -49,7 +63,7 @@ export function SpConnectionTestSsoPage() {
 		return () => {
 			cancelled = true;
 		};
-	}, [id]);
+	}, [id, t]);
 
 	if (loading) {
 		return <LoadingState />;
@@ -58,43 +72,40 @@ export function SpConnectionTestSsoPage() {
 	return (
 		<section>
 			<AdminPageHeader
-				title={`Test SSO — ${spName}`}
-				subtitle="SP-initiated redirect (manual)"
+				title={`${t('testSsoTitle')} — ${spName}`}
+				subtitle={t('testSsoSubtitle')}
 				breadcrumbs={[
-					{ label: 'Dashboard', to: '/admin' },
-					{ label: 'SP connections', to: SP_CONNECTION_ROUTE_PREFIX },
+					{ label: tNav('dashboard'), to: '/admin' },
+					{ label: t('listTitle'), to: SP_CONNECTION_ROUTE_PREFIX },
 					{ label: spName, to: `${SP_CONNECTION_ROUTE_PREFIX}/${id}` },
-					{ label: 'Test SSO' },
+					{ label: t('testSsoTitle') },
 				]}
 			/>
 			{error ? <ErrorBanner message={error} /> : null}
-			<p className="evg-muted">
-				Use the example script to build a signed AuthnRequest redirect URL. Open the printed URL in
-				a browser after syncing a test user.
-			</p>
+			<p className="evg-muted">{t('testSsoHelp')}</p>
 			<ul className="evg-dl">
 				<li>
-					<span>SP Entity ID</span>
+					<span>{t('spEntityId')}</span>
 					<code>{entityId}</code>
 				</li>
 				<li>
-					<span>IdP SSO URL</span>
+					<span>{t('idpSsoUrl')}</span>
 					<code>{ssoUrl}</code>
 				</li>
 			</ul>
-			<Panel title="Example command">
+			<Panel title={t('exampleCommand')}>
 				<TextArea
-					label="Command"
+					label={tCommon('command')}
 					readOnly
 					rows={3}
 					value={command}
 					onFocus={(e) => e.target.select()}
-					hint="Click the field to select all text for copying."
+					hint={t('commandHint')}
 				/>
 			</Panel>
 			<p>
 				<Link className="evg-btn evg-btn--link" to={`${SP_CONNECTION_ROUTE_PREFIX}/${id}`}>
-					Back to SP
+					{t('backToSp')}
 				</Link>
 			</p>
 		</section>

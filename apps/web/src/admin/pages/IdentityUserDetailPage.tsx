@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { AUDIT_ROUTE_PREFIX, IDENTITY_ROUTE_PREFIX, identityUserEditRoute } from '@nestidp/shared';
 import { AdminApiError, deleteIdentityUser, getIdentityUser } from '../adminApi';
 import { AdminPageHeader } from '../components/AdminPageHeader';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
-import { useDocumentTitle } from '../components/useDocumentTitle';
+import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
+import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
 import { identityOriginLabel, identityOriginToBadge } from '../status-badge';
 import { Badge, Button, ButtonLink, Panel, useToast } from '../../ui';
 
@@ -13,7 +15,10 @@ export function IdentityUserDetailPage() {
 	const { id } = useParams<{ id: string }>();
 	const navigate = useNavigate();
 	const { showToast } = useToast();
-	useDocumentTitle('User detail — NestIdP Admin');
+	const { t } = useTranslation('identity');
+	const { t: tNav } = useTranslation('nav');
+	const { t: tCommon } = useTranslation('common');
+	useAdminDocumentTitle(t('viewUser'));
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [detail, setDetail] = useState<Awaited<ReturnType<typeof getIdentityUser>> | null>(null);
@@ -31,7 +36,16 @@ export function IdentityUserDetailPage() {
 				}
 			} catch (err) {
 				if (!cancelled) {
-					setError(err instanceof AdminApiError ? err.message : 'Failed to load user');
+					setError(
+						err instanceof AdminApiError
+							? formatAdminApiError(
+									err.statusCode,
+									err.message,
+									resolveI18nKey,
+									'identity.loadUserFailed',
+								)
+							: t('loadUserFailed'),
+					);
 				}
 			} finally {
 				if (!cancelled) {
@@ -42,21 +56,25 @@ export function IdentityUserDetailPage() {
 		return () => {
 			cancelled = true;
 		};
-	}, [id]);
+	}, [id, t]);
 
 	async function handleDelete() {
 		if (!detail || !id) {
 			return;
 		}
-		if (!window.confirm(`Delete manual user "${detail.user.username}"?`)) {
+		if (!window.confirm(t('confirmDeleteUser', { name: detail.user.username }))) {
 			return;
 		}
 		try {
 			await deleteIdentityUser(id);
-			showToast('User deleted');
+			showToast(t('toastUserDeleted'));
 			navigate(`${IDENTITY_ROUTE_PREFIX}/users`);
 		} catch (err) {
-			setError(err instanceof AdminApiError ? err.message : 'Delete failed');
+			setError(
+				err instanceof AdminApiError
+					? formatAdminApiError(err.statusCode, err.message, resolveI18nKey, 'errors.deleteFailed')
+					: resolveI18nKey('errors.deleteFailed'),
+			);
 		}
 	}
 
@@ -69,7 +87,7 @@ export function IdentityUserDetailPage() {
 	}
 
 	if (!detail) {
-		return <ErrorBanner message="User not found" />;
+		return <ErrorBanner message={t('userNotFound')} />;
 	}
 
 	const { user, groups, roles, source, recentAudit } = detail;
@@ -80,18 +98,18 @@ export function IdentityUserDetailPage() {
 			<AdminPageHeader
 				title={user.username}
 				breadcrumbs={[
-					{ label: 'Dashboard', to: '/admin' },
-					{ label: 'Users', to: `${IDENTITY_ROUTE_PREFIX}/users` },
+					{ label: tNav('dashboard'), to: '/admin' },
+					{ label: tNav('users'), to: `${IDENTITY_ROUTE_PREFIX}/users` },
 					{ label: user.username },
 				]}
 				actions={
 					isManual ? (
 						<>
 							<ButtonLink variant="secondary" to={identityUserEditRoute(user.id)}>
-								Edit
+								{tCommon('edit')}
 							</ButtonLink>
 							<Button type="button" variant="danger" onClick={() => void handleDelete()}>
-								Delete
+								{tCommon('delete')}
 							</Button>
 						</>
 					) : null
@@ -102,17 +120,17 @@ export function IdentityUserDetailPage() {
 					{identityOriginLabel(user.origin)}
 				</Badge>
 			</p>
-			<Panel title="Source">
+			<Panel title={t('sourcePanel')}>
 				{source.kind === 'local_directory' ? (
-					<p>Local directory (manual)</p>
+					<p>{t('localDirectory')}</p>
 				) : (
 					<p>
-						Synced from <strong>{source.label}</strong>
+						{t('syncedFrom', { label: source.label })}
 						{source.apiConnectionRoute ? (
 							<>
 								{' '}
 								<ButtonLink variant="link" to={source.apiConnectionRoute}>
-									View API connection
+									{t('viewApiConnection')}
 								</ButtonLink>
 							</>
 						) : null}
@@ -121,23 +139,23 @@ export function IdentityUserDetailPage() {
 			</Panel>
 			<ul className="evg-dl">
 				<li>
-					<span>Email</span>
-					<code>{user.email ?? '—'}</code>
+					<span>{tCommon('email')}</span>
+					<code>{user.email ?? tCommon('emDash')}</code>
 				</li>
 				<li>
-					<span>Display name</span>
-					<code>{user.displayName ?? '—'}</code>
+					<span>{tCommon('displayName')}</span>
+					<code>{user.displayName ?? tCommon('emDash')}</code>
 				</li>
 				<li>
-					<span>External ID</span>
+					<span>{tCommon('externalId')}</span>
 					<code>{user.externalId}</code>
 				</li>
 				<li>
-					<span>Active</span>
+					<span>{tCommon('active')}</span>
 					<code>{String(user.active)}</code>
 				</li>
 			</ul>
-			<Panel title={`Groups (${groups.length})`}>
+			<Panel title={t('groupsPanel', { count: groups.length })}>
 				<ul className="evg-list">
 					{groups.map((group) => (
 						<li key={group.id}>
@@ -146,7 +164,7 @@ export function IdentityUserDetailPage() {
 					))}
 				</ul>
 			</Panel>
-			<Panel title={`Roles (${roles.length})`}>
+			<Panel title={t('rolesPanel', { count: roles.length })}>
 				<ul className="evg-list">
 					{roles.map((role) => (
 						<li key={role.id}>
@@ -156,7 +174,7 @@ export function IdentityUserDetailPage() {
 				</ul>
 			</Panel>
 			{recentAudit && recentAudit.length > 0 ? (
-				<Panel title="Recent changes">
+				<Panel title={t('recentChanges')}>
 					<ul className="evg-list">
 						{recentAudit.map((row) => (
 							<li key={row.id}>
@@ -167,14 +185,14 @@ export function IdentityUserDetailPage() {
 					</ul>
 					<p>
 						<ButtonLink variant="link" to={`${AUDIT_ROUTE_PREFIX}?category=identity`}>
-							View full audit log
+							{t('viewFullAuditLog')}
 						</ButtonLink>
 					</p>
 				</Panel>
 			) : null}
 			<p>
 				<ButtonLink variant="link" to={`${IDENTITY_ROUTE_PREFIX}/users`}>
-					Back to users
+					{t('backToUsers')}
 				</ButtonLink>
 			</p>
 		</section>

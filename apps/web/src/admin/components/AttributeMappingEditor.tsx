@@ -1,6 +1,9 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { SpAttributeMappingConfig } from '@nestidp/shared';
 import { Fieldset, Select, TextArea } from '../../ui';
+import { resolveI18nKey } from '../../i18n/api-error-messages';
+import { spPresetLabel } from '../../i18n/enum-labels';
 import { SP_ATTRIBUTE_MAPPING_PRESETS } from './sp-mapping-presets';
 
 type AttributeMappingEditorProps = {
@@ -10,6 +13,8 @@ type AttributeMappingEditorProps = {
 };
 
 export function AttributeMappingEditor({ value, onChange, disabled }: AttributeMappingEditorProps) {
+	const { t } = useTranslation('spConnections');
+	const { t: tCommon } = useTranslation('common');
 	const mapping = value ?? {};
 	const [presetKey, setPresetKey] = useState('');
 
@@ -18,9 +23,9 @@ export function AttributeMappingEditor({ value, onChange, disabled }: AttributeM
 	}
 
 	return (
-		<Fieldset legend="Attribute mapping" disabled={disabled}>
+		<Fieldset legend={t('attributeMapping')} disabled={disabled}>
 			<Select
-				label="Preset"
+				label={t('preset')}
 				id="mapping-preset"
 				value={presetKey}
 				onChange={(event) => {
@@ -32,15 +37,15 @@ export function AttributeMappingEditor({ value, onChange, disabled }: AttributeM
 					}
 				}}
 			>
-				<option value="">Choose preset…</option>
+				<option value="">{t('choosePreset')}</option>
 				{SP_ATTRIBUTE_MAPPING_PRESETS.map((preset) => (
 					<option key={preset.id} value={preset.id}>
-						{preset.label}
+						{spPresetLabel(preset.id, resolveI18nKey)}
 					</option>
 				))}
 			</Select>
 			<Select
-				label="NameID source"
+				label={t('nameIdSource')}
 				value={mapping.nameId?.source ?? ''}
 				onChange={(event) => {
 					const source = event.target.value as 'email' | 'username' | '';
@@ -53,14 +58,14 @@ export function AttributeMappingEditor({ value, onChange, disabled }: AttributeM
 					updateMapping({ ...mapping, nameId: { source } });
 				}}
 			>
-				<option value="">(default)</option>
-				<option value="email">email</option>
-				<option value="username">username</option>
+				<option value="">{tCommon('defaultOption')}</option>
+				<option value="email">{t('nameIdOptionEmail')}</option>
+				<option value="username">{t('nameIdOptionUsername')}</option>
 			</Select>
 			<TextArea
-				label="JSON (advanced)"
+				label={t('jsonAdvanced')}
 				rows={6}
-				hint="Optional custom mapping object; invalid JSON is ignored until fixed."
+				hint={t('jsonHint')}
 				value={value ? JSON.stringify(value, null, 2) : ''}
 				onChange={(event) => {
 					const raw = event.target.value.trim();

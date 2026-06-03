@@ -1,10 +1,15 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { SAML_SESSION_QUERY_PARAM } from '@nestidp/shared';
 import { AuthApiError, completeSsoLogin, getEndUserSession, loginEndUser } from '../auth/authApi';
 import { Button, Callout, Card, LoadingState, Spinner, TextInput } from '../ui';
+import { LanguageSelect } from '../ui/LanguageSelect';
+import { formatAuthApiError, resolveI18nKey } from '../i18n/api-error-messages';
 
 export function LoginPage() {
+	const { t } = useTranslation('login');
+	const { t: tCommon } = useTranslation('common');
 	const [searchParams] = useSearchParams();
 	const samlSessionId = searchParams.get(SAML_SESSION_QUERY_PARAM) ?? undefined;
 
@@ -35,13 +40,16 @@ export function LoginPage() {
 				const html = await completeSsoLogin(sessionId);
 				submitSsoHtml(html);
 			} catch (err) {
-				const message = err instanceof AuthApiError ? err.message : 'Could not continue SSO.';
+				const message =
+					err instanceof AuthApiError
+						? formatAuthApiError(err.message, resolveI18nKey)
+						: t('couldNotContinueSso');
 				setSsoError(message);
 			} finally {
 				setSsoRedirecting(false);
 			}
 		},
-		[submitSsoHtml],
+		[submitSsoHtml, t],
 	);
 
 	useEffect(() => {
@@ -53,12 +61,12 @@ export function LoginPage() {
 					return;
 				}
 				if (status.authenticated && status.user) {
-					setSessionBanner(`Signed in as ${status.user.username}`);
+					setSessionBanner(t('signedInAs', { username: status.user.username }));
 				}
 				if (status.samlSession?.expired) {
-					setSessionBanner('SAML session expired. Sign in again to continue SSO.');
+					setSessionBanner(t('samlSessionExpired'));
 				} else if (status.samlSession && !status.samlSession.spActive) {
-					setSessionBanner('Service provider connection is inactive.');
+					setSessionBanner(t('spInactive'));
 				}
 				setReadyToComplete(status.samlSession?.readyToComplete ?? false);
 
@@ -81,7 +89,7 @@ export function LoginPage() {
 		return () => {
 			cancelled = true;
 		};
-	}, [samlSessionId, runCompleteSso]);
+	}, [samlSessionId, runCompleteSso, t]);
 
 	async function handleSubmit(event: FormEvent) {
 		event.preventDefault();
@@ -97,15 +105,17 @@ export function LoginPage() {
 			});
 			setSamlSessionBound(result.samlSessionBound);
 			if (result.samlSessionBound && samlSessionId) {
-				setSuccess('SSO session ready. Redirecting to your application…');
+				setSuccess(t('ssoReady'));
 				autoCompleteAttempted.current = true;
 				await runCompleteSso(samlSessionId);
 			} else {
-				setSuccess(`Signed in as ${result.user.username}`);
+				setSuccess(t('signedInAs', { username: result.user.username }));
 			}
 		} catch (err) {
 			const message =
-				err instanceof AuthApiError ? err.message : 'Sign in failed. Please try again.';
+				err instanceof AuthApiError
+					? formatAuthApiError(err.message, resolveI18nKey)
+					: t('signInFailed');
 			setError(message);
 		} finally {
 			setLoading(false);
@@ -116,7 +126,7 @@ export function LoginPage() {
 		return (
 			<div className="evg-auth-layout">
 				<Card>
-					<LoadingState message="Checking session…" />
+					<LoadingState message={t('checkingSession')} />
 				</Card>
 			</div>
 		);
@@ -125,13 +135,13 @@ export function LoginPage() {
 	return (
 		<div className="evg-auth-layout">
 			<Card>
-				<h1>SAML Login</h1>
-				<p className="evg-muted">Sign in with credentials synced from your identity API.</p>
+				<h1>{t('title')}</h1>
+				<p className="evg-muted">{t('subtitle')}</p>
 				{sessionBanner ? <Callout variant="info">{sessionBanner}</Callout> : null}
-				{ssoRedirecting ? <Spinner label="Redirecting to application…" /> : null}
+				{ssoRedirecting ? <Spinner label={t('redirectingToApp')} /> : null}
 				<form onSubmit={(event) => void handleSubmit(event)}>
 					<TextInput
-						label="Username"
+						label={tCommon('username')}
 						name="username"
 						autoComplete="username"
 						value={username}
@@ -141,7 +151,7 @@ export function LoginPage() {
 						requiredMark
 					/>
 					<TextInput
-						label="Password"
+						label={tCommon('password')}
 						name="password"
 						type="password"
 						autoComplete="current-password"
@@ -152,7 +162,7 @@ export function LoginPage() {
 						requiredMark
 					/>
 					<Button type="submit" variant="primary" block disabled={loading || ssoRedirecting}>
-						{loading ? 'Signing in…' : 'Sign in'}
+						{loading ? t('signingIn') : t('signIn')}
 					</Button>
 				</form>
 				{error ? <Callout variant="danger">{error}</Callout> : null}
@@ -165,13 +175,14 @@ export function LoginPage() {
 						disabled={ssoRedirecting}
 						onClick={() => void runCompleteSso(samlSessionId)}
 					>
-						Continue to application
+						{t('continueToApplication')}
 					</Button>
 				) : null}
 				{ssoError ? <Callout variant="danger">{ssoError}</Callout> : null}
 				<p>
-					<Link to="/admin">Back to admin</Link>
+					<Link to="/admin">{t('backToAdmin')}</Link>
 				</p>
+				<LanguageSelect />
 			</Card>
 		</div>
 	);

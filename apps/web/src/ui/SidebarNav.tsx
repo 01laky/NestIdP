@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
 	API_CONNECTION_ROUTE_PREFIX,
 	SP_CONNECTION_ROUTE_PREFIX,
@@ -10,6 +11,7 @@ import {
 import { OperatorSessionBar } from './OperatorSessionBar';
 import { Button } from './Button';
 import { IconSprig } from './icons';
+import { LanguageSelect } from './LanguageSelect';
 
 export function SidebarNav({
 	operatorUsername,
@@ -20,82 +22,86 @@ export function SidebarNav({
 	onLogout: () => void;
 	onNavigate?: () => void;
 }) {
+	const { t } = useTranslation('nav');
+	const { t: tCommon } = useTranslation('common');
+
 	return (
 		<>
 			<a href="/admin" className="evg-brand">
 				<IconSprig />
-				NestIdP
+				{t('brand')}
 			</a>
-			<nav className="evg-nav" aria-label="Admin">
+			<nav className="evg-nav" aria-label={t('ariaAdmin')}>
 				<NavLink
 					to="/admin"
 					end
 					className={({ isActive }) => `evg-nav__link${isActive ? ' evg-nav__link--active' : ''}`}
 					onClick={onNavigate}
 				>
-					Dashboard
+					{t('dashboard')}
 				</NavLink>
 				<NavLink
 					to={API_CONNECTION_ROUTE_PREFIX}
 					className={({ isActive }) => `evg-nav__link${isActive ? ' evg-nav__link--active' : ''}`}
 					onClick={onNavigate}
 				>
-					API connections
+					{t('apiConnections')}
 				</NavLink>
 				<NavLink
 					to={SP_CONNECTION_ROUTE_PREFIX}
 					className={({ isActive }) => `evg-nav__link${isActive ? ' evg-nav__link--active' : ''}`}
 					onClick={onNavigate}
 				>
-					SP connections
+					{t('spConnections')}
 				</NavLink>
 				<NavLink
 					to={`${IDENTITY_ROUTE_PREFIX}/users`}
 					className={({ isActive }) => `evg-nav__link${isActive ? ' evg-nav__link--active' : ''}`}
 					onClick={onNavigate}
 				>
-					Users
+					{t('users')}
 				</NavLink>
 				<NavLink
 					to={`${IDENTITY_ROUTE_PREFIX}/groups`}
 					className={({ isActive }) => `evg-nav__link${isActive ? ' evg-nav__link--active' : ''}`}
 					onClick={onNavigate}
 				>
-					Groups
+					{t('groups')}
 				</NavLink>
 				<NavLink
 					to={`${IDENTITY_ROUTE_PREFIX}/roles`}
 					className={({ isActive }) => `evg-nav__link${isActive ? ' evg-nav__link--active' : ''}`}
 					onClick={onNavigate}
 				>
-					Roles
+					{t('roles')}
 				</NavLink>
 				<NavLink
 					to={IDP_SETTINGS_ROUTE_PREFIX}
 					className={({ isActive }) => `evg-nav__link${isActive ? ' evg-nav__link--active' : ''}`}
 					onClick={onNavigate}
 				>
-					IdP Settings
+					{t('idpSettings')}
 				</NavLink>
 				<NavLink
 					to={ADMIN_USERS_ROUTE_PREFIX}
 					className={({ isActive }) => `evg-nav__link${isActive ? ' evg-nav__link--active' : ''}`}
 					onClick={onNavigate}
 				>
-					Admin accounts
+					{t('adminAccounts')}
 				</NavLink>
 				<NavLink
 					to={AUDIT_ROUTE_PREFIX}
 					className={({ isActive }) => `evg-nav__link${isActive ? ' evg-nav__link--active' : ''}`}
 					onClick={onNavigate}
 				>
-					Audit log
+					{t('auditLog')}
 				</NavLink>
 				<NavLink to="/login" className="evg-nav__link" onClick={onNavigate}>
-					SAML login
+					{t('samlLogin')}
 				</NavLink>
 			</nav>
 			<div className="evg-sidebar-footer">
+				<LanguageSelect />
 				{operatorUsername ? (
 					<OperatorSessionBar
 						username={operatorUsername}
@@ -103,7 +109,7 @@ export function SidebarNav({
 					/>
 				) : null}
 				<Button variant="ghost" onClick={() => void onLogout()}>
-					Logout
+					{tCommon('logout')}
 				</Button>
 			</div>
 		</>

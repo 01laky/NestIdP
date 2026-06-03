@@ -1,9 +1,14 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Card, Callout, LoadingState, TextInput, Button } from '../ui';
+import { LanguageSelect } from '../ui/LanguageSelect';
 import { AdminApiError, getAdminMe, loginAdmin } from './adminApi';
+import { formatAuthApiError, resolveI18nKey } from '../i18n/api-error-messages';
 
 export function AdminLoginPage() {
+	const { t } = useTranslation('adminAuth');
+	const { t: tCommon } = useTranslation('common');
 	const navigate = useNavigate();
 	const [username, setUsername] = useState('');
 	const [password, setPassword] = useState('');
@@ -42,9 +47,9 @@ export function AdminLoginPage() {
 			navigate('/admin');
 		} catch (err) {
 			if (err instanceof AdminApiError) {
-				setError(err.message);
+				setError(formatAuthApiError(err.message, resolveI18nKey));
 			} else {
-				setError('Login failed');
+				setError(t('loginFailed'));
 			}
 		} finally {
 			setLoading(false);
@@ -55,7 +60,7 @@ export function AdminLoginPage() {
 		return (
 			<div className="evg-auth-layout">
 				<Card>
-					<LoadingState message="Checking session…" />
+					<LoadingState message={t('checkingSession')} />
 				</Card>
 			</div>
 		);
@@ -64,11 +69,11 @@ export function AdminLoginPage() {
 	return (
 		<div className="evg-auth-layout">
 			<Card>
-				<h1>Admin Login</h1>
-				<p className="evg-muted">Operator console — separate from end-user SAML SSO.</p>
+				<h1>{t('title')}</h1>
+				<p className="evg-muted">{t('subtitle')}</p>
 				<form onSubmit={(event) => void handleSubmit(event)}>
 					<TextInput
-						label="Username"
+						label={tCommon('username')}
 						name="username"
 						autoComplete="username"
 						value={username}
@@ -78,7 +83,7 @@ export function AdminLoginPage() {
 						requiredMark
 					/>
 					<TextInput
-						label="Password"
+						label={tCommon('password')}
 						name="password"
 						type="password"
 						autoComplete="current-password"
@@ -90,12 +95,13 @@ export function AdminLoginPage() {
 					/>
 					{error ? <Callout variant="danger">{error}</Callout> : null}
 					<Button type="submit" variant="primary" block disabled={loading}>
-						{loading ? 'Signing in…' : 'Sign in'}
+						{loading ? t('signingIn') : t('signIn')}
 					</Button>
 				</form>
 				<p>
-					<Link to="/login">End-user SAML SSO login</Link>
+					<Link to="/login">{t('endUserSamlLink')}</Link>
 				</p>
+				<LanguageSelect />
 			</Card>
 		</div>
 	);

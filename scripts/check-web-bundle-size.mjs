@@ -6,8 +6,8 @@
 import { readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-/** Monolith SPA (identity admin + Evergreen) — raised from 500 KB in 1.2.2; fonts still excluded. */
-const BUDGET_BYTES = 580 * 1024;
+/** Monolith SPA + i18next (en catalog in main chunk); locale JSON lazy-loaded — raised in 1.3.0. */
+const BUDGET_BYTES = 650 * 1024;
 const distAssets = join(process.cwd(), 'apps/web/dist/assets');
 
 function findLargestIndexJs(dir) {

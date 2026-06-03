@@ -1,15 +1,21 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { AUDIT_CATEGORIES } from '@nestidp/shared';
 import { AdminApiError, auditExportUrl, getCsrfToken, listAuditEvents } from '../adminApi';
 import { AdminPageHeader } from '../components/AdminPageHeader';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
-import { useDocumentTitle } from '../components/useDocumentTitle';
+import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
+import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
+import { auditCategoryLabel } from '../../i18n/enum-labels';
 import { Button, Select, Table, TextInput, useToast } from '../../ui';
 
 export function AuditLogPage() {
-	useDocumentTitle('Audit log — NestIdP Admin');
+	const { t } = useTranslation('audit');
+	const { t: tNav } = useTranslation('nav');
+	const { t: tCommon } = useTranslation('common');
+	useAdminDocumentTitle(t('title'));
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [category, setCategory] = useState('');
@@ -34,7 +40,11 @@ export function AuditLogPage() {
 
 	useEffect(() => {
 		void load().catch((err) => {
-			setError(err instanceof AdminApiError ? err.message : 'Failed to load audit log');
+			setError(
+				err instanceof AdminApiError
+					? formatAdminApiError(err.statusCode, err.message, resolveI18nKey, 'audit.loadFailed')
+					: t('loadFailed'),
+			);
 			setLoading(false);
 		});
 		// Initial load only; Filter button calls load() explicitly.
@@ -50,28 +60,28 @@ export function AuditLogPage() {
 			params.event = event.trim();
 		}
 		window.open(auditExportUrl(params), '_blank');
-		showToast('Export downloaded');
+		showToast(t('toastExportDownloaded'));
 	}
 
 	return (
 		<section>
 			<AdminPageHeader
-				title="Audit log"
-				subtitle="Security and configuration events (sync details remain in Sync logs)"
-				breadcrumbs={[{ label: 'Dashboard', to: '/admin' }, { label: 'Audit log' }]}
+				title={t('title')}
+				subtitle={t('subtitle')}
+				breadcrumbs={[{ label: tNav('dashboard'), to: '/admin' }, { label: t('title') }]}
 				actions={
 					<>
 						<Button type="button" variant="link" onClick={() => download('csv')}>
-							Export CSV
+							{t('exportCsv')}
 						</Button>
 						<Button type="button" variant="link" onClick={() => download('json')}>
-							Export JSON
+							{t('exportJson')}
 						</Button>
 					</>
 				}
 			/>
 			<details className="evg-filters-panel evg-filters-panel--collapsible">
-				<summary>Filters</summary>
+				<summary>{t('filters')}</summary>
 				<form
 					className="evg-stack inline"
 					onSubmit={(e) => {
@@ -79,22 +89,26 @@ export function AuditLogPage() {
 						void load();
 					}}
 				>
-					<Select label="Category" value={category} onChange={(e) => setCategory(e.target.value)}>
-						<option value="">All</option>
+					<Select
+						label={tCommon('category')}
+						value={category}
+						onChange={(e) => setCategory(e.target.value)}
+					>
+						<option value="">{tCommon('all')}</option>
 						{AUDIT_CATEGORIES.map((c) => (
 							<option key={c} value={c}>
-								{c}
+								{auditCategoryLabel(c, resolveI18nKey)}
 							</option>
 						))}
 					</Select>
 					<TextInput
-						label="Event"
+						label={tCommon('event')}
 						value={event}
 						onChange={(e) => setEvent(e.target.value)}
-						placeholder="exact name"
+						placeholder={t('eventPlaceholder')}
 					/>
 					<Button type="submit" variant="primary">
-						Filter
+						{tCommon('filter')}
 					</Button>
 				</form>
 			</details>
@@ -103,34 +117,38 @@ export function AuditLogPage() {
 			{data && !loading ? (
 				<>
 					<p className="evg-muted">
-						Showing {data.items.length} of {data.total} events
+						{t('showingEvents', { shown: data.items.length, total: data.total })}
 					</p>
 					<Table>
 						<thead>
 							<tr>
-								<th>Time</th>
-								<th>Category</th>
-								<th>Event</th>
-								<th>Actor</th>
-								<th>Subject</th>
+								<th>{tCommon('time')}</th>
+								<th>{tCommon('category')}</th>
+								<th>{tCommon('event')}</th>
+								<th>{tCommon('actor')}</th>
+								<th>{tCommon('subject')}</th>
 							</tr>
 						</thead>
 						<tbody>
 							{data.items.map((row) => (
 								<tr key={row.id}>
 									<td className="evg-muted">{new Date(row.createdAt).toLocaleString()}</td>
-									<td>{row.category}</td>
+									<td>{auditCategoryLabel(row.category, resolveI18nKey)}</td>
 									<td>{row.event}</td>
 									<td>{row.actorLabel ?? row.actorType}</td>
 									<td>
-										{row.subjectType ? `${row.subjectType}:${row.subjectId ?? ''}` : '—'}
+										{row.subjectType
+											? `${row.subjectType}:${row.subjectId ?? ''}`
+											: tCommon('emDash')}
 										{row.metadata &&
 										typeof row.metadata === 'object' &&
 										'syncLogId' in row.metadata &&
 										typeof row.metadata.syncLogId === 'string' ? (
 											<>
 												{' '}
-												<Link to={`/admin/sync-logs/${row.metadata.syncLogId}`}>Sync log</Link>
+												<Link to={`/admin/sync-logs/${row.metadata.syncLogId}`}>
+													{t('syncLogLink')}
+												</Link>
 											</>
 										) : null}
 									</td>

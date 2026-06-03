@@ -4,6 +4,44 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.3.1]
+
+### Added
+
+- Extended i18n Vitest registry **`WEB-I18N-41`–`115`** and **`API-I18N-02`–`05`**: regional browser
+  tags, API error slug matrix, enum label coverage, JSON parity failure cases, static admin-page
+  guards, cs/sk catalog distinctness, and integration tests across SidebarNav, identity lists, audit,
+  API/SP list pages, and sequential `changeLocale` cycling.
+- Infra check **`WEB-EVG-173`** asserts extended i18n test files exist.
+
+## [1.3.0]
+
+### Added
+
+- **Web i18n (10 locales):** `en`, `cs`, `sk`, `de`, `fr`, `es`, `pl`, `it`, `pt`, `nl` via **i18next** +
+  **react-i18next**; browser language detection with **English fallback**; unsupported tags (e.g. `hu`)
+  → `en`; erroneous `cz` → `cs`.
+- **`LanguageSelect`** with **Browser default** (clears `localStorage`, re-reads `navigator.languages`),
+  native language names, on admin shell, SAML login, and admin login.
+- Locale catalogs under **`apps/web/src/i18n/locales/`** (14 namespaces); lazy-loaded JSON chunks per
+  locale; English catalog in main bundle for first paint.
+- **`formatAdminApiError`** / **`formatAuthApiError`** mapping known API `message` slugs to **`errors`**
+  namespace; **`enum-labels.ts`** for audit categories, identity origin filter, SP mapping presets.
+- Shared **`@nestidp/shared` i18n constants** (`SUPPORTED_LOCALES`, `LOCALE_STORAGE_KEY`,
+  `BROWSER_LOCALE_SENTINEL`); root **`pnpm check:i18n-keys`** script for JSON key parity vs `en.json`.
+- Vitest **`WEB-I18N-01`–`40`**, **`API-I18N-01`**; Playwright **`e2e/i18n-login-cs.spec.ts`** (Czech
+  login smoke); Vitest setup forces **`en`** for existing admin tests.
+- Build scripts: **`scripts/i18n-locale-catalog.mjs`**, **`scripts/build-i18n-locale-json.mjs`**.
+
+### Changed
+
+- All operator-visible admin and login UI strings migrated to translation keys; **`document.documentElement.lang`**
+  synced on locale change; **`useAdminDocumentTitle`** uses translated page titles.
+- **`docs/development.md`** i18n contributor guide; **`docs/img/evergreen-ui.mmd`** / SVG includes
+  i18n layer; **`docs/proposal.MD`** Phase 1 marks Web SPA i18n complete.
+- Main Vite chunk budget **650 KB** raw (`scripts/check-web-bundle-size.mjs`) — i18next + English
+  catalog in main chunk; per-locale JSON remains async-loaded (fonts excluded).
+
 ## [1.2.3]
 
 ### Added

@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import type { SpAttributeMappingConfig } from '@nestidp/shared';
 import { SAML_NAME_ID_FORMATS, SP_CONNECTION_ROUTE_PREFIX } from '@nestidp/shared';
 import {
@@ -14,15 +15,18 @@ import { AdminPageHeader } from '../components/AdminPageHeader';
 import { AttributeMappingEditor } from '../components/AttributeMappingEditor';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
-import { useDocumentTitle } from '../components/useDocumentTitle';
+import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
+import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
 import { Button, Checkbox, Panel, Select, TextArea, TextInput, useToast } from '../../ui';
 
 export function SpConnectionFormPage() {
 	const { id } = useParams();
 	const isNew = !id;
 	const navigate = useNavigate();
-	useDocumentTitle(isNew ? 'New SP — NestIdP Admin' : 'Edit SP — NestIdP Admin');
-
+	const { t } = useTranslation('spConnections');
+	const { t: tNav } = useTranslation('nav');
+	const { t: tCommon } = useTranslation('common');
+	useAdminDocumentTitle(isNew ? t('formNew') : t('formEdit'));
 	const [loading, setLoading] = useState(!isNew);
 	const [error, setError] = useState<string | null>(null);
 	const [name, setName] = useState('');
@@ -54,7 +58,16 @@ export function SpConnectionFormPage() {
 				}
 			} catch (err) {
 				if (!cancelled) {
-					setError(err instanceof AdminApiError ? err.message : 'Failed to load SP');
+					setError(
+						err instanceof AdminApiError
+							? formatAdminApiError(
+									err.statusCode,
+									err.message,
+									resolveI18nKey,
+									'spConnections.loadFailed',
+								)
+							: t('loadFailed'),
+					);
 				}
 			} finally {
 				if (!cancelled) {
@@ -65,7 +78,7 @@ export function SpConnectionFormPage() {
 		return () => {
 			cancelled = true;
 		};
-	}, [id, isNew]);
+	}, [id, isNew, t]);
 
 	async function handleSubmit(event: FormEvent) {
 		event.preventDefault();
@@ -83,14 +96,23 @@ export function SpConnectionFormPage() {
 		try {
 			if (isNew) {
 				const created = await createSpConnection(body);
-				showToast('SP connection saved');
+				showToast(t('toastSaved'));
 				navigate(`${SP_CONNECTION_ROUTE_PREFIX}/${created.item.id}`);
 			} else if (id) {
 				await updateSpConnection(id, body);
-				showToast('SP connection saved');
+				showToast(t('toastSaved'));
 			}
 		} catch (err) {
-			setError(err instanceof AdminApiError ? err.message : 'Save failed');
+			setError(
+				err instanceof AdminApiError
+					? formatAdminApiError(
+							err.statusCode,
+							err.message,
+							resolveI18nKey,
+							'spConnections.saveFailed',
+						)
+					: t('saveFailed'),
+			);
 		} finally {
 			setSaving(false);
 		}
@@ -100,7 +122,7 @@ export function SpConnectionFormPage() {
 		if (!id) {
 			return;
 		}
-		if (!window.confirm('Deactivate SP first, then delete?')) {
+		if (!window.confirm(t('confirmDeactivateDelete'))) {
 			return;
 		}
 		try {
@@ -110,7 +132,16 @@ export function SpConnectionFormPage() {
 			await deleteSpConnection(id);
 			navigate(SP_CONNECTION_ROUTE_PREFIX);
 		} catch (err) {
-			setError(err instanceof AdminApiError ? err.message : 'Delete failed');
+			setError(
+				err instanceof AdminApiError
+					? formatAdminApiError(
+							err.statusCode,
+							err.message,
+							resolveI18nKey,
+							'spConnections.deleteFailed',
+						)
+					: t('deleteFailed'),
+			);
 		}
 	}
 
@@ -122,7 +153,16 @@ export function SpConnectionFormPage() {
 			const result = await testSpConnectionAcs(id);
 			setAcsTestMessage(result.message);
 		} catch (err) {
-			setAcsTestMessage(err instanceof AdminApiError ? err.message : 'ACS test failed');
+			setAcsTestMessage(
+				err instanceof AdminApiError
+					? formatAdminApiError(
+							err.statusCode,
+							err.message,
+							resolveI18nKey,
+							'spConnections.acsTestFailed',
+						)
+					: t('acsTestFailed'),
+			);
 		}
 	}
 
@@ -133,15 +173,15 @@ export function SpConnectionFormPage() {
 	return (
 		<section>
 			<AdminPageHeader
-				title={isNew ? 'New SP connection' : 'Edit SP connection'}
+				title={isNew ? t('formNew') : t('formEdit')}
 				breadcrumbs={[
-					{ label: 'Dashboard', to: '/admin' },
-					{ label: 'SP connections', to: SP_CONNECTION_ROUTE_PREFIX },
-					{ label: isNew ? 'New' : name || id! },
+					{ label: tNav('dashboard'), to: '/admin' },
+					{ label: t('listTitle'), to: SP_CONNECTION_ROUTE_PREFIX },
+					{ label: isNew ? tCommon('new') : name || id! },
 				]}
 			/>
 			{error ? <ErrorBanner message={error} /> : null}
-			<Panel title="SP connection">
+			<Panel title={t('spConnection')}>
 				<form
 					className="evg-stack"
 					aria-busy={saving}
@@ -149,7 +189,7 @@ export function SpConnectionFormPage() {
 				>
 					<fieldset className="evg-stack" disabled={saving}>
 						<TextInput
-							label="Name"
+							label={tCommon('name')}
 							name="name"
 							value={name}
 							onChange={(e) => setName(e.target.value)}
@@ -157,7 +197,7 @@ export function SpConnectionFormPage() {
 							requiredMark
 						/>
 						<TextInput
-							label="SP Entity ID"
+							label={t('spEntityId')}
 							name="spEntityId"
 							value={spEntityId}
 							onChange={(e) => setSpEntityId(e.target.value)}
@@ -165,7 +205,7 @@ export function SpConnectionFormPage() {
 							requiredMark
 						/>
 						<TextInput
-							label="ACS URL"
+							label={t('acsUrl')}
 							name="acsUrl"
 							value={acsUrl}
 							onChange={(e) => setAcsUrl(e.target.value)}
@@ -173,32 +213,32 @@ export function SpConnectionFormPage() {
 							requiredMark
 						/>
 						<Select
-							label="NameID format"
+							label={t('nameIdFormat')}
 							value={nameIdFormat}
 							onChange={(e) => setNameIdFormat(e.target.value)}
 						>
-							<option value="">(default)</option>
+							<option value="">{tCommon('defaultOption')}</option>
 							{SAML_NAME_ID_FORMATS.map((format) => (
 								<option key={format} value={format}>
 									{format}
 								</option>
 							))}
 						</Select>
-						<Checkbox label="Active" checked={active} onChange={setActive} />
+						<Checkbox label={tCommon('active')} checked={active} onChange={setActive} />
 						<AttributeMappingEditor
 							value={attributeMapping}
 							onChange={setAttributeMapping}
 							disabled={saving}
 						/>
 						<TextArea
-							label="SP certificate PEM (optional)"
+							label={t('spCertificatePem')}
 							rows={4}
-							hint="Paste PEM certificate for SP signature verification."
+							hint={t('spCertificateHint')}
 							value={spCertificate}
 							onChange={(e) => setSpCertificate(e.target.value)}
 						/>
 						<Button type="submit" variant="primary" disabled={saving}>
-							{saving ? 'Saving…' : 'Save'}
+							{saving ? tCommon('saving') : tCommon('save')}
 						</Button>
 					</fieldset>
 				</form>
@@ -211,7 +251,7 @@ export function SpConnectionFormPage() {
 						disabled={saving}
 						onClick={() => void handleTestAcs()}
 					>
-						Test ACS reachability
+						{t('testAcs')}
 					</Button>
 					<Button
 						type="button"
@@ -219,14 +259,14 @@ export function SpConnectionFormPage() {
 						disabled={saving}
 						onClick={() => void handleDeactivateAndDelete()}
 					>
-						Deactivate & delete
+						{t('deactivateAndDelete')}
 					</Button>
 					{acsTestMessage ? <span className="evg-muted"> — {acsTestMessage}</span> : null}
 				</div>
 			) : null}
 			<p>
 				<Link className="evg-btn evg-btn--link" to={SP_CONNECTION_ROUTE_PREFIX}>
-					Back to list
+					{t('backToList')}
 				</Link>
 			</p>
 		</section>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
 	IDENTITY_ROUTE_PREFIX,
 	identityRoleEditRoute,
@@ -9,7 +10,8 @@ import { AdminApiError, deleteIdentityRole, getIdentityRole } from '../adminApi'
 import { AdminPageHeader } from '../components/AdminPageHeader';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
-import { useDocumentTitle } from '../components/useDocumentTitle';
+import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
+import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
 import { identityOriginLabel, identityOriginToBadge } from '../status-badge';
 import { Badge, Button, ButtonLink, Panel, Table, useToast } from '../../ui';
 
@@ -17,7 +19,10 @@ export function IdentityRoleDetailPage() {
 	const { id } = useParams<{ id: string }>();
 	const navigate = useNavigate();
 	const { showToast } = useToast();
-	useDocumentTitle('Role detail — NestIdP Admin');
+	const { t } = useTranslation('identity');
+	const { t: tNav } = useTranslation('nav');
+	const { t: tCommon } = useTranslation('common');
+	useAdminDocumentTitle(t('viewRole'));
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [detail, setDetail] = useState<Awaited<ReturnType<typeof getIdentityRole>> | null>(null);
@@ -35,7 +40,16 @@ export function IdentityRoleDetailPage() {
 				}
 			} catch (err) {
 				if (!cancelled) {
-					setError(err instanceof AdminApiError ? err.message : 'Failed to load role');
+					setError(
+						err instanceof AdminApiError
+							? formatAdminApiError(
+									err.statusCode,
+									err.message,
+									resolveI18nKey,
+									'identity.loadRoleFailed',
+								)
+							: t('loadRoleFailed'),
+					);
 				}
 			} finally {
 				if (!cancelled) {
@@ -46,7 +60,7 @@ export function IdentityRoleDetailPage() {
 		return () => {
 			cancelled = true;
 		};
-	}, [id]);
+	}, [id, t]);
 
 	async function handleDelete() {
 		if (!detail || !id) {
@@ -54,17 +68,21 @@ export function IdentityRoleDetailPage() {
 		}
 		const msg =
 			detail.memberCount > 0
-				? `Delete role "${detail.role.name}"? ${detail.memberCount} user(s) have this role.`
-				: `Delete role "${detail.role.name}"?`;
+				? t('confirmDeleteRoleWithMembers', { name: detail.role.name, count: detail.memberCount })
+				: t('confirmDeleteRole', { name: detail.role.name });
 		if (!window.confirm(msg)) {
 			return;
 		}
 		try {
 			await deleteIdentityRole(id);
-			showToast('Role deleted');
+			showToast(t('toastRoleDeleted'));
 			navigate(`${IDENTITY_ROUTE_PREFIX}/roles`);
 		} catch (err) {
-			setError(err instanceof AdminApiError ? err.message : 'Delete failed');
+			setError(
+				err instanceof AdminApiError
+					? formatAdminApiError(err.statusCode, err.message, resolveI18nKey, 'errors.deleteFailed')
+					: resolveI18nKey('errors.deleteFailed'),
+			);
 		}
 	}
 
@@ -75,7 +93,7 @@ export function IdentityRoleDetailPage() {
 		return <ErrorBanner message={error} />;
 	}
 	if (!detail) {
-		return <ErrorBanner message="Role not found" />;
+		return <ErrorBanner message={t('roleNotFound')} />;
 	}
 
 	const { role, members, memberCount } = detail;
@@ -86,18 +104,18 @@ export function IdentityRoleDetailPage() {
 			<AdminPageHeader
 				title={role.name}
 				breadcrumbs={[
-					{ label: 'Dashboard', to: '/admin' },
-					{ label: 'Roles', to: `${IDENTITY_ROUTE_PREFIX}/roles` },
+					{ label: tNav('dashboard'), to: '/admin' },
+					{ label: tNav('roles'), to: `${IDENTITY_ROUTE_PREFIX}/roles` },
 					{ label: role.name },
 				]}
 				actions={
 					isManual ? (
 						<>
 							<ButtonLink variant="secondary" to={identityRoleEditRoute(role.id)}>
-								Edit
+								{tCommon('edit')}
 							</ButtonLink>
 							<Button type="button" variant="danger" onClick={() => void handleDelete()}>
-								Delete
+								{tCommon('delete')}
 							</Button>
 						</>
 					) : null
@@ -110,29 +128,24 @@ export function IdentityRoleDetailPage() {
 			</p>
 			<ul className="evg-dl">
 				<li>
-					<span>External ID</span>
+					<span>{tCommon('externalId')}</span>
 					<code>{role.externalId}</code>
 				</li>
 				<li>
-					<span>Members</span>
+					<span>{tCommon('members')}</span>
 					<code>{memberCount}</code>
 				</li>
 			</ul>
-			{!isManual ? (
-				<p className="evg-callout evg-callout--info">
-					To remove users from this synced role, edit each <strong>manual</strong> user’s role
-					memberships. Synced users’ memberships are controlled by identity sync.
-				</p>
-			) : null}
-			<Panel title={`Members (${members.length})`}>
+			{!isManual ? <p className="evg-callout evg-callout--info">{t('syncedRoleCallout')}</p> : null}
+			<Panel title={t('membersPanel', { count: members.length })}>
 				{members.length === 0 ? (
-					<p className="evg-muted">No members</p>
+					<p className="evg-muted">{t('noMembers')}</p>
 				) : (
 					<Table>
 						<thead>
 							<tr>
-								<th>Username</th>
-								<th>Origin</th>
+								<th>{tCommon('username')}</th>
+								<th>{tCommon('origin')}</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -154,7 +167,7 @@ export function IdentityRoleDetailPage() {
 			</Panel>
 			<p>
 				<ButtonLink variant="link" to={`${IDENTITY_ROUTE_PREFIX}/roles`}>
-					Back to roles
+					{t('backToRoles')}
 				</ButtonLink>
 			</p>
 		</section>

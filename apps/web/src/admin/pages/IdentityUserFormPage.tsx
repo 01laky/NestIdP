@@ -1,10 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import {
-	IDENTITY_ROUTE_PREFIX,
-	IDENTITY_USER_NEW_ROUTE,
-	identityUserDetailRoute,
-} from '@nestidp/shared';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { IDENTITY_ROUTE_PREFIX, identityUserDetailRoute } from '@nestidp/shared';
 import {
 	AdminApiError,
 	createIdentityUser,
@@ -15,7 +12,8 @@ import { IdentityMembershipPicker } from '../components/IdentityMembershipPicker
 import { AdminPageHeader } from '../components/AdminPageHeader';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
-import { useDocumentTitle } from '../components/useDocumentTitle';
+import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
+import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
 import { Button, ButtonLink, Checkbox, Panel, TextInput, useToast } from '../../ui';
 
 export function IdentityUserFormPage() {
@@ -23,8 +21,11 @@ export function IdentityUserFormPage() {
 	const isNew = !id;
 	const navigate = useNavigate();
 	const { showToast } = useToast();
-	useDocumentTitle(isNew ? 'New manual user — NestIdP Admin' : 'Edit manual user — NestIdP Admin');
-
+	const { t } = useTranslation('identity');
+	const { t: tNav } = useTranslation('nav');
+	const { t: tCommon } = useTranslation('common');
+	const { t: tErrors } = useTranslation('errors');
+	useAdminDocumentTitle(isNew ? t('formNewUser') : t('formEditUser'));
 	const [loading, setLoading] = useState(!isNew);
 	const [error, setError] = useState<string | null>(null);
 	const [readOnlySynced, setReadOnlySynced] = useState(false);
@@ -60,7 +61,16 @@ export function IdentityUserFormPage() {
 				setRoleIds(data.roles.map((r) => r.id));
 			} catch (err) {
 				if (!cancelled) {
-					setError(err instanceof AdminApiError ? err.message : 'Failed to load user');
+					setError(
+						err instanceof AdminApiError
+							? formatAdminApiError(
+									err.statusCode,
+									err.message,
+									resolveI18nKey,
+									'identity.loadUserFailed',
+								)
+							: t('loadUserFailed'),
+					);
 				}
 			} finally {
 				if (!cancelled) {
@@ -71,7 +81,7 @@ export function IdentityUserFormPage() {
 		return () => {
 			cancelled = true;
 		};
-	}, [id, isNew]);
+	}, [id, isNew, t]);
 
 	async function handleSubmit(event: FormEvent) {
 		event.preventDefault();
@@ -81,7 +91,7 @@ export function IdentityUserFormPage() {
 		}
 		if (isNew) {
 			if (password !== confirmPassword) {
-				setError('Passwords do not match');
+				setError(tErrors('passwordsDoNotMatch'));
 				return;
 			}
 		}
@@ -98,7 +108,7 @@ export function IdentityUserFormPage() {
 					groupIds,
 					roleIds,
 				});
-				showToast('Manual user created');
+				showToast(t('toastUserCreated'));
 				navigate(identityUserDetailRoute(created.user.id));
 			} else if (id) {
 				const body: Parameters<typeof updateIdentityUser>[1] = {
@@ -113,11 +123,15 @@ export function IdentityUserFormPage() {
 					body.password = password;
 				}
 				const updated = await updateIdentityUser(id, body);
-				showToast('User saved');
+				showToast(t('toastUserSaved'));
 				navigate(identityUserDetailRoute(updated.user.id));
 			}
 		} catch (err) {
-			setError(err instanceof AdminApiError ? err.message : 'Save failed');
+			setError(
+				err instanceof AdminApiError
+					? formatAdminApiError(err.statusCode, err.message, resolveI18nKey, 'errors.saveFailed')
+					: tErrors('saveFailed'),
+			);
 		} finally {
 			setSaving(false);
 		}
@@ -130,10 +144,10 @@ export function IdentityUserFormPage() {
 	if (readOnlySynced && id) {
 		return (
 			<section>
-				<ErrorBanner message="This user is managed by identity sync and cannot be edited here." />
+				<ErrorBanner message={t('managedBySyncUser')} />
 				<p>
 					<ButtonLink variant="link" to={identityUserDetailRoute(id)}>
-						View user
+						{t('viewUser')}
 					</ButtonLink>
 				</p>
 			</section>
@@ -143,41 +157,46 @@ export function IdentityUserFormPage() {
 	return (
 		<section>
 			<AdminPageHeader
-				title={isNew ? 'Create manual user' : 'Edit manual user'}
+				title={isNew ? t('formNewUser') : t('formEditUser')}
 				breadcrumbs={[
-					{ label: 'Dashboard', to: '/admin' },
-					{ label: 'Users', to: `${IDENTITY_ROUTE_PREFIX}/users` },
-					{ label: isNew ? 'New' : username || 'Edit' },
+					{ label: tNav('dashboard'), to: '/admin' },
+					{ label: tNav('users'), to: `${IDENTITY_ROUTE_PREFIX}/users` },
+					{ label: isNew ? tCommon('new') : username || tCommon('edit') },
 				]}
 			/>
 			{error ? <ErrorBanner message={error} /> : null}
 			<form className="evg-stack" onSubmit={(e) => void handleSubmit(e)} aria-busy={saving}>
-				<Panel title="Account">
+				<Panel title={t('accountPanel')}>
 					<TextInput
-						label="Username"
+						label={tCommon('username')}
 						value={username}
 						onChange={(e) => setUsername(e.target.value)}
 						requiredMark
 						disabled={saving}
 					/>
 					<TextInput
-						label="Email"
+						label={tCommon('email')}
 						type="email"
 						value={email}
 						onChange={(e) => setEmail(e.target.value)}
 						disabled={saving}
 					/>
 					<TextInput
-						label="Display name"
+						label={tCommon('displayName')}
 						value={displayName}
 						onChange={(e) => setDisplayName(e.target.value)}
 						disabled={saving}
 					/>
-					<Checkbox label="Active" checked={active} onChange={setActive} disabled={saving} />
+					<Checkbox
+						label={tCommon('active')}
+						checked={active}
+						onChange={setActive}
+						disabled={saving}
+					/>
 				</Panel>
-				<Panel title={isNew ? 'Password' : 'Password (optional)'}>
+				<Panel title={isNew ? t('passwordPanel') : t('passwordOptionalPanel')}>
 					<TextInput
-						label="Password"
+						label={tCommon('password')}
 						type="password"
 						value={password}
 						onChange={(e) => setPassword(e.target.value)}
@@ -186,7 +205,7 @@ export function IdentityUserFormPage() {
 					/>
 					{isNew ? (
 						<TextInput
-							label="Confirm password"
+							label={tCommon('confirmPassword')}
 							type="password"
 							value={confirmPassword}
 							onChange={(e) => setConfirmPassword(e.target.value)}
@@ -204,19 +223,14 @@ export function IdentityUserFormPage() {
 				/>
 				<p className="evg-actions">
 					<Button type="submit" disabled={saving}>
-						{isNew ? 'Create user' : 'Save'}
+						{isNew ? t('createUser') : tCommon('save')}
 					</Button>
 					<ButtonLink variant="link" to={`${IDENTITY_ROUTE_PREFIX}/users`}>
-						Cancel
+						{tCommon('cancel')}
 					</ButtonLink>
 				</p>
 			</form>
-			{isNew ? (
-				<p className="evg-muted">
-					Already have synced users? They are read-only — use{' '}
-					<Link to={IDENTITY_USER_NEW_ROUTE}>manual users</Link> for break-glass access only.
-				</p>
-			) : null}
+			{isNew ? <p className="evg-muted">{t('breakGlassHint')}</p> : null}
 		</section>
 	);
 }

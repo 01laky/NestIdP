@@ -15,6 +15,7 @@ const expectedExports = [
 	'EmptyState',
 	'ErrorBanner',
 	'Fieldset',
+	'LanguageSelect',
 	'LoadingState',
 	'MobileNavToggle',
 	'OperatorSessionBar',

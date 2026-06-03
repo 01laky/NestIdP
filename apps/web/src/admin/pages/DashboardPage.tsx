@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
 	API_CONNECTION_ROUTE_PREFIX,
 	IDENTITY_ROUTE_PREFIX,
@@ -9,12 +10,16 @@ import { AdminApiError, getAdminDashboard } from '../adminApi';
 import { AdminPageHeader } from '../components/AdminPageHeader';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
-import { useDocumentTitle } from '../components/useDocumentTitle';
+import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
+import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
 import { Badge, Panel, StatCard } from '../../ui';
 import { certStatusLabel, certStatusToBadge, lastSyncStatusToBadge } from '../status-badge';
 
 export function DashboardPage() {
-	useDocumentTitle('Dashboard — NestIdP Admin');
+	const { t } = useTranslation('dashboard');
+	const { t: tCommon } = useTranslation('common');
+	const { t: tNav } = useTranslation('nav');
+	useAdminDocumentTitle(t('title'));
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [dashboard, setDashboard] = useState<Awaited<ReturnType<typeof getAdminDashboard>> | null>(
@@ -31,7 +36,16 @@ export function DashboardPage() {
 				}
 			} catch (err) {
 				if (!cancelled) {
-					setError(err instanceof AdminApiError ? err.message : 'Failed to load dashboard');
+					setError(
+						err instanceof AdminApiError
+							? formatAdminApiError(
+									err.statusCode,
+									err.message,
+									resolveI18nKey,
+									'dashboard.loadFailed',
+								)
+							: t('loadFailed'),
+					);
 				}
 			} finally {
 				if (!cancelled) {
@@ -42,10 +56,10 @@ export function DashboardPage() {
 		return () => {
 			cancelled = true;
 		};
-	}, []);
+	}, [t]);
 
 	if (loading) {
-		return <LoadingState message="Loading dashboard…" />;
+		return <LoadingState message={t('loading')} />;
 	}
 
 	if (error) {
@@ -53,30 +67,33 @@ export function DashboardPage() {
 	}
 
 	if (!dashboard) {
-		return <ErrorBanner message="Dashboard unavailable" />;
+		return <ErrorBanner message={t('unavailable')} />;
 	}
 
 	const { counts } = dashboard;
 
 	return (
 		<section>
-			<AdminPageHeader title="Dashboard" subtitle="Identity sync and SAML service providers" />
+			<AdminPageHeader title={t('title')} subtitle={t('subtitle')} />
 			<div className="evg-stats-grid evg-stats-grid--dashboard">
-				<StatCard label="Users" value={counts.users} />
-				<StatCard label="Groups" value={counts.groups} />
-				<StatCard label="Roles" value={counts.roles} />
-				<StatCard label="API connections" value={counts.apiConnections} />
-				<StatCard label="SP connections" value={counts.spConnections} />
+				<StatCard label={t('statUsers')} value={counts.users} />
+				<StatCard label={t('statGroups')} value={counts.groups} />
+				<StatCard label={t('statRoles')} value={counts.roles} />
+				<StatCard label={t('statApiConnections')} value={counts.apiConnections} />
+				<StatCard label={t('statSpConnections')} value={counts.spConnections} />
 			</div>
 			{dashboard.apiConnection ? (
-				<Panel title="Identity source">
+				<Panel title={t('identitySource')}>
 					<p>
-						<strong>{dashboard.apiConnection.name}</strong> — last sync{' '}
+						<strong>{dashboard.apiConnection.name}</strong> — {t('lastSync')}{' '}
 						<Badge variant={lastSyncStatusToBadge(dashboard.lastSyncStatus ?? 'NEVER')}>
-							{dashboard.lastSyncStatus ?? 'NEVER'}
+							{dashboard.lastSyncStatus ?? tCommon('never')}
 						</Badge>
 						{dashboard.lastSyncAt ? (
-							<span className="evg-muted"> at {dashboard.lastSyncAt}</span>
+							<span className="evg-muted">
+								{' '}
+								{tCommon('at')} {dashboard.lastSyncAt}
+							</span>
 						) : null}
 					</p>
 					<p>
@@ -84,20 +101,20 @@ export function DashboardPage() {
 							className="evg-btn evg-btn--link"
 							to={`${API_CONNECTION_ROUTE_PREFIX}/${dashboard.apiConnection.id}/sync`}
 						>
-							Open sync
+							{t('openSync')}
 						</Link>
 					</p>
 				</Panel>
 			) : (
 				<p className="evg-muted">
-					No API connection yet.{' '}
+					{t('noApiConnection')}{' '}
 					<Link className="evg-btn evg-btn--link" to={`${API_CONNECTION_ROUTE_PREFIX}/new`}>
-						Create one
+						{t('createOne')}
 					</Link>
 					.
 				</p>
 			)}
-			<Panel title="IdP configuration">
+			<Panel title={t('idpConfiguration')}>
 				<p>
 					<Badge variant={certStatusToBadge(dashboard.idp.certStatus)}>
 						{certStatusLabel(dashboard.idp.certStatus)}
@@ -105,26 +122,26 @@ export function DashboardPage() {
 				</p>
 				<p>
 					<Link className="evg-btn evg-btn--link" to={dashboard.idp.idpSettingsRoute}>
-						Configure IdP settings
+						{t('configureIdpSettings')}
 					</Link>
 				</p>
 				{dashboard.idp.rotationActive ? (
-					<p className="evg-muted">Complete or cancel certificate rotation in IdP settings.</p>
+					<p className="evg-muted">{t('completeRotationCallout')}</p>
 				) : null}
 				{dashboard.idp.certStatus === 'expiring_soon' && dashboard.idp.signingCertNotAfter ? (
 					<p className="evg-muted">
-						Signing certificate expires on {dashboard.idp.signingCertNotAfter}.
+						{t('certExpiresOn', { date: dashboard.idp.signingCertNotAfter })}
 					</p>
 				) : null}
 				<dl className="evg-dl">
 					<div className="evg-dl__row">
-						<dt>Entity ID</dt>
+						<dt>{tCommon('entityId')}</dt>
 						<dd>
 							<code>{dashboard.entityId}</code>
 						</dd>
 					</div>
 					<div className="evg-dl__row">
-						<dt>Metadata</dt>
+						<dt>{t('metadataUrl')}</dt>
 						<dd>
 							<a href={dashboard.metadataUrl} target="_blank" rel="noreferrer">
 								{dashboard.metadataUrl}
@@ -132,34 +149,32 @@ export function DashboardPage() {
 						</dd>
 					</div>
 					<div className="evg-dl__row">
-						<dt>SSO</dt>
+						<dt>{tCommon('sso')}</dt>
 						<dd>
 							<code>{dashboard.ssoUrl}</code>
 						</dd>
 					</div>
 				</dl>
 			</Panel>
-			<Panel title="Operations">
+			<Panel title={t('operations')}>
 				<p>
 					<Link className="evg-btn evg-btn--link" to={dashboard.auditEventsRoute}>
-						Audit log
+						{tNav('auditLog')}
 					</Link>{' '}
 					·{' '}
 					<Link className="evg-btn evg-btn--link" to={dashboard.adminUsersRoute}>
-						Admin accounts
+						{tNav('adminAccounts')}
 					</Link>
 				</p>
-				<p className="evg-muted">
-					See docs/RELEASE.md in the repository before production go-live.
-				</p>
+				<p className="evg-muted">{t('releaseNote')}</p>
 			</Panel>
 			<p className="evg-muted">
 				<Link className="evg-btn evg-btn--link" to={`${IDENTITY_ROUTE_PREFIX}/users`}>
-					Browse users
+					{t('browseUsers')}
 				</Link>{' '}
 				·{' '}
 				<Link className="evg-btn evg-btn--link" to={SP_CONNECTION_ROUTE_PREFIX}>
-					SP connections
+					{tNav('spConnections')}
 				</Link>
 			</p>
 		</section>

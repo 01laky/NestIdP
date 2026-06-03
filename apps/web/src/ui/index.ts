@@ -10,6 +10,7 @@ export { CodeBlock } from './CodeBlock';
 export { EmptyState } from './EmptyState';
 export { ErrorBanner } from './ErrorBanner';
 export { Fieldset } from './Fieldset';
+export { LanguageSelect } from './LanguageSelect';
 export { LoadingState } from './LoadingState';
 export { MobileNavToggle } from './MobileNavToggle';
 export { OperatorSessionBar } from './OperatorSessionBar';

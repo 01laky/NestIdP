@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { IDP_SETTINGS_ROUTE_PREFIX } from '@nestidp/shared';
 import { AdminApiError, getAdminMe, logoutAdmin } from './adminApi';
 import { ApiConnectionFormPage } from './pages/ApiConnectionFormPage';
@@ -25,6 +26,7 @@ import { SyncLogDetailPage } from './pages/SyncLogDetailPage';
 import { AppShell, EmptyState, LoadingState, ToastProvider } from '../ui';
 
 export function AdminLayout() {
+	const { t } = useTranslation('common');
 	const navigate = useNavigate();
 	const [authState, setAuthState] = useState<'loading' | 'authenticated' | 'unauthenticated'>(
 		'loading',
@@ -73,7 +75,7 @@ export function AdminLayout() {
 	if (authState === 'loading') {
 		return (
 			<div className="evg-auth-layout">
-				<LoadingState message="Loading admin session…" />
+				<LoadingState message={t('loadingAdminSession')} />
 			</div>
 		);
 	}
@@ -116,11 +118,11 @@ export function AdminLayout() {
 						path="*"
 						element={
 							<EmptyState
-								title="Page not found"
-								description="This admin route does not exist."
+								title={t('pageNotFound')}
+								description={t('pageNotFoundDescription')}
 								action={
 									<a className="evg-btn evg-btn--link" href="/admin">
-										Back to dashboard
+										{t('backToDashboard')}
 									</a>
 								}
 							/>

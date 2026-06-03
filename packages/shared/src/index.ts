@@ -14,3 +14,4 @@ export * from './idp-settings.js';
 export * from './admin-users.js';
 export * from './audit-events.js';
 export * from './admin-password-policy.js';
+export * from './i18n.js';

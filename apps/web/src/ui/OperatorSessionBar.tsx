@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ADMIN_USERS_ROUTE_PREFIX } from '@nestidp/shared';
 
 export function OperatorSessionBar({
@@ -8,12 +9,12 @@ export function OperatorSessionBar({
 	username: string;
 	className?: string;
 }) {
+	const { t } = useTranslation('common');
+
 	return (
 		<div className={`evg-operator-bar ${className}`.trim()}>
-			<span>
-				Signed in as <strong>{username}</strong>
-			</span>
-			<Link to={`${ADMIN_USERS_ROUTE_PREFIX}#change-password`}>Change password</Link>
+			<span>{t('signedInAs', { username })}</span>
+			<Link to={`${ADMIN_USERS_ROUTE_PREFIX}#change-password`}>{t('changePassword')}</Link>
 		</div>
 	);
 }

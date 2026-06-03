@@ -1,16 +1,21 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { API_CONNECTION_ROUTE_PREFIX } from '@nestidp/shared';
 import { AdminApiError, listApiConnections } from '../adminApi';
 import { AdminPageHeader } from '../components/AdminPageHeader';
 import { EmptyState } from '../components/EmptyState';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
-import { useDocumentTitle } from '../components/useDocumentTitle';
+import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
+import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
 import { Table } from '../../ui';
 
 export function ApiConnectionsListPage() {
-	useDocumentTitle('API connections — NestIdP Admin');
+	const { t } = useTranslation('apiConnections');
+	const { t: tNav } = useTranslation('nav');
+	const { t: tCommon } = useTranslation('common');
+	useAdminDocumentTitle(t('listTitle'));
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [connections, setConnections] = useState<
@@ -27,7 +32,16 @@ export function ApiConnectionsListPage() {
 				}
 			} catch (err) {
 				if (!cancelled) {
-					setError(err instanceof AdminApiError ? err.message : 'Failed to load connections');
+					setError(
+						err instanceof AdminApiError
+							? formatAdminApiError(
+									err.statusCode,
+									err.message,
+									resolveI18nKey,
+									'apiConnections.loadListFailed',
+								)
+							: t('loadListFailed'),
+					);
 				}
 			} finally {
 				if (!cancelled) {
@@ -38,17 +52,17 @@ export function ApiConnectionsListPage() {
 		return () => {
 			cancelled = true;
 		};
-	}, []);
+	}, [t]);
 
 	return (
 		<section>
 			<AdminPageHeader
-				title="API connections"
-				subtitle="External identity API (Bearer)"
-				breadcrumbs={[{ label: 'Dashboard', to: '/admin' }, { label: 'API connections' }]}
+				title={t('listTitle')}
+				subtitle={t('listSubtitle')}
+				breadcrumbs={[{ label: tNav('dashboard'), to: '/admin' }, { label: t('listTitle') }]}
 				actions={
 					<Link className="evg-btn evg-btn--link" to={`${API_CONNECTION_ROUTE_PREFIX}/new`}>
-						New connection
+						{t('newConnection')}
 					</Link>
 				}
 			/>
@@ -56,11 +70,11 @@ export function ApiConnectionsListPage() {
 			{error ? <ErrorBanner message={error} /> : null}
 			{!loading && !error && connections.length === 0 ? (
 				<EmptyState
-					title="No API connections"
-					description="Create one to sync users, groups, and roles."
+					title={t('noConnections')}
+					description={t('noConnectionsDescription')}
 					action={
 						<Link className="evg-btn evg-btn--link" to={`${API_CONNECTION_ROUTE_PREFIX}/new`}>
-							Create connection
+							{t('createConnection')}
 						</Link>
 					}
 				/>
@@ -69,9 +83,9 @@ export function ApiConnectionsListPage() {
 				<Table>
 					<thead>
 						<tr>
-							<th>Name</th>
-							<th>Base URL</th>
-							<th>Last sync</th>
+							<th>{tCommon('name')}</th>
+							<th>{tCommon('baseUrl')}</th>
+							<th>{t('tableLastSync')}</th>
 							<th />
 						</tr>
 					</thead>
@@ -84,8 +98,13 @@ export function ApiConnectionsListPage() {
 								</td>
 								<td>{connection.lastSyncStatus}</td>
 								<td>
-									<Link to={`${API_CONNECTION_ROUTE_PREFIX}/${connection.id}`}>Edit</Link> ·{' '}
-									<Link to={`${API_CONNECTION_ROUTE_PREFIX}/${connection.id}/sync`}>Sync</Link>
+									<Link to={`${API_CONNECTION_ROUTE_PREFIX}/${connection.id}`}>
+										{t('editLink')}
+									</Link>{' '}
+									·{' '}
+									<Link to={`${API_CONNECTION_ROUTE_PREFIX}/${connection.id}/sync`}>
+										{tCommon('sync')}
+									</Link>
 								</td>
 							</tr>
 						))}

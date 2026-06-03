@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { IDENTITY_ROUTE_PREFIX, identityRoleDetailRoute } from '@nestidp/shared';
 import {
 	AdminApiError,
@@ -10,7 +11,8 @@ import {
 import { AdminPageHeader } from '../components/AdminPageHeader';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
-import { useDocumentTitle } from '../components/useDocumentTitle';
+import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
+import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
 import { Button, ButtonLink, Panel, TextInput, useToast } from '../../ui';
 
 export function IdentityRoleFormPage() {
@@ -18,8 +20,10 @@ export function IdentityRoleFormPage() {
 	const isNew = !id;
 	const navigate = useNavigate();
 	const { showToast } = useToast();
-	useDocumentTitle(isNew ? 'New role — NestIdP Admin' : 'Edit role — NestIdP Admin');
-
+	const { t } = useTranslation('identity');
+	const { t: tNav } = useTranslation('nav');
+	const { t: tCommon } = useTranslation('common');
+	useAdminDocumentTitle(isNew ? t('formNewRole') : t('formEditRole'));
 	const [loading, setLoading] = useState(!isNew);
 	const [error, setError] = useState<string | null>(null);
 	const [readOnlySynced, setReadOnlySynced] = useState(false);
@@ -43,7 +47,16 @@ export function IdentityRoleFormPage() {
 				setName(data.role.name);
 			} catch (err) {
 				if (!cancelled) {
-					setError(err instanceof AdminApiError ? err.message : 'Failed to load role');
+					setError(
+						err instanceof AdminApiError
+							? formatAdminApiError(
+									err.statusCode,
+									err.message,
+									resolveI18nKey,
+									'identity.loadRoleFailed',
+								)
+							: t('loadRoleFailed'),
+					);
 				}
 			} finally {
 				if (!cancelled) {
@@ -54,7 +67,7 @@ export function IdentityRoleFormPage() {
 		return () => {
 			cancelled = true;
 		};
-	}, [id, isNew]);
+	}, [id, isNew, t]);
 
 	async function handleSubmit(event: FormEvent) {
 		event.preventDefault();
@@ -66,15 +79,19 @@ export function IdentityRoleFormPage() {
 		try {
 			if (isNew) {
 				const created = await createIdentityRole({ name: name.trim() });
-				showToast('Role created');
+				showToast(t('toastRoleCreated'));
 				navigate(identityRoleDetailRoute(created.role.id));
 			} else if (id) {
 				const updated = await updateIdentityRole(id, { name: name.trim() });
-				showToast('Role saved');
+				showToast(t('toastRoleSaved'));
 				navigate(identityRoleDetailRoute(updated.role.id));
 			}
 		} catch (err) {
-			setError(err instanceof AdminApiError ? err.message : 'Save failed');
+			setError(
+				err instanceof AdminApiError
+					? formatAdminApiError(err.statusCode, err.message, resolveI18nKey, 'errors.saveFailed')
+					: resolveI18nKey('errors.saveFailed'),
+			);
 		} finally {
 			setSaving(false);
 		}
@@ -87,10 +104,10 @@ export function IdentityRoleFormPage() {
 	if (readOnlySynced && id) {
 		return (
 			<section>
-				<ErrorBanner message="This role is managed by identity sync." />
+				<ErrorBanner message={t('managedBySyncRole')} />
 				<p>
 					<ButtonLink variant="link" to={identityRoleDetailRoute(id)}>
-						View role
+						{t('viewRole')}
 					</ButtonLink>
 				</p>
 			</section>
@@ -100,18 +117,18 @@ export function IdentityRoleFormPage() {
 	return (
 		<section>
 			<AdminPageHeader
-				title={isNew ? 'Create manual role' : 'Edit manual role'}
+				title={isNew ? t('formNewRole') : t('formEditRole')}
 				breadcrumbs={[
-					{ label: 'Dashboard', to: '/admin' },
-					{ label: 'Roles', to: `${IDENTITY_ROUTE_PREFIX}/roles` },
-					{ label: isNew ? 'New' : name || 'Edit' },
+					{ label: tNav('dashboard'), to: '/admin' },
+					{ label: tNav('roles'), to: `${IDENTITY_ROUTE_PREFIX}/roles` },
+					{ label: isNew ? tCommon('new') : name || tCommon('edit') },
 				]}
 			/>
 			{error ? <ErrorBanner message={error} /> : null}
 			<form className="evg-stack" onSubmit={(e) => void handleSubmit(e)} aria-busy={saving}>
-				<Panel title="Role">
+				<Panel title={t('rolePanel')}>
 					<TextInput
-						label="Name"
+						label={tCommon('name')}
 						value={name}
 						onChange={(e) => setName(e.target.value)}
 						requiredMark
@@ -120,10 +137,10 @@ export function IdentityRoleFormPage() {
 				</Panel>
 				<p className="evg-actions">
 					<Button type="submit" disabled={saving}>
-						{isNew ? 'Create role' : 'Save'}
+						{isNew ? t('createRole') : tCommon('save')}
 					</Button>
 					<ButtonLink variant="link" to={`${IDENTITY_ROUTE_PREFIX}/roles`}>
-						Cancel
+						{tCommon('cancel')}
 					</ButtonLink>
 				</p>
 			</form>

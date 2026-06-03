@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { SidebarNav } from './SidebarNav';
 import { MobileNavToggle } from './MobileNavToggle';
 import { OperatorSessionBar } from './OperatorSessionBar';
@@ -12,6 +13,7 @@ export function AppShell({
 	operatorUsername: string | null;
 	onLogout: () => void;
 }) {
+	const { t } = useTranslation('common');
 	const [drawerOpen, setDrawerOpen] = useState(false);
 
 	useEffect(() => {
@@ -27,13 +29,13 @@ export function AppShell({
 	return (
 		<div className="evg-shell evg-shell--with-sidebar">
 			<a href="#evg-main" className="evg-skip-link">
-				Skip to content
+				{t('skipToContent')}
 			</a>
 			{drawerOpen ? (
 				<button
 					type="button"
 					className="evg-drawer-scrim"
-					aria-label="Close menu"
+					aria-label={t('closeMenu')}
 					onClick={() => setDrawerOpen(false)}
 				/>
 			) : null}
@@ -54,7 +56,7 @@ export function AppShell({
 					{operatorUsername ? (
 						<OperatorSessionBar username={operatorUsername} />
 					) : (
-						<span className="evg-muted">Operator console</span>
+						<span className="evg-muted">{t('operatorConsole')}</span>
 					)}
 				</header>
 				<main id="evg-main" className="evg-main">

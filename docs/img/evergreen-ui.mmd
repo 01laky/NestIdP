@@ -1,6 +1,7 @@
 flowchart TB
 	subgraph web["apps/web"]
 		tokens["styles/evergreen/*.css"]
+		i18n["src/i18n — I18nProvider, locales/*.json"]
 		ui["src/ui — AppShell, Toast, Table, …"]
 		pages["admin + login pages"]
 	end
@@ -30,6 +31,7 @@ flowchart TB
 	end
 	tokens --> ui
 	fonts --> tokens
+	i18n --> pages
 	ui --> pages
 	pages --> api["/api/admin/* REST"]
 	pages --> saml["/login SAML UI"]

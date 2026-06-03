@@ -1,7 +1,10 @@
+import { useTranslation } from 'react-i18next';
 import { Button } from './Button';
 import { IconMenu } from './icons';
 
 export function MobileNavToggle({ expanded, onClick }: { expanded: boolean; onClick: () => void }) {
+	const { t } = useTranslation('common');
+
 	return (
 		<Button
 			variant="secondary"
@@ -12,7 +15,7 @@ export function MobileNavToggle({ expanded, onClick }: { expanded: boolean; onCl
 			onClick={onClick}
 		>
 			<IconMenu />
-			<span className="evg-sr-only">Menu</span>
+			<span className="evg-sr-only">{t('menu')}</span>
 		</Button>
 	);
 }

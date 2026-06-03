@@ -251,7 +251,7 @@ describe('IdpSettingsPage', () => {
 
 		renderPage();
 		await waitFor(() => {
-			expect(document.title).toBe('IdP Settings — NestIdP Admin');
+			expect(document.title).toBe('IdP settings — NestIdP Admin');
 		});
 
 		cleanup();
@@ -465,8 +465,9 @@ describe('IdpSettingsPage', () => {
 		renderPage();
 
 		await waitFor(() => {
-			expect(screen.getByRole('link', { name: 'Dashboard' })).toBeDefined();
-			expect(screen.getByText('IdP settings')).toBeDefined();
+			const crumb = screen.getByLabelText('Breadcrumb');
+			expect(crumb.textContent).toContain('Dashboard');
+			expect(crumb.textContent).toContain('IdP settings');
 		});
 	});
 

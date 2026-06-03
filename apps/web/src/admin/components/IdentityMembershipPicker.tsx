@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { IdentityOriginLiteral } from '@nestidp/shared';
 import { AdminApiError, listIdentityGroups, listIdentityRoles } from '../adminApi';
 import { identityOriginLabel } from '../status-badge';
 import { Checkbox, ErrorBanner, Fieldset, TextInput } from '../../ui';
+import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
 
 const MAX_SELECTED = 100;
 const LIST_LIMIT = 200;
@@ -24,6 +26,8 @@ export function IdentityMembershipPicker({
 	onRoleIdsChange,
 	disabled = false,
 }: IdentityMembershipPickerProps) {
+	const { t } = useTranslation('identity');
+	const { t: tNav } = useTranslation('nav');
 	const [loadError, setLoadError] = useState<string | null>(null);
 	const [groups, setGroups] = useState<
 		Array<{ id: string; name: string; origin: IdentityOriginLiteral }>
@@ -61,7 +65,14 @@ export function IdentityMembershipPicker({
 			} catch (err) {
 				if (!cancelled) {
 					setLoadError(
-						err instanceof AdminApiError ? err.message : 'Failed to load groups and roles',
+						err instanceof AdminApiError
+							? formatAdminApiError(
+									err.statusCode,
+									err.message,
+									resolveI18nKey,
+									'identity.loadMembershipFailed',
+								)
+							: t('loadMembershipFailed'),
 					);
 				}
 			}
@@ -69,7 +80,7 @@ export function IdentityMembershipPicker({
 		return () => {
 			cancelled = true;
 		};
-	}, []);
+	}, [t]);
 
 	const filteredGroups = useMemo(() => {
 		const q = groupFilter.trim().toLowerCase();
@@ -111,19 +122,17 @@ export function IdentityMembershipPicker({
 		return (
 			<Fieldset legend={legend} disabled={disabled}>
 				<TextInput
-					label="Filter by name"
+					label={t('filterByName')}
 					labelVisuallyHidden
-					placeholder="Filter by name…"
+					placeholder={t('filterByNamePlaceholder')}
 					value={filter}
 					onChange={(e) => onFilterChange(e.target.value)}
 				/>
 				{atCap ? (
-					<p className="evg-muted">
-						Maximum {MAX_SELECTED} {kind} selected.
-					</p>
+					<p className="evg-muted">{t('maxSelected', { max: MAX_SELECTED, kind })}</p>
 				) : null}
 				{items.length === 0 ? (
-					<p className="evg-muted">No matches</p>
+					<p className="evg-muted">{t('noMatches')}</p>
 				) : (
 					<ul className="evg-stack">
 						{items.map((item) => {
@@ -151,7 +160,7 @@ export function IdentityMembershipPicker({
 			{loadError ? <ErrorBanner message={loadError} /> : null}
 			{renderFieldset(
 				'groups',
-				'Groups',
+				tNav('groups'),
 				filteredGroups,
 				groupFilter,
 				setGroupFilter,
@@ -160,7 +169,7 @@ export function IdentityMembershipPicker({
 			)}
 			{renderFieldset(
 				'roles',
-				'Roles',
+				tNav('roles'),
 				filteredRoles,
 				roleFilter,
 				setRoleFilter,

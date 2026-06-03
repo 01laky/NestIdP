@@ -16,9 +16,9 @@ describe('Evergreen infrastructure', () => {
 		expect(existsSync(join(repoRoot, 'scripts/check-web-bundle-size.mjs'))).toBe(true);
 	});
 
-	it('WEB-EVG-71: bundle script enforces 580 KB budget constant', () => {
+	it('WEB-EVG-71: bundle script enforces 650 KB budget constant', () => {
 		const script = readFileSync(join(repoRoot, 'scripts/check-web-bundle-size.mjs'), 'utf8');
-		expect(script).toContain('580 * 1024');
+		expect(script).toContain('650 * 1024');
 		expect(script).toContain('index-');
 	});
 
@@ -54,5 +54,23 @@ describe('Evergreen infrastructure', () => {
 		const mmd = readFileSync(join(repoRoot, 'docs/img/evergreen-ui.mmd'), 'utf8');
 		expect(mmd).toContain('Checkbox');
 		expect(mmd).toContain('Fieldset');
+	});
+
+	it('WEB-EVG-172: i18n login smoke spec and check-i18n-keys script exist', () => {
+		expect(existsSync(join(webRoot, 'e2e/i18n-login-cs.spec.ts'))).toBe(true);
+		expect(existsSync(join(repoRoot, 'scripts/check-i18n-keys.mjs'))).toBe(true);
+	});
+
+	it('WEB-EVG-173: extended i18n vitest suites exist', () => {
+		const i18nDir = join(webRoot, 'src/i18n');
+		for (const name of [
+			'i18n-edge-extended.test.ts',
+			'i18n-key-parity.test.ts',
+			'api-error-messages.test.ts',
+			'enum-labels.test.ts',
+			'i18n.integration.extended.test.tsx',
+		]) {
+			expect(existsSync(join(i18nDir, name))).toBe(true);
+		}
 	});
 });

@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import type { IdpSettingsPublicDto } from '@nestidp/shared';
 import {
 	IDP_ROTATION_STALE_WARNING_DAYS,
@@ -22,7 +23,8 @@ import { AdminBreadcrumbs } from '../components/AdminBreadcrumbs';
 import { AdminPageHeader } from '../components/AdminPageHeader';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
-import { useDocumentTitle } from '../components/useDocumentTitle';
+import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
+import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
 import { Button, CodeBlock, Panel, Select, TextArea, TextInput, useToast } from '../../ui';
 
 function copyText(label: string, value: string): void {
@@ -59,21 +61,24 @@ function isStaleRotation(startedAt: string | null): boolean {
 	return started <= threshold;
 }
 
-function certStatusLabel(settings: IdpSettingsPublicDto): string {
+function certStatusKey(settings: IdpSettingsPublicDto): string {
 	if (settings.rotation.active) {
-		return 'Rotation in progress';
+		return 'certStatusRotation';
 	}
 	if (!settings.hasSigningCertificate) {
-		return 'No signing certificate';
+		return 'certStatusMissing';
 	}
 	if (isExpiringSoon(settings.signingCertNotAfter)) {
-		return 'Expires soon';
+		return 'certStatusExpiresSoon';
 	}
-	return 'Certificate OK';
+	return 'certStatusOk';
 }
 
 export function IdpSettingsPage() {
-	useDocumentTitle('IdP Settings — NestIdP Admin');
+	const { t } = useTranslation('idpSettings');
+	const { t: tNav } = useTranslation('nav');
+	const { t: tCommon } = useTranslation('common');
+	useAdminDocumentTitle(t('title'));
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [success, setSuccess] = useState<string | null>(null);
@@ -102,7 +107,16 @@ export function IdpSettingsPage() {
 				await reload();
 			} catch (err) {
 				if (!cancelled) {
-					setError(err instanceof AdminApiError ? err.message : 'Failed to load IdP settings');
+					setError(
+						err instanceof AdminApiError
+							? formatAdminApiError(
+									err.statusCode,
+									err.message,
+									resolveI18nKey,
+									'idpSettings.loadFailed',
+								)
+							: t('loadFailed'),
+					);
 				}
 			} finally {
 				if (!cancelled) {
@@ -113,7 +127,7 @@ export function IdpSettingsPage() {
 		return () => {
 			cancelled = true;
 		};
-	}, []);
+	}, [t]);
 
 	async function runMutation(action: () => Promise<void>): Promise<void> {
 		setBusy(true);
@@ -122,7 +136,16 @@ export function IdpSettingsPage() {
 		try {
 			await action();
 		} catch (err) {
-			setError(err instanceof AdminApiError ? err.message : 'Request failed');
+			setError(
+				err instanceof AdminApiError
+					? formatAdminApiError(
+							err.statusCode,
+							err.message,
+							resolveI18nKey,
+							'idpSettings.requestFailed',
+						)
+					: t('requestFailed'),
+			);
 		} finally {
 			setBusy(false);
 		}
@@ -133,8 +156,8 @@ export function IdpSettingsPage() {
 		await runMutation(async () => {
 			await updateIdpSettings({ entityId });
 			await reload();
-			setSuccess('Entity ID updated.');
-			showToast('Entity ID updated');
+			setSuccess(t('successEntityIdUpdated'));
+			showToast(t('toastEntityIdUpdated'));
 		});
 	}
 
@@ -143,32 +166,26 @@ export function IdpSettingsPage() {
 		await runMutation(async () => {
 			await updateIdpSettings({ nameIdFormat });
 			await reload();
-			setSuccess('Default NameID format updated.');
-			showToast('Default NameID format updated');
+			setSuccess(t('successNameIdUpdated'));
+			showToast(t('toastNameIdUpdated'));
 		});
 	}
 
 	async function handleGeneratePrimary() {
-		if (
-			!window.confirm(
-				'Generate a new primary certificate? This replaces the existing primary immediately.',
-			)
-		) {
+		if (!window.confirm(t('confirmGeneratePrimary'))) {
 			return;
 		}
 		await runMutation(async () => {
 			await generateIdpSigningCert();
 			await reload();
-			setSuccess('Primary signing certificate generated.');
-			showToast('Primary signing certificate generated');
+			setSuccess(t('successPrimaryGenerated'));
+			showToast(t('toastPrimaryGenerated'));
 		});
 	}
 
 	async function handleUploadPrimary(event: FormEvent) {
 		event.preventDefault();
-		if (
-			!window.confirm('Upload replaces the existing primary certificate immediately. Continue?')
-		) {
+		if (!window.confirm(t('confirmUploadPrimary'))) {
 			return;
 		}
 		await runMutation(async () => {
@@ -180,50 +197,44 @@ export function IdpSettingsPage() {
 			setUploadCert('');
 			setUploadKey('');
 			await reload();
-			setSuccess('Primary signing certificate uploaded.');
-			showToast('Primary signing certificate uploaded');
+			setSuccess(t('successPrimaryUploaded'));
+			showToast(t('toastPrimaryUploaded'));
 		});
 	}
 
 	async function handleStartRotationGenerate() {
-		if (
-			!window.confirm('Start certificate rotation? Metadata will publish two signing certificates.')
-		) {
+		if (!window.confirm(t('confirmStartRotation'))) {
 			return;
 		}
 		await runMutation(async () => {
 			await startIdpCertRotation({ mode: 'generate' });
 			await reload();
-			setSuccess('Rotation started with a newly generated pending certificate.');
-			showToast('Certificate rotation started');
+			setSuccess(t('successRotationStarted'));
+			showToast(t('toastRotationStarted'));
 		});
 	}
 
 	async function handleCompleteRotation() {
-		if (
-			!window.confirm(
-				'Complete rotation? Pending certificate becomes primary. SPs must already trust the new certificate.',
-			)
-		) {
+		if (!window.confirm(t('confirmCompleteRotation'))) {
 			return;
 		}
 		await runMutation(async () => {
 			await completeIdpCertRotation();
 			await reload();
-			setSuccess('Certificate rotation completed.');
-			showToast('Certificate rotation completed');
+			setSuccess(t('successRotationCompleted'));
+			showToast(t('toastRotationCompleted'));
 		});
 	}
 
 	async function handleCancelRotation() {
-		if (!window.confirm('Cancel rotation and discard the pending certificate?')) {
+		if (!window.confirm(t('confirmCancelRotation'))) {
 			return;
 		}
 		await runMutation(async () => {
 			await cancelIdpCertRotation();
 			await reload();
-			setSuccess('Certificate rotation cancelled.');
-			showToast('Certificate rotation cancelled');
+			setSuccess(t('successRotationCancelled'));
+			showToast(t('toastRotationCancelled'));
 		});
 	}
 
@@ -235,67 +246,66 @@ export function IdpSettingsPage() {
 	}
 
 	if (loading) {
-		return <LoadingState message="Loading IdP settings…" />;
+		return <LoadingState message={t('loading')} />;
 	}
 
 	if (!settings) {
-		return <ErrorBanner message={error ?? 'IdP settings unavailable'} />;
+		return <ErrorBanner message={error ?? t('unavailable')} />;
 	}
 
 	return (
 		<section>
-			<AdminBreadcrumbs items={[{ label: 'Dashboard', to: '/admin' }, { label: 'IdP Settings' }]} />
-			<AdminPageHeader
-				title="IdP settings"
-				subtitle="Global SAML Identity Provider configuration"
+			<AdminBreadcrumbs
+				items={[{ label: tNav('dashboard'), to: '/admin' }, { label: t('title') }]}
 			/>
+			<AdminPageHeader title={t('title')} subtitle={t('subtitle')} />
 			{error ? <ErrorBanner message={error} /> : null}
 			{success ? <p className="evg-success-text">{success}</p> : null}
 
-			<Panel title="Overview">
+			<Panel title={t('overview')}>
 				<ul className="evg-dl">
 					<li>
-						<span>Metadata URL</span>
+						<span>{t('metadataUrl')}</span>
 						<code>{settings.metadataUrl}</code>
 						<Button
 							type="button"
 							variant="link"
 							size="sm"
-							onClick={() => copyText('metadata URL', settings.metadataUrl)}
+							onClick={() => copyText(t('metadataUrl'), settings.metadataUrl)}
 						>
-							Copy
+							{tCommon('copy')}
 						</Button>
 					</li>
 					<li>
-						<span>SSO URL</span>
+						<span>{t('ssoUrl')}</span>
 						<code>{settings.ssoUrl}</code>
 						<Button
 							type="button"
 							variant="link"
 							size="sm"
-							onClick={() => copyText('SSO URL', settings.ssoUrl)}
+							onClick={() => copyText(t('ssoUrl'), settings.ssoUrl)}
 						>
-							Copy
+							{tCommon('copy')}
 						</Button>
 					</li>
 					<li>
-						<span>IdP base URL</span>
+						<span>{t('idpBaseUrl')}</span>
 						<code>{settings.idpBaseUrl}</code>
 					</li>
 				</ul>
 			</Panel>
 
 			{settings.entityId !== settings.idpBaseUrl ? (
-				<ErrorBanner message="Entity ID differs from IDP_BASE_URL. Service providers must update IdP metadata and trust after entity ID changes." />
+				<ErrorBanner message={t('entityIdMismatch')} />
 			) : null}
 
 			{isExpiringSoon(settings.signingCertNotAfter) ? (
 				<p className="evg-callout evg-callout--warning">
-					Signing certificate expires on {settings.signingCertNotAfter} — plan renewal or rotation.
+					{t('certExpiresWarning', { date: settings.signingCertNotAfter })}
 				</p>
 			) : null}
 
-			<Panel title="Entity ID">
+			<Panel title={t('entityIdPanel')}>
 				<form
 					className="evg-stack"
 					aria-busy={busy}
@@ -303,22 +313,20 @@ export function IdpSettingsPage() {
 				>
 					<fieldset className="evg-stack" disabled={busy}>
 						<TextInput
-							label="Entity ID"
+							label={tCommon('entityId')}
 							name="entityId"
 							value={entityId}
 							onChange={(event) => setEntityId(event.target.value)}
 						/>
 						<Button type="submit" variant="primary" disabled={busy}>
-							{busy ? 'Saving…' : 'Save entity ID'}
+							{busy ? tCommon('saving') : t('saveEntityId')}
 						</Button>
 					</fieldset>
 				</form>
 			</Panel>
 
-			<Panel title="Default NameID format">
-				<p className="evg-muted">
-					Used in IdP metadata only. Assertion NameID still comes from each SP connection.
-				</p>
+			<Panel title={t('defaultNameIdFormat')}>
+				<p className="evg-muted">{t('defaultNameIdHint')}</p>
 				<form
 					className="evg-stack"
 					aria-busy={busy}
@@ -326,7 +334,7 @@ export function IdpSettingsPage() {
 				>
 					<fieldset className="evg-stack" disabled={busy}>
 						<Select
-							label="NameID format"
+							label={t('defaultNameIdFormat')}
 							value={nameIdFormat}
 							onChange={(event) => setNameIdFormat(event.target.value)}
 						>
@@ -337,24 +345,24 @@ export function IdpSettingsPage() {
 							))}
 						</Select>
 						<Button type="submit" variant="primary" disabled={busy}>
-							{busy ? 'Saving…' : 'Save NameID format'}
+							{busy ? tCommon('saving') : t('saveNameIdFormat')}
 						</Button>
 					</fieldset>
 				</form>
 			</Panel>
 
-			<Panel title="Signing certificate">
+			<Panel title={t('signingCertificate')}>
 				<p>
-					<span className="evg-badge evg-badge--info">{certStatusLabel(settings)}</span>
+					<span className="evg-badge evg-badge--info">{t(certStatusKey(settings))}</span>
 				</p>
 				<ul className="evg-dl">
 					<li>
-						<span>Fingerprint (SHA-256)</span>
-						<code>{settings.signingCertFingerprintSha256 ?? '—'}</code>
+						<span>{t('fingerprint')}</span>
+						<code>{settings.signingCertFingerprintSha256 ?? tCommon('emDash')}</code>
 					</li>
 					<li>
-						<span>Not after</span>
-						<code>{settings.signingCertNotAfter ?? '—'}</code>
+						<span>{t('notAfter')}</span>
+						<code>{settings.signingCertNotAfter ?? tCommon('emDash')}</code>
 					</li>
 				</ul>
 				<div className="evg-cluster">
@@ -364,7 +372,7 @@ export function IdpSettingsPage() {
 						disabled={busy || settings.rotation.active}
 						onClick={() => void handleGeneratePrimary()}
 					>
-						Generate certificate
+						{t('generateCertificate')}
 					</Button>
 					<Button
 						type="button"
@@ -372,7 +380,7 @@ export function IdpSettingsPage() {
 						disabled={busy || settings.rotation.active}
 						onClick={() => setShowUpload(true)}
 					>
-						Upload certificate
+						{t('uploadCertificate')}
 					</Button>
 					<Button
 						type="button"
@@ -380,13 +388,13 @@ export function IdpSettingsPage() {
 						disabled={busy || settings.rotation.active || !settings.hasSigningCertificate}
 						onClick={() => void handleStartRotationGenerate()}
 					>
-						Start rotation (generate)
+						{t('startRotationGenerate')}
 					</Button>
 				</div>
 			</Panel>
 
 			{showUpload ? (
-				<Panel title="Upload primary certificate">
+				<Panel title={t('uploadPrimary')}>
 					<form
 						className="evg-stack"
 						aria-busy={busy}
@@ -394,22 +402,22 @@ export function IdpSettingsPage() {
 					>
 						<fieldset className="evg-stack" disabled={busy}>
 							<TextArea
-								label="Signing certificate PEM"
+								label={t('signingCertPem')}
 								rows={6}
-								hint="Paste PEM certificate."
+								hint={t('signingCertHint')}
 								value={uploadCert}
 								onChange={(event) => setUploadCert(event.target.value)}
 							/>
 							<TextArea
-								label="Private key PEM"
+								label={t('privateKeyPem')}
 								rows={6}
-								hint="Paste PEM private key."
+								hint={t('privateKeyHint')}
 								value={uploadKey}
 								onChange={(event) => setUploadKey(event.target.value)}
 							/>
 							<div className="evg-cluster">
 								<Button type="submit" variant="primary" disabled={busy}>
-									Upload
+									{tCommon('upload')}
 								</Button>
 								<Button
 									type="button"
@@ -417,7 +425,7 @@ export function IdpSettingsPage() {
 									disabled={busy}
 									onClick={() => setShowUpload(false)}
 								>
-									Cancel
+									{tCommon('cancel')}
 								</Button>
 							</div>
 						</fieldset>
@@ -426,26 +434,25 @@ export function IdpSettingsPage() {
 			) : null}
 
 			{settings.rotation.active ? (
-				<Panel title="Certificate rotation">
+				<Panel title={t('certificateRotation')}>
 					{isStaleRotation(settings.rotation.startedAt) ? (
 						<p className="evg-callout evg-callout--info">
-							Rotation started {settings.rotation.startedAt} — complete cutover or cancel to avoid
-							prolonged dual-cert metadata.
+							{t('rotationStale', { date: settings.rotation.startedAt })}
 						</p>
 					) : null}
 					<p className="evg-muted">
-						Pending fingerprint: {settings.rotation.pendingCertFingerprintSha256 ?? '—'}
+						{t('pendingFingerprint', {
+							fingerprint: settings.rotation.pendingCertFingerprintSha256 ?? tCommon('emDash'),
+						})}
 					</p>
 					<ol className="evg-checklist">
+						<li>{t('rotationStep1')}</li>
 						<li>
-							Verify metadata preview shows two signing KeyDescriptor entries (primary + pending).
+							{t('rotationStep2')}{' '}
+							<Link to={SP_CONNECTION_ROUTE_PREFIX}>{t('openSpConnections')}</Link>
 						</li>
-						<li>
-							Update SP trust — distribute updated IdP metadata to every SP.{' '}
-							<Link to={SP_CONNECTION_ROUTE_PREFIX}>Open SP connections</Link>
-						</li>
-						<li>Test SSO with at least one SP-initiated login before completing rotation.</li>
-						<li>Complete rotation only after steps 1–3.</li>
+						<li>{t('rotationStep3')}</li>
+						<li>{t('rotationStep4')}</li>
 					</ol>
 					<div className="evg-cluster">
 						<Button
@@ -454,7 +461,7 @@ export function IdpSettingsPage() {
 							disabled={busy}
 							onClick={() => void handleCompleteRotation()}
 						>
-							Complete rotation
+							{t('completeRotation')}
 						</Button>
 						<Button
 							type="button"
@@ -462,28 +469,25 @@ export function IdpSettingsPage() {
 							disabled={busy}
 							onClick={() => void handleCancelRotation()}
 						>
-							Cancel rotation
+							{t('cancelRotation')}
 						</Button>
 					</div>
 				</Panel>
 			) : null}
 
-			<Panel title="Metadata preview">
+			<Panel title={t('metadataPreview')}>
 				<Button
 					type="button"
 					variant="secondary"
 					disabled={busy}
 					onClick={() => void handleRefreshMetadataPreview()}
 				>
-					Refresh preview
+					{t('refreshPreview')}
 				</Button>
 				{metadataPreview ? <CodeBlock>{metadataPreview}</CodeBlock> : null}
 			</Panel>
 
-			<p className="evg-callout evg-callout--info">
-				Lazy auto-generation still exists as a dev/test fallback when no certificate is configured,
-				but operators should configure signing material explicitly in production.
-			</p>
+			<p className="evg-callout evg-callout--info">{t('lazyAutoGenNote')}</p>
 		</section>
 	);
 }
