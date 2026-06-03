@@ -13,7 +13,7 @@ import { AdminPageHeader } from '../components/AdminPageHeader';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
 import { useDocumentTitle } from '../components/useDocumentTitle';
-import { Panel, Table, useToast } from '../../ui';
+import { Button, Panel, Table, TextInput, useToast } from '../../ui';
 
 export function AdminUsersPage() {
 	useDocumentTitle('Admin accounts — NestIdP Admin');
@@ -27,6 +27,8 @@ export function AdminUsersPage() {
 	const [currentPassword, setCurrentPassword] = useState('');
 	const [newPassword, setNewPassword] = useState('');
 	const [newPasswordConfirm, setNewPasswordConfirm] = useState('');
+	const [creating, setCreating] = useState(false);
+	const [changingPassword, setChangingPassword] = useState(false);
 	const { showToast } = useToast();
 
 	async function reload() {
@@ -62,6 +64,7 @@ export function AdminUsersPage() {
 			setError('Passwords do not match');
 			return;
 		}
+		setCreating(true);
 		try {
 			await createAdminUser({ username, password });
 			setUsername('');
@@ -71,6 +74,8 @@ export function AdminUsersPage() {
 			showToast('Admin account created');
 		} catch (err) {
 			setError(err instanceof AdminApiError ? err.message : 'Create failed');
+		} finally {
+			setCreating(false);
 		}
 	}
 
@@ -81,6 +86,7 @@ export function AdminUsersPage() {
 			setError('New passwords do not match');
 			return;
 		}
+		setChangingPassword(true);
 		try {
 			await changeAdminPassword({ currentPassword, newPassword });
 			setCurrentPassword('');
@@ -89,6 +95,8 @@ export function AdminUsersPage() {
 			showToast('Password changed');
 		} catch (err) {
 			setError(err instanceof AdminApiError ? err.message : 'Password change failed');
+		} finally {
+			setChangingPassword(false);
 		}
 	}
 
@@ -118,9 +126,10 @@ export function AdminUsersPage() {
 									<td className="evg-muted">{new Date(admin.createdAt).toLocaleString()}</td>
 									<td>
 										{admin.id !== meId && admins.length > 1 ? (
-											<button
+											<Button
 												type="button"
-												className="evg-btn evg-btn--link evg-btn--danger"
+												size="sm"
+												variant="danger"
 												onClick={() => {
 													if (window.confirm(`Delete admin "${admin.username}"?`)) {
 														void deleteAdminUser(admin.id).then(() => reload());
@@ -128,7 +137,7 @@ export function AdminUsersPage() {
 												}}
 											>
 												Delete
-											</button>
+											</Button>
 										) : (
 											<span className="evg-muted">—</span>
 										)}
@@ -139,78 +148,91 @@ export function AdminUsersPage() {
 					</Table>
 
 					<Panel title="Create admin">
-						<form className="evg-stack" onSubmit={(e) => void handleCreate(e)}>
-							<h2>Create admin</h2>
-							<label>
-								Username
-								<input value={username} onChange={(e) => setUsername(e.target.value)} required />
-							</label>
-							<label>
-								Password
-								<input
+						<form className="evg-stack" aria-busy={creating} onSubmit={(e) => void handleCreate(e)}>
+							<fieldset className="evg-stack" disabled={creating}>
+								<TextInput
+									label="Username"
+									name="username"
+									value={username}
+									onChange={(e) => setUsername(e.target.value)}
+									required
+									requiredMark
+								/>
+								<TextInput
+									label="Password"
+									name="password"
 									type="password"
 									value={password}
 									onChange={(e) => setPassword(e.target.value)}
 									required
+									requiredMark
 								/>
-							</label>
-							<label>
-								Confirm password
-								<input
+								<TextInput
+									label="Confirm password"
+									name="confirmPassword"
 									type="password"
 									value={confirmPassword}
 									onChange={(e) => setConfirmPassword(e.target.value)}
 									required
+									requiredMark
 								/>
-							</label>
-							<button type="submit" className="evg-btn evg-btn--primary">
-								Create admin
-							</button>
+								<Button type="submit" variant="primary" disabled={creating}>
+									{creating ? 'Creating…' : 'Create admin'}
+								</Button>
+							</fieldset>
 						</form>
 					</Panel>
 
 					<Panel title="Change my password" id="change-password">
-						<form className="evg-stack" onSubmit={(e) => void handleChangeMyPassword(e)}>
+						<form
+							className="evg-stack"
+							aria-busy={changingPassword}
+							onSubmit={(e) => void handleChangeMyPassword(e)}
+						>
 							<p className="evg-muted">
 								Uses a separate endpoint; other admins can reset your password via PATCH without
 								knowing your current password.
 							</p>
-							<label>
-								Current password
-								<input
+							<fieldset className="evg-stack" disabled={changingPassword}>
+								<TextInput
+									label="Current password"
+									name="currentPassword"
 									type="password"
 									value={currentPassword}
 									onChange={(e) => setCurrentPassword(e.target.value)}
 									required
+									requiredMark
 								/>
-							</label>
-							<label>
-								New password
-								<input
+								<TextInput
+									label="New password"
+									name="newPassword"
 									type="password"
 									value={newPassword}
 									onChange={(e) => setNewPassword(e.target.value)}
 									required
+									requiredMark
 								/>
-							</label>
-							<label>
-								Confirm new password
-								<input
+								<TextInput
+									label="Confirm new password"
+									name="newPasswordConfirm"
 									type="password"
 									value={newPasswordConfirm}
 									onChange={(e) => setNewPasswordConfirm(e.target.value)}
 									required
+									requiredMark
 								/>
-							</label>
-							<button type="submit" className="evg-btn evg-btn--primary">
-								Update my password
-							</button>
+								<Button type="submit" variant="primary" disabled={changingPassword}>
+									{changingPassword ? 'Updating…' : 'Update my password'}
+								</Button>
+							</fieldset>
 						</form>
 					</Panel>
 				</>
 			) : null}
 			<p className="evg-muted">
-				<Link to={ADMIN_USERS_ROUTE_PREFIX}>Refresh</Link>
+				<Link className="evg-btn evg-btn--link" to={ADMIN_USERS_ROUTE_PREFIX}>
+					Refresh
+				</Link>
 			</p>
 		</section>
 	);

@@ -5,6 +5,7 @@ export type TextInputProps = InputHTMLAttributes<HTMLInputElement> & {
 	hint?: string;
 	error?: string;
 	requiredMark?: boolean;
+	labelVisuallyHidden?: boolean;
 };
 
 export function TextInput({
@@ -12,6 +13,7 @@ export function TextInput({
 	hint,
 	error,
 	requiredMark,
+	labelVisuallyHidden,
 	id,
 	className = '',
 	...rest
@@ -20,7 +22,7 @@ export function TextInput({
 
 	return (
 		<label className="evg-field" htmlFor={inputId}>
-			<span className="evg-field__label">
+			<span className={`evg-field__label${labelVisuallyHidden ? ' evg-sr-only' : ''}`.trim()}>
 				{label}
 				{requiredMark ? <span className="evg-muted"> (required)</span> : null}
 			</span>

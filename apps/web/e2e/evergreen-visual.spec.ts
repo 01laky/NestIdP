@@ -99,4 +99,55 @@ test.describe('Evergreen visual baselines', () => {
 		await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
 		await expect(page).toHaveScreenshot('dashboard-1280.png', { fullPage: true });
 	});
+
+	test('api connection form desktop 1280×720', async ({ page }) => {
+		await mockAuthenticatedAdmin(page);
+		await page.route('**/api/admin/api-connections', async (route) => {
+			if (route.request().method() === 'GET') {
+				await route.fulfill({
+					status: 200,
+					contentType: 'application/json',
+					body: JSON.stringify({ connections: [] }),
+				});
+				return;
+			}
+			await route.continue();
+		});
+		await page.setViewportSize({ width: 1280, height: 720 });
+		await page.goto('/admin/api-connections/new');
+		await expect(page.getByRole('heading', { name: 'New API connection' })).toBeVisible();
+		await expect(page.locator('input[name="name"]')).toBeVisible();
+		await expect(page).toHaveScreenshot('api-connection-form-1280.png', { fullPage: true });
+	});
+
+	test('idp settings desktop 1280×720', async ({ page }) => {
+		await mockAuthenticatedAdmin(page);
+		await page.route('**/api/admin/idp/settings', async (route) => {
+			await route.fulfill({
+				status: 200,
+				contentType: 'application/json',
+				body: JSON.stringify({
+					entityId: 'http://localhost:3000',
+					nameIdFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
+					hasSigningCertificate: true,
+					signingCertFingerprintSha256: 'aa:bb:cc',
+					signingCertNotAfter: '2030-01-01T00:00:00.000Z',
+					metadataUrl: 'http://localhost:3000/saml/metadata',
+					ssoUrl: 'http://localhost:3000/saml/sso',
+					idpBaseUrl: 'http://localhost:3000',
+					rotation: {
+						active: false,
+						startedAt: null,
+						hasPendingCertificate: false,
+						pendingCertFingerprintSha256: null,
+					},
+					updatedAt: '2026-01-01T00:00:00.000Z',
+				}),
+			});
+		});
+		await page.setViewportSize({ width: 1280, height: 720 });
+		await page.goto('/admin/settings/idp');
+		await expect(page.getByRole('heading', { name: 'IdP settings' })).toBeVisible();
+		await expect(page).toHaveScreenshot('idp-settings-1280.png', { fullPage: true });
+	});
 });

@@ -15,7 +15,7 @@ import { AttributeMappingEditor } from '../components/AttributeMappingEditor';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
 import { useDocumentTitle } from '../components/useDocumentTitle';
-import { useToast } from '../../ui';
+import { Button, Checkbox, Panel, Select, TextArea, TextInput, useToast } from '../../ui';
 
 export function SpConnectionFormPage() {
 	const { id } = useParams();
@@ -141,64 +141,93 @@ export function SpConnectionFormPage() {
 				]}
 			/>
 			{error ? <ErrorBanner message={error} /> : null}
-			<form onSubmit={(event) => void handleSubmit(event)}>
-				<label>
-					Name
-					<input value={name} onChange={(e) => setName(e.target.value)} required />
-				</label>
-				<label>
-					SP Entity ID
-					<input value={spEntityId} onChange={(e) => setSpEntityId(e.target.value)} required />
-				</label>
-				<label>
-					ACS URL
-					<input value={acsUrl} onChange={(e) => setAcsUrl(e.target.value)} required />
-				</label>
-				<label>
-					NameID format
-					<select value={nameIdFormat} onChange={(e) => setNameIdFormat(e.target.value)}>
-						<option value="">(default)</option>
-						{SAML_NAME_ID_FORMATS.map((format) => (
-							<option key={format} value={format}>
-								{format}
-							</option>
-						))}
-					</select>
-				</label>
-				<label>
-					<input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />{' '}
-					Active
-				</label>
-				<AttributeMappingEditor value={attributeMapping} onChange={setAttributeMapping} />
-				<label>
-					SP certificate PEM (optional)
-					<textarea
-						rows={4}
-						value={spCertificate}
-						onChange={(e) => setSpCertificate(e.target.value)}
-					/>
-				</label>
-				<button type="submit" disabled={saving}>
-					{saving ? 'Saving…' : 'Save'}
-				</button>
-			</form>
+			<Panel title="SP connection">
+				<form
+					className="evg-stack"
+					aria-busy={saving}
+					onSubmit={(event) => void handleSubmit(event)}
+				>
+					<fieldset className="evg-stack" disabled={saving}>
+						<TextInput
+							label="Name"
+							name="name"
+							value={name}
+							onChange={(e) => setName(e.target.value)}
+							required
+							requiredMark
+						/>
+						<TextInput
+							label="SP Entity ID"
+							name="spEntityId"
+							value={spEntityId}
+							onChange={(e) => setSpEntityId(e.target.value)}
+							required
+							requiredMark
+						/>
+						<TextInput
+							label="ACS URL"
+							name="acsUrl"
+							value={acsUrl}
+							onChange={(e) => setAcsUrl(e.target.value)}
+							required
+							requiredMark
+						/>
+						<Select
+							label="NameID format"
+							value={nameIdFormat}
+							onChange={(e) => setNameIdFormat(e.target.value)}
+						>
+							<option value="">(default)</option>
+							{SAML_NAME_ID_FORMATS.map((format) => (
+								<option key={format} value={format}>
+									{format}
+								</option>
+							))}
+						</Select>
+						<Checkbox label="Active" checked={active} onChange={setActive} />
+						<AttributeMappingEditor
+							value={attributeMapping}
+							onChange={setAttributeMapping}
+							disabled={saving}
+						/>
+						<TextArea
+							label="SP certificate PEM (optional)"
+							rows={4}
+							hint="Paste PEM certificate for SP signature verification."
+							value={spCertificate}
+							onChange={(e) => setSpCertificate(e.target.value)}
+						/>
+						<Button type="submit" variant="primary" disabled={saving}>
+							{saving ? 'Saving…' : 'Save'}
+						</Button>
+					</fieldset>
+				</form>
+			</Panel>
 			{!isNew && id ? (
-				<p>
-					<button type="button" onClick={() => void handleTestAcs()}>
-						Test ACS reachability
-					</button>{' '}
-					<button
+				<div className="evg-cluster">
+					<Button
 						type="button"
-						className="evg-btn evg-btn--danger"
+						variant="secondary"
+						disabled={saving}
+						onClick={() => void handleTestAcs()}
+					>
+						Test ACS reachability
+					</Button>
+					<Button
+						type="button"
+						variant="danger"
+						disabled={saving}
 						onClick={() => void handleDeactivateAndDelete()}
 					>
 						Deactivate & delete
-					</button>
+					</Button>
 					{acsTestMessage ? <span className="evg-muted"> — {acsTestMessage}</span> : null}
-				</p>
+				</div>
 			) : null}
 			<p>
-				<Link to={SP_CONNECTION_ROUTE_PREFIX}>Back to list</Link>
+				<Link className="evg-btn evg-btn--link" to={SP_CONNECTION_ROUTE_PREFIX}>
+					Back to list
+				</Link>
 			</p>
 		</section>
 	);

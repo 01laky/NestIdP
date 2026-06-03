@@ -383,9 +383,11 @@ curl -s -b "$COOKIE_JAR" "http://localhost:3000/api/admin/sync/CONNECTION_ID/log
 
 Custom NestJS `SamlModule` (xmlbuilder2 + xml-crypto) — SP-initiated SSO, signed assertions, metadata. Flow: [sso-flow.svg](./img/sso-flow.svg) (see [proposal.MD](./proposal.MD) §6.2). `/saml/slo` remains unimplemented (501).
 
-## Evergreen UI (v1.1.0+)
+## Evergreen UI (v1.1.0+, admin forms complete in v1.1.3)
 
 Operator console and SAML login use the **Evergreen** design system: CSS tokens under `apps/web/src/styles/evergreen/`, React primitives under `apps/web/src/ui/` (import from `ui/index.ts` barrel). No Tailwind or runtime CSS-in-JS.
+
+**v1.1.3+:** all admin CRUD/filter pages must use `ui/` primitives (`TextInput`, `Button`, `Select`, `TextArea`, `Checkbox`, `Fieldset`, `Panel`); raw HTML form controls are not styled.
 
 ![Evergreen UI layering](./img/evergreen-ui.svg)
 
@@ -401,41 +403,53 @@ Breakpoints: mobile-first; sidebar drawer below **768px** (`AppShell` + menu but
 
 ### Component chooser
 
-| Need                 | Component                   | Notes                                                         |
-| -------------------- | --------------------------- | ------------------------------------------------------------- |
-| Page title + actions | `PageHeader`                | Actions slot right; wrap on mobile                            |
-| Section grouping     | `Panel`                     | Bordered; optional `id` for anchors (e.g. `#change-password`) |
-| Highlight metric     | `StatCard`                  | Dashboard stat grid                                           |
-| Floating feedback    | `Toast` via `useToast()`    | Success after POST; not for field validation                  |
-| Inline page errors   | `ErrorBanner`               | Top of form; persists until fixed                             |
-| Empty list           | `EmptyState`                | Optional CTA                                                  |
-| Loading list/page    | `LoadingState`              | Centred spinner + message                                     |
-| Tabular data         | `Table`                     | Horizontal scroll wrapper; wide tables on small viewports     |
-| PEM / JSON / logs    | `CodeBlock`                 | Scrollable monospace                                          |
-| Sync/cert/API status | `Badge` + `status-badge.ts` | Do not hand-pick colours per page                             |
-| Destructive action   | `Button variant="danger"`   | Confirm in copy only (no modal in 1.1.0)                      |
-| Operator identity    | `OperatorSessionBar`        | Admin shell only, not login pages                             |
+| Need                 | Component                   | Notes                                                              |
+| -------------------- | --------------------------- | ------------------------------------------------------------------ |
+| Page title + actions | `PageHeader`                | Actions slot right; wrap on mobile                                 |
+| Section grouping     | `Panel`                     | Bordered; optional `id` for anchors (e.g. `#change-password`)      |
+| Text / password      | `TextInput`                 | `requiredMark`, `labelVisuallyHidden` for compact search rows      |
+| Multi-line / PEM     | `TextArea`                  | Paste PEM on IdP settings (no file picker in v1.1.3)               |
+| Dropdown             | `Select`                    | NameID format, audit category, mapping presets                     |
+| Boolean flag         | `Checkbox`                  | SP active, sync dry-run                                            |
+| Grouped mapping      | `Fieldset`                  | Attribute mapping editor legend + fields                           |
+| Submit / actions     | `Button`                    | `primary` / `secondary` / `danger` / `link`; `size="sm"` in tables |
+| Highlight metric     | `StatCard`                  | Dashboard stat grid                                                |
+| Floating feedback    | `Toast` via `useToast()`    | Success after POST; not for field validation                       |
+| Inline page errors   | `ErrorBanner`               | Top of form; persists until fixed                                  |
+| Empty list           | `EmptyState`                | Optional CTA                                                       |
+| Loading list/page    | `LoadingState`              | Centred spinner + message                                          |
+| Tabular data         | `Table`                     | Horizontal scroll wrapper; wide tables on small viewports          |
+| PEM / JSON / logs    | `CodeBlock`                 | Scrollable monospace                                               |
+| Sync/cert/API status | `Badge` + `status-badge.ts` | Do not hand-pick colours per page                                  |
+| Operator identity    | `OperatorSessionBar`        | Admin shell only, not login pages                                  |
+
+Form busy state: wrap fields in `<fieldset disabled={busy}>` and set `aria-busy` on `<form>` during saves.
+
+Future **`FileInput`** (v1.2): if operators need PEM file picker, use `evg-file-input` + `FileReader` — no API change.
 
 Dark mode is deferred to v1.2.0 (light theme only in 1.1.0).
 
 ### Web tests and visual baselines
 
-Vitest IDs **`WEB-EVG-01`–`72`** cover primitives, styles, conventions (static grep), toast
-mutation flows, Login SSO UI states, dashboard badge mappers, and infra checks. Baseline registry
-**`WEB-EVG-01`–`23`**; extended edge cases **`WEB-EVG-24`–`72`**. Existing **`WEB-ADM-*`** /
-**`WEB-AUTH-*`** must stay green.
+Vitest IDs **`WEB-EVG-01`–`168`** cover primitives, styles, conventions (static grep), toast
+mutation flows, Login SSO UI states, dashboard badge mappers, admin form migrations, extended admin
+form edge cases, and infra checks.
+Existing **`WEB-ADM-*`** / **`WEB-AUTH-*`** must stay green.
 
-| Range           | Focus                                                                                 |
-| --------------- | ------------------------------------------------------------------------------------- |
-| `01`–`23`       | Core Evergreen acceptance (AppShell, primitives, styles, Playwright/bundle infra)     |
-| `24`–`37`       | UI primitive edge cases (all `Button`/`Badge` variants, form errors, `Panel` anchors) |
-| `38`–`40`       | Static conventions (no legacy CSS classes, barrel imports, `main.tsx` entry)          |
-| `41`–`46`       | Toast on six admin mutation flows (API/SP/sync/admins/IdP/audit export)               |
-| `47`–`50`       | `status-badge.ts` unknown/fallback/active-flag edges                                  |
-| `51`–`53`, `15` | `ToastProvider` queue max 3, `aria-live`, `useToast` guard                            |
-| `54`–`57`, `70` | `AppShell` drawer scrim, logout, a11y, `OperatorSessionBar` deep link                 |
-| `58`–`60`       | `print.css` + dark-theme deferral                                                     |
-| `61`–`72`       | Barrel exports, bundle script, Playwright PNGs, Login SSO, Dashboard badges           |
+| Range           | Focus                                                                                                                                                                                                     |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `01`–`23`       | Core Evergreen acceptance (AppShell, primitives, styles, Playwright/bundle infra)                                                                                                                         |
+| `24`–`37`       | UI primitive edge cases (all `Button`/`Badge` variants, form errors, `Panel` anchors)                                                                                                                     |
+| `38`–`40`       | Static conventions (no legacy CSS classes, barrel imports, `main.tsx` entry)                                                                                                                              |
+| `41`–`46`       | Toast on six admin mutation flows (API/SP/sync/admins/IdP/audit export)                                                                                                                                   |
+| `47`–`50`       | `status-badge.ts` unknown/fallback/active-flag edges                                                                                                                                                      |
+| `51`–`53`, `15` | `ToastProvider` queue max 3, `aria-live`, `useToast` guard                                                                                                                                                |
+| `54`–`57`, `70` | `AppShell` drawer scrim, logout, a11y, `OperatorSessionBar` deep link                                                                                                                                     |
+| `58`–`60`       | `print.css` + dark-theme deferral                                                                                                                                                                         |
+| `61`–`72`       | Barrel exports, bundle script, Playwright PNGs, Login SSO, Dashboard badges                                                                                                                               |
+| `73`–`108`      | Admin form static guards, `Checkbox`/`Fieldset`, per-page `*.evergreen-forms.test.tsx`, a11y smoke, six Playwright baselines, diagram                                                                     |
+| `109`–`118`     | `Checkbox`/`Fieldset`/`TextInput` edge cases (`checkbox-fieldset-edge.test.tsx`)                                                                                                                          |
+| `119`–`168`     | Admin form edge cases: save/busy, Panel titles, IdP rotation/expiry, sync dry-run, badges, static barrel guards (`admin-forms-evergreen-edge.test.tsx`, `AttributeMappingEditor.evergreen-edge.test.tsx`) |
 
 ```bash
 pnpm --filter @nestidp/web test
@@ -447,7 +461,7 @@ pnpm --filter @nestidp/web test:e2e:visual
 pnpm --filter @nestidp/web test:e2e:visual:update
 ```
 
-Committed screenshots: `apps/web/e2e/screenshots/*.png` (four baselines: admin login and dashboard at 375px and 1280px).
+Committed screenshots: `apps/web/e2e/screenshots/*.png` (six baselines: login, dashboard, API connection form, IdP settings).
 
 ## Testing
 

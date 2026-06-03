@@ -170,10 +170,10 @@ describe('IdpSettingsPage', () => {
 		await waitFor(() => screen.getByRole('button', { name: 'Upload certificate' }));
 		fireEvent.click(screen.getByRole('button', { name: 'Upload certificate' }));
 
-		fireEvent.change(screen.getByLabelText('Signing certificate PEM'), {
+		fireEvent.change(screen.getByLabelText(/^Signing certificate PEM/), {
 			target: { value: '-----BEGIN CERTIFICATE-----\ncert\n-----END CERTIFICATE-----' },
 		});
-		fireEvent.change(screen.getByLabelText('Private key PEM'), {
+		fireEvent.change(screen.getByLabelText(/^Private key PEM/), {
 			target: { value: '-----BEGIN PRIVATE KEY-----\nkey\n-----END PRIVATE KEY-----' },
 		});
 		fireEvent.click(screen.getByRole('button', { name: 'Upload' }));
@@ -352,10 +352,10 @@ describe('IdpSettingsPage', () => {
 		await waitFor(() => screen.getByRole('button', { name: 'Upload certificate' }));
 		fireEvent.click(screen.getByRole('button', { name: 'Upload certificate' }));
 
-		fireEvent.change(screen.getByLabelText('Signing certificate PEM'), {
+		fireEvent.change(screen.getByLabelText(/^Signing certificate PEM/), {
 			target: { value: 'cert-pem' },
 		});
-		fireEvent.change(screen.getByLabelText('Private key PEM'), {
+		fireEvent.change(screen.getByLabelText(/^Private key PEM/), {
 			target: { value: 'key-pem' },
 		});
 		fireEvent.click(screen.getByRole('button', { name: 'Upload' }));

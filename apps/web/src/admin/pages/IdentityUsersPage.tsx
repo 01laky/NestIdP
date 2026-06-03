@@ -7,7 +7,7 @@ import { EmptyState } from '../components/EmptyState';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
 import { useDocumentTitle } from '../components/useDocumentTitle';
-import { Table } from '../../ui';
+import { Button, Table, TextInput } from '../../ui';
 
 export function IdentityUsersPage() {
 	useDocumentTitle('Users — NestIdP Admin');
@@ -52,12 +52,16 @@ export function IdentityUsersPage() {
 				]}
 			/>
 			<form className="evg-inline-form" onSubmit={handleSearch}>
-				<input
+				<TextInput
+					label="Search"
+					labelVisuallyHidden
 					placeholder="Search username or email"
 					value={search}
 					onChange={(e) => setSearch(e.target.value)}
 				/>
-				<button type="submit">Search</button>
+				<Button type="submit" variant="secondary">
+					Search
+				</Button>
 			</form>
 			{loading ? <LoadingState /> : null}
 			{error ? <ErrorBanner message={error} /> : null}
@@ -71,27 +75,21 @@ export function IdentityUsersPage() {
 							<th>Username</th>
 							<th>Email</th>
 							<th>Active</th>
-							<th />
 						</tr>
 					</thead>
 					<tbody>
 						{items.map((user) => (
 							<tr key={user.id}>
-								<td>{user.username}</td>
-								<td>{user.email ?? '—'}</td>
-								<td>{user.active ? 'yes' : 'no'}</td>
 								<td>
-									<Link to={`${IDENTITY_ROUTE_PREFIX}/users/${user.id}`}>Detail</Link>
+									<Link to={`${IDENTITY_ROUTE_PREFIX}/users/${user.id}`}>{user.username}</Link>
 								</td>
+								<td>{user.email ?? '—'}</td>
+								<td>{user.active ? 'Yes' : 'No'}</td>
 							</tr>
 						))}
 					</tbody>
 				</Table>
 			) : null}
-			<p>
-				<Link to={`${IDENTITY_ROUTE_PREFIX}/groups`}>Groups</Link> ·{' '}
-				<Link to={`${IDENTITY_ROUTE_PREFIX}/roles`}>Roles</Link>
-			</p>
 		</section>
 	);
 }

@@ -13,7 +13,7 @@ import { AdminPageHeader } from '../components/AdminPageHeader';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
 import { useDocumentTitle } from '../components/useDocumentTitle';
-import { useToast } from '../../ui';
+import { Button, Panel, TextInput, useToast } from '../../ui';
 
 export function ApiConnectionFormPage() {
 	const { id } = useParams();
@@ -130,45 +130,69 @@ export function ApiConnectionFormPage() {
 				]}
 			/>
 			{error ? <ErrorBanner message={error} /> : null}
-			<form onSubmit={(event) => void handleSubmit(event)}>
-				<label>
-					Name
-					<input value={name} onChange={(e) => setName(e.target.value)} required />
-				</label>
-				<label>
-					Base URL
-					<input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} required />
-				</label>
-				<label>
-					Bearer token {isNew ? '' : '(leave blank to keep)'}
-					<input
-						type="password"
-						value={bearerToken}
-						onChange={(e) => setBearerToken(e.target.value)}
-						required={isNew}
-					/>
-				</label>
-				<button type="submit" disabled={saving}>
-					{saving ? 'Saving…' : 'Save'}
-				</button>
-			</form>
+			<Panel title="Connection details">
+				<form
+					className="evg-stack"
+					aria-busy={saving}
+					onSubmit={(event) => void handleSubmit(event)}
+				>
+					<fieldset className="evg-stack" disabled={saving}>
+						<TextInput
+							label="Name"
+							name="name"
+							value={name}
+							onChange={(e) => setName(e.target.value)}
+							required
+							requiredMark={isNew}
+						/>
+						<TextInput
+							label="Base URL"
+							name="baseUrl"
+							value={baseUrl}
+							onChange={(e) => setBaseUrl(e.target.value)}
+							required
+							requiredMark={isNew}
+						/>
+						<TextInput
+							label={isNew ? 'Bearer token' : 'Bearer token (leave blank to keep)'}
+							name="bearerToken"
+							type="password"
+							value={bearerToken}
+							onChange={(e) => setBearerToken(e.target.value)}
+							required={isNew}
+							requiredMark={isNew}
+						/>
+						<Button type="submit" variant="primary" disabled={saving}>
+							{saving ? 'Saving…' : 'Save'}
+						</Button>
+					</fieldset>
+				</form>
+			</Panel>
 			{!isNew && id ? (
-				<p>
-					<button type="button" onClick={() => void handleTest()}>
-						Test connectivity
-					</button>{' '}
-					<button
+				<div className="evg-cluster">
+					<Button
 						type="button"
-						className="evg-btn evg-btn--danger"
+						variant="secondary"
+						disabled={saving}
+						onClick={() => void handleTest()}
+					>
+						Test connectivity
+					</Button>
+					<Button
+						type="button"
+						variant="danger"
+						disabled={saving}
 						onClick={() => void handleDelete()}
 					>
 						Delete
-					</button>
+					</Button>
 					{testMessage ? <span className="evg-muted"> — {testMessage}</span> : null}
-				</p>
+				</div>
 			) : null}
 			<p>
-				<Link to={API_CONNECTION_ROUTE_PREFIX}>Back to list</Link>
+				<Link className="evg-btn evg-btn--link" to={API_CONNECTION_ROUTE_PREFIX}>
+					Back to list
+				</Link>
 			</p>
 		</section>
 	);

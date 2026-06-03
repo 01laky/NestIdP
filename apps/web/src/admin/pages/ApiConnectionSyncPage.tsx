@@ -12,7 +12,7 @@ import { AdminPageHeader } from '../components/AdminPageHeader';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
 import { useDocumentTitle } from '../components/useDocumentTitle';
-import { useToast } from '../../ui';
+import { Button, Checkbox, Panel, useToast } from '../../ui';
 
 export function ApiConnectionSyncPage() {
 	const { id } = useParams<{ id: string }>();
@@ -104,19 +104,20 @@ export function ApiConnectionSyncPage() {
 			/>
 			{error ? <ErrorBanner message={error} /> : null}
 			<p className="evg-muted">Current status: {status}</p>
-			<form onSubmit={(event) => void handleSync(event)}>
-				<label>
-					<input
-						type="checkbox"
-						checked={dryRun}
-						onChange={(event) => setDryRun(event.target.checked)}
-					/>{' '}
-					Dry run (no DB writes)
-				</label>
-				<button type="submit" disabled={syncing}>
-					{syncing ? 'Running…' : dryRun ? 'Run dry sync' : 'Run full sync'}
-				</button>
-			</form>
+			<Panel title="Run sync">
+				<form
+					className="evg-stack"
+					aria-busy={syncing}
+					onSubmit={(event) => void handleSync(event)}
+				>
+					<fieldset className="evg-stack" disabled={syncing}>
+						<Checkbox label="Dry run (no DB writes)" checked={dryRun} onChange={setDryRun} />
+						<Button type="submit" variant="primary" disabled={syncing}>
+							{syncing ? 'Running…' : dryRun ? 'Run dry sync' : 'Run full sync'}
+						</Button>
+					</fieldset>
+				</form>
+			</Panel>
 			{message ? <p className="evg-muted">{message}</p> : null}
 			<h3>Recent logs</h3>
 			{logs.length === 0 ? (

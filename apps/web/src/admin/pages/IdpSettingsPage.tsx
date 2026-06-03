@@ -23,7 +23,7 @@ import { AdminPageHeader } from '../components/AdminPageHeader';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
 import { useDocumentTitle } from '../components/useDocumentTitle';
-import { useToast } from '../../ui';
+import { Button, CodeBlock, Panel, Select, TextArea, TextInput, useToast } from '../../ui';
 
 function copyText(label: string, value: string): void {
 	void (async () => {
@@ -252,37 +252,38 @@ export function IdpSettingsPage() {
 			{error ? <ErrorBanner message={error} /> : null}
 			{success ? <p className="evg-success-text">{success}</p> : null}
 
-			<div className="evg-panel">
-				<h3>Overview</h3>
+			<Panel title="Overview">
 				<ul className="evg-dl">
 					<li>
 						<span>Metadata URL</span>
 						<code>{settings.metadataUrl}</code>
-						<button
+						<Button
 							type="button"
-							className="evg-btn evg-btn--link evg-btn--sm"
+							variant="link"
+							size="sm"
 							onClick={() => copyText('metadata URL', settings.metadataUrl)}
 						>
 							Copy
-						</button>
+						</Button>
 					</li>
 					<li>
 						<span>SSO URL</span>
 						<code>{settings.ssoUrl}</code>
-						<button
+						<Button
 							type="button"
-							className="evg-btn evg-btn--link evg-btn--sm"
+							variant="link"
+							size="sm"
 							onClick={() => copyText('SSO URL', settings.ssoUrl)}
 						>
 							Copy
-						</button>
+						</Button>
 					</li>
 					<li>
 						<span>IdP base URL</span>
 						<code>{settings.idpBaseUrl}</code>
 					</li>
 				</ul>
-			</div>
+			</Panel>
 
 			{settings.entityId !== settings.idpBaseUrl ? (
 				<ErrorBanner message="Entity ID differs from IDP_BASE_URL. Service providers must update IdP metadata and trust after entity ID changes." />
@@ -294,42 +295,55 @@ export function IdpSettingsPage() {
 				</p>
 			) : null}
 
-			<form className="evg-panel evg-stack" onSubmit={(event) => void handleSaveEntityId(event)}>
-				<h3>Entity ID</h3>
-				<label>
-					Entity ID
-					<input value={entityId} onChange={(event) => setEntityId(event.target.value)} />
-				</label>
-				<button type="submit" disabled={busy}>
-					Save entity ID
-				</button>
-			</form>
+			<Panel title="Entity ID">
+				<form
+					className="evg-stack"
+					aria-busy={busy}
+					onSubmit={(event) => void handleSaveEntityId(event)}
+				>
+					<fieldset className="evg-stack" disabled={busy}>
+						<TextInput
+							label="Entity ID"
+							name="entityId"
+							value={entityId}
+							onChange={(event) => setEntityId(event.target.value)}
+						/>
+						<Button type="submit" variant="primary" disabled={busy}>
+							{busy ? 'Saving…' : 'Save entity ID'}
+						</Button>
+					</fieldset>
+				</form>
+			</Panel>
 
-			<form
-				className="evg-panel evg-stack"
-				onSubmit={(event) => void handleSaveNameIdFormat(event)}
-			>
-				<h3>Default NameID format</h3>
+			<Panel title="Default NameID format">
 				<p className="evg-muted">
 					Used in IdP metadata only. Assertion NameID still comes from each SP connection.
 				</p>
-				<label>
-					NameID format
-					<select value={nameIdFormat} onChange={(event) => setNameIdFormat(event.target.value)}>
-						{SAML_NAME_ID_FORMATS.map((format) => (
-							<option key={format} value={format}>
-								{format}
-							</option>
-						))}
-					</select>
-				</label>
-				<button type="submit" disabled={busy}>
-					Save NameID format
-				</button>
-			</form>
+				<form
+					className="evg-stack"
+					aria-busy={busy}
+					onSubmit={(event) => void handleSaveNameIdFormat(event)}
+				>
+					<fieldset className="evg-stack" disabled={busy}>
+						<Select
+							label="NameID format"
+							value={nameIdFormat}
+							onChange={(event) => setNameIdFormat(event.target.value)}
+						>
+							{SAML_NAME_ID_FORMATS.map((format) => (
+								<option key={format} value={format}>
+									{format}
+								</option>
+							))}
+						</Select>
+						<Button type="submit" variant="primary" disabled={busy}>
+							{busy ? 'Saving…' : 'Save NameID format'}
+						</Button>
+					</fieldset>
+				</form>
+			</Panel>
 
-			<div className="evg-panel">
-				<h3>Signing certificate</h3>
+			<Panel title="Signing certificate">
 				<p>
 					<span className="evg-badge evg-badge--info">{certStatusLabel(settings)}</span>
 				</p>
@@ -343,64 +357,76 @@ export function IdpSettingsPage() {
 						<code>{settings.signingCertNotAfter ?? '—'}</code>
 					</li>
 				</ul>
-				<div className="evg-actions-row">
-					<button
+				<div className="evg-cluster">
+					<Button
 						type="button"
+						variant="secondary"
 						disabled={busy || settings.rotation.active}
 						onClick={() => void handleGeneratePrimary()}
 					>
 						Generate certificate
-					</button>
-					<button
+					</Button>
+					<Button
 						type="button"
+						variant="secondary"
 						disabled={busy || settings.rotation.active}
 						onClick={() => setShowUpload(true)}
 					>
 						Upload certificate
-					</button>
-					<button
+					</Button>
+					<Button
 						type="button"
+						variant="secondary"
 						disabled={busy || settings.rotation.active || !settings.hasSigningCertificate}
 						onClick={() => void handleStartRotationGenerate()}
 					>
 						Start rotation (generate)
-					</button>
+					</Button>
 				</div>
-			</div>
+			</Panel>
 
 			{showUpload ? (
-				<form className="evg-panel evg-stack" onSubmit={(event) => void handleUploadPrimary(event)}>
-					<h3>Upload primary certificate</h3>
-					<label>
-						Signing certificate PEM
-						<textarea
-							rows={6}
-							value={uploadCert}
-							onChange={(event) => setUploadCert(event.target.value)}
-						/>
-					</label>
-					<label>
-						Private key PEM
-						<textarea
-							rows={6}
-							value={uploadKey}
-							onChange={(event) => setUploadKey(event.target.value)}
-						/>
-					</label>
-					<div className="evg-actions-row">
-						<button type="submit" disabled={busy}>
-							Upload
-						</button>
-						<button type="button" disabled={busy} onClick={() => setShowUpload(false)}>
-							Cancel
-						</button>
-					</div>
-				</form>
+				<Panel title="Upload primary certificate">
+					<form
+						className="evg-stack"
+						aria-busy={busy}
+						onSubmit={(event) => void handleUploadPrimary(event)}
+					>
+						<fieldset className="evg-stack" disabled={busy}>
+							<TextArea
+								label="Signing certificate PEM"
+								rows={6}
+								hint="Paste PEM certificate."
+								value={uploadCert}
+								onChange={(event) => setUploadCert(event.target.value)}
+							/>
+							<TextArea
+								label="Private key PEM"
+								rows={6}
+								hint="Paste PEM private key."
+								value={uploadKey}
+								onChange={(event) => setUploadKey(event.target.value)}
+							/>
+							<div className="evg-cluster">
+								<Button type="submit" variant="primary" disabled={busy}>
+									Upload
+								</Button>
+								<Button
+									type="button"
+									variant="secondary"
+									disabled={busy}
+									onClick={() => setShowUpload(false)}
+								>
+									Cancel
+								</Button>
+							</div>
+						</fieldset>
+					</form>
+				</Panel>
 			) : null}
 
 			{settings.rotation.active ? (
-				<div className="evg-panel">
-					<h3>Certificate rotation</h3>
+				<Panel title="Certificate rotation">
 					{isStaleRotation(settings.rotation.startedAt) ? (
 						<p className="evg-callout evg-callout--info">
 							Rotation started {settings.rotation.startedAt} — complete cutover or cancel to avoid
@@ -421,24 +447,38 @@ export function IdpSettingsPage() {
 						<li>Test SSO with at least one SP-initiated login before completing rotation.</li>
 						<li>Complete rotation only after steps 1–3.</li>
 					</ol>
-					<div className="evg-actions-row">
-						<button type="button" disabled={busy} onClick={() => void handleCompleteRotation()}>
+					<div className="evg-cluster">
+						<Button
+							type="button"
+							variant="primary"
+							disabled={busy}
+							onClick={() => void handleCompleteRotation()}
+						>
 							Complete rotation
-						</button>
-						<button type="button" disabled={busy} onClick={() => void handleCancelRotation()}>
+						</Button>
+						<Button
+							type="button"
+							variant="danger"
+							disabled={busy}
+							onClick={() => void handleCancelRotation()}
+						>
 							Cancel rotation
-						</button>
+						</Button>
 					</div>
-				</div>
+				</Panel>
 			) : null}
 
-			<div className="evg-panel">
-				<h3>Metadata preview</h3>
-				<button type="button" disabled={busy} onClick={() => void handleRefreshMetadataPreview()}>
+			<Panel title="Metadata preview">
+				<Button
+					type="button"
+					variant="secondary"
+					disabled={busy}
+					onClick={() => void handleRefreshMetadataPreview()}
+				>
 					Refresh preview
-				</button>
-				{metadataPreview ? <pre className="evg-code-block">{metadataPreview}</pre> : null}
-			</div>
+				</Button>
+				{metadataPreview ? <CodeBlock>{metadataPreview}</CodeBlock> : null}
+			</Panel>
 
 			<p className="evg-callout evg-callout--info">
 				Lazy auto-generation still exists as a dev/test fallback when no certificate is configured,

@@ -1,10 +1,11 @@
-import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import {
 	ADMIN_USERS_ROUTE_PREFIX,
 	API_CONNECTION_ROUTE_PREFIX,
 	AUDIT_ROUTE_PREFIX,
 	IDP_SETTINGS_ROUTE_PREFIX,
+	SP_CONNECTION_ROUTE_PREFIX,
 	type ApiConnectionDto,
 	type AuditEventListResponseDto,
 	type SyncLogDto,
@@ -130,7 +131,7 @@ describe('Evergreen toast integration — mutation flows', () => {
 		});
 
 		const { container } = renderWithUi(
-			<MemoryRouter initialEntries={['/admin/sp-connections/new']}>
+			<MemoryRouter initialEntries={[`${SP_CONNECTION_ROUTE_PREFIX}/new`]}>
 				<Routes>
 					<Route path="/admin/sp-connections/new" element={<SpConnectionFormPage />} />
 				</Routes>
@@ -138,11 +139,11 @@ describe('Evergreen toast integration — mutation flows', () => {
 		);
 
 		const form = container.querySelector('form')!;
-		fireEvent.change(within(form).getByLabelText('Name'), { target: { value: 'New App' } });
-		fireEvent.change(within(form).getByLabelText('SP Entity ID'), {
+		fireEvent.change(form.querySelector('input[name="name"]')!, { target: { value: 'New App' } });
+		fireEvent.change(form.querySelector('input[name="spEntityId"]')!, {
 			target: { value: 'urn:sp:new' },
 		});
-		fireEvent.change(within(form).getByLabelText('ACS URL'), {
+		fireEvent.change(form.querySelector('input[name="acsUrl"]')!, {
 			target: { value: 'https://sp.example.com/acs' },
 		});
 		fireEvent.click(screen.getByRole('button', { name: 'Save' }));
@@ -212,10 +213,10 @@ describe('Evergreen toast integration — mutation flows', () => {
 			</MemoryRouter>,
 		);
 
-		await waitFor(() => screen.getByLabelText('Username'));
-		fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'ops2' } });
-		fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'long-password-12' } });
-		fireEvent.change(screen.getByLabelText('Confirm password'), {
+		await waitFor(() => screen.getByLabelText(/^Username/));
+		fireEvent.change(screen.getByLabelText(/^Username/), { target: { value: 'ops2' } });
+		fireEvent.change(screen.getByLabelText(/^Password/), { target: { value: 'long-password-12' } });
+		fireEvent.change(screen.getByLabelText(/^Confirm password/), {
 			target: { value: 'long-password-12' },
 		});
 		fireEvent.click(screen.getByRole('button', { name: 'Create admin' }));

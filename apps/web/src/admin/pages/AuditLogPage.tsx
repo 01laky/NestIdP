@@ -6,8 +6,7 @@ import { AdminPageHeader } from '../components/AdminPageHeader';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
 import { useDocumentTitle } from '../components/useDocumentTitle';
-import { useToast } from '../../ui';
-import { Table } from '../../ui';
+import { Button, Select, Table, TextInput, useToast } from '../../ui';
 
 export function AuditLogPage() {
 	useDocumentTitle('Audit log — NestIdP Admin');
@@ -62,16 +61,12 @@ export function AuditLogPage() {
 				breadcrumbs={[{ label: 'Dashboard', to: '/admin' }, { label: 'Audit log' }]}
 				actions={
 					<>
-						<button type="button" className="evg-btn evg-btn--link" onClick={() => download('csv')}>
+						<Button type="button" variant="link" onClick={() => download('csv')}>
 							Export CSV
-						</button>
-						<button
-							type="button"
-							className="evg-btn evg-btn--link"
-							onClick={() => download('json')}
-						>
+						</Button>
+						<Button type="button" variant="link" onClick={() => download('json')}>
 							Export JSON
-						</button>
+						</Button>
 					</>
 				}
 			/>
@@ -84,33 +79,23 @@ export function AuditLogPage() {
 						void load();
 					}}
 				>
-					<label>
-						Category
-						<select
-							className="evg-select"
-							value={category}
-							onChange={(e) => setCategory(e.target.value)}
-						>
-							<option value="">All</option>
-							{AUDIT_CATEGORIES.map((c) => (
-								<option key={c} value={c}>
-									{c}
-								</option>
-							))}
-						</select>
-					</label>
-					<label>
-						Event
-						<input
-							className="evg-input"
-							value={event}
-							onChange={(e) => setEvent(e.target.value)}
-							placeholder="exact name"
-						/>
-					</label>
-					<button type="submit" className="evg-btn evg-btn--primary">
+					<Select label="Category" value={category} onChange={(e) => setCategory(e.target.value)}>
+						<option value="">All</option>
+						{AUDIT_CATEGORIES.map((c) => (
+							<option key={c} value={c}>
+								{c}
+							</option>
+						))}
+					</Select>
+					<TextInput
+						label="Event"
+						value={event}
+						onChange={(e) => setEvent(e.target.value)}
+						placeholder="exact name"
+					/>
+					<Button type="submit" variant="primary">
 						Filter
-					</button>
+					</Button>
 				</form>
 			</details>
 			{loading ? <LoadingState /> : null}

@@ -4,6 +4,42 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.1.4]
+
+### Added
+
+- Extended Evergreen edge-case Vitest registry **`WEB-EVG-109`–`168`**: `Checkbox`/`Fieldset`/`TextInput`
+  primitive edges, `AttributeMappingEditor` preset/JSON/disabled paths, admin form save/busy/badge/Panel
+  flows (API/SP/IdP/sync/admins/audit/identity/test-SSO/sync-log), and static import guards for migrated
+  pages — parity with login `WEB-EVG-24`–`72` depth for operator forms.
+
+### Fixed
+
+- `Checkbox` ignores `onChange` when `disabled` so label clicks cannot toggle state in tests or assistive flows.
+
+## [1.1.3]
+
+### Changed
+
+- Complete Evergreen styling for all admin forms: every operator CRUD/filter page now uses
+  `TextInput`, `Button`, `Select`, `TextArea`, `Checkbox`, `Fieldset`, and `Panel` from
+  `apps/web/src/ui/` instead of unstyled native HTML controls; form busy/disabled (`fieldset`,
+  `aria-busy`) and table row actions (`Button size="sm"`) standardized.
+
+### Added
+
+- `Checkbox`, `Fieldset`, and `TextInput.labelVisuallyHidden` UI primitives with focus-visible
+  styles for inputs and checkboxes.
+- Vitest registry **`WEB-EVG-73`–`108`**: static guards (no raw controls in admin), colocated
+  `*.evergreen-forms.test.tsx` per page, a11y label smoke tests, extended conventions.
+- Playwright baselines `api-connection-form-1280.png` and `idp-settings-1280.png`.
+- Evergreen UI diagram update (`docs/img/evergreen-ui.mmd`) showing admin form → ui primitive flow.
+
+### Fixed
+
+- Operator perception that “theme is missing” on form pages — design tokens were present since
+  1.1.0 but page markup did not use `ui/` components.
+
 ## [1.1.2]
 
 ### Fixed

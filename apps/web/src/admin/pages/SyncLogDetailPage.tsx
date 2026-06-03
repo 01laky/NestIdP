@@ -6,6 +6,8 @@ import { AdminPageHeader } from '../components/AdminPageHeader';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
 import { useDocumentTitle } from '../components/useDocumentTitle';
+import { syncLogStatusToBadge } from '../status-badge';
+import { Badge, CodeBlock } from '../../ui';
 
 export function SyncLogDetailPage() {
 	const { syncLogId } = useParams<{ syncLogId: string }>();
@@ -65,7 +67,7 @@ export function SyncLogDetailPage() {
 			<ul className="evg-dl">
 				<li>
 					<span>Status</span>
-					<strong>{log.status}</strong>
+					<Badge variant={syncLogStatusToBadge(log.status)}>{log.status}</Badge>
 				</li>
 				<li>
 					<span>Started</span>
@@ -81,12 +83,14 @@ export function SyncLogDetailPage() {
 				</li>
 			</ul>
 			{log.errors && log.errors.length > 0 ? (
-				<pre className="evg-code-block">{JSON.stringify(log.errors, null, 2)}</pre>
+				<CodeBlock>{JSON.stringify(log.errors, null, 2)}</CodeBlock>
 			) : (
 				<p className="evg-muted">No errors recorded.</p>
 			)}
 			<p>
-				<Link to={API_CONNECTION_ROUTE_PREFIX}>Back to API connections</Link>
+				<Link className="evg-btn evg-btn--link" to={API_CONNECTION_ROUTE_PREFIX}>
+					Back to API connections
+				</Link>
 			</p>
 		</section>
 	);

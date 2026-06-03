@@ -7,8 +7,36 @@ flowchart TB
 	subgraph assets["Self-hosted assets"]
 		fonts["public/fonts/*.woff2"]
 	end
+	subgraph forms["Admin CRUD / filters"]
+		apiForm["ApiConnectionFormPage"]
+		spForm["SpConnectionFormPage"]
+		idpForm["IdpSettingsPage"]
+		adminUsers["AdminUsersPage"]
+		auditFilters["AuditLogPage filters"]
+		identitySearch["IdentityUsersPage search"]
+	end
+	subgraph primitives["ui/ form primitives"]
+		ti["TextInput"]
+		ta["TextArea"]
+		sel["Select"]
+		cb["Checkbox"]
+		fs["Fieldset"]
+		btn["Button"]
+		pan["Panel"]
+	end
 	tokens --> ui
 	fonts --> tokens
 	ui --> pages
 	pages --> api["/api/admin/* REST"]
 	pages --> saml["/login SAML UI"]
+	apiForm --> ti
+	apiForm --> btn
+	apiForm --> pan
+	spForm --> fs
+	spForm --> sel
+	spForm --> cb
+	idpForm --> ta
+	idpForm --> ti
+	adminUsers --> ti
+	auditFilters --> sel
+	identitySearch --> ti

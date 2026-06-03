@@ -1,4 +1,5 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { renderWithUi } from '../test/renderWithUi';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -162,6 +163,25 @@ describe('AdminLayout', () => {
 		renderAdminAt('/admin/api-connections');
 		await waitFor(() => {
 			expect(screen.getByRole('heading', { name: 'API connections' })).toBeDefined();
+		});
+	});
+
+	it('WEB-EVG-99: nested api-connections/new renders labeled Name field', async () => {
+		vi.spyOn(adminApi, 'getAdminMe').mockResolvedValue({
+			admin: { id: '1', username: 'admin' },
+			csrfToken: 'test-csrf-token',
+		});
+
+		renderWithUi(
+			<MemoryRouter initialEntries={['/admin/api-connections/new']}>
+				<Routes>
+					<Route path="/admin/*" element={<AdminLayout />} />
+				</Routes>
+			</MemoryRouter>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByLabelText(/^Name/i)).toBeDefined();
 		});
 	});
 

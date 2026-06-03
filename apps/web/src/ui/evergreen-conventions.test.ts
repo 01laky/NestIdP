@@ -50,9 +50,9 @@ describe('Evergreen conventions (static)', () => {
 		expect(hits).toEqual([]);
 	});
 
-	it('WEB-EVG-39: admin pages import ui via barrel not deep component paths', () => {
-		const pagesDir = join(webSrc, 'admin/pages');
-		const files = walkTsx(pagesDir);
+	it('WEB-EVG-39: admin pages and components import ui via barrel not deep paths', () => {
+		const dirs = [join(webSrc, 'admin/pages'), join(webSrc, 'admin/components')];
+		const files = dirs.flatMap((dir) => walkTsx(dir));
 		const deepImports: string[] = [];
 		for (const file of files) {
 			const text = readFileSync(file, 'utf8');
@@ -61,6 +61,30 @@ describe('Evergreen conventions (static)', () => {
 			}
 		}
 		expect(deepImports).toEqual([]);
+	});
+
+	it('WEB-EVG-88: extends barrel rule to admin/components (alias of WEB-EVG-39)', () => {
+		const componentsDir = join(webSrc, 'admin/components');
+		const files = walkTsx(componentsDir);
+		for (const file of files) {
+			const text = readFileSync(file, 'utf8');
+			if (/from ['"]\.\.\/\.\.\/ui\/[A-Z]/.test(text)) {
+				expect.fail(`deep import in ${file}`);
+			}
+		}
+	});
+
+	it('WEB-EVG-90: primary admin editor forms use evg-stack class', () => {
+		const formPages = [
+			'ApiConnectionFormPage.tsx',
+			'SpConnectionFormPage.tsx',
+			'AdminUsersPage.tsx',
+			'ApiConnectionSyncPage.tsx',
+		];
+		for (const name of formPages) {
+			const text = readFileSync(join(webSrc, 'admin/pages', name), 'utf8');
+			expect(text).toMatch(/className="evg-stack"/);
+		}
 	});
 
 	it('WEB-EVG-40: main entry imports evergreen index.css not legacy index.css', () => {

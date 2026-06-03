@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import { renderWithUi } from '../../test/renderWithUi';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -51,11 +51,11 @@ describe('SpConnectionFormPage', () => {
 		const { container } = renderNew();
 		const form = container.querySelector('form');
 		expect(form).not.toBeNull();
-		fireEvent.change(within(form!).getByLabelText('Name'), { target: { value: 'New App' } });
-		fireEvent.change(within(form!).getByLabelText('SP Entity ID'), {
+		fireEvent.change(form!.querySelector('input[name="name"]')!, { target: { value: 'New App' } });
+		fireEvent.change(form!.querySelector('input[name="spEntityId"]')!, {
 			target: { value: 'urn:sp:new' },
 		});
-		fireEvent.change(within(form!).getByLabelText('ACS URL'), {
+		fireEvent.change(form!.querySelector('input[name="acsUrl"]')!, {
 			target: { value: 'https://sp.example.com/acs' },
 		});
 		fireEvent.click(screen.getByRole('button', { name: 'Save' }));
@@ -74,11 +74,11 @@ describe('SpConnectionFormPage', () => {
 		const { container } = renderNew();
 		const form = container.querySelector('form');
 		expect(form).not.toBeNull();
-		fireEvent.change(within(form!).getByLabelText('Name'), { target: { value: 'Dup' } });
-		fireEvent.change(within(form!).getByLabelText('SP Entity ID'), {
+		fireEvent.change(form!.querySelector('input[name="name"]')!, { target: { value: 'Dup' } });
+		fireEvent.change(form!.querySelector('input[name="spEntityId"]')!, {
 			target: { value: 'urn:sp:dup' },
 		});
-		fireEvent.change(within(form!).getByLabelText('ACS URL'), {
+		fireEvent.change(form!.querySelector('input[name="acsUrl"]')!, {
 			target: { value: 'https://sp.example.com/acs' },
 		});
 		fireEvent.click(screen.getByRole('button', { name: 'Save' }));

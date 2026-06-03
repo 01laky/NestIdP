@@ -154,6 +154,29 @@
 	margin: var(--evg-space-4) 0;
 }
 
+.evg-field--checkbox {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--evg-space-2);
+}
+
+.evg-field--checkbox .evg-field__hint {
+	flex: 1 1 100%;
+	margin: 0;
+}
+
+.evg-checkbox {
+	width: 1.125rem;
+	height: 1.125rem;
+	accent-color: var(--evg-color-brand-600);
+}
+
+.evg-checkbox:focus-visible {
+	outline: 2px solid var(--evg-color-focus-ring);
+	outline-offset: 2px;
+}
+
 .evg-inline-form {
 	display: flex;
 	flex-wrap: wrap;

@@ -32,6 +32,13 @@ describe('Evergreen styles', () => {
 		expect(printCss).toContain('overflow: visible');
 	});
 
+	it('WEB-EVG-107: components.css defines focus-visible on evg-input', () => {
+		const css = readFileSync(join(evergreenDir, 'components.css'), 'utf8');
+		expect(css).toMatch(/\.evg-input:focus-visible/);
+		expect(css).toMatch(/\.evg-select:focus-visible/);
+		expect(css).toMatch(/\.evg-textarea:focus-visible/);
+	});
+
 	it('WEB-EVG-60: tokens.css does not ship dark theme (deferred v1.2)', () => {
 		const tokens = readFileSync(join(evergreenDir, 'tokens.css'), 'utf8');
 		expect(tokens).not.toMatch(/prefers-color-scheme:\s*dark/);

@@ -61,11 +61,13 @@ describe('AdminUsersPage', () => {
 		});
 
 		renderPage();
-		await waitFor(() => screen.getByLabelText('Username'));
+		await waitFor(() => screen.getByLabelText(/^Username/));
 
-		fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'ops' } });
-		fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret123456' } });
-		fireEvent.change(screen.getByLabelText('Confirm password'), {
+		fireEvent.change(screen.getByLabelText(/^Username/), { target: { value: 'ops' } });
+		fireEvent.change(document.querySelector('input[name="password"]')!, {
+			target: { value: 'secret123456' },
+		});
+		fireEvent.change(document.querySelector('input[name="confirmPassword"]')!, {
 			target: { value: 'different123456' },
 		});
 		fireEvent.click(screen.getByRole('button', { name: 'Create admin' }));
@@ -98,11 +100,13 @@ describe('AdminUsersPage', () => {
 		});
 
 		renderPage();
-		await waitFor(() => screen.getByLabelText('Username'));
+		await waitFor(() => screen.getByLabelText(/^Username/));
 
-		fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'ops' } });
-		fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret123456' } });
-		fireEvent.change(screen.getByLabelText('Confirm password'), {
+		fireEvent.change(screen.getByLabelText(/^Username/), { target: { value: 'ops' } });
+		fireEvent.change(document.querySelector('input[name="password"]')!, {
+			target: { value: 'secret123456' },
+		});
+		fireEvent.change(document.querySelector('input[name="confirmPassword"]')!, {
 			target: { value: 'secret123456' },
 		});
 		fireEvent.click(screen.getByRole('button', { name: 'Create admin' }));
@@ -199,13 +203,15 @@ describe('AdminUsersPage', () => {
 		});
 
 		renderPage();
-		await waitFor(() => screen.getByLabelText('Current password'));
+		await waitFor(() => screen.getByLabelText(/^Current password/));
 
-		fireEvent.change(screen.getByLabelText('Current password'), {
+		fireEvent.change(screen.getByLabelText(/^Current password/), {
 			target: { value: 'oldpass123456' },
 		});
-		fireEvent.change(screen.getByLabelText('New password'), { target: { value: 'newpass123456' } });
-		fireEvent.change(screen.getByLabelText('Confirm new password'), {
+		fireEvent.change(screen.getByLabelText(/^New password/), {
+			target: { value: 'newpass123456' },
+		});
+		fireEvent.change(screen.getByLabelText(/^Confirm new password/), {
 			target: { value: 'otherpass123456' },
 		});
 		fireEvent.click(screen.getByRole('button', { name: 'Update my password' }));

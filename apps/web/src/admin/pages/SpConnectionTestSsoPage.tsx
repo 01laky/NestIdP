@@ -6,6 +6,7 @@ import { AdminPageHeader } from '../components/AdminPageHeader';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
 import { useDocumentTitle } from '../components/useDocumentTitle';
+import { Panel, TextArea } from '../../ui';
 
 const EXAMPLE_SCRIPT = 'docs/examples/saml-sp-initiated-redirect.mjs';
 
@@ -81,12 +82,20 @@ export function SpConnectionTestSsoPage() {
 					<code>{ssoUrl}</code>
 				</li>
 			</ul>
-			<label>
-				Command
-				<textarea readOnly rows={3} value={command} onFocus={(e) => e.target.select()} />
-			</label>
+			<Panel title="Example command">
+				<TextArea
+					label="Command"
+					readOnly
+					rows={3}
+					value={command}
+					onFocus={(e) => e.target.select()}
+					hint="Click the field to select all text for copying."
+				/>
+			</Panel>
 			<p>
-				<Link to={`${SP_CONNECTION_ROUTE_PREFIX}/${id}`}>Back to SP</Link>
+				<Link className="evg-btn evg-btn--link" to={`${SP_CONNECTION_ROUTE_PREFIX}/${id}`}>
+					Back to SP
+				</Link>
 			</p>
 		</section>
 	);

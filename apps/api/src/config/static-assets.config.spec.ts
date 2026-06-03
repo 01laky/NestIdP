@@ -55,12 +55,7 @@ describe('static-assets.config', () => {
 
 	describe('STATIC_ROUTE_EXCLUDES', () => {
 		it('excludes API, SAML, and health endpoints from SPA static handler', () => {
-			expect(STATIC_ROUTE_EXCLUDES).toEqual([
-				'/api*rest',
-				'/saml*rest',
-				'/health',
-				'/ready',
-			]);
+			expect(STATIC_ROUTE_EXCLUDES).toEqual(['/api*rest', '/saml*rest', '/health', '/ready']);
 		});
 
 		it('does not exclude admin or login SPA routes', () => {

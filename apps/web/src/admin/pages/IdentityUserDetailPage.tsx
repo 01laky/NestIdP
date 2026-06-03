@@ -6,6 +6,7 @@ import { AdminPageHeader } from '../components/AdminPageHeader';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
 import { useDocumentTitle } from '../components/useDocumentTitle';
+import { Panel } from '../../ui';
 
 export function IdentityUserDetailPage() {
 	const { id } = useParams<{ id: string }>();
@@ -82,20 +83,24 @@ export function IdentityUserDetailPage() {
 					<code>{String(user.active)}</code>
 				</li>
 			</ul>
-			<h3>Groups ({groups.length})</h3>
-			<ul className="evg-list">
-				{groups.map((group) => (
-					<li key={group.id}>{group.name}</li>
-				))}
-			</ul>
-			<h3>Roles ({roles.length})</h3>
-			<ul className="evg-list">
-				{roles.map((role) => (
-					<li key={role.id}>{role.name}</li>
-				))}
-			</ul>
+			<Panel title={`Groups (${groups.length})`}>
+				<ul className="evg-list">
+					{groups.map((group) => (
+						<li key={group.id}>{group.name}</li>
+					))}
+				</ul>
+			</Panel>
+			<Panel title={`Roles (${roles.length})`}>
+				<ul className="evg-list">
+					{roles.map((role) => (
+						<li key={role.id}>{role.name}</li>
+					))}
+				</ul>
+			</Panel>
 			<p>
-				<Link to={`${IDENTITY_ROUTE_PREFIX}/users`}>Back to users</Link>
+				<Link className="evg-btn evg-btn--link" to={`${IDENTITY_ROUTE_PREFIX}/users`}>
+					Back to users
+				</Link>
 			</p>
 		</section>
 	);

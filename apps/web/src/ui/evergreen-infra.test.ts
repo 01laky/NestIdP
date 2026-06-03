@@ -22,15 +22,35 @@ describe('Evergreen infrastructure', () => {
 		expect(script).toContain('index-');
 	});
 
-	it('WEB-EVG-72: four Playwright screenshot baselines are committed', () => {
+	it('WEB-EVG-72: Playwright screenshot baselines are committed', () => {
 		const shots = join(webRoot, 'e2e/screenshots');
 		for (const name of [
 			'admin-login-375.png',
 			'admin-login-1280.png',
 			'dashboard-375.png',
 			'dashboard-1280.png',
+			'api-connection-form-1280.png',
+			'idp-settings-1280.png',
 		]) {
 			expect(existsSync(join(shots, name))).toBe(true);
 		}
+	});
+
+	it('WEB-EVG-93: six form and shell baselines including API form and IdP settings', () => {
+		const shots = join(webRoot, 'e2e/screenshots');
+		expect(existsSync(join(shots, 'api-connection-form-1280.png'))).toBe(true);
+		expect(existsSync(join(shots, 'idp-settings-1280.png'))).toBe(true);
+	});
+
+	it('WEB-EVG-94: evergreen-visual spec includes form page screenshots', () => {
+		const spec = readFileSync(join(webRoot, 'e2e/evergreen-visual.spec.ts'), 'utf8');
+		expect(spec).toContain('api-connection-form-1280.png');
+		expect(spec).toContain('idp-settings-1280.png');
+	});
+
+	it('WEB-EVG-108: evergreen-ui.mmd documents Checkbox and Fieldset form primitives', () => {
+		const mmd = readFileSync(join(repoRoot, 'docs/img/evergreen-ui.mmd'), 'utf8');
+		expect(mmd).toContain('Checkbox');
+		expect(mmd).toContain('Fieldset');
 	});
 });
