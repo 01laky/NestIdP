@@ -1,22 +1,9 @@
-export const DEFAULT_ADMIN_PASSWORD = 'changeme';
+import { DEFAULT_ADMIN_PASSWORD, isWeakAdminPassword } from '@nestidp/shared';
 
-const MIN_STRONG_PASSWORD_LENGTH = 12;
+export { DEFAULT_ADMIN_PASSWORD };
 
 export function isWeakBootstrapPassword(password: string | undefined): boolean {
-	if (password === undefined) {
-		return true;
-	}
-	const trimmed = password.trim();
-	if (trimmed.length === 0) {
-		return true;
-	}
-	if (trimmed === DEFAULT_ADMIN_PASSWORD) {
-		return true;
-	}
-	if (trimmed.length < MIN_STRONG_PASSWORD_LENGTH) {
-		return true;
-	}
-	return false;
+	return isWeakAdminPassword(password);
 }
 
 export function assertProductionBootstrapPassword(

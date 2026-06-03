@@ -1,22 +1,41 @@
 services:
-  postgres:
-    profiles: ['postgres']
-    image: postgres:16-alpine
-    container_name: nestidp-postgres
-    restart: unless-stopped
-    ports:
-      - '5432:5432'
-    environment:
-      POSTGRES_USER: nestidp
-      POSTGRES_PASSWORD: nestidp
-      POSTGRES_DB: nestidp
-    volumes:
-      - nestidp_pg_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U nestidp -d nestidp']
-      interval: 5s
-      timeout: 5s
-      retries: 5
+	postgres:
+		image: postgres:16-alpine
+		restart: unless-stopped
+		environment:
+			POSTGRES_USER: nestidp
+			POSTGRES_PASSWORD: nestidp
+			POSTGRES_DB: nestidp
+		volumes:
+			- nestidp_pg_data:/var/lib/postgresql/data
+		healthcheck:
+			test: ['CMD-SHELL', 'pg_isready -U nestidp -d nestidp']
+			interval: 5s
+			timeout: 5s
+			retries: 5
+
+	nestidp:
+		build: .
+		restart: unless-stopped
+		ports:
+			- '3000:3000'
+		env_file:
+			- .env.docker
+		environment:
+			DATABASE_PROVIDER: postgresql
+			DATABASE_URL: postgresql://nestidp:nestidp@postgres:5432/nestidp
+			NODE_ENV: production
+			PORT: '3000'
+			IDP_BASE_URL: http://localhost:3000
+		depends_on:
+			postgres:
+				condition: service_healthy
+		healthcheck:
+			test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/health']
+			interval: 30s
+			timeout: 5s
+			retries: 3
+			start_period: 60s
 
 volumes:
-  nestidp_pg_data:
+	nestidp_pg_data:

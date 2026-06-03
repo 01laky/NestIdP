@@ -2,7 +2,8 @@ import { SpConnectionsAuditService } from './sp-connections-audit.service';
 
 describe('SpConnectionsAuditService', () => {
 	it('API-SPC-AUDIT-01: logs created/updated/deleted/acs tested as JSON', () => {
-		const service = new SpConnectionsAuditService();
+		const audit = { recordSafe: jest.fn() };
+		const service = new SpConnectionsAuditService(audit as never);
 		const logSpy = jest.spyOn(service['logger'], 'log').mockImplementation();
 
 		service.logCreated('sp-1', 'urn:sp:1');

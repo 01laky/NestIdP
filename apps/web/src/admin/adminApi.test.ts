@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
 	ADMIN_CSRF_HEADER_NAME,
+	ADMIN_USERS_API_PATH,
 	API_CONNECTIONS_API_PATH,
+	AUDIT_EVENTS_API_PATH,
 	IDENTITY_USERS_API_PATH,
 	IDP_METADATA_URL_API_PATH,
 	IDP_SETTINGS_API_PATH,
@@ -37,6 +39,13 @@ import {
 	getIdpMetadataUrl,
 	getSpConnection,
 	listSpConnections,
+	listAdminUsers,
+	createAdminUser,
+	updateAdminUser,
+	deleteAdminUser,
+	changeAdminPassword,
+	listAuditEvents,
+	auditExportUrl,
 } from './adminApi';
 
 describe('adminApi', () => {
@@ -721,6 +730,112 @@ describe('adminApi', () => {
 		expect(fetchMock).toHaveBeenCalledWith(
 			`${IDP_SETTINGS_API_PATH}/metadata-preview`,
 			expect.any(Object),
+		);
+	});
+
+	it('WEB-ADM-77: listAdminUsers GETs admin-users API', async () => {
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => [{ id: 'a1', username: 'admin', createdAt: '', updatedAt: '' }],
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		await listAdminUsers();
+		expect(fetchMock).toHaveBeenCalledWith(ADMIN_USERS_API_PATH, expect.any(Object));
+	});
+
+	it('WEB-ADM-78: createAdminUser POSTs with CSRF header', async () => {
+		setCsrfToken('csrf-create-admin');
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 201,
+			json: async () => ({ id: 'a2', username: 'ops', createdAt: '', updatedAt: '' }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		await createAdminUser({ username: 'ops', password: 'OpsPass123456' });
+		expect(fetchMock).toHaveBeenCalledWith(
+			ADMIN_USERS_API_PATH,
+			expect.objectContaining({
+				method: 'POST',
+				headers: expect.objectContaining({ [ADMIN_CSRF_HEADER_NAME]: 'csrf-create-admin' }),
+			}),
+		);
+	});
+
+	it('WEB-ADM-79: deleteAdminUser DELETEs with CSRF', async () => {
+		setCsrfToken('csrf-del');
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ ok: true, id: 'a2' }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		await deleteAdminUser('a2');
+		expect(fetchMock).toHaveBeenCalledWith(
+			`${ADMIN_USERS_API_PATH}/a2`,
+			expect.objectContaining({
+				method: 'DELETE',
+				headers: expect.objectContaining({ [ADMIN_CSRF_HEADER_NAME]: 'csrf-del' }),
+			}),
+		);
+	});
+
+	it('WEB-ADM-80: changeAdminPassword POSTs change-password endpoint', async () => {
+		setCsrfToken('csrf-pwd');
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ ok: true }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		await changeAdminPassword({ currentPassword: 'old', newPassword: 'new' });
+		expect(fetchMock).toHaveBeenCalledWith(
+			'/api/admin/auth/change-password',
+			expect.objectContaining({ method: 'POST' }),
+		);
+	});
+
+	it('WEB-ADM-96: auditExportUrl builds export path with format query', () => {
+		expect(auditExportUrl({ format: 'csv', category: 'admin_auth' })).toBe(
+			`${AUDIT_EVENTS_API_PATH}/export?format=csv&category=admin_auth`,
+		);
+	});
+
+	it('WEB-ADM-97: listAuditEvents appends query string', async () => {
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ items: [], total: 0, limit: 50, offset: 0 }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		await listAuditEvents({ limit: '10', category: 'sync' });
+		expect(fetchMock).toHaveBeenCalledWith(
+			`${AUDIT_EVENTS_API_PATH}?limit=10&category=sync`,
+			expect.any(Object),
+		);
+	});
+
+	it('WEB-ADM-98: auditExportUrl does not include CSRF (GET-only)', () => {
+		const url = auditExportUrl({ format: 'json' });
+		expect(url).toContain('/export?');
+		expect(url).not.toContain('csrf');
+	});
+
+	it('WEB-ADM-99: updateAdminUser PATCHes password with CSRF', async () => {
+		setCsrfToken('csrf-patch');
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ id: 'a2', username: 'ops', createdAt: '', updatedAt: '' }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		await updateAdminUser('a2', { password: 'NewOpsPass123' });
+		expect(fetchMock).toHaveBeenCalledWith(
+			`${ADMIN_USERS_API_PATH}/a2`,
+			expect.objectContaining({
+				method: 'PATCH',
+				body: JSON.stringify({ password: 'NewOpsPass123' }),
+			}),
 		);
 	});
 });

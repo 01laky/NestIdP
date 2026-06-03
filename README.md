@@ -1,6 +1,6 @@
 # NestIdP
 
-Deployable SAML Identity Provider monolith (NestJS + React + SQL via Prisma).
+Deployable SAML Identity Provider monolith (NestJS + React + SQL via Prisma). **v1.0.0** — Phase 1 MVP (SAML SSO, admin console, identity sync, Docker deploy).
 
 Architecture and product scope: [docs/proposal.MD](docs/proposal.MD)
 
@@ -10,13 +10,15 @@ Development guide: [docs/development.md](docs/development.md)
 
 Database selection: [docs/database.md](docs/database.md)
 
+Production: [docs/deployment.md](docs/deployment.md) · Go-live checklist: [docs/RELEASE.md](docs/RELEASE.md) · Identity API: [docs/integration-api.md](docs/integration-api.md)
+
 ## Prerequisites
 
 - Node.js **>= 18**
 - pnpm **>= 9**
-- Docker **optional** — only if you use PostgreSQL locally (`docker compose --profile postgres`)
+- Docker **optional** for SQLite dev; **required** for the full Compose stack (PostgreSQL + app)
 
-## Quick start (SQLite — default)
+## Quick start (SQLite — local dev)
 
 ```bash
 cp .env.example .env
@@ -37,6 +39,22 @@ Vite proxies `/api`, `/saml`, `/health`, and `/ready` to the API during developm
 
 Local SQLite database file: `apps/api/data/nestidp.db` (created on first migration).
 
+## Quick start (Docker Compose — production-like)
+
+```bash
+cp .env.docker.example .env.docker
+# Edit secrets: SESSION_SECRET, ENCRYPTION_KEY, ADMIN_PASSWORD, IDP_BASE_URL
+
+docker compose up --build -d
+curl -sf http://localhost:3000/ready
+```
+
+| Service   | URL                                                                                    |
+| --------- | -------------------------------------------------------------------------------------- |
+| IdP (all) | http://localhost:3000 — admin `/admin/login`, SAML `/login`, metadata `/saml/metadata` |
+
+Migrations run automatically on container start. See [docs/deployment.md](docs/deployment.md).
+
 ## Scripts
 
 | Command                  | Description                           |
@@ -52,14 +70,14 @@ Local SQLite database file: `apps/api/data/nestidp.db` (created on first migrati
 
 ## Production
 
+**Recommended:** Docker Compose or your orchestrator running the published image — [docs/deployment.md](docs/deployment.md).
+
 ```bash
-pnpm build
-NODE_ENV=production node apps/api/dist/main.js
+cp .env.docker.example .env.docker
+docker compose up --build -d
 ```
 
-Set `DATABASE_PROVIDER` and `DATABASE_URL` for your deployment database. See [docs/database.md](docs/database.md).
-
-Or build and run the Docker image (requires `pnpm-lock.yaml` after first install).
+**Bare metal:** `pnpm build`, `pnpm db:migrate:deploy`, then `NODE_ENV=production node apps/api/dist/main.js`. Set `DATABASE_PROVIDER` and `DATABASE_URL` (PostgreSQL). Complete [docs/RELEASE.md](docs/RELEASE.md) before go-live.
 
 ## Environment
 

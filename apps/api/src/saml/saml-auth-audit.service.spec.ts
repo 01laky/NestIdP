@@ -1,7 +1,8 @@
 import { SamlAuthAuditService } from './saml-auth-audit.service';
 
 describe('SamlAuthAuditService', () => {
-	const service = new SamlAuthAuditService();
+	const audit = { recordSafe: jest.fn() };
+	const service = new SamlAuthAuditService(audit as never);
 	let logSpy: jest.SpyInstance;
 	let warnSpy: jest.SpyInstance;
 

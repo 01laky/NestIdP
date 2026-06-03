@@ -71,12 +71,14 @@ jest.setTimeout(60_000);
 		const syncLogService = new SyncLogService(prisma as unknown as PrismaService);
 		const identitySyncClient = new IdentitySyncClientService(config);
 
+		const audit = { recordSafe: jest.fn() };
 		const syncService = new SyncService(
 			prisma as unknown as PrismaService,
 			identityRepository,
 			syncLogService,
 			identitySyncClient,
 			encryption,
+			audit as never,
 		);
 
 		jest.spyOn(identitySyncClient, 'fetchUsersRaw').mockResolvedValue([

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AuditCoreModule } from '../audit/audit-core.module';
 import { AdminAuthModule } from '../admin-auth/admin-auth.module';
 import { EncryptionModule } from '../encryption/encryption.module';
 import { PrismaModule } from '../prisma/prisma.module';
@@ -8,7 +9,7 @@ import { ApiConnectionsController } from './api-connections.controller';
 import { ApiConnectionsService } from './api-connections.service';
 
 @Module({
-	imports: [PrismaModule, AdminAuthModule, EncryptionModule],
+	imports: [PrismaModule, AuditCoreModule, AdminAuthModule, EncryptionModule],
 	controllers: [ApiConnectionsController],
 	providers: [ApiConnectionsService, ApiConnectionTestService, ApiConnectionsAuditService],
 })

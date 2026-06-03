@@ -56,6 +56,8 @@ describe('AdminDashboardService', () => {
 		expect(result.lastSyncStatus).toBeNull();
 		expect(result.metadataUrl).toBe('http://localhost:3000/saml/metadata');
 		expect(result.identityUsersRoute).toContain('/admin/identity/users');
+		expect(result.auditEventsRoute).toBe('/admin/audit');
+		expect(result.adminUsersRoute).toBe('/admin/settings/admins');
 	});
 
 	it('API-ADM-DASH-SVC-02: includes apiConnection and sync fields', async () => {

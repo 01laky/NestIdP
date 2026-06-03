@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AuditCoreModule } from '../audit/audit-core.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AdminAuthController } from './admin-auth.controller';
 import { AdminAuthGuard } from './admin-auth.guard';
@@ -8,9 +9,10 @@ import { AdminCsrfService } from './admin-csrf.service';
 import { AdminSessionService } from './admin-session.service';
 import { LoginRateLimiterService } from './login-rate-limiter.service';
 import { PasswordService } from './password.service';
+import { AdminAuthAuditService } from './admin-auth-audit.service';
 
 @Module({
-	imports: [PrismaModule],
+	imports: [PrismaModule, AuditCoreModule],
 	controllers: [AdminAuthController],
 	providers: [
 		AdminAuthService,
@@ -20,6 +22,7 @@ import { PasswordService } from './password.service';
 		AdminCsrfService,
 		PasswordService,
 		LoginRateLimiterService,
+		AdminAuthAuditService,
 	],
 	exports: [
 		AdminAuthGuard,

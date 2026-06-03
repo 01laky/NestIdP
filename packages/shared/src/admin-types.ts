@@ -1,6 +1,8 @@
 import type { ApiConnectionDto } from './connections.js';
 import type { LastSyncStatus } from './schema-enums.js';
 import type { AdminDashboardIdpCertStatus } from './idp-settings.js';
+import { AUDIT_ROUTE_PREFIX } from './audit-events.js';
+import { ADMIN_USERS_ROUTE_PREFIX } from './admin-users.js';
 
 export interface AdminStatsDto {
 	users: number;
@@ -33,6 +35,8 @@ export interface AdminDashboardResponseDto {
 	apiConnection: ApiConnectionDto | null;
 	lastSyncStatus: LastSyncStatus | null;
 	lastSyncAt: string | null;
+	auditEventsRoute: typeof AUDIT_ROUTE_PREFIX;
+	adminUsersRoute: typeof ADMIN_USERS_ROUTE_PREFIX;
 }
 
 /** @deprecated Use AdminDashboardResponseDto */

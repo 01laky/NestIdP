@@ -1,6 +1,11 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { IDP_SETTINGS_ROUTE_PREFIX } from '@nestidp/shared';
+import {
+	ADMIN_USERS_ROUTE_PREFIX,
+	AUDIT_ROUTE_PREFIX,
+	IDP_SETTINGS_ROUTE_PREFIX,
+	type AdminDashboardResponseDto,
+} from '@nestidp/shared';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as adminApi from '../adminApi';
 import { DashboardPage } from './DashboardPage';
@@ -14,8 +19,8 @@ const defaultIdp = {
 };
 
 function dashboardStub(
-	overrides: Partial<Awaited<ReturnType<typeof adminApi.getAdminDashboard>>> = {},
-) {
+	overrides: Partial<AdminDashboardResponseDto> = {},
+): AdminDashboardResponseDto {
 	return {
 		counts: { users: 3, groups: 2, roles: 1, apiConnections: 1, spConnections: 4 },
 		apiConnectionsRoute: '/admin/api-connections',
@@ -31,6 +36,8 @@ function dashboardStub(
 		apiConnection: null,
 		lastSyncStatus: null,
 		lastSyncAt: null,
+		auditEventsRoute: AUDIT_ROUTE_PREFIX,
+		adminUsersRoute: ADMIN_USERS_ROUTE_PREFIX,
 		...overrides,
 	};
 }

@@ -24,6 +24,20 @@ enum SyncLogStatus {
 	FAILED
 }
 
+enum AuditActorType {
+	admin
+	end_user
+	system
+}
+
+enum AuditCategory {
+	admin_auth
+	admin_config
+	end_user_auth
+	saml
+	sync
+}
+
 model ApiConnection {
 	id                       String         @id @default(cuid())
 	name                     String
@@ -169,6 +183,24 @@ model SamlSession {
 
 	@@index([expiresAt])
 	@@index([spConnectionId])
+}
+
+model AuditEvent {
+	id          String         @id @default(cuid())
+	category    AuditCategory
+	event       String
+	actorType   AuditActorType
+	actorId     String?
+	actorLabel  String?
+	subjectType String?
+	subjectId   String?
+	clientIp    String?
+	metadata    Json?
+	createdAt   DateTime       @default(now())
+
+	@@index([category, createdAt])
+	@@index([event, createdAt])
+	@@index([createdAt])
 }
 
 model IdpSettings {

@@ -1,11 +1,14 @@
+import { AuditPersistenceService } from '../audit/audit-persistence.service';
 import { IdpSettingsAuditService } from './idp-settings-audit.service';
 
 describe('IdpSettingsAuditService', () => {
 	let service: IdpSettingsAuditService;
 	let logSpy: jest.SpyInstance;
+	const audit = { recordSafe: jest.fn() };
 
 	beforeEach(() => {
-		service = new IdpSettingsAuditService();
+		jest.clearAllMocks();
+		service = new IdpSettingsAuditService(audit as unknown as AuditPersistenceService);
 		logSpy = jest.spyOn(service['logger'], 'log').mockImplementation();
 	});
 

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { AuditCoreModule } from '../audit/audit-core.module';
 import { IdentityModule } from '../identity/identity.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { IdpSigningService } from './idp-signing.service';
@@ -14,7 +15,7 @@ import { SamlSessionCleanupService } from './saml-session-cleanup.service';
 import { SamlSsoService } from './saml-sso.service';
 
 @Module({
-	imports: [PrismaModule, IdentityModule, ConfigModule],
+	imports: [PrismaModule, AuditCoreModule, IdentityModule, ConfigModule],
 	controllers: [SamlController],
 	providers: [
 		SamlRequestParserService,

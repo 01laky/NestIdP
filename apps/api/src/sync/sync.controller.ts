@@ -9,9 +9,11 @@ import {
 	ParseIntPipe,
 	Post,
 	Query,
+	Req,
 	UseGuards,
 	ValidationPipe,
 } from '@nestjs/common';
+import { AdminAuthenticatedRequest } from '../admin-auth/admin-auth.types';
 import {
 	SYNC_API_PATH,
 	type SyncLogListResponseDto,
@@ -58,7 +60,12 @@ export class SyncController {
 		@Param('connectionId', ParseCuidPipe) connectionId: string,
 		@Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
 		body: TriggerSyncBodyDto,
+		@Req() req: AdminAuthenticatedRequest,
 	): Promise<TriggerSyncResponseDto> {
-		return this.syncService.triggerSync(connectionId, { dryRun: body.dryRun });
+		return this.syncService.triggerSync(connectionId, {
+			dryRun: body.dryRun,
+			adminId: req.adminUser?.id,
+			adminUsername: req.adminUser?.username,
+		});
 	}
 }

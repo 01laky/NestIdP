@@ -19,6 +19,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { SamlModule } from './saml/saml.module';
 import { SpaModule } from './spa/spa.module';
 import { EncryptionModule } from './encryption/encryption.module';
+import { AuditModule } from './audit/audit.module';
 
 const webDistPath = getWebDistPath(__dirname);
 const enableStaticServing = shouldEnableStaticServing(
@@ -45,6 +46,7 @@ const enableStaticServing = shouldEnableStaticServing(
 				]
 			: []),
 		PrismaModule,
+		AuditModule,
 		BootstrapModule,
 		HealthModule,
 		EncryptionModule,

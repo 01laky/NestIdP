@@ -48,7 +48,7 @@ describe('SamlResponseBuilderService (SQLite)', () => {
 			},
 		} as unknown as ConfigService;
 		const encryptionService = new EncryptionService(configService);
-		const audit = new SamlAuthAuditService();
+		const audit = new SamlAuthAuditService({ recordSafe: jest.fn() } as never);
 		const idpSigning = new IdpSigningService(
 			prisma as unknown as PrismaService,
 			encryptionService,

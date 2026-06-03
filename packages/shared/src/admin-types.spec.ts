@@ -8,6 +8,8 @@ import {
 } from './idp-settings.js';
 import { SAML_METADATA_PATH, SP_CONNECTIONS_API_PATH } from './saml.js';
 import { SYNC_API_PATH } from './sync.js';
+import { AUDIT_ROUTE_PREFIX } from './audit-events.js';
+import { ADMIN_USERS_ROUTE_PREFIX } from './admin-users.js';
 
 const defaultIdp = {
 	idpSettingsRoute: IDP_SETTINGS_ROUTE_PREFIX,
@@ -70,6 +72,8 @@ describe('AdminDashboardResponseDto', () => {
 			apiConnection: null,
 			lastSyncStatus: null,
 			lastSyncAt: null,
+			auditEventsRoute: AUDIT_ROUTE_PREFIX,
+			adminUsersRoute: ADMIN_USERS_ROUTE_PREFIX,
 		};
 		expect(response.entityId).toContain('idp.example.com');
 		expect(response.lastSyncAt).toBeNull();
@@ -97,6 +101,8 @@ describe('AdminDashboardResponseDto', () => {
 			apiConnection: null,
 			lastSyncStatus: 'NEVER',
 			lastSyncAt: null,
+			auditEventsRoute: AUDIT_ROUTE_PREFIX,
+			adminUsersRoute: ADMIN_USERS_ROUTE_PREFIX,
 		};
 		expect(response.apiConnectionsRoute).toContain('api-connections');
 		expect(response.apiConnectionsRoute).not.toContain('sp-connections');
@@ -124,6 +130,8 @@ describe('AdminDashboardResponseDto', () => {
 			apiConnection: null,
 			lastSyncStatus: null,
 			lastSyncAt: null,
+			auditEventsRoute: AUDIT_ROUTE_PREFIX,
+			adminUsersRoute: ADMIN_USERS_ROUTE_PREFIX,
 		};
 		expect(response.idp.certStatus).toBe('rotation_active');
 	});

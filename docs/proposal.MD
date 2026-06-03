@@ -639,22 +639,23 @@ Any platform supporting Docker containers and a SQL database (SQLite or PostgreS
 
 ### Phase 1 — MVP
 
-- [ ] NestJS monolith scaffold (API + static serving)
-- [x] React Admin SPA (API connections, SP connections, IdP settings)
-- [ ] React SAML login page
+_Phase 1 complete in **v1.0.0** (Prompt 10 — Docker, persistent audit, admin accounts UI)._
+
+- [x] NestJS monolith scaffold (API + static serving)
+- [x] React Admin SPA (API connections, SP connections, IdP settings, audit log, admin accounts)
+- [x] React SAML login page (SP-initiated SSO completion)
 - [x] Prisma schema and migrations (portable across sqlite/postgresql)
 - [x] API connection CRUD (baseUrl + Bearer token)
 - [x] Manual identity sync from one active source
 - [x] User/group/role upsert via **fixed** v1 REST contract (with password hash)
 - [x] End-user login against synced credentials
-- [ ] **Custom `SamlModule`** — parse SAMLRequest, build/sign SAMLResponse, metadata, POST binding (xmlbuilder2 + xml-crypto)
-- [ ] SP-initiated SSO (HTTP-Redirect in, HTTP-POST out)
-- [ ] IdP metadata endpoint
-- [ ] Signed SAML assertions with attribute mapping
+- [x] **Custom `SamlModule`** — parse SAMLRequest, build/sign SAMLResponse, metadata, POST binding (xmlbuilder2 + xml-crypto)
+- [x] SP-initiated SSO (HTTP-Redirect in, HTTP-POST out)
+- [x] IdP metadata endpoint
+- [x] Signed SAML assertions with attribute mapping
 - [x] Admin authentication (local)
-- [x] React SAML login page (functional form; SAML POST completion in Prompt 07)
-- [ ] Docker + docker-compose for local dev and deployment
-- [ ] Basic audit log (sync events, admin actions) — v0.6 adds structured stdout auth events; persistent audit → later prompt
+- [x] Docker + docker-compose for local dev and deployment
+- [x] Basic audit log — `SyncLog` for sync runs + persistent `AuditEvent` for admin/security/SAML events (dual-write to stdout)
 
 ### Phase 2 — Hardening and Configurable API Contract
 
@@ -686,7 +687,7 @@ Any platform supporting Docker containers and a SQL database (SQLite or PostgreS
 | 2 | What happens to users removed from the external API — soft-delete or hard-delete? | Data retention policy. |
 | 3 | Should the login page support SP branding (logo per SP connection)? | UX scope for v1. |
 | 4 | ~~Is one API connection sufficient for v1?~~ **Resolved:** v1 and v2 use one sync source; multiple APIs in v3 (Section 7.6). | — |
-| 5 | Which bcrypt library/parameters must the external API use in v1? | Fixed contract interoperability; document in integration guide. |
+| 5 | ~~Which bcrypt library/parameters must the external API use in v1?~~ **Resolved:** bcrypt only; `$2a$` / `$2b$` / `$2y$` hashes; recommend cost 12. See [integration-api.md](./integration-api.md). | — |
 | 6 | v2 field mapping UI — simple key map or JSONPath-style? | Admin UX and sync engine complexity. |
 | 7 | v2 proxy — per API connection only, or also a global default? | Admin UX and sync client implementation. |
 | 8 | v3 multi-source sync — conflict resolution when same user exists in two APIs? | Merge strategy and data model. |

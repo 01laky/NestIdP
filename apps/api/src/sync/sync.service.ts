@@ -27,6 +27,7 @@ import {
 } from './external-api.validator';
 import { IdentitySyncClientService } from './identity-sync-client.service';
 import { IdentitySyncHttpError } from './identity-sync.errors';
+import { AuditPersistenceService } from '../audit/audit-persistence.service';
 import { SyncLogService } from './sync-log.service';
 import {
 	DRY_RUN_SUMMARY_MESSAGE,
@@ -44,11 +45,12 @@ export class SyncService {
 		private readonly identitySyncClient: IdentitySyncClientService,
 		@Inject(CREDENTIALS_ENCRYPTION)
 		private readonly encryption: CredentialsEncryptionPort,
+		private readonly audit: AuditPersistenceService,
 	) {}
 
 	async triggerSync(
 		connectionId: string,
-		options?: { dryRun?: boolean },
+		options?: { dryRun?: boolean; adminId?: string; adminUsername?: string },
 	): Promise<TriggerSyncResponseDto> {
 		const dryRun = options?.dryRun === true;
 		const connection = await this.prisma.apiConnection.findUnique({ where: { id: connectionId } });
@@ -78,6 +80,10 @@ export class SyncService {
 		const seenRoleExternalIds = new Set<string>();
 		const upsertedGroupExternalIds = new Set<string>();
 		const upsertedRoleExternalIds = new Set<string>();
+		const auditContext = {
+			adminId: options?.adminId,
+			adminUsername: options?.adminUsername,
+		};
 
 		try {
 			const bearerToken = this.decryptCredentials(connection.authCredentialsEncrypted, errors);
@@ -89,6 +95,7 @@ export class SyncService {
 					dryRun,
 					errors,
 					{ usersSynced, groupsSynced, rolesSynced },
+					auditContext,
 				);
 			}
 
@@ -111,6 +118,7 @@ export class SyncService {
 					dryRun,
 					errors,
 					{ usersSynced, groupsSynced, rolesSynced },
+					auditContext,
 				);
 			}
 
@@ -277,6 +285,10 @@ export class SyncService {
 				});
 			}
 
+			this.recordSyncAudit('sync_completed', finishedLog.id, options, {
+				usersSynced,
+				status: 'SUCCESS',
+			});
 			return {
 				syncLog: toSyncLogDto(finishedLog),
 				connection: toApiConnectionDto(connectionAfter),
@@ -289,6 +301,7 @@ export class SyncService {
 				dryRun,
 				errors,
 				{ usersSynced, groupsSynced, rolesSynced },
+				options,
 			);
 		}
 	}
@@ -337,6 +350,22 @@ export class SyncService {
 		}
 	}
 
+	private recordSyncAudit(
+		event: 'sync_completed' | 'sync_failed',
+		syncLogId: string,
+		options: { adminId?: string; adminUsername?: string } | undefined,
+		metadata: Record<string, unknown>,
+	): void {
+		this.audit.recordSafe({
+			category: 'sync',
+			event,
+			actorType: options?.adminId ? 'admin' : 'system',
+			actorId: options?.adminId ?? null,
+			actorLabel: options?.adminUsername ?? null,
+			metadata: { syncLogId, ...metadata },
+		});
+	}
+
 	private async finishFailedTrigger(
 		connectionId: string,
 		connectionBefore: ApiConnection,
@@ -344,8 +373,13 @@ export class SyncService {
 		dryRun: boolean,
 		errors: SyncLogErrorEntryDto[],
 		counters: { usersSynced: number; groupsSynced: number; rolesSynced: number },
+		options?: { adminId?: string; adminUsername?: string },
 	): Promise<TriggerSyncResponseDto> {
 		const finishedLog = await this.syncLogService.finishLog(logId, 'FAILED', counters, errors);
+		this.recordSyncAudit('sync_failed', finishedLog.id, options, {
+			usersSynced: counters.usersSynced,
+			status: 'FAILED',
+		});
 		let connectionAfter = connectionBefore;
 		if (!dryRun) {
 			connectionAfter = await this.prisma.apiConnection.update({

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AuditCoreModule } from '../audit/audit-core.module';
 import { AdminAuthModule } from '../admin-auth/admin-auth.module';
 import { IdpSettingsModule } from '../idp-settings/idp-settings.module';
 import { PrismaModule } from '../prisma/prisma.module';
@@ -9,7 +10,7 @@ import { SpConnectionsController } from './sp-connections.controller';
 import { SpConnectionsService } from './sp-connections.service';
 
 @Module({
-	imports: [PrismaModule, AdminAuthModule, IdpSettingsModule],
+	imports: [PrismaModule, AuditCoreModule, AdminAuthModule, IdpSettingsModule],
 	controllers: [SpConnectionsController, IdpMetadataController],
 	providers: [SpConnectionsService, SpConnectionsAuditService, SpConnectionTestAcsService],
 	exports: [SpConnectionsService],

@@ -1,8 +1,15 @@
+import { AuditPersistenceService } from '../audit/audit-persistence.service';
 import { ApiConnectionsAuditService } from './api-connections-audit.service';
 
 describe('ApiConnectionsAuditService', () => {
+	const audit = { recordSafe: jest.fn() };
+
+	beforeEach(() => {
+		jest.clearAllMocks();
+	});
+
 	it('API-CON-AUDIT-01: logs lifecycle and test events', () => {
-		const service = new ApiConnectionsAuditService();
+		const service = new ApiConnectionsAuditService(audit as unknown as AuditPersistenceService);
 		const logSpy = jest.spyOn(service['logger'], 'log').mockImplementation();
 
 		service.logCreated('c1', 'Corp');
@@ -21,7 +28,7 @@ describe('ApiConnectionsAuditService', () => {
 	});
 
 	it('API-CON-AUDIT-02: created event payload has no bearer token field', () => {
-		const service = new ApiConnectionsAuditService();
+		const service = new ApiConnectionsAuditService(audit as unknown as AuditPersistenceService);
 		const logSpy = jest.spyOn(service['logger'], 'log').mockImplementation();
 
 		service.logCreated('c1', 'Corp');
@@ -35,7 +42,7 @@ describe('ApiConnectionsAuditService', () => {
 	});
 
 	it('API-CON-AUDIT-03: tested event includes reachable without credentials', () => {
-		const service = new ApiConnectionsAuditService();
+		const service = new ApiConnectionsAuditService(audit as unknown as AuditPersistenceService);
 		const logSpy = jest.spyOn(service['logger'], 'log').mockImplementation();
 
 		service.logTested('c1', true, 200);

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { SAML_SESSION_BIND_PORT } from '@nestidp/shared';
+import { AuditCoreModule } from '../audit/audit-core.module';
 import { IdentityModule } from '../identity/identity.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { SamlModule } from '../saml/saml.module';
@@ -12,7 +13,7 @@ import { EndUserSessionService } from './end-user-session.service';
 import { SamlSessionBindService } from './saml-session-bind.service';
 
 @Module({
-	imports: [PrismaModule, IdentityModule, SamlModule],
+	imports: [PrismaModule, AuditCoreModule, IdentityModule, SamlModule],
 	controllers: [AuthController],
 	providers: [
 		EndUserAuthService,

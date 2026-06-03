@@ -218,6 +218,62 @@ export class EnvironmentVariables {
 	@IsOptional()
 	@IsString()
 	PORT?: string;
+
+	@IsOptional()
+	@IsString()
+	TRUST_PROXY?: string;
+
+	@IsOptional()
+	@IsString()
+	MIGRATE_ONLY?: string;
+
+	@IsOptional()
+	@Transform(({ value }) => {
+		if (value === undefined || value === null || value === '') {
+			return undefined;
+		}
+		const parsed = Number.parseInt(String(value), 10);
+		return Number.isFinite(parsed) ? parsed : value;
+	})
+	@IsInt()
+	@Min(1)
+	AUDIT_RETENTION_DAYS?: number;
+
+	@IsOptional()
+	@Transform(({ value }) => {
+		if (value === undefined || value === null || value === '') {
+			return undefined;
+		}
+		const parsed = Number.parseInt(String(value), 10);
+		return Number.isFinite(parsed) ? parsed : value;
+	})
+	@IsInt()
+	@Min(0)
+	AUDIT_CLEANUP_INTERVAL_MS?: number;
+
+	@IsOptional()
+	@Transform(({ value }) => {
+		if (value === undefined || value === null || value === '') {
+			return undefined;
+		}
+		const parsed = Number.parseInt(String(value), 10);
+		return Number.isFinite(parsed) ? parsed : value;
+	})
+	@IsInt()
+	@Min(1)
+	ADMIN_USER_CREATE_RATE_LIMIT_MAX?: number;
+
+	@IsOptional()
+	@Transform(({ value }) => {
+		if (value === undefined || value === null || value === '') {
+			return undefined;
+		}
+		const parsed = Number.parseInt(String(value), 10);
+		return Number.isFinite(parsed) ? parsed : value;
+	})
+	@IsInt()
+	@Min(1000)
+	ADMIN_USER_CREATE_RATE_LIMIT_WINDOW_MS?: number;
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {

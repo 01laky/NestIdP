@@ -11,10 +11,20 @@ describe('AdminAuthService', () => {
 	const passwordService = {
 		verifyTimingSafe: jest.fn(),
 	};
+	const configService = {
+		get: jest.fn(() => 'development'),
+	};
+	const audit = {
+		logLoginSuccess: jest.fn(),
+		logLoginFailure: jest.fn(),
+	};
 	const service = new AdminAuthService(
 		prisma as never,
 		passwordService as unknown as PasswordService,
+		configService as never,
+		audit as never,
 	);
+	const clientIp = '127.0.0.1';
 
 	beforeEach(() => {
 		jest.clearAllMocks();
@@ -28,7 +38,7 @@ describe('AdminAuthService', () => {
 		});
 		passwordService.verifyTimingSafe.mockResolvedValue(true);
 
-		await expect(service.login('admin', 'secret')).resolves.toEqual({
+		await expect(service.login('admin', 'secret', clientIp)).resolves.toEqual({
 			id: 'a1',
 			username: 'admin',
 		});
@@ -38,8 +48,12 @@ describe('AdminAuthService', () => {
 		prisma.adminUser.findUnique.mockResolvedValue(null);
 		passwordService.verifyTimingSafe.mockResolvedValue(false);
 
-		await expect(service.login('missing', 'secret')).rejects.toThrow(UnauthorizedException);
-		await expect(service.login('missing', 'secret')).rejects.toThrow('Invalid credentials');
+		await expect(service.login('missing', 'secret', clientIp)).rejects.toThrow(
+			UnauthorizedException,
+		);
+		await expect(service.login('missing', 'secret', clientIp)).rejects.toThrow(
+			'Invalid credentials',
+		);
 	});
 
 	it('API-AUT-03: login fails wrong password → 401 generic message', async () => {
@@ -50,7 +64,7 @@ describe('AdminAuthService', () => {
 		});
 		passwordService.verifyTimingSafe.mockResolvedValue(false);
 
-		await expect(service.login('admin', 'wrong')).rejects.toThrow('Invalid credentials');
+		await expect(service.login('admin', 'wrong', clientIp)).rejects.toThrow('Invalid credentials');
 	});
 
 	it('API-AUT-04: response never includes passwordHash', async () => {
@@ -61,7 +75,7 @@ describe('AdminAuthService', () => {
 		});
 		passwordService.verifyTimingSafe.mockResolvedValue(true);
 
-		const result = await service.login('admin', 'secret');
+		const result = await service.login('admin', 'secret', clientIp);
 		expect(result).not.toHaveProperty('passwordHash');
 	});
 
@@ -69,7 +83,7 @@ describe('AdminAuthService', () => {
 		prisma.adminUser.findUnique.mockResolvedValue(null);
 		passwordService.verifyTimingSafe.mockResolvedValue(false);
 
-		await expect(service.login('ghost', 'secret')).rejects.toThrow(UnauthorizedException);
+		await expect(service.login('ghost', 'secret', clientIp)).rejects.toThrow(UnauthorizedException);
 		expect(passwordService.verifyTimingSafe).toHaveBeenCalledWith('secret', null);
 	});
 

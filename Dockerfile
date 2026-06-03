@@ -31,6 +31,7 @@ RUN pnpm --filter @nestidp/api prisma:generate
 RUN pnpm --filter @nestidp/api build
 
 FROM node:20-alpine AS runner
+RUN apk add --no-cache openssl wget
 RUN corepack enable && corepack prepare pnpm@9 --activate
 WORKDIR /app
 ENV NODE_ENV=production
@@ -42,8 +43,9 @@ COPY --from=build-api /app/apps/web/dist ./apps/web/dist
 COPY --from=build-api /app/packages/shared/dist ./packages/shared/dist
 COPY --from=build-api /app/packages/shared/package.json ./packages/shared/package.json
 COPY package.json pnpm-workspace.yaml ./
+COPY scripts/docker-entrypoint.sh /app/scripts/docker-entrypoint.sh
+RUN chmod +x /app/scripts/docker-entrypoint.sh
 EXPOSE 3000
-# Production deploy: run migrations before start, e.g.:
-#   pnpm --filter @nestidp/api prisma:migrate:deploy && node apps/api/dist/main.js
-# Or use an entrypoint script in a later prompt.
-CMD ["node", "apps/api/dist/main.js"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+	CMD wget -qO- http://127.0.0.1:3000/health || exit 1
+ENTRYPOINT ["/app/scripts/docker-entrypoint.sh"]

@@ -1,9 +1,16 @@
 import type {
 	AdminDashboardResponseDto,
+	AdminChangePasswordRequestDto,
+	AdminChangePasswordResponseDto,
 	AdminLoginRequestDto,
 	AdminLoginResponseDto,
 	AdminLogoutResponseDto,
 	AdminMeResponseDto,
+	AdminUserPublicDto,
+	AuditEventListResponseDto,
+	CreateAdminUserRequestDto,
+	DeleteAdminUserResponseDto,
+	UpdateAdminUserRequestDto,
 	ApiConnectionListResponseDto,
 	ApiConnectionResponseDto,
 	ApiConnectionTestResponseDto,
@@ -41,6 +48,8 @@ import {
 	IDENTITY_USERS_API_PATH,
 	IDP_METADATA_URL_API_PATH,
 	IDP_SETTINGS_API_PATH,
+	ADMIN_USERS_API_PATH,
+	AUDIT_EVENTS_API_PATH,
 	SP_CONNECTIONS_API_PATH,
 	SYNC_API_PATH,
 } from '@nestidp/shared';
@@ -356,6 +365,55 @@ export function cancelIdpCertRotation(): Promise<IdpSettingsPublicDto> {
 
 export function getIdpMetadataPreview(): Promise<IdpMetadataPreviewResponseDto> {
 	return adminFetch<IdpMetadataPreviewResponseDto>(`${IDP_SETTINGS_API_PATH}/metadata-preview`);
+}
+
+export function listAdminUsers(): Promise<AdminUserPublicDto[]> {
+	return adminFetch<AdminUserPublicDto[]>(ADMIN_USERS_API_PATH);
+}
+
+export function createAdminUser(body: CreateAdminUserRequestDto): Promise<AdminUserPublicDto> {
+	return adminFetch<AdminUserPublicDto>(ADMIN_USERS_API_PATH, {
+		method: 'POST',
+		body: JSON.stringify(body),
+	});
+}
+
+export function updateAdminUser(
+	id: string,
+	body: UpdateAdminUserRequestDto,
+): Promise<AdminUserPublicDto> {
+	return adminFetch<AdminUserPublicDto>(`${ADMIN_USERS_API_PATH}/${id}`, {
+		method: 'PATCH',
+		body: JSON.stringify(body),
+	});
+}
+
+export function deleteAdminUser(id: string): Promise<DeleteAdminUserResponseDto> {
+	return adminFetch<DeleteAdminUserResponseDto>(`${ADMIN_USERS_API_PATH}/${id}`, {
+		method: 'DELETE',
+	});
+}
+
+export function changeAdminPassword(
+	body: AdminChangePasswordRequestDto,
+): Promise<AdminChangePasswordResponseDto> {
+	return adminFetch<AdminChangePasswordResponseDto>('/api/admin/auth/change-password', {
+		method: 'POST',
+		body: JSON.stringify(body),
+	});
+}
+
+export function listAuditEvents(
+	params: Record<string, string> = {},
+): Promise<AuditEventListResponseDto> {
+	const query = new URLSearchParams(params);
+	const suffix = query.size > 0 ? `?${query.toString()}` : '';
+	return adminFetch<AuditEventListResponseDto>(`${AUDIT_EVENTS_API_PATH}${suffix}`);
+}
+
+export function auditExportUrl(params: Record<string, string>): string {
+	const query = new URLSearchParams(params);
+	return `${AUDIT_EVENTS_API_PATH}/export?${query.toString()}`;
 }
 
 export type { SpConnectionPublicDto };

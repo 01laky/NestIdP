@@ -2,9 +2,12 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+	ADMIN_USERS_ROUTE_PREFIX,
 	API_CONNECTION_ROUTE_PREFIX,
+	AUDIT_ROUTE_PREFIX,
 	IDP_SETTINGS_ROUTE_PREFIX,
 	SP_CONNECTION_ROUTE_PREFIX,
+	type AdminDashboardResponseDto,
 } from '@nestidp/shared';
 import { AdminLayout } from './AdminLayout';
 import * as adminApi from './adminApi';
@@ -36,7 +39,7 @@ function renderAdminAt(path: string) {
 	);
 }
 
-const dashboardStub = {
+const dashboardStub: AdminDashboardResponseDto = {
 	counts: { users: 0, groups: 0, roles: 0, apiConnections: 0, spConnections: 0 },
 	apiConnectionsRoute: API_CONNECTION_ROUTE_PREFIX,
 	spConnectionsRoute: SP_CONNECTION_ROUTE_PREFIX,
@@ -57,6 +60,8 @@ const dashboardStub = {
 	apiConnection: null,
 	lastSyncStatus: null,
 	lastSyncAt: null,
+	auditEventsRoute: AUDIT_ROUTE_PREFIX,
+	adminUsersRoute: ADMIN_USERS_ROUTE_PREFIX,
 };
 
 describe('AdminLayout', () => {

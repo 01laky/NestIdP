@@ -4,9 +4,11 @@ describe('EndUserAuthAuditService', () => {
 	let service: EndUserAuthAuditService;
 	let logSpy: jest.SpyInstance;
 	let warnSpy: jest.SpyInstance;
+	const audit = { recordSafe: jest.fn() };
 
 	beforeEach(() => {
-		service = new EndUserAuthAuditService();
+		jest.clearAllMocks();
+		service = new EndUserAuthAuditService(audit as never);
 		logSpy = jest.spyOn(service['logger'], 'log').mockImplementation(() => undefined);
 		warnSpy = jest.spyOn(service['logger'], 'warn').mockImplementation(() => undefined);
 	});
@@ -26,6 +28,7 @@ describe('EndUserAuthAuditService', () => {
 				samlSessionBound: true,
 			}),
 		);
+		expect(audit.recordSafe).toHaveBeenCalled();
 	});
 
 	it('API-AUTH-AUDIT-02: logLoginFailure emits reason', () => {

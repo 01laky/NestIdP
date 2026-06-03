@@ -3,18 +3,39 @@ flowchart TB
 
 	REQ --> HEALTH{"/health or /ready?"}
 	HEALTH -->|yes| HEALTH_API["HealthController"]
+
 	HEALTH -->|no| API{"/api/* ?"}
-	API -->|yes| REST["Admin / Auth / Identity / SP REST API"]
+	API -->|"/api/admin/auth/*"| ADMIN_AUTH["Admin auth · login/logout/me/change-password"]
+	API -->|"/api/admin/api-connections/*"| API_CONN["API connections CRUD + test"]
+	API -->|"/api/admin/sync/*"| SYNC_API["Identity sync trigger + logs"]
+	API -->|"/api/admin/sp-connections/*"| SP_API["SP connections CRUD + ACS test"]
+	API -->|"/api/admin/idp/*"| IDP_API["IdP settings + metadata URL"]
+	API -->|"/api/admin/identity/*"| IDENTITY_API["Synced users/groups/roles browse"]
+	API -->|"/api/admin/admin-users/*"| ADM_USERS_API["Operator accounts CRUD"]
+	API -->|"/api/admin/audit-events/*"| AUDIT_API["Audit log list + export"]
+	API -->|"/api/admin"| DASH_API["Admin dashboard JSON"]
+	API -->|"/api/auth/*"| END_USER_AUTH["End-user login · session · complete-sso"]
+
 	API -->|no| SAML{"/saml/* ?"}
-	SAML -->|yes| SAML_API["SamlController · protocol"]
+	SAML -->|yes| SAML_API["SamlController · metadata + SSO"]
+
 	SAML -->|no| LOGIN{"/login ?"}
-	LOGIN -->|yes| SPA_LOGIN["React login page"]
+	LOGIN -->|yes| SPA_LOGIN["React SAML login page"]
+
 	LOGIN -->|no| ADMIN{"/admin/* ?"}
-	ADMIN -->|yes| SPA_ADMIN["React admin SPA"]
+	ADMIN -->|"/admin/login"| SPA_ADMIN_LOGIN["React operator login"]
+	ADMIN -->|"/admin/audit"| SPA_AUDIT["Audit log"]
+	ADMIN -->|"/admin/settings/admins"| SPA_ADMINS["Admin accounts"]
+	ADMIN -->|"/admin/settings/idp"| SPA_IDP["IdP settings"]
+	ADMIN -->|"/admin/api-connections/*"| SPA_API_CONN["API connections UI"]
+	ADMIN -->|"/admin/sp-connections/*"| SPA_SP["SP connections UI"]
+	ADMIN -->|"/admin/identity/*"| SPA_IDENTITY["Identity browse"]
+	ADMIN -->|other /admin/*| SPA_ADMIN["React admin SPA shell"]
+
 	ADMIN -->|no| STATIC["Static assets / SPA fallback"]
 
 	classDef gate fill:#422006,stroke:#fbbf24,stroke-width:2px,color:#fffbeb
 	classDef handler fill:#134e4a,stroke:#2dd4bf,stroke-width:2px,color:#f0fdfa
 
 	class HEALTH,API,SAML,LOGIN,ADMIN gate
-	class HEALTH_API,REST,SAML_API,SPA_LOGIN,SPA_ADMIN,STATIC handler
+	class HEALTH_API,ADMIN_AUTH,API_CONN,SYNC_API,SP_API,IDP_API,IDENTITY_API,ADM_USERS_API,AUDIT_API,DASH_API,END_USER_AUTH,SAML_API,SPA_LOGIN,SPA_ADMIN_LOGIN,SPA_AUDIT,SPA_ADMINS,SPA_IDP,SPA_API_CONN,SPA_SP,SPA_IDENTITY,SPA_ADMIN,STATIC handler

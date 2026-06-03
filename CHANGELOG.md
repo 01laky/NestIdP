@@ -4,6 +4,57 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.0.1]
+
+### Added
+
+- Comprehensive v1.0 edge-case test coverage per `prompts/10-v1-release.md` §15 registry:
+  audit API (`API-AUD-*` 25+, `API-AUD-EXP-*` 8, `API-AUD-RET-*` 7, `API-AUD-QRY-*` 6),
+  admin users (`API-ADM-USR-*` 31, `API-ADM-USR-RL-*` 4 + integration rate-limit),
+  change-password (`API-ADM-PWD-*` 10), trust proxy + Helmet (`API-TRUST-*`, `API-HELM-*`),
+  env validation (`API-*-ENV-*`), E2E release (`E2E-10-*` 10), web (`WEB-ADM-70`–`99`).
+- `http-security.ts` extracted from `main.ts` for testable trust-proxy and Helmet behavior.
+
+### Fixed
+
+- Audit list/export query validation now rejects unknown query params (`forbidNonWhitelisted`).
+
+## [1.0.0]
+
+### Added
+
+- Persistent **`AuditEvent`** model and **`GET /api/admin/audit-events`** with filters and **`GET …/export`** (JSON/CSV, 10k row cap)
+- **`AuditRetentionCleanupService`** — `AUDIT_RETENTION_DAYS` (default 90) and `AUDIT_CLEANUP_INTERVAL_MS` purge job
+- Dual-write audit persistence for admin/SAML/end-user/sync summary events (stdout retained for log aggregation)
+- **`/admin/audit`** React page with export buttons and sync-log deep links
+- **`AdminUsersModule`** — **`GET/POST/PATCH/DELETE /api/admin/admin-users`** and **`/admin/settings/admins`** UI
+- **`POST /api/admin/auth/change-password`** for self-service operator password change
+- Rate limiting on **`POST /api/admin/admin-users`** (`ADMIN_USER_CREATE_RATE_LIMIT_*`)
+- Docker **`scripts/docker-entrypoint.sh`** with **`prisma migrate deploy`** and **`MIGRATE_ONLY=1`** init-container mode
+- Full **`docker-compose.yml`** stack (`nestidp` + `postgres`, `restart: unless-stopped`, healthchecks)
+- **`.env.docker.example`**, **`scripts/ci-docker-smoke.sh`**, CI **`docker-smoke`** job
+- **`TRUST_PROXY`** and production **Helmet** security headers (CSP tuned for SAML POST HTML)
+- **`docs/integration-api.md`**, **`docs/deployment.md`**, **`docs/RELEASE.md`**
+- Dashboard links to audit log and admin accounts (`auditEventsRoute`, `adminUsersRoute`)
+- Shared: `audit-events.ts`, `admin-users.ts`, `admin-password-policy.ts`; tests API-AUD-_, API-ADM-USR-_, API-ADM-PWD-_, SH-AUD-_, SH-ADM-USR-\*
+
+### Changed
+
+- Refactored `*AuditService` services to dual-write via **`AuditPersistenceService`**
+- **`AdminAuthService.login`** trims username; logs **`admin_login_success`** / **`admin_login_failure`** to audit DB
+- **`docker-compose.yml`** — default `docker compose up` runs app + PostgreSQL (breaking: removed `profiles: ['postgres']` only workflow)
+- **`Dockerfile`** — OpenSSL + wget in runner, **`ENTRYPOINT`** script, **`HEALTHCHECK`**
+- `docs/development.md`, `docs/proposal.MD` §13 Phase 1 complete; §14 Q5 resolved
+- Monorepo version **1.0.0**
+
+### Security
+
+- Admin account lifecycle audit trail; cannot delete last admin or self while logged in
+- Production weak-password rules on admin create, PATCH password, and change-password
+- Audit metadata denylist strips secrets before DB insert
+
+**Tests:** run `pnpm test` after upgrade for current totals (API + web + shared + e2e + optional PostgreSQL smoke).
+
 ## [0.9.0]
 
 ### Added

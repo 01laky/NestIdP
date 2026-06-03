@@ -6,6 +6,8 @@ import {
 	API_CONNECTIONS_API_PATH,
 	IDENTITY_ROUTE_PREFIX,
 	IDP_SETTINGS_ROUTE_PREFIX,
+	AUDIT_ROUTE_PREFIX,
+	ADMIN_USERS_ROUTE_PREFIX,
 	SYNC_API_PATH,
 	SP_CONNECTION_ROUTE_PREFIX,
 	SP_CONNECTIONS_API_PATH,
@@ -60,6 +62,8 @@ export class AdminDashboardService {
 			apiConnection: connectionRow ? toApiConnectionDto(connectionRow) : null,
 			lastSyncStatus: connectionRow?.lastSyncStatus ?? null,
 			lastSyncAt: connectionRow?.lastSyncAt?.toISOString() ?? null,
+			auditEventsRoute: AUDIT_ROUTE_PREFIX,
+			adminUsersRoute: ADMIN_USERS_ROUTE_PREFIX,
 		};
 	}
 }

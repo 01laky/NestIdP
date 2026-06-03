@@ -1,30 +1,85 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { AuditPersistenceService } from '../audit/audit-persistence.service';
 
 @Injectable()
 export class IdpSettingsAuditService {
 	private readonly logger = new Logger(IdpSettingsAuditService.name);
 
+	constructor(private readonly audit: AuditPersistenceService) {}
+
 	logSettingsUpdated(fields: string[]): void {
-		this.logger.log(JSON.stringify({ event: 'idp_settings_updated', fields }));
+		const payload = { event: 'idp_settings_updated', fields };
+		this.logger.log(JSON.stringify(payload));
+		this.audit.recordSafe({
+			category: 'admin_config',
+			event: 'idp_settings_updated',
+			actorType: 'admin',
+			subjectType: 'IdpSettings',
+			subjectId: 'default',
+			metadata: { fields },
+		});
 	}
 
 	logSigningCertGenerated(rotation: boolean): void {
-		this.logger.log(JSON.stringify({ event: 'idp_signing_cert_generated', rotation }));
+		const payload = { event: 'idp_signing_cert_generated', rotation };
+		this.logger.log(JSON.stringify(payload));
+		this.audit.recordSafe({
+			category: 'admin_config',
+			event: 'idp_signing_cert_generated',
+			actorType: 'admin',
+			subjectType: 'IdpSettings',
+			subjectId: 'default',
+			metadata: { rotation },
+		});
 	}
 
 	logSigningCertUploaded(rotation: boolean): void {
-		this.logger.log(JSON.stringify({ event: 'idp_signing_cert_uploaded', rotation }));
+		const payload = { event: 'idp_signing_cert_uploaded', rotation };
+		this.logger.log(JSON.stringify(payload));
+		this.audit.recordSafe({
+			category: 'admin_config',
+			event: 'idp_signing_cert_uploaded',
+			actorType: 'admin',
+			subjectType: 'IdpSettings',
+			subjectId: 'default',
+			metadata: { rotation },
+		});
 	}
 
 	logRotationStarted(mode: 'generate' | 'upload'): void {
-		this.logger.log(JSON.stringify({ event: 'idp_signing_rotation_started', mode }));
+		const payload = { event: 'idp_signing_rotation_started', mode };
+		this.logger.log(JSON.stringify(payload));
+		this.audit.recordSafe({
+			category: 'admin_config',
+			event: 'idp_signing_rotation_started',
+			actorType: 'admin',
+			subjectType: 'IdpSettings',
+			subjectId: 'default',
+			metadata: { mode },
+		});
 	}
 
 	logRotationCompleted(): void {
-		this.logger.log(JSON.stringify({ event: 'idp_signing_rotation_completed' }));
+		const payload = { event: 'idp_signing_rotation_completed' };
+		this.logger.log(JSON.stringify(payload));
+		this.audit.recordSafe({
+			category: 'admin_config',
+			event: 'idp_signing_rotation_completed',
+			actorType: 'admin',
+			subjectType: 'IdpSettings',
+			subjectId: 'default',
+		});
 	}
 
 	logRotationCancelled(): void {
-		this.logger.log(JSON.stringify({ event: 'idp_signing_rotation_cancelled' }));
+		const payload = { event: 'idp_signing_rotation_cancelled' };
+		this.logger.log(JSON.stringify(payload));
+		this.audit.recordSafe({
+			category: 'admin_config',
+			event: 'idp_signing_rotation_cancelled',
+			actorType: 'admin',
+			subjectType: 'IdpSettings',
+			subjectId: 'default',
+		});
 	}
 }

@@ -1,6 +1,8 @@
 # Development guide
 
-Companion to [proposal.MD](./proposal.MD) for local setup (**v0.6.0** — admin bootstrap, API connections, identity sync, end-user login).
+Companion to [proposal.MD](./proposal.MD) for local setup (**v1.0.0** — Phase 1 complete: SAML SSO, admin console, Docker deploy, persistent audit log, admin account management).
+
+Integration guide: [integration-api.md](./integration-api.md) · Deploy: [deployment.md](./deployment.md) · Go-live: [RELEASE.md](./RELEASE.md)
 
 Database selection: **[database.md](./database.md)** — SQLite for local dev, PostgreSQL (or SQLite) at deploy time.
 
@@ -20,7 +22,7 @@ docs/img/          Mermaid (.mmd) sources + committed SVGs
 
 ## ORM and database
 
-**Prisma** ORM with full MVP schema (11 models). See [database.md](./database.md) and the [ER diagram](./img/schema-entities.svg).
+**Prisma** ORM with full MVP schema (12 models including `AuditEvent`). See [database.md](./database.md) and the [ER diagram](./img/schema-entities.svg).
 
 | Variable            | Default (dev)             | Purpose                                 |
 | ------------------- | ------------------------- | --------------------------------------- |
@@ -57,11 +59,15 @@ This syncs `schema.prisma` with `DATABASE_PROVIDER`. Root `pnpm install` runs `p
 | `/api/admin/api-connections` | API connection CRUD + connectivity test                   |
 | `/api/admin/sync/*`          | Identity sync trigger, status, logs                       |
 | `/api/auth/*`                | End-user login API (synced credentials)                   |
-| `/saml/*`                    | SAML protocol (stub, HTTP 501)                            |
+| `/saml/*`                    | SAML protocol (metadata, SP-initiated SSO)                |
+| `/api/admin/audit-events`    | Persistent audit log (list + export)                      |
+| `/api/admin/admin-users`     | Operator account CRUD                                     |
 | `/health`                    | Liveness — always OK, no database                         |
 | `/ready`                     | Readiness — Prisma ping                                   |
 | `/admin/login`               | React operator login (separate from SAML `/login`)        |
 | `/admin/settings/idp`        | IdP settings — entity ID, cert lifecycle, rotation wizard |
+| `/admin/settings/admins`     | Operator account management                               |
+| `/admin/audit`               | Security and configuration audit log                      |
 | `/admin/*`                   | React admin SPA (session gate)                            |
 | `/login`                     | React SAML login page                                     |
 
@@ -110,7 +116,7 @@ Constants:
 - **No CSRF** on end-user routes (admin-only in v1)
 - **SAML prep:** optional `samlSessionId` on login binds `SamlSession.userId`; SAML XML/POST is **Prompt 07**
 - **SP branding:** none in v0.6 (proposal §14 Q3 — single neutral `/login` page)
-- **Audit:** structured stdout events (`end_user_login_success`, `end_user_login_failure`, …) — persistent audit table → Prompt 10
+- **Audit:** dual-write to stdout and persistent **`AuditEvent`** table (browse at `/admin/audit`)
 
 Optional env:
 
@@ -161,8 +167,6 @@ SP_ENTITY_ID=urn:test:sp node docs/examples/saml-sp-initiated-redirect.mjs
 
 Inject `@Inject(SAML_SESSION_BIND_PORT)` from `AuthModule` — do not duplicate bind SQL in `SamlModule`.
 
-**Prompt 10:** Docker packaging.
-
 #### IdP settings and certificate rotation (v0.9.0)
 
 Operator UI: **`/admin/settings/idp`** (sidebar **IdP Settings**). Dashboard shows **`idp.certStatus`** (`missing` | `ok` | `expiring_soon` | `rotation_active`) without a second API call.
@@ -188,7 +192,7 @@ Private keys encrypted at rest (`EncryptionService`); admin JSON exposes fingerp
 
 `IdpSettings.nameIdFormat` affects **metadata only**; assertion NameID still comes from each **`SpConnection.nameIdFormat`**.
 
-### Admin REST API (v0.5.0)
+### Admin REST API (v1.0.0)
 
 Full operator surface:
 
@@ -196,6 +200,7 @@ Full operator surface:
 | ------ | -------------------------------------- | ------- | ----- | ----------------------------------------------------- |
 | POST   | `/api/admin/auth/login`                | —       | —     | Operator login                                        |
 | POST   | `/api/admin/auth/logout`               | session | yes\* | Logout (\*when session cookie present)                |
+| POST   | `/api/admin/auth/change-password`      | session | yes   | Self-service password change (current + new)          |
 | GET    | `/api/admin/auth/me`                   | session | —     | Session + `csrfToken`                                 |
 | GET    | `/api/admin`                           | session | —     | Dashboard (`AdminDashboardResponseDto`)               |
 | GET    | `/api/admin/api-connections`           | session | —     | List API connections                                  |
@@ -208,6 +213,12 @@ Full operator surface:
 | GET    | `/api/admin/sync/:connectionId/status` | session | —     | Sync status + latest log                              |
 | GET    | `/api/admin/sync/:connectionId/logs`   | session | —     | List sync logs (`?limit=`, default 20, max 100)       |
 | GET    | `/api/admin/sync/logs/:syncLogId`      | session | —     | Get sync log detail                                   |
+| GET    | `/api/admin/admin-users`               | session | —     | List operator accounts (no password hashes)           |
+| POST   | `/api/admin/admin-users`               | session | yes   | Create operator (rate limited)                        |
+| PATCH  | `/api/admin/admin-users/:id`           | session | yes   | Reset another admin’s password                        |
+| DELETE | `/api/admin/admin-users/:id`           | session | yes   | Delete operator (not last / not self)                 |
+| GET    | `/api/admin/audit-events`              | session | —     | Paginated audit log (`?category=`, `since`, …)        |
+| GET    | `/api/admin/audit-events/export`       | session | —     | Export JSON/CSV (max 10_000 rows)                     |
 
 Constants in `@nestidp/shared`:
 
@@ -218,6 +229,10 @@ Constants in `@nestidp/shared`:
 - **`IDENTITY_ROUTE_PREFIX`** — React UI route (`/admin/identity`)
 - **`IDP_SETTINGS_ROUTE_PREFIX`** — React UI route (`/admin/settings/idp`)
 - **`IDP_SETTINGS_API_PATH`** — REST base (`/api/admin/idp/settings`)
+- **`ADMIN_USERS_API_PATH`** — `/api/admin/admin-users`
+- **`ADMIN_USERS_ROUTE_PREFIX`** — `/admin/settings/admins`
+- **`AUDIT_EVENTS_API_PATH`** — `/api/admin/audit-events`
+- **`AUDIT_ROUTE_PREFIX`** — `/admin/audit`
 - **`ADMIN_CSRF_HEADER_NAME`** — `X-CSRF-Token` on mutating admin calls
 
 ![API connection CRUD flow](./img/api-connection-crud.svg)
@@ -238,7 +253,7 @@ Bearer tokens are encrypted at rest (AES-256-GCM via `ENCRYPTION_KEY`); API resp
 - **Concurrency** — only one real sync per connection; stale `IN_PROGRESS` runs auto-fail after `SYNC_STALE_RUN_MINUTES` (default 30)
 - **Partial errors** — per-user failures go to `SyncLog.errors[]`; run completes with `SUCCESS` unless fetch/decrypt fails
 - **Upsert failure** skips groups/roles fetch for that user
-- External contract: [proposal.MD §7.2](./proposal.MD)
+- External contract: [integration-api.md](./integration-api.md) (proposal [§7.2](./proposal.MD))
 
 Optional env:
 
@@ -273,7 +288,18 @@ On login and `GET /me`, the API returns the same `csrfToken` in JSON. The web cl
 
 Vite dev server proxies `/api` to Nest; admin fetches must use **`credentials: 'include'`** (see `apps/web/src/admin/adminApi.ts`).
 
-First boot: set `ADMIN_USERNAME` / `ADMIN_PASSWORD` in `.env` — bootstrap creates the first admin when the table is empty. Change default password after deploy.
+First boot: set `ADMIN_USERNAME` / `ADMIN_PASSWORD` in `.env` — bootstrap creates the first admin when the table is empty. Change default password after deploy. Additional operators: `/admin/settings/admins` or `POST /api/admin/admin-users`.
+
+Optional production / ops env:
+
+| Variable                                 | Default    | Purpose                                                 |
+| ---------------------------------------- | ---------- | ------------------------------------------------------- |
+| `TRUST_PROXY`                            | `false`    | `true` / `1` — trust one reverse-proxy hop for `req.ip` |
+| `AUDIT_RETENTION_DAYS`                   | `90`       | Purge `AuditEvent` rows older than N days               |
+| `AUDIT_CLEANUP_INTERVAL_MS`              | `86400000` | Retention job interval; `0` = startup only              |
+| `ADMIN_USER_CREATE_RATE_LIMIT_MAX`       | `5`        | Max `POST /admin-users` per window                      |
+| `ADMIN_USER_CREATE_RATE_LIMIT_WINDOW_MS` | `900000`   | Admin create rate window                                |
+| `MIGRATE_ONLY`                           | `0`        | `1` — migrate and exit (Docker init job)                |
 
 **v1 single-connection limit:** only one `ApiConnection` row may exist until multi-source sync (Phase 3). A second `POST` returns **409 Conflict**.
 
@@ -353,13 +379,9 @@ curl -s -b "$COOKIE_JAR" "http://localhost:3000/api/admin/sync/CONNECTION_ID/log
 
 `/health` never calls Prisma. The API starts even when the database is unavailable; only `/ready` reflects DB state.
 
-## SAML module (scaffold)
+## SAML module
 
-Custom NestJS `SamlModule` — **no** `samlify` or `@node-saml/node-saml`. XML libraries are added when SAML logic is implemented.
-
-Current stubs return HTTP **501** with JSON body describing deferred work.
-
-Target SP-initiated flow: [sso-flow.svg](./img/sso-flow.svg) (see [proposal.MD](./proposal.MD) §6.2).
+Custom NestJS `SamlModule` (xmlbuilder2 + xml-crypto) — SP-initiated SSO, signed assertions, metadata. Flow: [sso-flow.svg](./img/sso-flow.svg) (see [proposal.MD](./proposal.MD) §6.2). `/saml/slo` remains unimplemented (501).
 
 ## Testing
 
@@ -388,17 +410,14 @@ This sets `core.hooksPath=.githooks`. Hooks run on `prepare-commit-msg` and `com
 
 ## Docker
 
-- **Default dev:** SQLite — no containers required
-- **Optional PostgreSQL:** `docker compose --profile postgres up -d`
-- Application runs on the host via `pnpm dev` during development
-- `Dockerfile` — multi-stage production image; run `db:migrate:deploy` before start in production
+- **Default dev:** SQLite — no containers required; `pnpm dev` on the host
+- **Full stack:** `docker compose up --build` — PostgreSQL + NestIdP (migrations via entrypoint). See [deployment.md](./deployment.md)
+- **Host dev + Postgres only:** `docker compose up -d postgres` then `pnpm dev` with `DATABASE_PROVIDER=postgresql`
+- **`MIGRATE_ONLY=1`:** run migrations without starting HTTP (init containers)
+- **`TRUST_PROXY`:** set `true` when behind a TLS-terminating reverse proxy
 
-## Next implementation steps
+Copy `.env.docker.example` → `.env.docker` for compose secrets.
 
-1. ~~Admin bootstrap seed + authentication (Prompt 03)~~
-2. ~~API connection CRUD (baseUrl + Bearer token) (Prompt 04)~~
-3. ~~Identity sync (fixed v1 REST contract) — Prompt 05~~
-4. ~~End-user login + password verification — Prompt 06~~
-5. ~~Custom SamlModule XML implementation (Prompt 07)~~
-6. ~~Admin SPA pages (Prompt 08–09)~~
-7. Docker packaging (Prompt 10)
+## Phase 1 complete — what’s next
+
+Phase 1 (MVP) is **done** in v1.0.0. Phase 2 items (scheduled sync, configurable API contract, outbound proxy, SAMLRequest signature verify, IdP-initiated SSO, SLO) are tracked in [proposal.MD §13](./proposal.MD).

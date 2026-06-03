@@ -223,4 +223,43 @@ describe('validateEnv', () => {
 	it('API-ENV-SAML-03: rejects invalid SAML_CLOCK_SKEW_SECONDS', () => {
 		expect(() => validateEnv({ ...validConfig, SAML_CLOCK_SKEW_SECONDS: '0' })).toThrow();
 	});
+
+	it('API-TRUST-ENV-01: accepts optional TRUST_PROXY true/1/false', () => {
+		expect(validateEnv({ ...validConfig, TRUST_PROXY: 'true' }).TRUST_PROXY).toBe('true');
+		expect(validateEnv({ ...validConfig, TRUST_PROXY: '1' }).TRUST_PROXY).toBe('1');
+		expect(validateEnv({ ...validConfig, TRUST_PROXY: 'false' }).TRUST_PROXY).toBe('false');
+	});
+
+	it('API-DCK-MIG-01: accepts optional MIGRATE_ONLY 0 and 1', () => {
+		expect(validateEnv({ ...validConfig, MIGRATE_ONLY: '0' }).MIGRATE_ONLY).toBe('0');
+		expect(validateEnv({ ...validConfig, MIGRATE_ONLY: '1' }).MIGRATE_ONLY).toBe('1');
+	});
+
+	it('API-DCK-MIG-02: accepts arbitrary MIGRATE_ONLY string for entrypoint script', () => {
+		expect(validateEnv({ ...validConfig, MIGRATE_ONLY: 'yes' }).MIGRATE_ONLY).toBe('yes');
+	});
+
+	it('API-AUD-ENV-01: accepts AUDIT_RETENTION_DAYS and AUDIT_CLEANUP_INTERVAL_MS', () => {
+		const result = validateEnv({
+			...validConfig,
+			AUDIT_RETENTION_DAYS: '30',
+			AUDIT_CLEANUP_INTERVAL_MS: '3600000',
+		});
+		expect(result.AUDIT_RETENTION_DAYS).toBe(30);
+		expect(result.AUDIT_CLEANUP_INTERVAL_MS).toBe(3_600_000);
+	});
+
+	it('API-AUD-ENV-02: rejects AUDIT_RETENTION_DAYS below 1', () => {
+		expect(() => validateEnv({ ...validConfig, AUDIT_RETENTION_DAYS: '0' })).toThrow();
+	});
+
+	it('API-ADM-USR-ENV-01: accepts admin user create rate limit env vars', () => {
+		const result = validateEnv({
+			...validConfig,
+			ADMIN_USER_CREATE_RATE_LIMIT_MAX: '10',
+			ADMIN_USER_CREATE_RATE_LIMIT_WINDOW_MS: '60000',
+		});
+		expect(result.ADMIN_USER_CREATE_RATE_LIMIT_MAX).toBe(10);
+		expect(result.ADMIN_USER_CREATE_RATE_LIMIT_WINDOW_MS).toBe(60_000);
+	});
 });

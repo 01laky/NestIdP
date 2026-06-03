@@ -4,7 +4,13 @@ import { Test, TestingModule } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { AUTH_API_PATH, IDP_SETTINGS_API_PATH, SP_CONNECTIONS_API_PATH } from '@nestidp/shared';
+import {
+	ADMIN_USERS_API_PATH,
+	AUDIT_EVENTS_API_PATH,
+	AUTH_API_PATH,
+	IDP_SETTINGS_API_PATH,
+	SP_CONNECTIONS_API_PATH,
+} from '@nestidp/shared';
 import { AdminModule } from '../src/admin/admin.module';
 import { AdminAuthModule } from '../src/admin-auth/admin-auth.module';
 import { AuthModule } from '../src/auth/auth.module';
@@ -38,6 +44,18 @@ describe('Routing (e2e)', () => {
 		},
 		adminUser: {
 			findUnique: jest.fn(),
+			findMany: jest.fn().mockResolvedValue([
+				{
+					id: 'admin-1',
+					username: 'admin',
+					createdAt: new Date('2026-01-01T00:00:00.000Z'),
+					updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+				},
+			]),
+			count: jest.fn().mockResolvedValue(1),
+			create: jest.fn(),
+			update: jest.fn(),
+			delete: jest.fn(),
 		},
 		samlSession: {
 			findUnique: jest.fn(),
@@ -48,6 +66,13 @@ describe('Routing (e2e)', () => {
 		idpSettings: {
 			findUnique: jest.fn(),
 			update: jest.fn(),
+		},
+		auditEvent: {
+			deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+			findFirst: jest.fn().mockResolvedValue(null),
+			findMany: jest.fn().mockResolvedValue([]),
+			count: jest.fn().mockResolvedValue(0),
+			create: jest.fn(),
 		},
 	};
 
@@ -474,6 +499,115 @@ describe('Routing (e2e)', () => {
 		await request(app.getHttpServer() as App)
 			.get('/saml/unknown')
 			.expect(404);
+	});
+
+	it('E2E-10-01: GET /admin/settings/admins returns SPA shell', async () => {
+		const response = await request(app.getHttpServer() as App).get('/admin/settings/admins');
+		expect(response.body?.module).not.toBe('admin');
+	});
+
+	it('E2E-10-02: GET /admin/audit returns SPA shell', async () => {
+		const response = await request(app.getHttpServer() as App).get('/admin/audit');
+		expect(response.body?.module).not.toBe('admin');
+	});
+
+	it('E2E-10-03: GET /api/admin/admin-users without session returns 401', async () => {
+		await request(app.getHttpServer() as App)
+			.get('/api/admin/admin-users')
+			.expect(401);
+	});
+
+	it('E2E-10-04: GET /api/admin/audit-events without session returns 401', async () => {
+		await request(app.getHttpServer() as App)
+			.get('/api/admin/audit-events')
+			.expect(401);
+	});
+
+	it('E2E-10-05: POST /api/admin/admin-users without session returns 401', async () => {
+		await request(app.getHttpServer() as App)
+			.post(ADMIN_USERS_API_PATH)
+			.send({ username: 'x', password: 'ValidPass12345' })
+			.expect(401);
+	});
+
+	it('E2E-10-06: GET /api/admin/audit-events/export without session returns 401', async () => {
+		await request(app.getHttpServer() as App)
+			.get(`${AUDIT_EVENTS_API_PATH}/export?format=json`)
+			.expect(401);
+	});
+
+	it('E2E-10-07: GET /api/admin/admin-users with session returns JSON array', async () => {
+		const password = 'e2e-adm-usr-pass';
+		const { hashPassword } = await import('../src/admin-auth/password.util');
+		const passwordHash = await hashPassword(password);
+		prismaMock.adminUser.findUnique.mockImplementation(
+			async (args: { where: { username?: string; id?: string } }) => {
+				if (args.where.username === 'admusr' || args.where.id === 'admin-usr') {
+					return { id: 'admin-usr', username: 'admusr', passwordHash };
+				}
+				return null;
+			},
+		);
+
+		const agent = request.agent(app.getHttpServer() as App);
+		await agent.post('/api/admin/auth/login').send({ username: 'admusr', password }).expect(200);
+
+		const response = await agent.get(ADMIN_USERS_API_PATH).expect(200);
+		expect(response.headers['content-type']).toMatch(/application\/json/);
+		expect(Array.isArray(response.body)).toBe(true);
+		expect(response.text).not.toContain('<!DOCTYPE html>');
+	});
+
+	it('E2E-10-08: GET /api/admin/audit-events with session returns paginated JSON', async () => {
+		const password = 'e2e-audit-pass';
+		const { hashPassword } = await import('../src/admin-auth/password.util');
+		const passwordHash = await hashPassword(password);
+		prismaMock.adminUser.findUnique.mockImplementation(
+			async (args: { where: { username?: string; id?: string } }) => {
+				if (args.where.username === 'auditop' || args.where.id === 'admin-audit') {
+					return { id: 'admin-audit', username: 'auditop', passwordHash };
+				}
+				return null;
+			},
+		);
+		prismaMock.auditEvent.findMany.mockResolvedValue([]);
+		prismaMock.auditEvent.count.mockResolvedValue(0);
+
+		const agent = request.agent(app.getHttpServer() as App);
+		await agent.post('/api/admin/auth/login').send({ username: 'auditop', password }).expect(200);
+
+		const response = await agent.get(AUDIT_EVENTS_API_PATH).expect(200);
+		expect(response.body.items).toEqual([]);
+		expect(response.body.total).toBe(0);
+		expect(response.headers['content-type']).toMatch(/application\/json/);
+	});
+
+	it('E2E-10-09: POST /api/admin/auth/change-password without session returns 401', async () => {
+		await request(app.getHttpServer() as App)
+			.post('/api/admin/auth/change-password')
+			.send({ currentPassword: 'a', newPassword: 'b' })
+			.expect(401);
+	});
+
+	it('E2E-10-10: dashboard includes audit and admin users routes', async () => {
+		const password = 'e2e-dash-v10-pass';
+		const { hashPassword } = await import('../src/admin-auth/password.util');
+		const passwordHash = await hashPassword(password);
+		prismaMock.adminUser.findUnique.mockImplementation(
+			async (args: { where: { username?: string; id?: string } }) => {
+				if (args.where.username === 'dashv10' || args.where.id === 'admin-v10') {
+					return { id: 'admin-v10', username: 'dashv10', passwordHash };
+				}
+				return null;
+			},
+		);
+
+		const agent = request.agent(app.getHttpServer() as App);
+		await agent.post('/api/admin/auth/login').send({ username: 'dashv10', password }).expect(200);
+
+		const response = await agent.get('/api/admin').expect(200);
+		expect(response.body.auditEventsRoute).toBe('/admin/audit');
+		expect(response.body.adminUsersRoute).toBe('/admin/settings/admins');
 	});
 });
 

@@ -11,3 +11,6 @@ export * from './end-user-auth.js';
 export * from './saml.js';
 export * from './identity-admin.js';
 export * from './idp-settings.js';
+export * from './admin-users.js';
+export * from './audit-events.js';
+export * from './admin-password-policy.js';

@@ -21,9 +21,13 @@ import type {
 } from '@nestidp/shared';
 import { ADMIN_CSRF_HEADER_NAME, ADMIN_SESSION_COOKIE_NAME } from '@nestidp/shared';
 import { AdminAuthGuard } from './admin-auth.guard';
+import { AdminCsrfGuard } from './admin-csrf.guard';
 import { AdminAuthService } from './admin-auth.service';
 import { AdminAuthenticatedRequest, toAdminMeDto } from './admin-auth.types';
+import type { AdminChangePasswordResponseDto } from '@nestidp/shared';
+import { AdminChangePasswordBodyDto } from './admin-change-password.dto';
 import { AdminLoginBodyDto } from './admin-login-body.dto';
+import { AdminAuthAuditService } from './admin-auth-audit.service';
 import { AdminSessionService } from './admin-session.service';
 import { LoginRateLimiterService } from './login-rate-limiter.service';
 
@@ -33,6 +37,7 @@ export class AdminAuthController {
 		private readonly adminAuthService: AdminAuthService,
 		private readonly adminSessionService: AdminSessionService,
 		private readonly loginRateLimiter: LoginRateLimiterService,
+		private readonly adminAuthAudit: AdminAuthAuditService,
 	) {}
 
 	@Post('login')
@@ -50,7 +55,7 @@ export class AdminAuthController {
 		}
 
 		try {
-			const admin = await this.adminAuthService.login(body.username, body.password);
+			const admin = await this.adminAuthService.login(body.username, body.password, clientIp);
 			const payload = this.adminSessionService.createPayload(admin.id, admin.username);
 			this.adminSessionService.setCookie(res, payload);
 			this.loginRateLimiter.reset(clientIp);
@@ -82,7 +87,30 @@ export class AdminAuthController {
 				throw new ForbiddenException('Invalid CSRF token');
 			}
 		}
+		if (payload && req.adminUser) {
+			this.adminAuthAudit.logLogout(req.adminUser.id, req.adminUser.username, req.ip ?? 'unknown');
+		}
 		this.adminSessionService.clearCookie(res);
+		return { ok: true };
+	}
+
+	@Post('change-password')
+	@HttpCode(HttpStatus.OK)
+	@UseGuards(AdminAuthGuard, AdminCsrfGuard)
+	async changePassword(
+		@Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+		body: AdminChangePasswordBodyDto,
+		@Req() req: AdminAuthenticatedRequest,
+	): Promise<AdminChangePasswordResponseDto> {
+		if (!req.adminUser) {
+			throw new UnauthorizedException('Unauthorized');
+		}
+		await this.adminAuthService.changePassword(
+			req.adminUser.id,
+			body.currentPassword,
+			body.newPassword,
+			req.ip ?? 'unknown',
+		);
 		return { ok: true };
 	}
 

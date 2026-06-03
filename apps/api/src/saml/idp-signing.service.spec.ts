@@ -34,7 +34,7 @@ describe('IdpSigningService (SQLite)', () => {
 			get: (key: string) => (key === 'ENCRYPTION_KEY' ? TEST_ENCRYPTION_KEY : undefined),
 		} as unknown as ConfigService;
 		const encryptionService = new EncryptionService(configService);
-		const audit = new SamlAuthAuditService();
+		const audit = new SamlAuthAuditService({ recordSafe: jest.fn() } as never);
 		service = new IdpSigningService(
 			prisma as unknown as PrismaService,
 			encryptionService,
@@ -119,7 +119,7 @@ describe('IdpSigningService (SQLite)', () => {
 			freshPrisma as unknown as PrismaService,
 			new EncryptionService(configService),
 			configService,
-			new SamlAuthAuditService(),
+			new SamlAuthAuditService({ recordSafe: jest.fn() } as never),
 		);
 		await createTestIdpSettings(freshPrisma, { entityId: 'http://fresh.test' });
 		expect(await freshService.hasSigningMaterial()).toBe(false);

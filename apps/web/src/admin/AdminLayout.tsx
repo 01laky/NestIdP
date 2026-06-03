@@ -4,6 +4,8 @@ import {
 	API_CONNECTION_ROUTE_PREFIX,
 	IDENTITY_ROUTE_PREFIX,
 	IDP_SETTINGS_ROUTE_PREFIX,
+	AUDIT_ROUTE_PREFIX,
+	ADMIN_USERS_ROUTE_PREFIX,
 	SP_CONNECTION_ROUTE_PREFIX,
 } from '@nestidp/shared';
 import { AdminApiError, getAdminMe, logoutAdmin } from './adminApi';
@@ -18,6 +20,8 @@ import { IdentityUsersPage } from './pages/IdentityUsersPage';
 import { SpConnectionFormPage } from './pages/SpConnectionFormPage';
 import { SpConnectionTestSsoPage } from './pages/SpConnectionTestSsoPage';
 import { IdpSettingsPage } from './pages/IdpSettingsPage';
+import { AdminUsersPage } from './pages/AdminUsersPage';
+import { AuditLogPage } from './pages/AuditLogPage';
 import { SpConnectionsListPage } from './pages/SpConnectionsListPage';
 import { SyncLogDetailPage } from './pages/SyncLogDetailPage';
 
@@ -88,6 +92,8 @@ export function AdminLayout() {
 					<Link to={`${IDENTITY_ROUTE_PREFIX}/groups`}>Groups</Link>
 					<Link to={`${IDENTITY_ROUTE_PREFIX}/roles`}>Roles</Link>
 					<Link to={IDP_SETTINGS_ROUTE_PREFIX}>IdP Settings</Link>
+					<Link to={ADMIN_USERS_ROUTE_PREFIX}>Admin accounts</Link>
+					<Link to={AUDIT_ROUTE_PREFIX}>Audit log</Link>
 					<Link to="/login">SAML login</Link>
 				</nav>
 				<button type="button" className="admin-logout" onClick={() => void handleLogout()}>
@@ -112,6 +118,8 @@ export function AdminLayout() {
 					<Route path="identity/roles" element={<IdentityRolesPage />} />
 					<Route path="settings" element={<Navigate to={IDP_SETTINGS_ROUTE_PREFIX} replace />} />
 					<Route path="settings/idp" element={<IdpSettingsPage />} />
+					<Route path="settings/admins" element={<AdminUsersPage />} />
+					<Route path="audit" element={<AuditLogPage />} />
 					<Route path="*" element={<p className="muted">Page not found.</p>} />
 				</Routes>
 			</main>

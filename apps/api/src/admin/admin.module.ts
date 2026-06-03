@@ -10,9 +10,12 @@ import { SyncModule } from '../sync/sync.module';
 import { AdminController } from './admin.controller';
 import { AdminDashboardService } from './admin-dashboard.service';
 import { AdminStatsService } from './admin-stats.service';
+import { AdminUsersModule } from '../admin-users/admin-users.module';
+import { AuditModule } from '../audit/audit.module';
 
 @Module({
 	imports: [
+		AuditModule,
 		PrismaModule,
 		IdentityModule,
 		IdentityAdminModule,
@@ -21,6 +24,7 @@ import { AdminStatsService } from './admin-stats.service';
 		SyncModule,
 		SpConnectionsModule,
 		IdpSettingsModule,
+		AdminUsersModule,
 	],
 	controllers: [AdminController],
 	providers: [AdminStatsService, AdminDashboardService],

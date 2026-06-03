@@ -26,3 +26,12 @@ export interface AdminMeResponseDto {
 	admin: AdminMeDto;
 	csrfToken: string;
 }
+
+export interface AdminChangePasswordRequestDto {
+	currentPassword: string;
+	newPassword: string;
+}
+
+export interface AdminChangePasswordResponseDto {
+	ok: true;
+}

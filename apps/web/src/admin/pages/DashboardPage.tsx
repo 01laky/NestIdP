@@ -147,6 +147,14 @@ export function DashboardPage() {
 					</li>
 				</ul>
 			</div>
+			<div className="admin-panel">
+				<h3>Operations</h3>
+				<p>
+					<Link to={dashboard.auditEventsRoute}>Audit log</Link> ·{' '}
+					<Link to={dashboard.adminUsersRoute}>Admin accounts</Link>
+				</p>
+				<p className="muted">See docs/RELEASE.md in the repository before production go-live.</p>
+			</div>
 			<p className="muted">
 				<Link to={`${IDENTITY_ROUTE_PREFIX}/users`}>Browse users</Link> ·{' '}
 				<Link to={SP_CONNECTION_ROUTE_PREFIX}>SP connections</Link>

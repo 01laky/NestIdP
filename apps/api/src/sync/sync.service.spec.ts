@@ -70,12 +70,17 @@ describe('SyncService', () => {
 		decrypt: jest.fn().mockReturnValue(BEARER_TOKEN),
 	};
 
+	const audit = {
+		recordSafe: jest.fn(),
+	};
+
 	const service = new SyncService(
 		prisma as never,
 		identityRepository as unknown as IdentityRepository,
 		syncLogService as unknown as SyncLogService,
 		identitySyncClient as unknown as IdentitySyncClientService,
 		encryption,
+		audit as never,
 	);
 
 	const baseConnection = {

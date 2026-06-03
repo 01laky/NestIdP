@@ -15,7 +15,7 @@ NestIdP uses **Prisma** as the ORM. The application code does not branch on a sp
 
 Additional providers (MySQL, etc.) can be added later if the Prisma schema stays portable.
 
-## Domain tables (v0.2.0)
+## Domain tables (v1.0.0)
 
 | Model                   | Purpose                                  |
 | ----------------------- | ---------------------------------------- |
@@ -24,7 +24,8 @@ Additional providers (MySQL, etc.) can be added later if the Prisma schema stays
 | `UserGroup`, `UserRole` | Membership join tables                   |
 | `SpConnection`          | SAML Service Provider config             |
 | `AdminUser`             | Operator accounts (separate from `User`) |
-| `SyncLog`               | Sync run history                         |
+| `SyncLog`               | Sync run history (detailed sync errors)  |
+| `AuditEvent`            | Persistent security/config audit trail   |
 | `SamlSession`           | In-flight SP-initiated SSO state         |
 | `IdpSettings`           | Global IdP singleton (entity ID, certs)  |
 
@@ -68,6 +69,27 @@ Singleton row `id = default`. Bootstrap creates **`entityId`** only (from `IDP_B
 
 Deploy: `pnpm db:migrate:deploy` applies migration `20260602120000_idp_settings_rotation` on both SQLite and PostgreSQL.
 
+### Audit events (v1.0.0)
+
+Operator and security events are stored in **`AuditEvent`** (separate from **`SyncLog`**).
+
+| Column                      | Purpose                                                             |
+| --------------------------- | ------------------------------------------------------------------- |
+| `category`                  | `admin_auth`, `admin_config`, `end_user_auth`, `saml`, `sync`       |
+| `event`                     | Stable machine name (e.g. `admin_login_success`, `sync_completed`)  |
+| `actorType`                 | `admin`, `end_user`, or `system`                                    |
+| `actorId` / `actorLabel`    | Who performed the action (username in label; never passwords)       |
+| `subjectType` / `subjectId` | Optional target entity (e.g. `ApiConnection`, `AdminUser`)          |
+| `clientIp`                  | Client IP when available (`TRUST_PROXY` affects accuracy behind LB) |
+| `metadata`                  | Small JSON extras (sanitized; max ~4 KB; no secrets)                |
+| `createdAt`                 | Event timestamp                                                     |
+
+**Retention:** `AuditRetentionCleanupService` deletes rows older than `AUDIT_RETENTION_DAYS` (default 90). **`SyncLog`** is not purged by this job.
+
+**Migration:** `20260603120000_audit_events` (SQLite and PostgreSQL).
+
+Dual-write: events also appear in container stdout for log aggregation.
+
 ## Local development (SQLite)
 
 No Docker required:
@@ -92,19 +114,20 @@ The file is gitignored. Delete it to reset local data.
 
 ## PostgreSQL (optional local or production)
 
-Start PostgreSQL via Docker profile:
+**Option A — PostgreSQL only (host dev):**
 
 ```bash
 cp .env.example .env
-# Edit .env:
-#   DATABASE_PROVIDER=postgresql
-#   DATABASE_URL=postgresql://nestidp:nestidp@localhost:5432/nestidp
+# DATABASE_PROVIDER=postgresql
+# DATABASE_URL=postgresql://nestidp:nestidp@localhost:5432/nestidp
 
-docker compose --profile postgres up -d
+docker compose up -d postgres
 pnpm install
 pnpm db:migrate
 pnpm dev
 ```
+
+**Option B — full stack (app + DB in Docker):** see [deployment.md](./deployment.md) (`docker compose up --build`).
 
 ## How provider selection works
 
@@ -166,10 +189,10 @@ Prefer API startup bootstrap in production deploys — seed CLI is for local/ops
 ## Production boot
 
 1. Set `DATABASE_PROVIDER` + `DATABASE_URL`
-2. Run migrations: `pnpm db:migrate:deploy`
-3. Start API: `node apps/api/dist/main.js`
+2. Run migrations: `pnpm db:migrate:deploy` (or Docker entrypoint / `MIGRATE_ONLY=1` init job)
+3. Start API: `node apps/api/dist/main.js` (or `docker compose up`)
 
-Docker/Kubernetes: run migrate as an init container or entrypoint step before the app serves traffic. See the comment in `Dockerfile`.
+See [deployment.md](./deployment.md) for Compose, backups, and [RELEASE.md](./RELEASE.md) for go-live checks.
 
 ## PostgreSQL integration tests (optional local)
 

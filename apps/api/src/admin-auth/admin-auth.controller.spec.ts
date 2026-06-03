@@ -21,12 +21,16 @@ describe('AdminAuthController', () => {
 		recordFailure: jest.fn(),
 		reset: jest.fn(),
 	};
+	const adminAuthAudit = {
+		logLogout: jest.fn(),
+	};
 	const res = { cookie: jest.fn(), clearCookie: jest.fn() } as unknown as Response;
 
 	const controller = new AdminAuthController(
 		adminAuthService as unknown as AdminAuthService,
 		adminSessionService as unknown as AdminSessionService,
 		loginRateLimiter as unknown as LoginRateLimiterService,
+		adminAuthAudit as never,
 	);
 
 	beforeEach(() => {

@@ -1,11 +1,16 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { IDP_SETTINGS_ROUTE_PREFIX } from '@nestidp/shared';
+import {
+	ADMIN_USERS_ROUTE_PREFIX,
+	AUDIT_ROUTE_PREFIX,
+	IDP_SETTINGS_ROUTE_PREFIX,
+	type AdminDashboardResponseDto,
+} from '@nestidp/shared';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AppRoutes } from './AppRoutes';
 import * as adminApi from './admin/adminApi';
 
-const dashboardStub = {
+const dashboardStub: AdminDashboardResponseDto = {
 	counts: { users: 0, groups: 0, roles: 0, apiConnections: 0, spConnections: 0 },
 	apiConnectionsRoute: '/admin/api-connections',
 	spConnectionsRoute: '/admin/sp-connections',
@@ -26,6 +31,8 @@ const dashboardStub = {
 	apiConnection: null,
 	lastSyncStatus: null,
 	lastSyncAt: null,
+	auditEventsRoute: AUDIT_ROUTE_PREFIX,
+	adminUsersRoute: ADMIN_USERS_ROUTE_PREFIX,
 };
 
 vi.mock('./admin/adminApi', () => ({
