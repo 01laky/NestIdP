@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.3.5]
+
+### Fixed
+
+- **GitHub Actions** (`.github/workflows/ci.yml`): workflow YAML used tab indentation, which GitHub
+  rejects before any job starts — runs showed **Failure** with **no jobs or logs**. Re-indented with
+  spaces so **verify** and **docker-smoke** jobs run normally.
+
 ## [1.3.4]
 
 ### Added
