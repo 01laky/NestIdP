@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { IDENTITY_ROUTE_PREFIX, identityGroupDetailRoute } from '@nestidp/shared';
 import {
 	AdminApiError,
@@ -11,7 +11,7 @@ import { AdminPageHeader } from '../components/AdminPageHeader';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
 import { useDocumentTitle } from '../components/useDocumentTitle';
-import { Button, Panel, TextInput, useToast } from '../../ui';
+import { Button, ButtonLink, Panel, TextInput, useToast } from '../../ui';
 
 export function IdentityGroupFormPage() {
 	const { id } = useParams();
@@ -89,9 +89,9 @@ export function IdentityGroupFormPage() {
 			<section>
 				<ErrorBanner message="This group is managed by identity sync." />
 				<p>
-					<Link className="evg-btn evg-btn--link" to={identityGroupDetailRoute(id)}>
+					<ButtonLink variant="link" to={identityGroupDetailRoute(id)}>
 						View group
-					</Link>
+					</ButtonLink>
 				</p>
 			</section>
 		);
@@ -122,9 +122,9 @@ export function IdentityGroupFormPage() {
 					<Button type="submit" disabled={saving}>
 						{isNew ? 'Create group' : 'Save'}
 					</Button>
-					<Link className="evg-btn evg-btn--link" to={`${IDENTITY_ROUTE_PREFIX}/groups`}>
+					<ButtonLink variant="link" to={`${IDENTITY_ROUTE_PREFIX}/groups`}>
 						Cancel
-					</Link>
+					</ButtonLink>
 				</p>
 			</form>
 		</section>

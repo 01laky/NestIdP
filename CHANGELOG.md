@@ -4,6 +4,48 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.3]
+
+### Added
+
+- Extended identity UI Vitest registry **`WEB-IDN-UI-25`–`58`**: static guards (no hand-rolled
+  `evg-btn` on `Identity*.tsx`, list `evg-inline-form` / `labelVisuallyHidden` contracts), groups
+  and roles filter `aria-busy` + disabled controls, combined search+origin refetch, table wraps,
+  synced vs manual detail/form `ButtonLink` paths, empty state, API error with filter form intact,
+  CSS token and `.evg-inline-form` rules (`identity-ui-edge-extended.test.tsx`).
+- **`ButtonLink`** unit tests **`WEB-IDN-UI-53`–`57`** (variants, sizes, `className` merge,
+  `evgButtonClasses` parity with `Button`).
+- **`IdentitySectionNav`** tests **`WEB-IDN-UI-45`**, **`46`**, **`58`** (current-section link
+  omission, `aria-label`, hrefs).
+
+### Changed
+
+- **`docs/development.md`** documents Vitest registry **`WEB-IDN-UI-01`–`58`** across three test
+  files.
+
+## [1.2.2]
+
+### Added
+
+- **`ButtonLink`** UI primitive (`variant` / `size` aligned with `Button`) for router navigation CTAs without hand-rolled `evg-btn` classes on `<Link>`.
+- **`IdentitySectionNav`** footer component on identity list pages (cross-links between Users, Groups, and Roles via `ButtonLink`).
+- Vitest registry **`WEB-IDN-UI-01`–`24`** for inline filter layout, a11y (`role="search"`), loading `aria-busy`, Enter-to-submit, and identity page `ButtonLink` migration.
+- Playwright visual baseline **`identity-users-list-1280.png`** and tests **`WEB-EVG-153b`**, **`WEB-EVG-153c`** for groups/roles **Apply** buttons.
+
+### Changed
+
+- Identity list filters: visible **Search** / **Origin** labels, unified **Apply** submit, `--evg-control-height` alignment in `.evg-inline-form`, `evg-field--grow` / `--fixed` widths, mobile stack ≤480px, users callout spacing (`evg-identity-callout`), tables wrapped in `evg-table-wrap`.
+- All **`Identity*.tsx`** admin pages use **`ButtonLink`** for primary/secondary/link actions (headers, edit, cancel, back, API connection link).
+- **`docs/development.md`** documents inline list filters vs audit `evg-stack inline`; **`docs/img/evergreen-ui.mmd`** / SVG updated for `ButtonLink` and inline form flow.
+
+### Changed
+
+- Main Vite chunk size budget raised to **580 KB** raw (`scripts/check-web-bundle-size.mjs`) — identity admin modules exceed the prior 500 KB cap; fonts remain excluded.
+
+### Fixed
+
+- Uneven filter toolbar on identity users/groups/roles lists (misaligned input/select/button heights and truncated search placeholder).
+
 ## [1.2.1]
 
 ### Added

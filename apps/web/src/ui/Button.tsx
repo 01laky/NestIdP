@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import { evgButtonClasses } from './button-classes';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'link';
 
@@ -18,15 +19,7 @@ export function Button({
 	type = 'button',
 	...rest
 }: ButtonProps) {
-	const classes = [
-		'evg-btn',
-		`evg-btn--${variant}`,
-		size === 'sm' ? 'evg-btn--sm' : '',
-		block ? 'evg-btn--block' : '',
-		className,
-	]
-		.filter(Boolean)
-		.join(' ');
+	const classes = evgButtonClasses({ variant, size, block, className });
 
 	return (
 		<button type={type} className={classes} {...rest}>

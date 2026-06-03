@@ -7,6 +7,7 @@ const expectedExports = [
 	'Breadcrumbs',
 	'BreadcrumbList',
 	'Button',
+	'ButtonLink',
 	'Callout',
 	'Card',
 	'Checkbox',

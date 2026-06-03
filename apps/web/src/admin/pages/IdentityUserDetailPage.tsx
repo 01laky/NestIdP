@@ -7,7 +7,7 @@ import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
 import { useDocumentTitle } from '../components/useDocumentTitle';
 import { identityOriginLabel, identityOriginToBadge } from '../status-badge';
-import { Badge, Button, Panel, useToast } from '../../ui';
+import { Badge, Button, ButtonLink, Panel, useToast } from '../../ui';
 
 export function IdentityUserDetailPage() {
 	const { id } = useParams<{ id: string }>();
@@ -87,9 +87,9 @@ export function IdentityUserDetailPage() {
 				actions={
 					isManual ? (
 						<>
-							<Link className="evg-btn evg-btn--secondary" to={identityUserEditRoute(user.id)}>
+							<ButtonLink variant="secondary" to={identityUserEditRoute(user.id)}>
 								Edit
-							</Link>
+							</ButtonLink>
 							<Button type="button" variant="danger" onClick={() => void handleDelete()}>
 								Delete
 							</Button>
@@ -111,9 +111,9 @@ export function IdentityUserDetailPage() {
 						{source.apiConnectionRoute ? (
 							<>
 								{' '}
-								<Link className="evg-btn evg-btn--link" to={source.apiConnectionRoute}>
+								<ButtonLink variant="link" to={source.apiConnectionRoute}>
 									View API connection
-								</Link>
+								</ButtonLink>
 							</>
 						) : null}
 					</p>
@@ -166,16 +166,16 @@ export function IdentityUserDetailPage() {
 						))}
 					</ul>
 					<p>
-						<Link className="evg-btn evg-btn--link" to={`${AUDIT_ROUTE_PREFIX}?category=identity`}>
+						<ButtonLink variant="link" to={`${AUDIT_ROUTE_PREFIX}?category=identity`}>
 							View full audit log
-						</Link>
+						</ButtonLink>
 					</p>
 				</Panel>
 			) : null}
 			<p>
-				<Link className="evg-btn evg-btn--link" to={`${IDENTITY_ROUTE_PREFIX}/users`}>
+				<ButtonLink variant="link" to={`${IDENTITY_ROUTE_PREFIX}/users`}>
 					Back to users
-				</Link>
+				</ButtonLink>
 			</p>
 		</section>
 	);

@@ -2,6 +2,7 @@ export { AppShell } from './AppShell';
 export { Badge } from './Badge';
 export { Breadcrumbs, BreadcrumbList } from './Breadcrumbs';
 export { Button, type ButtonProps, type ButtonVariant } from './Button';
+export { ButtonLink, type ButtonLinkProps } from './ButtonLink';
 export { Callout, type CalloutVariant } from './Callout';
 export { Card } from './Card';
 export { Checkbox } from './Checkbox';

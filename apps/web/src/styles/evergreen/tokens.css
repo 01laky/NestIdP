@@ -58,6 +58,8 @@
 	--evg-duration-normal: 200ms;
 	--evg-ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
 
+	--evg-control-height: 2.75rem;
+
 	--evg-sidebar-width: 240px;
 	--evg-z-drawer: 40;
 	--evg-z-toast: 50;

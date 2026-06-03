@@ -226,8 +226,8 @@ describe('Identity manual CRUD — web edge', () => {
 				</Routes>
 			</MemoryRouter>,
 		);
-		fireEvent.change(screen.getByLabelText('Show'), { target: { value: 'manual' } });
-		fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+		fireEvent.change(screen.getByLabelText('Origin'), { target: { value: 'manual' } });
+		fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
 		await waitFor(() => {
 			expect(listSpy).toHaveBeenCalledWith(expect.objectContaining({ origin: 'manual' }));
 		});
@@ -460,7 +460,7 @@ describe('Identity manual CRUD — web edge', () => {
 				</Routes>
 			</MemoryRouter>,
 		);
-		fireEvent.change(screen.getByLabelText('Show'), { target: { value: 'synced' } });
+		fireEvent.change(screen.getByLabelText('Origin'), { target: { value: 'synced' } });
 		fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
 		await waitFor(() => {
 			expect(listSpy).toHaveBeenCalledWith(expect.objectContaining({ origin: 'synced' }));
@@ -688,7 +688,7 @@ describe('Identity manual CRUD — web edge', () => {
 				</Routes>
 			</MemoryRouter>,
 		);
-		const select = screen.getByLabelText('Show');
+		const select = screen.getByLabelText('Origin');
 		fireEvent.change(select, { target: { value: 'manual' } });
 		fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
 		await waitFor(() => {

@@ -16,7 +16,7 @@ import { AdminPageHeader } from '../components/AdminPageHeader';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
 import { useDocumentTitle } from '../components/useDocumentTitle';
-import { Button, Checkbox, Panel, TextInput, useToast } from '../../ui';
+import { Button, ButtonLink, Checkbox, Panel, TextInput, useToast } from '../../ui';
 
 export function IdentityUserFormPage() {
 	const { id } = useParams();
@@ -132,9 +132,9 @@ export function IdentityUserFormPage() {
 			<section>
 				<ErrorBanner message="This user is managed by identity sync and cannot be edited here." />
 				<p>
-					<Link className="evg-btn evg-btn--link" to={identityUserDetailRoute(id)}>
+					<ButtonLink variant="link" to={identityUserDetailRoute(id)}>
 						View user
-					</Link>
+					</ButtonLink>
 				</p>
 			</section>
 		);
@@ -206,9 +206,9 @@ export function IdentityUserFormPage() {
 					<Button type="submit" disabled={saving}>
 						{isNew ? 'Create user' : 'Save'}
 					</Button>
-					<Link className="evg-btn evg-btn--link" to={`${IDENTITY_ROUTE_PREFIX}/users`}>
+					<ButtonLink variant="link" to={`${IDENTITY_ROUTE_PREFIX}/users`}>
 						Cancel
-					</Link>
+					</ButtonLink>
 				</p>
 			</form>
 			{isNew ? (

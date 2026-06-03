@@ -644,6 +644,12 @@ Any platform supporting Docker containers and a SQL database (SQLite or PostgreS
 6. Add SP connection; provide IdP metadata URL to SP administrator.
 7. Test SP-initiated SSO end-to-end.
 
+### 12.5 Operator distribution (deferred)
+
+Today, contributors and early adopters use the **git monorepo** and `docker compose` from source. That is sufficient for development and internal pilots.
+
+**Product distribution for real operators** (customers, integrators, on-prem teams who should not clone and build the repo) is planned as a **final roadmap phase** — see **Phase 4** below. It starts only after the major product work in Phases 2 and 3 is done (or explicitly reprioritized). Until then, deployment remains **Docker-first** as documented in `docs/deployment.md` and `docs/RELEASE.md`.
+
 ---
 
 ## 13. Phased Roadmap
@@ -689,6 +695,21 @@ _Phase 1 complete in **v1.0.0** (Prompt 10 — Docker, persistent audit, admin a
 - [ ] Multi-tenant support
 - [ ] OIDC support
 
+### Phase 4 — Product distribution (after Phases 2–3)
+
+_Deferred. Do not start until the planned feature work in Phases 2 and 3 is complete (or the roadmap is revised). v1 already ships a single Docker image from source; this phase **productizes** how non-developers obtain and upgrade NestIdP._
+
+**Goal:** Operators install a **versioned artifact** (e.g. `1.2.1`), not “pull `main` and build.” Contributors keep using the git monorepo.
+
+- [ ] **Semver GitHub Releases** — tag `v*.*.*`, release notes (CHANGELOG), no requirement to clone for deploy
+- [ ] **Published OCI images** — immutable image per release (e.g. GHCR), documented pull tag matching semver
+- [ ] **Deploy bundle** — release asset or small repo: `docker-compose.yml`, `.env.docker.example`, link to `docs/RELEASE.md` / `docs/deployment.md` (no local `pnpm build` on customer side)
+- [ ] **Single official install path** in docs — Docker Compose (or Helm later if needed); “advanced” alternatives clearly secondary
+- [ ] **Upgrade runbook** — image bump, env checklist, `prisma migrate deploy`, rollback notes
+- [ ] **Optional native packages (DEB/RPM)** — only if a concrete customer requires on-prem without Docker; separate packaging pipeline (systemd, `/etc/nestidp`, PostgreSQL dependency), not a substitute for the container artifact
+
+**Out of scope for Phase 4 unless separately scoped:** managed/hosted IdP SaaS, multi-distro packaging matrix, Shibboleth-style OS vendor repos.
+
 ---
 
 ## 14. Open Questions
@@ -729,3 +750,5 @@ _Phase 1 complete in **v1.0.0** (Prompt 10 — Docker, persistent audit, admin a
 NestIdP is a focused, deployable SAML Identity Provider built as a NestJS + React monolith. Operators configure two distinct connection types in the admin console: **API connections** (identity sources synced inbound) and **SP connections** (SAML applications receiving outbound assertions). End users authenticate on a dedicated login page; the backend verifies credentials against password hashes synced from the external API and, upon success, issues a signed SAML Response posted back to the requesting Service Provider.
 
 The architecture prioritizes simplicity, a single deployment artifact, and clear module boundaries within the monolith — enabling future extraction or extension without premature complexity.
+
+**Distribution:** Phase 4 will add operator-facing releases (images, deploy bundle, documented upgrade path) once core roadmap features in Phases 2–3 are delivered; until then, Docker from the repository remains the supported deploy path.

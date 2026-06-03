@@ -4,13 +4,22 @@ export type SelectProps = SelectHTMLAttributes<HTMLSelectElement> & {
 	label: string;
 	children: ReactNode;
 	error?: string;
+	fieldClassName?: string;
 };
 
-export function Select({ label, children, error, id, className = '', ...rest }: SelectProps) {
+export function Select({
+	label,
+	children,
+	error,
+	fieldClassName = '',
+	id,
+	className = '',
+	...rest
+}: SelectProps) {
 	const selectId = id ?? rest.name ?? label.replace(/\s+/g, '-').toLowerCase();
 
 	return (
-		<label className="evg-field" htmlFor={selectId}>
+		<label className={`evg-field ${fieldClassName}`.trim()} htmlFor={selectId}>
 			<span className="evg-field__label">{label}</span>
 			<select id={selectId} className={`evg-select ${className}`.trim()} {...rest}>
 				{children}

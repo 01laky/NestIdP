@@ -13,7 +13,9 @@ flowchart TB
 		idpForm["IdpSettingsPage"]
 		adminUsers["AdminUsersPage"]
 		auditFilters["AuditLogPage filters"]
-		identitySearch["IdentityUsersPage search"]
+		identitySearch["IdentityUsersPage filters"]
+		identityLists["IdentityGroupsPage / RolesPage filters"]
+		identityNav["IdentitySectionNav"]
 	end
 	subgraph primitives["ui/ form primitives"]
 		ti["TextInput"]
@@ -22,7 +24,9 @@ flowchart TB
 		cb["Checkbox"]
 		fs["Fieldset"]
 		btn["Button"]
+		btnLink["ButtonLink"]
 		pan["Panel"]
+		inlineForm["evg-inline-form + field modifiers"]
 	end
 	tokens --> ui
 	fonts --> tokens
@@ -39,4 +43,10 @@ flowchart TB
 	idpForm --> ti
 	adminUsers --> ti
 	auditFilters --> sel
-	identitySearch --> ti
+	identitySearch --> inlineForm
+	inlineForm --> ti
+	inlineForm --> sel
+	inlineForm --> btn
+	identityLists --> inlineForm
+	identitySearch --> btnLink
+	identityNav --> btnLink

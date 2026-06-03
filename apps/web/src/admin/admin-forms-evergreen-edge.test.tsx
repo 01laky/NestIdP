@@ -18,6 +18,8 @@ import { ApiConnectionFormPage } from './pages/ApiConnectionFormPage';
 import { ApiConnectionSyncPage } from './pages/ApiConnectionSyncPage';
 import { AdminUsersPage } from './pages/AdminUsersPage';
 import { AuditLogPage } from './pages/AuditLogPage';
+import { IdentityGroupsPage } from './pages/IdentityGroupsPage';
+import { IdentityRolesPage } from './pages/IdentityRolesPage';
 import { IdentityUserDetailPage } from './pages/IdentityUserDetailPage';
 import { IdentityUsersPage } from './pages/IdentityUsersPage';
 import { IdpSettingsPage } from './pages/IdpSettingsPage';
@@ -612,7 +614,7 @@ describe('Admin forms Evergreen — extended edge cases', () => {
 			expect(container.querySelector('form.evg-inline-form')).not.toBeNull();
 		});
 
-		it('WEB-EVG-153: Search submit is secondary Button', () => {
+		it('WEB-EVG-153: users list Apply submit is secondary Button', () => {
 			vi.spyOn(adminApi, 'listIdentityUsers').mockResolvedValue({ items: [], total: 0 });
 			renderWithUi(
 				<MemoryRouter initialEntries={[`${IDENTITY_ROUTE_PREFIX}/users`]}>
@@ -621,7 +623,35 @@ describe('Admin forms Evergreen — extended edge cases', () => {
 					</Routes>
 				</MemoryRouter>,
 			);
-			expect(screen.getByRole('button', { name: 'Search' }).className).toContain(
+			expect(screen.getByRole('button', { name: 'Apply' }).className).toContain(
+				'evg-btn--secondary',
+			);
+		});
+
+		it('WEB-EVG-153b: groups list Apply submit is secondary Button', () => {
+			vi.spyOn(adminApi, 'listIdentityGroups').mockResolvedValue({ items: [], total: 0 });
+			renderWithUi(
+				<MemoryRouter initialEntries={[`${IDENTITY_ROUTE_PREFIX}/groups`]}>
+					<Routes>
+						<Route path={`${IDENTITY_ROUTE_PREFIX}/groups`} element={<IdentityGroupsPage />} />
+					</Routes>
+				</MemoryRouter>,
+			);
+			expect(screen.getByRole('button', { name: 'Apply' }).className).toContain(
+				'evg-btn--secondary',
+			);
+		});
+
+		it('WEB-EVG-153c: roles list Apply submit is secondary Button', () => {
+			vi.spyOn(adminApi, 'listIdentityRoles').mockResolvedValue({ items: [], total: 0 });
+			renderWithUi(
+				<MemoryRouter initialEntries={[`${IDENTITY_ROUTE_PREFIX}/roles`]}>
+					<Routes>
+						<Route path={`${IDENTITY_ROUTE_PREFIX}/roles`} element={<IdentityRolesPage />} />
+					</Routes>
+				</MemoryRouter>,
+			);
+			expect(screen.getByRole('button', { name: 'Apply' }).className).toContain(
 				'evg-btn--secondary',
 			);
 		});
@@ -866,12 +896,15 @@ describe('Admin forms static conventions — edge cases', () => {
 			'IdpSettingsPage.tsx': ['TextInput', 'Button'],
 			'AdminUsersPage.tsx': ['TextInput', 'Button'],
 			'AuditLogPage.tsx': ['Button'],
-			'IdentityUsersPage.tsx': ['TextInput', 'Button'],
-			'IdentityUserFormPage.tsx': ['TextInput', 'Button', 'Panel'],
-			'IdentityGroupFormPage.tsx': ['TextInput', 'Button', 'Panel'],
-			'IdentityRoleFormPage.tsx': ['TextInput', 'Button', 'Panel'],
-			'IdentityGroupDetailPage.tsx': ['Button', 'Panel', 'Table'],
-			'IdentityRoleDetailPage.tsx': ['Button', 'Panel', 'Table'],
+			'IdentityUsersPage.tsx': ['TextInput', 'Button', 'ButtonLink'],
+			'IdentityUserFormPage.tsx': ['TextInput', 'Button', 'ButtonLink', 'Panel'],
+			'IdentityGroupFormPage.tsx': ['TextInput', 'Button', 'ButtonLink', 'Panel'],
+			'IdentityRoleFormPage.tsx': ['TextInput', 'Button', 'ButtonLink', 'Panel'],
+			'IdentityGroupDetailPage.tsx': ['Button', 'ButtonLink', 'Panel', 'Table'],
+			'IdentityRoleDetailPage.tsx': ['Button', 'ButtonLink', 'Panel', 'Table'],
+			'IdentityGroupsPage.tsx': ['Button', 'ButtonLink', 'Select'],
+			'IdentityRolesPage.tsx': ['Button', 'ButtonLink', 'Select'],
+			'IdentityUserDetailPage.tsx': ['Button', 'ButtonLink', 'Panel'],
 		};
 		const missing: string[] = [];
 		for (const file of formPages) {

@@ -11,7 +11,7 @@ import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
 import { useDocumentTitle } from '../components/useDocumentTitle';
 import { identityOriginLabel, identityOriginToBadge } from '../status-badge';
-import { Badge, Button, Panel, Table, useToast } from '../../ui';
+import { Badge, Button, ButtonLink, Panel, Table, useToast } from '../../ui';
 
 export function IdentityGroupDetailPage() {
 	const { id } = useParams<{ id: string }>();
@@ -93,9 +93,9 @@ export function IdentityGroupDetailPage() {
 				actions={
 					isManual ? (
 						<>
-							<Link className="evg-btn evg-btn--secondary" to={identityGroupEditRoute(group.id)}>
+							<ButtonLink variant="secondary" to={identityGroupEditRoute(group.id)}>
 								Edit
-							</Link>
+							</ButtonLink>
 							<Button type="button" variant="danger" onClick={() => void handleDelete()}>
 								Delete
 							</Button>
@@ -153,9 +153,9 @@ export function IdentityGroupDetailPage() {
 				)}
 			</Panel>
 			<p>
-				<Link className="evg-btn evg-btn--link" to={`${IDENTITY_ROUTE_PREFIX}/groups`}>
+				<ButtonLink variant="link" to={`${IDENTITY_ROUTE_PREFIX}/groups`}>
 					Back to groups
-				</Link>
+				</ButtonLink>
 			</p>
 		</section>
 	);

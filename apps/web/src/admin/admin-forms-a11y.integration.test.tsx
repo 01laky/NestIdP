@@ -50,7 +50,7 @@ describe('Admin forms a11y smoke', () => {
 		});
 	});
 
-	it('WEB-EVG-103c: IdentityUsersPage search via hidden label', () => {
+	it('WEB-EVG-103c: IdentityUsersPage search via visible label', () => {
 		vi.spyOn(adminApi, 'listIdentityUsers').mockResolvedValue({ items: [], total: 0 });
 		renderWithUi(
 			<MemoryRouter initialEntries={[`${IDENTITY_ROUTE_PREFIX}/users`]}>

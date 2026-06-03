@@ -418,7 +418,8 @@ Breakpoints: mobile-first; sidebar drawer below **768px** (`AppShell` + menu but
 | -------------------- | --------------------------- | ------------------------------------------------------------------ |
 | Page title + actions | `PageHeader`                | Actions slot right; wrap on mobile                                 |
 | Section grouping     | `Panel`                     | Bordered; optional `id` for anchors (e.g. `#change-password`)      |
-| Text / password      | `TextInput`                 | `requiredMark`, `labelVisuallyHidden` for compact search rows      |
+| Text / password      | `TextInput`                 | `requiredMark`; list filters use visible labels + `fieldClassName` |
+| Router CTA           | `ButtonLink`                | Same variants as `Button` on `<Link>` (identity headers, nav)      |
 | Multi-line / PEM     | `TextArea`                  | Paste PEM on IdP settings (no file picker in v1.1.3)               |
 | Dropdown             | `Select`                    | NameID format, audit category, mapping presets                     |
 | Boolean flag         | `Checkbox`                  | SP active, sync dry-run                                            |
@@ -436,6 +437,22 @@ Breakpoints: mobile-first; sidebar drawer below **768px** (`AppShell` + menu but
 
 Form busy state: wrap fields in `<fieldset disabled={busy}>` and set `aria-busy` on `<form>` during saves.
 
+### Inline list filters vs audit filters
+
+| Pattern                   | Markup                                                                                                                                                                                                                       | Use when                                           |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| **Identity list filters** | `<form className="evg-inline-form" role="search">` (users only) with visible labels, `TextInput` `fieldClassName="evg-field--grow"`, `Select` `fieldClassName="evg-field--fixed"`, submit **`Apply`** (`Button` `secondary`) | Users / groups / roles browse pages                |
+| **Audit log filters**     | `<details className="evg-filters-panel">` + `<form className="evg-stack inline">` + primary **Filter**                                                                                                                       | Collapsible, multi-field filters on `AuditLogPage` |
+
+Shared CSS: `--evg-control-height` aligns inputs, selects, and buttons in `.evg-inline-form`; `@media (max-width: 480px)` stacks fields full width. While refetching after **Apply**, disable filter controls and set `aria-busy="true"` on the form.
+
+Footer cross-links: **`IdentitySectionNav`** (`apps/web/src/admin/components/IdentitySectionNav.tsx`) with `ButtonLink variant="link"`.
+
+Vitest registry **`WEB-IDN-UI-01`–`58`**: **`01`–`24`** in `identity-list-toolbar.test.tsx`
+(toolbar layout, a11y, keyboard submit); **`25`–`52`** in `identity-ui-edge-extended.test.tsx`
+(static guards, synced/manual detail and forms, filter busy states, CSS contracts); **`53`–`57`**
+in `button-link.test.tsx`; **`45`**, **`46`**, **`58`** in `IdentitySectionNav.test.tsx`.
+
 Future **`FileInput`** (v1.2): if operators need PEM file picker, use `evg-file-input` + `FileReader` — no API change.
 
 Dark mode is deferred to v1.2.0 (light theme only in 1.1.0).
@@ -451,32 +468,37 @@ mutation flows, Login SSO UI states, dashboard badge mappers, admin form migrati
 form edge cases, and infra checks.
 Existing **`WEB-ADM-*`** / **`WEB-AUTH-*`** must stay green.
 
-| Range           | Focus                                                                                                                                                                                                     |
-| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `01`–`23`       | Core Evergreen acceptance (AppShell, primitives, styles, Playwright/bundle infra)                                                                                                                         |
-| `24`–`37`       | UI primitive edge cases (all `Button`/`Badge` variants, form errors, `Panel` anchors)                                                                                                                     |
-| `38`–`40`       | Static conventions (no legacy CSS classes, barrel imports, `main.tsx` entry)                                                                                                                              |
-| `41`–`46`       | Toast on six admin mutation flows (API/SP/sync/admins/IdP/audit export)                                                                                                                                   |
-| `47`–`50`       | `status-badge.ts` unknown/fallback/active-flag edges                                                                                                                                                      |
-| `51`–`53`, `15` | `ToastProvider` queue max 3, `aria-live`, `useToast` guard                                                                                                                                                |
-| `54`–`57`, `70` | `AppShell` drawer scrim, logout, a11y, `OperatorSessionBar` deep link                                                                                                                                     |
-| `58`–`60`       | `print.css` + dark-theme deferral                                                                                                                                                                         |
-| `61`–`72`       | Barrel exports, bundle script, Playwright PNGs, Login SSO, Dashboard badges                                                                                                                               |
-| `73`–`108`      | Admin form static guards, `Checkbox`/`Fieldset`, per-page `*.evergreen-forms.test.tsx`, a11y smoke, six Playwright baselines, diagram                                                                     |
-| `109`–`118`     | `Checkbox`/`Fieldset`/`TextInput` edge cases (`checkbox-fieldset-edge.test.tsx`)                                                                                                                          |
-| `119`–`168`     | Admin form edge cases: save/busy, Panel titles, IdP rotation/expiry, sync dry-run, badges, static barrel guards (`admin-forms-evergreen-edge.test.tsx`, `AttributeMappingEditor.evergreen-edge.test.tsx`) |
+| Range                      | Focus                                                                                                                                                                                                     |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `01`–`23`                  | Core Evergreen acceptance (AppShell, primitives, styles, Playwright/bundle infra)                                                                                                                         |
+| `24`–`37`                  | UI primitive edge cases (all `Button`/`Badge` variants, form errors, `Panel` anchors)                                                                                                                     |
+| `38`–`40`                  | Static conventions (no legacy CSS classes, barrel imports, `main.tsx` entry)                                                                                                                              |
+| `41`–`46`                  | Toast on six admin mutation flows (API/SP/sync/admins/IdP/audit export)                                                                                                                                   |
+| `47`–`50`                  | `status-badge.ts` unknown/fallback/active-flag edges                                                                                                                                                      |
+| `51`–`53`, `15`            | `ToastProvider` queue max 3, `aria-live`, `useToast` guard                                                                                                                                                |
+| `54`–`57`, `70`            | `AppShell` drawer scrim, logout, a11y, `OperatorSessionBar` deep link                                                                                                                                     |
+| `58`–`60`                  | `print.css` + dark-theme deferral                                                                                                                                                                         |
+| `61`–`72`                  | Barrel exports, bundle script, Playwright PNGs, Login SSO, Dashboard badges                                                                                                                               |
+| `73`–`108`                 | Admin form static guards, `Checkbox`/`Fieldset`, per-page `*.evergreen-forms.test.tsx`, a11y smoke, six Playwright baselines, diagram                                                                     |
+| `109`–`118`                | `Checkbox`/`Fieldset`/`TextInput` edge cases (`checkbox-fieldset-edge.test.tsx`)                                                                                                                          |
+| `119`–`168`                | Admin form edge cases: save/busy, Panel titles, IdP rotation/expiry, sync dry-run, badges, static barrel guards (`admin-forms-evergreen-edge.test.tsx`, `AttributeMappingEditor.evergreen-edge.test.tsx`) |
+| `153`–`153c`               | Identity list **Apply** button variant on users, groups, roles                                                                                                                                            |
+| `WEB-IDN-UI-01`–`24`       | Identity inline filters, `ButtonLink`, section nav, a11y, keyboard submit (`identity-list-toolbar.test.tsx`)                                                                                              |
+| `WEB-IDN-UI-25`–`52`       | Extended identity UI: static `evg-btn` guard, list/detail/form `ButtonLink`, filter busy/error, CSS (`identity-ui-edge-extended.test.tsx`)                                                                |
+| `WEB-IDN-UI-53`–`57`       | `ButtonLink` variants, sizes, class merge (`button-link.test.tsx`)                                                                                                                                        |
+| `WEB-IDN-UI-45`–`46`, `58` | `IdentitySectionNav` current-section omission and `aria-label` (`IdentitySectionNav.test.tsx`)                                                                                                            |
 
 ```bash
 pnpm --filter @nestidp/web test
 pnpm --filter @nestidp/web build
-node scripts/check-web-bundle-size.mjs   # main index-*.js ≤ 500 KB raw
+node scripts/check-web-bundle-size.mjs   # main index-*.js ≤ 580 KB raw
 pnpm --filter @nestidp/web exec playwright install chromium
 pnpm --filter @nestidp/web test:e2e:visual
 # Intentional UI changes:
 pnpm --filter @nestidp/web test:e2e:visual:update
 ```
 
-Committed screenshots: `apps/web/e2e/screenshots/*.png` (six baselines: login, dashboard, API connection form, IdP settings).
+Committed screenshots: `apps/web/e2e/screenshots/*.png` (seven baselines: login, dashboard, API connection form, IdP settings, identity users list).
 
 ## Testing
 

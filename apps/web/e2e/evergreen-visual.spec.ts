@@ -150,4 +150,47 @@ test.describe('Evergreen visual baselines', () => {
 		await expect(page.getByRole('heading', { name: 'IdP settings' })).toBeVisible();
 		await expect(page).toHaveScreenshot('idp-settings-1280.png', { fullPage: true });
 	});
+
+	test('identity users list desktop 1280×720', async ({ page }) => {
+		await page.route('**/api/admin/auth/me', async (route) => {
+			await route.fulfill({
+				status: 200,
+				contentType: 'application/json',
+				body: JSON.stringify({
+					admin: { id: '1', username: 'admin' },
+					csrfToken: 'test-csrf',
+				}),
+			});
+		});
+		await page.route('**/api/admin/identity/users**', async (route) => {
+			if (route.request().method() !== 'GET') {
+				await route.continue();
+				return;
+			}
+			await route.fulfill({
+				status: 200,
+				contentType: 'application/json',
+				body: JSON.stringify({
+					items: [
+						{
+							id: 'u1',
+							username: 'alice',
+							email: 'alice@example.com',
+							displayName: 'Alice',
+							externalId: 'manual:user:u1',
+							apiConnectionId: 'loc',
+							origin: 'manual',
+							active: true,
+						},
+					],
+					total: 1,
+				}),
+			});
+		});
+		await page.setViewportSize({ width: 1280, height: 720 });
+		await page.goto('/admin/identity/users');
+		await expect(page.locator('h2.evg-page-header__title')).toHaveText('Users');
+		await expect(page.getByRole('button', { name: 'Apply' })).toBeVisible();
+		await expect(page).toHaveScreenshot('identity-users-list-1280.png', { fullPage: true });
+	});
 });

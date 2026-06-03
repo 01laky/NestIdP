@@ -180,14 +180,57 @@
 .evg-inline-form {
 	display: flex;
 	flex-wrap: wrap;
+	align-items: flex-end;
 	gap: var(--evg-space-2);
 	margin-bottom: var(--evg-space-4);
 }
 
-.evg-inline-form .evg-input {
-	flex: 1;
-	min-width: 12rem;
-	margin-top: 0;
+.evg-inline-form .evg-field {
+	margin-bottom: 0;
+}
+
+.evg-inline-form .evg-field--grow {
+	flex: 1 1 16rem;
+	min-width: 16rem;
+}
+
+.evg-inline-form .evg-field--fixed {
+	flex: 0 1 10rem;
+	min-width: 8rem;
+}
+
+.evg-inline-form .evg-input,
+.evg-inline-form .evg-select {
+	min-height: var(--evg-control-height);
+	box-sizing: border-box;
+	margin-top: var(--evg-space-1);
+}
+
+.evg-inline-form .evg-btn {
+	min-height: var(--evg-control-height);
+	box-sizing: border-box;
+}
+
+.evg-panel.evg-identity-callout {
+	margin-bottom: var(--evg-space-6);
+}
+
+@media (max-width: 480px) {
+	.evg-inline-form {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.evg-inline-form .evg-field--grow,
+	.evg-inline-form .evg-field--fixed {
+		flex: 1 1 auto;
+		min-width: 0;
+		width: 100%;
+	}
+
+	.evg-inline-form .evg-btn {
+		width: 100%;
+	}
 }
 
 /* Table */

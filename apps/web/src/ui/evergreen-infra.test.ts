@@ -16,9 +16,9 @@ describe('Evergreen infrastructure', () => {
 		expect(existsSync(join(repoRoot, 'scripts/check-web-bundle-size.mjs'))).toBe(true);
 	});
 
-	it('WEB-EVG-71: bundle script enforces 500 KB budget constant', () => {
+	it('WEB-EVG-71: bundle script enforces 580 KB budget constant', () => {
 		const script = readFileSync(join(repoRoot, 'scripts/check-web-bundle-size.mjs'), 'utf8');
-		expect(script).toContain('500 * 1024');
+		expect(script).toContain('580 * 1024');
 		expect(script).toContain('index-');
 	});
 
@@ -36,16 +36,18 @@ describe('Evergreen infrastructure', () => {
 		}
 	});
 
-	it('WEB-EVG-93: six form and shell baselines including API form and IdP settings', () => {
+	it('WEB-EVG-93: form and shell baselines including identity users list', () => {
 		const shots = join(webRoot, 'e2e/screenshots');
 		expect(existsSync(join(shots, 'api-connection-form-1280.png'))).toBe(true);
 		expect(existsSync(join(shots, 'idp-settings-1280.png'))).toBe(true);
+		expect(existsSync(join(shots, 'identity-users-list-1280.png'))).toBe(true);
 	});
 
 	it('WEB-EVG-94: evergreen-visual spec includes form page screenshots', () => {
 		const spec = readFileSync(join(webRoot, 'e2e/evergreen-visual.spec.ts'), 'utf8');
 		expect(spec).toContain('api-connection-form-1280.png');
 		expect(spec).toContain('idp-settings-1280.png');
+		expect(spec).toContain('identity-users-list-1280.png');
 	});
 
 	it('WEB-EVG-108: evergreen-ui.mmd documents Checkbox and Fieldset form primitives', () => {

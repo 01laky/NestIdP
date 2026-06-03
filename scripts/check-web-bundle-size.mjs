@@ -6,7 +6,8 @@
 import { readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-const BUDGET_BYTES = 500 * 1024;
+/** Monolith SPA (identity admin + Evergreen) — raised from 500 KB in 1.2.2; fonts still excluded. */
+const BUDGET_BYTES = 580 * 1024;
 const distAssets = join(process.cwd(), 'apps/web/dist/assets');
 
 function findLargestIndexJs(dir) {

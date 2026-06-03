@@ -11,7 +11,7 @@ import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
 import { useDocumentTitle } from '../components/useDocumentTitle';
 import { identityOriginLabel, identityOriginToBadge } from '../status-badge';
-import { Badge, Button, Panel, Table, useToast } from '../../ui';
+import { Badge, Button, ButtonLink, Panel, Table, useToast } from '../../ui';
 
 export function IdentityRoleDetailPage() {
 	const { id } = useParams<{ id: string }>();
@@ -93,9 +93,9 @@ export function IdentityRoleDetailPage() {
 				actions={
 					isManual ? (
 						<>
-							<Link className="evg-btn evg-btn--secondary" to={identityRoleEditRoute(role.id)}>
+							<ButtonLink variant="secondary" to={identityRoleEditRoute(role.id)}>
 								Edit
-							</Link>
+							</ButtonLink>
 							<Button type="button" variant="danger" onClick={() => void handleDelete()}>
 								Delete
 							</Button>
@@ -153,9 +153,9 @@ export function IdentityRoleDetailPage() {
 				)}
 			</Panel>
 			<p>
-				<Link className="evg-btn evg-btn--link" to={`${IDENTITY_ROUTE_PREFIX}/roles`}>
+				<ButtonLink variant="link" to={`${IDENTITY_ROUTE_PREFIX}/roles`}>
 					Back to roles
-				</Link>
+				</ButtonLink>
 			</p>
 		</section>
 	);
