@@ -73,6 +73,7 @@ test.describe('Responsive app shell (WEB-RSP Playwright)', () => {
 	});
 
 	test('WEB-RSP-31: mobile drawer open screenshot baseline', async ({ page }) => {
+		test.skip(!!process.env.CI, 'PNG baselines are updated on developer machines, not in CI');
 		await mockAuthenticatedAdmin(page);
 		await page.setViewportSize({ width: 375, height: 800 });
 		await page.goto('/admin');

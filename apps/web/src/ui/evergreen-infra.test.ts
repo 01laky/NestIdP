@@ -90,6 +90,12 @@ describe('Evergreen infrastructure', () => {
 		expect(existsSync(join(webRoot, 'e2e/screenshots/admin-shell-375-drawer-open.png'))).toBe(true);
 	});
 
+	it('WEB-EVG-178: test:e2e:ci script runs responsive shell without screenshot test', () => {
+		const pkg = readFileSync(join(webRoot, 'package.json'), 'utf8');
+		expect(pkg).toContain('"test:e2e:ci"');
+		expect(pkg).toContain('grep-invert WEB-RSP-31');
+	});
+
 	it('WEB-EVG-177: extended responsive shell vitest suites exist', () => {
 		expect(existsSync(join(webRoot, 'src/ui/responsive-shell-edge-extended.test.ts'))).toBe(true);
 		expect(existsSync(join(webRoot, 'src/ui/responsive-shell-edge-extended.test.tsx'))).toBe(true);

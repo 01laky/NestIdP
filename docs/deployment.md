@@ -188,6 +188,14 @@ Configure load balancers to use `/ready` for traffic routing.
 
 ## Local development without full stack
 
+**Hot reload in Docker (Nest watch + Vite HMR):**
+
+```bash
+cp .env.docker.example .env.docker
+pnpm dev:docker
+# Browser: http://localhost:5173 (SPA) — API: http://localhost:3000
+```
+
 **API + web on host, PostgreSQL in Docker:**
 
 ```bash

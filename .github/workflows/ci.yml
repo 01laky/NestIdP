@@ -46,17 +46,22 @@ jobs:
 
 			- run: pnpm test
 				env:
+					CI: true
 					POSTGRES_TEST_URL: postgresql://nestidp:nestidp@localhost:5432/nestidp_test
 
 			- run: pnpm build
 
 			- run: node scripts/check-web-bundle-size.mjs
 
-			- run: pnpm --filter @nestidp/web exec playwright install chromium --with-deps
-
-			- run: pnpm --filter @nestidp/web test:e2e:visual
+			- run: pnpm diagrams:build
 
 			- run: pnpm diagrams:check
+
+			- run: pnpm --filter @nestidp/web exec playwright install chromium --with-deps
+
+			- run: pnpm --filter @nestidp/web test:e2e:ci
+				env:
+					CI: true
 
 	docker-smoke:
 		runs-on: ubuntu-latest

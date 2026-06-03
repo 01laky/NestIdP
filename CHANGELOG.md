@@ -4,6 +4,37 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.3.4]
+
+### Added
+
+- **Docker dev hot reload**: `Dockerfile.dev`, `docker-compose.dev.yml`, `scripts/docker-dev-entrypoint.sh` —
+  **`pnpm dev:docker`** runs PostgreSQL + **Nest `--watch`** + **Vite HMR** on **http://localhost:5173**
+  (API on **3000**); bind-mounts source with preserved `node_modules` volumes; file polling for macOS Docker.
+- **`apps/api/scripts/run-jest-tests.mjs`**: serial Jest on CI (`--runInBand`) to avoid migration races and flakes.
+- **`pnpm --filter @nestidp/web test:e2e:ci`**: Playwright responsive shell smoke without macOS PNG baselines.
+
+### Changed
+
+- **GitHub Actions** (`.github/workflows/ci.yml`): `CI=true` for tests; **`pnpm diagrams:build`** before check;
+  visual Evergreen screenshots **skipped on CI**; e2e runs **`test:e2e:ci`** instead of full visual suite.
+- **Vite**: `host: true` and optional **polling watch** when `CHOKIDAR_USEPOLLING=true` (Docker dev).
+
+## [1.3.3]
+
+### Added
+
+- **`scripts/cleanup-test-processes.mjs`** and **`scripts/run-monorepo-tests.mjs`**: root `pnpm test` runs
+  packages sequentially and kills stale Vitest/Jest/Playwright workers on normal exit, failure, or
+  **SIGINT**; **`pnpm test:cleanup`** for manual cleanup after aborted IDE/agent runs.
+- **`pretest` / `posttest`** hooks on `@nestidp/web` and `@nestidp/api` invoke the same cleanup script.
+
+### Changed
+
+- Web Vitest: **`maxWorkers: 4`**, fork pool, explicit teardown/hook timeouts.
+- API Jest: **`--forceExit`** and capped **`--maxWorkers`** (4 unit, 2 e2e) to reduce hung workers and
+  parallel `sync-prisma-provider` races.
+
 ## [1.3.2]
 
 ### Added

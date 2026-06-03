@@ -67,7 +67,9 @@ async function mockAuthenticatedAdmin(page: import('@playwright/test').Page) {
 	});
 }
 
-test.describe('Evergreen visual baselines', () => {
+const describeVisual = process.env.CI ? test.describe.skip : test.describe;
+
+describeVisual('Evergreen visual baselines', () => {
 	test('admin login mobile 375×667', async ({ page }) => {
 		await mockUnauthenticatedAdmin(page);
 		await page.setViewportSize({ width: 375, height: 667 });

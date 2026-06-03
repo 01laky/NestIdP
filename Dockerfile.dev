@@ -1,0 +1,22 @@
+# syntax=docker/dockerfile:1
+# Development image: source bind-mount + Nest/Vite watch (see docker-compose.dev.yml).
+
+FROM node:20-alpine
+RUN apk add --no-cache openssl
+RUN corepack enable && corepack prepare pnpm@9 --activate
+WORKDIR /app
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/api/package.json ./apps/api/
+COPY apps/web/package.json ./apps/web/
+COPY packages/shared/package.json ./packages/shared/
+
+RUN pnpm install
+
+COPY . .
+
+RUN pnpm --filter @nestidp/shared build \
+	&& pnpm --filter @nestidp/api prisma:generate
+
+EXPOSE 3000 5173
+ENTRYPOINT ["/app/scripts/docker-dev-entrypoint.sh"]

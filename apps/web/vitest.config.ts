@@ -14,5 +14,11 @@ export default defineConfig({
 		environment: 'jsdom',
 		include: ['src/**/*.test.{ts,tsx}'],
 		setupFiles: ['src/test/setup-i18n.ts'],
+		pool: 'forks',
+		maxWorkers: 4,
+		minWorkers: 1,
+		teardownTimeout: 15_000,
+		hookTimeout: 30_000,
+		testTimeout: 60_000,
 	},
 });

@@ -1,6 +1,6 @@
 {
 	"name": "nest-idp",
-	"version": "1.3.2",
+	"version": "1.3.4",
 	"private": true,
 	"packageManager": "pnpm@9.15.9",
 	"engines": {
@@ -10,9 +10,12 @@
 	"scripts": {
 		"postinstall": "pnpm --filter @nestidp/shared build && pnpm --filter @nestidp/api prisma:generate",
 		"dev": "pnpm --filter @nestidp/shared build && concurrently -n api,web -c blue,green \"pnpm --filter @nestidp/api dev\" \"pnpm --filter @nestidp/web dev\"",
+		"dev:docker": "docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile dev up --build",
+		"dev:docker:down": "docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile dev down",
 		"build": "pnpm --filter @nestidp/shared build && pnpm --filter @nestidp/web build && pnpm --filter @nestidp/api build",
 		"lint": "eslint . && pnpm --filter @nestidp/api lint && pnpm --filter @nestidp/web lint",
-		"test": "pnpm --filter @nestidp/shared test && pnpm --filter @nestidp/api test && pnpm --filter @nestidp/web test",
+		"test": "node scripts/run-monorepo-tests.mjs",
+		"test:cleanup": "node scripts/cleanup-test-processes.mjs",
 		"format": "prettier --write \"**/*.{ts,tsx,js,json,md}\"",
 		"diagrams:build": "node scripts/build-diagrams.mjs",
 		"diagrams:check": "node scripts/check-diagrams.mjs",

@@ -1,6 +1,6 @@
 {
 	"name": "@nestidp/web",
-	"version": "1.3.2",
+	"version": "1.3.4",
 	"private": true,
 	"type": "module",
 	"scripts": {
@@ -8,9 +8,12 @@
 		"build": "vite build",
 		"preview": "vite preview",
 		"lint": "tsc -b --noEmit",
+		"pretest": "node ../../scripts/cleanup-test-processes.mjs",
+		"posttest": "node ../../scripts/cleanup-test-processes.mjs",
 		"test": "vitest run",
 		"test:e2e:visual": "playwright test",
-		"test:e2e:visual:update": "playwright test --update-snapshots"
+		"test:e2e:visual:update": "playwright test --update-snapshots",
+		"test:e2e:ci": "playwright test e2e/responsive-shell.spec.ts --grep-invert WEB-RSP-31"
 	},
 	"dependencies": {
 		"@nestidp/shared": "workspace:*",

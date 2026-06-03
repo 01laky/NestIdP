@@ -562,13 +562,25 @@ pnpm test
 pnpm diagrams:check
 ```
 
+### Stale test processes (Vitest / Jest)
+
+Long or interrupted test runs can leave **`node (vitest N)`** workers running and load the CPU. The repo guards against this:
+
+| Command / hook         | Behaviour                                                                                           |
+| ---------------------- | --------------------------------------------------------------------------------------------------- |
+| `pnpm test`            | Runs `scripts/run-monorepo-tests.mjs` (sequential packages + **cleanup on exit**, including Ctrl+C) |
+| `pnpm test:cleanup`    | Manually kill NestIdP-scoped or orphaned Vitest/Jest/Playwright processes                           |
+| `pretest` / `posttest` | `apps/web` and `apps/api` call cleanup before and after each package test run                       |
+
+If the machine still feels slow after aborting tests in the IDE, run **`pnpm test:cleanup`**. Web Vitest is capped at **4 workers** (`apps/web/vitest.config.ts`); API Jest uses **`--forceExit`** and limited **`--maxWorkers`** to reduce hangs and migration races.
+
 - `@nestidp/shared` — schema enums, password hash constants, route prefixes, database validation
 - `@nestidp/api` — unit tests, schema integration tests (SQLite temp DB), optional PostgreSQL smoke (`POSTGRES_TEST_URL`), e2e routing (mocked Prisma)
 - `@nestidp/web` — React route tests (admin vs login separation), Evergreen `WEB-EVG-*` registry
 
 Integration tests live under `apps/api/src/prisma/*.integration.spec.ts` and run as part of `pnpm test`.
 
-CI (`.github/workflows/ci.yml`) runs lint, test (with Postgres service), build, web bundle size check, Playwright visual baselines, and `diagrams:check` on push/PR to `main`.
+CI (`.github/workflows/ci.yml`) runs lint, test (with Postgres + `CI=true`), build, bundle size check, `diagrams:build` + `diagrams:check`, and Playwright **`test:e2e:ci`** (responsive shell smoke; full PNG baselines are local-only) on push/PR to `main`.
 
 ## Git hooks
 
@@ -583,7 +595,8 @@ This sets `core.hooksPath=.githooks`. Hooks run on `prepare-commit-msg` and `com
 ## Docker
 
 - **Default dev:** SQLite — no containers required; `pnpm dev` on the host
-- **Full stack:** `docker compose up --build` — PostgreSQL + NestIdP (migrations via entrypoint). See [deployment.md](./deployment.md)
+- **Production stack:** `docker compose up --build` — PostgreSQL + built NestIdP image. See [deployment.md](./deployment.md)
+- **Hot reload in Docker (v1.3.4):** `pnpm dev:docker` — Postgres + **Nest watch** + **Vite HMR** at **http://localhost:5173** (no rebuild for TS/CSS edits). Stop: `pnpm dev:docker:down`
 - **Host dev + Postgres only:** `docker compose up -d postgres` then `pnpm dev` with `DATABASE_PROVIDER=postgresql`
 - **`MIGRATE_ONLY=1`:** run migrations without starting HTTP (init containers)
 - **`TRUST_PROXY`:** set `true` when behind a TLS-terminating reverse proxy

@@ -201,26 +201,33 @@ describe('Responsive shell — extended CSS and static guards (WEB-RSP-50–99)'
 		expect(existsSync(join(screenshots, 'idp-settings-1280.png'))).toBe(true);
 	});
 
-	it('WEB-RSP-81: CHANGELOG documents WEB-RSP extended registry', () => {
+	it('WEB-RSP-81: CHANGELOG documents WEB-RSP and dev docker hot reload', () => {
 		const changelog = readFileSync(join(repoRoot, 'CHANGELOG.md'), 'utf8');
-		expect(changelog).toContain('## [1.3.2]');
+		expect(changelog).toContain('## [1.3.4]');
 		expect(changelog).toMatch(/WEB-RSP/);
+		expect(changelog).toMatch(/dev:docker|hot reload/i);
 	});
 
-	it('WEB-RSP-82: root package version 1.3.2', () => {
+	it('WEB-RSP-82: root package version 1.3.4', () => {
 		const pkg = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'));
-		expect(pkg.version).toBe('1.3.2');
+		expect(pkg.version).toBe('1.3.4');
 	});
 
-	it('WEB-RSP-83: web package version 1.3.2', () => {
+	it('WEB-RSP-83: web package version 1.3.4', () => {
 		const pkg = JSON.parse(readFileSync(join(webRoot, 'package.json'), 'utf8'));
-		expect(pkg.version).toBe('1.3.2');
+		expect(pkg.version).toBe('1.3.4');
 	});
 
-	it('WEB-RSP-84: prompt 16 responsive shell doc exists', () => {
-		expect(existsSync(join(repoRoot, 'prompts/16-responsive-app-shell-fixed-sidebar.md'))).toBe(
-			true,
-		);
+	it('WEB-RSP-84: root package.json defines dev:docker scripts', () => {
+		const pkg = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'));
+		expect(pkg.scripts['dev:docker']).toContain('docker-compose.dev.yml');
+		expect(pkg.scripts['dev:docker:down']).toBeDefined();
+	});
+
+	it('WEB-RSP-84b: docker dev compose and Dockerfile.dev exist', () => {
+		expect(existsSync(join(repoRoot, 'docker-compose.dev.yml'))).toBe(true);
+		expect(existsSync(join(repoRoot, 'Dockerfile.dev'))).toBe(true);
+		expect(existsSync(join(repoRoot, 'scripts/docker-dev-entrypoint.sh'))).toBe(true);
 	});
 
 	it('WEB-RSP-85: core responsive vitest files exist', () => {
