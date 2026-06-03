@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.1.2]
+
+### Fixed
+
+- Production SPA routes (`/admin`, `/login`) returned 500 after Evergreen deploy: `ServeStaticModule`
+  exclude patterns `/api*` and `/saml*` are invalid under path-to-regexp v8; replaced with named
+  wildcards `/api*rest` and `/saml*rest`.
+
 ## [1.1.1]
 
 ### Added

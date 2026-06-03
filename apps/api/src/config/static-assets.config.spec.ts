@@ -55,7 +55,12 @@ describe('static-assets.config', () => {
 
 	describe('STATIC_ROUTE_EXCLUDES', () => {
 		it('excludes API, SAML, and health endpoints from SPA static handler', () => {
-			expect(STATIC_ROUTE_EXCLUDES).toEqual(['/api*', '/saml*', '/health', '/ready']);
+			expect(STATIC_ROUTE_EXCLUDES).toEqual([
+				'/api*rest',
+				'/saml*rest',
+				'/health',
+				'/ready',
+			]);
 		});
 
 		it('does not exclude admin or login SPA routes', () => {
@@ -63,15 +68,15 @@ describe('static-assets.config', () => {
 			expect(STATIC_ROUTE_EXCLUDES.some((path) => path.includes('login'))).toBe(false);
 		});
 
-		it('API-STA-03: /api/admin/sync matches /api* exclude pattern', () => {
+		it('API-STA-03: /api/admin/sync is under /api prefix excluded from static', () => {
 			const syncPath = '/api/admin/sync/connection-id/status';
-			expect(STATIC_ROUTE_EXCLUDES.some((pattern) => pattern === '/api*')).toBe(true);
+			expect(STATIC_ROUTE_EXCLUDES.some((pattern) => pattern.startsWith('/api'))).toBe(true);
 			expect(syncPath.startsWith('/api')).toBe(true);
 		});
 
-		it('API-STA-04: /api/auth/login matches /api* exclude pattern', () => {
+		it('API-STA-04: /api/auth/login is under /api prefix excluded from static', () => {
 			const loginPath = '/api/auth/login';
-			expect(STATIC_ROUTE_EXCLUDES.some((pattern) => pattern === '/api*')).toBe(true);
+			expect(STATIC_ROUTE_EXCLUDES.some((pattern) => pattern.startsWith('/api'))).toBe(true);
 			expect(loginPath.startsWith('/api')).toBe(true);
 		});
 	});
