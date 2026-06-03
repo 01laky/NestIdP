@@ -4,6 +4,15 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.3.6]
+
+### Fixed
+
+- **GitHub Actions**: removed duplicate `pnpm/action-setup` `version: 9` so CI uses
+  `packageManager` (`pnpm@9.15.9`) from root `package.json` and avoids
+  `ERR_PNPM_BAD_PM_VERSION`. Set `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24` for the
+  Node 20 action-runtime deprecation warning on `checkout` and `pnpm/action-setup`.
+
 ## [1.3.5]
 
 ### Fixed
