@@ -430,8 +430,13 @@ describe('Routing (e2e)', () => {
 
 	it('GET /admin does not hit admin API controller (no JSON stub)', async () => {
 		const response = await request(app.getHttpServer() as App).get('/admin');
-		expect(response.status).not.toBe(200);
 		expect(response.body?.module).not.toBe('admin');
+		if (response.status === 200) {
+			expect(response.text).toMatch(/<!doctype html>/i);
+		} else {
+			expect(response.status).toBe(503);
+			expect(response.body?.status).toBe('unavailable');
+		}
 	});
 
 	it('GET /login returns SPA fallback not SAML endpoint', async () => {

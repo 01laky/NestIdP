@@ -8,10 +8,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import {
-	AUDIT_EVENTS_API_PATH,
-	AUDIT_EXPORT_MAX_ROWS,
-} from '@nestidp/shared';
+import { AUDIT_EVENTS_API_PATH, AUDIT_EXPORT_MAX_ROWS } from '@nestidp/shared';
 import { AdminModule } from '../admin/admin.module';
 import { AdminAuthModule } from '../admin-auth/admin-auth.module';
 import { LoginRateLimiterService } from '../admin-auth/login-rate-limiter.service';

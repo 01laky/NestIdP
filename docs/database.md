@@ -148,9 +148,11 @@ Root `postinstall` runs **`prisma:generate` only** — not `migrate`. Fresh clon
 | `pnpm db:migrate`        | Local dev — creates/applies migrations (`migrate dev`) |
 | `pnpm db:migrate:deploy` | Production / CI — applies committed migrations only    |
 
-Migration SQL is generated per provider. Dev default creates migrations against **SQLite**. For PostgreSQL deploy: set `DATABASE_PROVIDER=postgresql`, run `prisma:prepare`, then `db:migrate:deploy` on an empty database.
+Migration SQL is generated per provider. Committed histories live in **`prisma/migrations-sqlite/`** (dev default) and **`prisma/migrations-postgresql/`** (production / Docker). `pnpm prisma:prepare` copies the matching folder to **`prisma/migrations/`** and syncs `schema.prisma`.
 
-If PostgreSQL migration diverges after a SQLite-first workflow, reset the target database and run `migrate deploy`, or regenerate migrations against a fresh PostgreSQL dev instance.
+For PostgreSQL deploy: set `DATABASE_PROVIDER=postgresql` and `DATABASE_URL`, run `pnpm prisma:prepare`, then `pnpm db:migrate:deploy` on an empty database. Docker entrypoint runs the same prepare step before `migrate deploy`.
+
+If a PostgreSQL database was partially migrated with the wrong history, reset the target database and run `migrate deploy` again.
 
 ## First admin bootstrap (v0.3.0)
 

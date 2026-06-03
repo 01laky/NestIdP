@@ -1,5 +1,5 @@
 import { config as loadDotenv } from 'dotenv';
-import { existsSync, readFileSync, writeFileSync } from 'fs';
+import { cpSync, existsSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -58,6 +58,18 @@ function syncPrismaSchemaProvider(path, provider) {
 	}
 }
 
+function syncMigrationHistory(provider) {
+	const srcDir = resolve(apiRoot, `prisma/migrations-${provider}`);
+	const destDir = resolve(apiRoot, 'prisma/migrations');
+	if (!existsSync(srcDir)) {
+		throw new Error(
+			`Missing migration history for "${provider}" at ${srcDir}. Expected prisma/migrations-${provider}/.`,
+		);
+	}
+	rmSync(destDir, { recursive: true, force: true });
+	cpSync(srcDir, destDir, { recursive: true });
+}
+
 const provider = resolveDatabaseProvider(process.env.DATABASE_PROVIDER);
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -66,4 +78,5 @@ if (databaseUrl) {
 }
 
 syncPrismaSchemaProvider(schemaPath, provider);
+syncMigrationHistory(provider);
 console.log(`[prisma:prepare] datasource provider set to "${provider}"`);

@@ -9,7 +9,8 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json ./apps/api/
 COPY apps/web/package.json ./apps/web/
 COPY packages/shared/package.json ./packages/shared/
-RUN pnpm install
+# Source and prisma schema are copied in later stages; skip postinstall (shared build + prisma:generate).
+RUN pnpm install --ignore-scripts
 
 FROM deps AS build-shared
 COPY packages/shared ./packages/shared
@@ -37,11 +38,12 @@ WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build-api /app/node_modules ./node_modules
 COPY --from=build-api /app/apps/api/dist ./apps/api/dist
+COPY --from=build-api /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=build-api /app/apps/api/package.json ./apps/api/package.json
 COPY --from=build-api /app/apps/api/prisma ./apps/api/prisma
+COPY --from=build-api /app/apps/api/scripts ./apps/api/scripts
 COPY --from=build-api /app/apps/web/dist ./apps/web/dist
-COPY --from=build-api /app/packages/shared/dist ./packages/shared/dist
-COPY --from=build-api /app/packages/shared/package.json ./packages/shared/package.json
+COPY --from=build-api /app/packages/shared ./packages/shared
 COPY package.json pnpm-workspace.yaml ./
 COPY scripts/docker-entrypoint.sh /app/scripts/docker-entrypoint.sh
 RUN chmod +x /app/scripts/docker-entrypoint.sh

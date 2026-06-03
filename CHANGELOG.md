@@ -4,6 +4,24 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.0.2]
+
+### Fixed
+
+- Docker Compose stack no longer crash-loops on startup: `prisma:prepare` now copies
+  provider-specific migration SQL (`migrations-postgresql/` vs `migrations-sqlite/`)
+  before `migrate deploy`, fixing P3019 lock mismatch and PostgreSQL `DATETIME` errors.
+- Docker image includes `apps/api/scripts/sync-prisma-provider.mjs`; entrypoint runs
+  prepare using runtime `DATABASE_PROVIDER` / `DATABASE_URL`.
+- `@nestidp/shared` package `exports` now includes `require` so the production API
+  (CommonJS) can load the workspace package in the Docker runner.
+- SPA fallback (`/admin`, `/login`) resolves `index.html` from `apps/web/dist` instead of
+  a non-existent `apps/api/web/dist` path when running from compiled `dist/spa/`.
+
+### Added
+
+- `prisma/migrations-postgresql/` — squashed PostgreSQL migration history for production deploy.
+
 ## [1.0.1]
 
 ### Added
