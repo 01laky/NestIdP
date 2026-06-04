@@ -16,8 +16,13 @@ RUN pnpm install --ignore-scripts
 
 COPY . .
 
+# Match docker-compose.dev.yml postgresql so the image layer is not sqlite-only.
+ENV DATABASE_PROVIDER=postgresql
+ENV DATABASE_URL=postgresql://nestidp:nestidp@postgres:5432/nestidp
+
 RUN pnpm --filter @nestidp/shared build \
-	&& pnpm --filter @nestidp/api prisma:generate
+	&& node ./apps/api/scripts/sync-prisma-provider.mjs \
+	&& ./apps/api/node_modules/.bin/prisma generate --schema=./apps/api/prisma/schema.prisma
 
 EXPOSE 3000 5173
 ENTRYPOINT ["/app/scripts/docker-dev-entrypoint.sh"]

@@ -8,6 +8,9 @@ node ./apps/api/scripts/sync-prisma-provider.mjs
 echo "NestIdP [dev]: running database migrations..."
 ./apps/api/node_modules/.bin/prisma migrate deploy --schema=./apps/api/prisma/schema.prisma
 
+echo "NestIdP [dev]: generating Prisma client for ${DATABASE_PROVIDER}..."
+./apps/api/node_modules/.bin/prisma generate --schema=./apps/api/prisma/schema.prisma
+
 echo "NestIdP [dev]: building @nestidp/shared (watch mode)..."
 pnpm --filter @nestidp/shared build
 pnpm --filter @nestidp/shared exec tsc -w -p tsconfig.json &

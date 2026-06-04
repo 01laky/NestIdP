@@ -4,6 +4,15 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.3.15]
+
+### Fixed
+
+- **Docker dev**: run `prisma generate` after `sync-prisma-provider` in `docker-dev-entrypoint.sh` so the
+  API uses a PostgreSQL Prisma client when `DATABASE_URL` is `postgresql://…` (fixes 500 / crash:
+  `the URL must start with the protocol file:`). Dev image build now generates the client for
+  postgresql instead of default sqlite.
+
 ## [1.3.14]
 
 ### Fixed
