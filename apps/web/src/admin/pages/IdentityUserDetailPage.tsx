@@ -9,7 +9,7 @@ import { LoadingState } from '../components/LoadingState';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
 import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
 import { identityOriginLabel, identityOriginToBadge } from '../status-badge';
-import { Badge, Button, ButtonLink, Panel, useToast } from '../../ui';
+import { Badge, Button, ButtonLink, Panel, useConfirmAction, useToast } from '../../ui';
 
 export function IdentityUserDetailPage() {
 	const { id } = useParams<{ id: string }>();
@@ -18,6 +18,7 @@ export function IdentityUserDetailPage() {
 	const { t } = useTranslation('identity');
 	const { t: tNav } = useTranslation('nav');
 	const { t: tCommon } = useTranslation('common');
+	const confirmAction = useConfirmAction();
 	useAdminDocumentTitle(t('viewUser'));
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
@@ -62,20 +63,31 @@ export function IdentityUserDetailPage() {
 		if (!detail || !id) {
 			return;
 		}
-		if (!window.confirm(t('confirmDeleteUser', { name: detail.user.username }))) {
-			return;
-		}
-		try {
-			await deleteIdentityUser(id);
-			showToast(t('toastUserDeleted'));
-			navigate(`${IDENTITY_ROUTE_PREFIX}/users`);
-		} catch (err) {
-			setError(
-				err instanceof AdminApiError
-					? formatAdminApiError(err.statusCode, err.message, resolveI18nKey, 'errors.deleteFailed')
-					: resolveI18nKey('errors.deleteFailed'),
-			);
-		}
+		await confirmAction({
+			title: t('confirmDeleteUserTitle'),
+			description: t('confirmDeleteUser', { name: detail.user.username }),
+			tone: 'danger',
+			showAuditNote: true,
+			confirmLabel: tCommon('delete'),
+			onConfirm: async () => {
+				try {
+					await deleteIdentityUser(id);
+					showToast(t('toastUserDeleted'));
+					navigate(`${IDENTITY_ROUTE_PREFIX}/users`);
+				} catch (err) {
+					setError(
+						err instanceof AdminApiError
+							? formatAdminApiError(
+									err.statusCode,
+									err.message,
+									resolveI18nKey,
+									'errors.deleteFailed',
+								)
+							: resolveI18nKey('errors.deleteFailed'),
+					);
+				}
+			},
+		});
 	}
 
 	if (loading) {

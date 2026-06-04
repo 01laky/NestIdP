@@ -1,0 +1,23 @@
+sequenceDiagram
+	actor Op as Operator
+	participant Page as Admin page
+	participant Prov as ConfirmProvider
+	participant Shell as AppShell
+	participant API as Nest API
+
+	Op->>Page: Click destructive action
+	Page->>Prov: confirm() / confirmAction()
+	Prov->>Shell: closeMobileNav()
+	Prov->>Op: Modal (warning or danger)
+	alt type-to-confirm
+		Op->>Prov: Type REPLACE / COMPLETE
+	end
+	alt Cancel / Esc / backdrop
+		Op->>Prov: Cancel
+		Prov-->>Page: false
+	else Confirm
+		Op->>Prov: Confirm
+		Prov-->>Page: true
+		Page->>API: Mutation (delete, sync, cert, …)
+		API-->>Page: Result + audit event
+	end

@@ -1,8 +1,9 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SidebarNav } from './SidebarNav';
 import { MobileNavToggle } from './MobileNavToggle';
 import { OperatorSessionBar } from './OperatorSessionBar';
+import { ShellUiContext } from './shell-ui-context';
 
 const DESKTOP_MQ = '(min-width: 768px)';
 
@@ -53,48 +54,52 @@ export function AppShell({
 		return () => mq.removeEventListener('change', onChange);
 	}, []);
 
+	const shellUi = useMemo(() => ({ closeMobileNav: () => setDrawerOpen(false) }), []);
+
 	return (
-		<div className="evg-shell evg-shell--with-sidebar">
-			<a href="#evg-main" className="evg-skip-link">
-				{t('skipToContent')}
-			</a>
-			{drawerOpen ? (
-				<button
-					type="button"
-					className="evg-drawer-scrim"
-					aria-label={t('closeMenu')}
-					onClick={() => setDrawerOpen(false)}
-				/>
-			) : null}
-			<aside
-				id="evg-sidebar"
-				data-testid="evg-sidebar"
-				className={`evg-sidebar${drawerOpen ? ' evg-sidebar--open' : ''}`}
-			>
-				<SidebarNav
-					operatorUsername={operatorUsername}
-					onLogout={onLogout}
-					onNavigate={() => setDrawerOpen(false)}
-				/>
-			</aside>
-			<div className="evg-shell-body">
-				<header className="evg-topbar">
-					<MobileNavToggle expanded={drawerOpen} onClick={() => setDrawerOpen((v) => !v)} />
-					{operatorUsername ? (
-						<OperatorSessionBar username={operatorUsername} />
-					) : (
-						<span className="evg-muted">{t('operatorConsole')}</span>
-					)}
-				</header>
-				<main
-					id="evg-main"
-					className="evg-main"
-					aria-hidden={drawerOpen ? true : undefined}
-					{...(drawerOpen ? ({ inert: '' } as { inert: '' }) : {})}
+		<ShellUiContext.Provider value={shellUi}>
+			<div className="evg-shell evg-shell--with-sidebar">
+				<a href="#evg-main" className="evg-skip-link">
+					{t('skipToContent')}
+				</a>
+				{drawerOpen ? (
+					<button
+						type="button"
+						className="evg-drawer-scrim"
+						aria-label={t('closeMenu')}
+						onClick={() => setDrawerOpen(false)}
+					/>
+				) : null}
+				<aside
+					id="evg-sidebar"
+					data-testid="evg-sidebar"
+					className={`evg-sidebar${drawerOpen ? ' evg-sidebar--open' : ''}`}
 				>
-					<div className="evg-container">{children}</div>
-				</main>
+					<SidebarNav
+						operatorUsername={operatorUsername}
+						onLogout={onLogout}
+						onNavigate={() => setDrawerOpen(false)}
+					/>
+				</aside>
+				<div className="evg-shell-body">
+					<header className="evg-topbar">
+						<MobileNavToggle expanded={drawerOpen} onClick={() => setDrawerOpen((v) => !v)} />
+						{operatorUsername ? (
+							<OperatorSessionBar username={operatorUsername} />
+						) : (
+							<span className="evg-muted">{t('operatorConsole')}</span>
+						)}
+					</header>
+					<main
+						id="evg-main"
+						className="evg-main"
+						aria-hidden={drawerOpen ? true : undefined}
+						{...(drawerOpen ? ({ inert: '' } as { inert: '' }) : {})}
+					>
+						<div className="evg-container">{children}</div>
+					</main>
+				</div>
 			</div>
-		</div>
+		</ShellUiContext.Provider>
 	);
 }

@@ -523,6 +523,129 @@
 	font-size: var(--evg-text-sm);
 }
 
+/* Confirm modal */
+.evg-modal {
+	position: fixed;
+	inset: 0;
+	z-index: var(--evg-z-modal);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: var(--evg-space-4);
+}
+
+.evg-modal__backdrop {
+	position: absolute;
+	inset: 0;
+	border: none;
+	padding: 0;
+	margin: 0;
+	background: rgba(27, 61, 47, 0.45);
+	cursor: pointer;
+}
+
+.evg-modal__panel {
+	position: relative;
+	width: 100%;
+	max-width: 28rem;
+	max-height: min(90vh, 32rem);
+	display: flex;
+	flex-direction: column;
+	background: var(--evg-color-surface-0);
+	border-radius: var(--evg-radius-md);
+	box-shadow: var(--evg-shadow-lg);
+	border: 1px solid var(--evg-color-border);
+}
+
+.evg-modal--danger {
+	border-left: 4px solid var(--evg-color-danger-600, #b91c1c);
+}
+
+.evg-modal--warning {
+	border-left: 4px solid var(--evg-modal-warning-border);
+}
+
+.evg-modal__header {
+	padding: var(--evg-space-4) var(--evg-space-4) 0;
+}
+
+.evg-modal__title {
+	margin: 0;
+	font-size: var(--evg-text-lg);
+	font-weight: 600;
+}
+
+.evg-modal__body {
+	padding: var(--evg-space-3) var(--evg-space-4);
+	overflow-y: auto;
+	flex: 1;
+}
+
+.evg-modal__description {
+	margin: 0 0 var(--evg-space-3);
+	font-size: var(--evg-text-sm);
+	line-height: 1.5;
+}
+
+.evg-modal__detail {
+	margin: 0 0 var(--evg-space-3);
+	font-size: var(--evg-text-sm);
+	color: var(--evg-color-text-muted);
+	max-height: 8rem;
+	overflow-y: auto;
+}
+
+.evg-modal__audit-note {
+	margin: var(--evg-space-3) 0 0;
+	font-size: var(--evg-text-xs);
+	color: var(--evg-color-text-muted);
+}
+
+.evg-modal__type-field {
+	margin-top: var(--evg-space-3);
+}
+
+.evg-modal__footer {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--evg-space-2);
+	justify-content: flex-end;
+	padding: var(--evg-space-3) var(--evg-space-4) var(--evg-space-4);
+	border-top: 1px solid var(--evg-color-border);
+}
+
+@media (max-width: 480px) {
+	.evg-modal {
+		padding: var(--evg-space-4);
+		align-items: flex-end;
+	}
+
+	.evg-modal__footer {
+		flex-direction: column-reverse;
+	}
+
+	.evg-modal__footer .evg-btn {
+		width: 100%;
+	}
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.evg-modal__panel {
+		animation: evg-modal-in var(--evg-duration-normal) var(--evg-ease-standard);
+	}
+}
+
+@keyframes evg-modal-in {
+	from {
+		opacity: 0;
+		transform: translateY(0.5rem);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
 .evg-list {
 	padding-left: var(--evg-space-5);
 	margin: var(--evg-space-3) 0;

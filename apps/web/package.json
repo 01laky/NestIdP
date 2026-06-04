@@ -1,6 +1,6 @@
 {
 	"name": "@nestidp/web",
-	"version": "1.4.2",
+	"version": "1.4.3",
 	"private": true,
 	"type": "module",
 	"scripts": {
@@ -13,7 +13,7 @@
 		"test": "vitest run",
 		"test:e2e:visual": "playwright test",
 		"test:e2e:visual:update": "playwright test --update-snapshots",
-		"test:e2e:ci": "playwright test e2e/responsive-shell.spec.ts e2e/admin-login-remember.spec.ts --grep-invert WEB-RSP-31"
+		"test:e2e:ci": "playwright test e2e/responsive-shell.spec.ts e2e/admin-login-remember.spec.ts e2e/admin-confirm-dialog.spec.ts --grep-invert WEB-RSP-31"
 	},
 	"dependencies": {
 		"@nestidp/shared": "workspace:*",

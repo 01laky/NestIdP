@@ -23,7 +23,7 @@ import { AdminUsersPage } from './pages/AdminUsersPage';
 import { AuditLogPage } from './pages/AuditLogPage';
 import { SpConnectionsListPage } from './pages/SpConnectionsListPage';
 import { SyncLogDetailPage } from './pages/SyncLogDetailPage';
-import { AppShell, EmptyState, LoadingState, ToastProvider } from '../ui';
+import { AppShell, ConfirmProvider, EmptyState, LoadingState, ToastProvider } from '../ui';
 
 export function AdminLayout() {
 	const { t } = useTranslation('common');
@@ -87,48 +87,50 @@ export function AdminLayout() {
 	return (
 		<ToastProvider>
 			<AppShell operatorUsername={operatorUsername} onLogout={() => void handleLogout()}>
-				<Routes>
-					<Route index element={<DashboardPage />} />
-					<Route path="api-connections" element={<ApiConnectionsListPage />} />
-					<Route path="api-connections/new" element={<ApiConnectionFormPage />} />
-					<Route path="api-connections/:id" element={<ApiConnectionFormPage />} />
-					<Route path="api-connections/:id/sync" element={<ApiConnectionSyncPage />} />
-					<Route path="sync-logs/:syncLogId" element={<SyncLogDetailPage />} />
-					<Route path="sp-connections" element={<SpConnectionsListPage />} />
-					<Route path="sp-connections/new" element={<SpConnectionFormPage />} />
-					<Route path="sp-connections/:id" element={<SpConnectionFormPage />} />
-					<Route path="sp-connections/:id/test-sso" element={<SpConnectionTestSsoPage />} />
-					<Route path="identity/users" element={<IdentityUsersPage />} />
-					<Route path="identity/users/new" element={<IdentityUserFormPage />} />
-					<Route path="identity/users/:id/edit" element={<IdentityUserFormPage />} />
-					<Route path="identity/users/:id" element={<IdentityUserDetailPage />} />
-					<Route path="identity/groups" element={<IdentityGroupsPage />} />
-					<Route path="identity/groups/new" element={<IdentityGroupFormPage />} />
-					<Route path="identity/groups/:id/edit" element={<IdentityGroupFormPage />} />
-					<Route path="identity/groups/:id" element={<IdentityGroupDetailPage />} />
-					<Route path="identity/roles" element={<IdentityRolesPage />} />
-					<Route path="identity/roles/new" element={<IdentityRoleFormPage />} />
-					<Route path="identity/roles/:id/edit" element={<IdentityRoleFormPage />} />
-					<Route path="identity/roles/:id" element={<IdentityRoleDetailPage />} />
-					<Route path="settings" element={<Navigate to={IDP_SETTINGS_ROUTE_PREFIX} replace />} />
-					<Route path="settings/idp" element={<IdpSettingsPage />} />
-					<Route path="settings/admins" element={<AdminUsersPage />} />
-					<Route path="audit" element={<AuditLogPage />} />
-					<Route
-						path="*"
-						element={
-							<EmptyState
-								title={t('pageNotFound')}
-								description={t('pageNotFoundDescription')}
-								action={
-									<a className="evg-btn evg-btn--link" href="/admin">
-										{t('backToDashboard')}
-									</a>
-								}
-							/>
-						}
-					/>
-				</Routes>
+				<ConfirmProvider>
+					<Routes>
+						<Route index element={<DashboardPage />} />
+						<Route path="api-connections" element={<ApiConnectionsListPage />} />
+						<Route path="api-connections/new" element={<ApiConnectionFormPage />} />
+						<Route path="api-connections/:id" element={<ApiConnectionFormPage />} />
+						<Route path="api-connections/:id/sync" element={<ApiConnectionSyncPage />} />
+						<Route path="sync-logs/:syncLogId" element={<SyncLogDetailPage />} />
+						<Route path="sp-connections" element={<SpConnectionsListPage />} />
+						<Route path="sp-connections/new" element={<SpConnectionFormPage />} />
+						<Route path="sp-connections/:id" element={<SpConnectionFormPage />} />
+						<Route path="sp-connections/:id/test-sso" element={<SpConnectionTestSsoPage />} />
+						<Route path="identity/users" element={<IdentityUsersPage />} />
+						<Route path="identity/users/new" element={<IdentityUserFormPage />} />
+						<Route path="identity/users/:id/edit" element={<IdentityUserFormPage />} />
+						<Route path="identity/users/:id" element={<IdentityUserDetailPage />} />
+						<Route path="identity/groups" element={<IdentityGroupsPage />} />
+						<Route path="identity/groups/new" element={<IdentityGroupFormPage />} />
+						<Route path="identity/groups/:id/edit" element={<IdentityGroupFormPage />} />
+						<Route path="identity/groups/:id" element={<IdentityGroupDetailPage />} />
+						<Route path="identity/roles" element={<IdentityRolesPage />} />
+						<Route path="identity/roles/new" element={<IdentityRoleFormPage />} />
+						<Route path="identity/roles/:id/edit" element={<IdentityRoleFormPage />} />
+						<Route path="identity/roles/:id" element={<IdentityRoleDetailPage />} />
+						<Route path="settings" element={<Navigate to={IDP_SETTINGS_ROUTE_PREFIX} replace />} />
+						<Route path="settings/idp" element={<IdpSettingsPage />} />
+						<Route path="settings/admins" element={<AdminUsersPage />} />
+						<Route path="audit" element={<AuditLogPage />} />
+						<Route
+							path="*"
+							element={
+								<EmptyState
+									title={t('pageNotFound')}
+									description={t('pageNotFoundDescription')}
+									action={
+										<a className="evg-btn evg-btn--link" href="/admin">
+											{t('backToDashboard')}
+										</a>
+									}
+								/>
+							}
+						/>
+					</Routes>
+				</ConfirmProvider>
 			</AppShell>
 		</ToastProvider>
 	);

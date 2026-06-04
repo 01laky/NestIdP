@@ -15,7 +15,7 @@ import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
 import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
-import { Button, Panel, TextInput, useToast } from '../../ui';
+import { Button, Panel, TextInput, useConfirmAction, useToast } from '../../ui';
 
 export function ApiConnectionFormPage() {
 	const { id } = useParams();
@@ -24,6 +24,7 @@ export function ApiConnectionFormPage() {
 	const { t } = useTranslation('apiConnections');
 	const { t: tNav } = useTranslation('nav');
 	const { t: tCommon } = useTranslation('common');
+	const confirmAction = useConfirmAction();
 	useAdminDocumentTitle(isNew ? t('formNew') : t('formEdit'));
 	const [loading, setLoading] = useState(!isNew);
 	const [error, setError] = useState<string | null>(null);
@@ -133,24 +134,30 @@ export function ApiConnectionFormPage() {
 		if (!id) {
 			return;
 		}
-		if (!window.confirm(t('confirmDelete'))) {
-			return;
-		}
-		try {
-			await deleteApiConnection(id);
-			navigate(API_CONNECTION_ROUTE_PREFIX);
-		} catch (err) {
-			setError(
-				err instanceof AdminApiError
-					? formatAdminApiError(
-							err.statusCode,
-							err.message,
-							resolveI18nKey,
-							'apiConnections.deleteFailed',
-						)
-					: t('deleteFailed'),
-			);
-		}
+		await confirmAction({
+			title: t('confirmDeleteTitle'),
+			description: t('confirmDelete'),
+			tone: 'danger',
+			showAuditNote: true,
+			confirmLabel: tCommon('delete'),
+			onConfirm: async () => {
+				try {
+					await deleteApiConnection(id);
+					navigate(API_CONNECTION_ROUTE_PREFIX);
+				} catch (err) {
+					setError(
+						err instanceof AdminApiError
+							? formatAdminApiError(
+									err.statusCode,
+									err.message,
+									resolveI18nKey,
+									'apiConnections.deleteFailed',
+								)
+							: t('deleteFailed'),
+					);
+				}
+			},
+		});
 	}
 
 	if (loading) {

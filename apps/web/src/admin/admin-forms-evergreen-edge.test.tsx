@@ -299,6 +299,9 @@ describe('Admin forms Evergreen — extended edge cases', () => {
 					}),
 			);
 			fireEvent.click(screen.getByRole('button', { name: /Run full sync/i }));
+			const { clickDialogConfirm } = await import('../test/confirm-dialog-helpers');
+			await screen.findByRole('dialog');
+			clickDialogConfirm('Run full sync');
 			await waitFor(() => {
 				expect(screen.getByRole('button', { name: /Running/i })).toBeDefined();
 			});

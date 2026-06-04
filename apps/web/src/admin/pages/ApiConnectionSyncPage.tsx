@@ -14,7 +14,7 @@ import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
 import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
-import { Button, Checkbox, Panel, useToast } from '../../ui';
+import { Button, Checkbox, Panel, useConfirm, useToast } from '../../ui';
 
 export function ApiConnectionSyncPage() {
 	const { id } = useParams<{ id: string }>();
@@ -32,6 +32,7 @@ export function ApiConnectionSyncPage() {
 	const [syncing, setSyncing] = useState(false);
 	const [message, setMessage] = useState<string | null>(null);
 	const { showToast } = useToast();
+	const confirm = useConfirm();
 
 	async function reload() {
 		if (!id) {
@@ -79,6 +80,18 @@ export function ApiConnectionSyncPage() {
 		event.preventDefault();
 		if (!id) {
 			return;
+		}
+		if (!dryRun) {
+			const ok = await confirm({
+				title: t('confirmFullSyncTitle'),
+				description: t('confirmFullSync'),
+				tone: 'warning',
+				showAuditNote: true,
+				confirmLabel: t('runFullSync'),
+			});
+			if (!ok) {
+				return;
+			}
 		}
 		setSyncing(true);
 		setMessage(null);

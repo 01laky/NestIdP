@@ -4,6 +4,31 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.4.3]
+
+### Added
+
+- Evergreen **confirm dialog** (`useConfirm`, `useConfirmAction`, `ConfirmProvider`) replacing
+  native `window.confirm` across the admin SPA (11 existing sites plus **full identity sync**).
+- **Warning** vs **danger** tones; **type-to-confirm** (`REPLACE` / `COMPLETE`) for signing-cert
+  generate, upload, and complete rotation; member **detail** preview on group/role delete; optional
+  **audit log** note on destructive and high-risk actions.
+- Vitest `WEB-EVG-CONF-*`, `WEB-ADM-CONF-*`, Playwright `WEB-ADM-E2E-CONF-*`; diagram
+  `docs/img/admin-confirm-dialog.mmd` / SVG.
+- Extended confirm edge tests: provider concurrency, focus restore, body scroll lock,
+  type-to-confirm case sensitivity, full page cancel/confirm matrix, member preview overflow,
+  modal CSS z-index contracts, E2E Escape/wrong-challenge/sync cancel.
+
+### Changed
+
+- IdP signing certificate and API connection **full sync** actions use in-app modals instead of
+  browser confirm dialogs.
+- Clipboard copy failure on IdP settings shows a toast instead of `window.prompt`.
+
+### Removed
+
+- All `window.confirm` and `window.prompt` usage under `apps/web/src/admin`.
+
 ## [1.4.2]
 
 ### Added

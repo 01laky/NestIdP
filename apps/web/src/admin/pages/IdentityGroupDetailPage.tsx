@@ -13,7 +13,8 @@ import { LoadingState } from '../components/LoadingState';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
 import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
 import { identityOriginLabel, identityOriginToBadge } from '../status-badge';
-import { Badge, Button, ButtonLink, Panel, Table, useToast } from '../../ui';
+import { buildIdentityMemberDeleteDetail } from '../identity-delete-detail';
+import { Badge, Button, ButtonLink, Panel, Table, useConfirmAction, useToast } from '../../ui';
 
 export function IdentityGroupDetailPage() {
 	const { id } = useParams<{ id: string }>();
@@ -22,6 +23,7 @@ export function IdentityGroupDetailPage() {
 	const { t } = useTranslation('identity');
 	const { t: tNav } = useTranslation('nav');
 	const { t: tCommon } = useTranslation('common');
+	const confirmAction = useConfirmAction();
 	useAdminDocumentTitle(t('viewGroup'));
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
@@ -66,24 +68,39 @@ export function IdentityGroupDetailPage() {
 		if (!detail || !id) {
 			return;
 		}
-		const msg =
+		const description =
 			detail.memberCount > 0
-				? t('confirmDeleteGroupWithMembers', { name: detail.group.name, count: detail.memberCount })
+				? t('confirmDeleteGroupWithMembers', {
+						name: detail.group.name,
+						count: detail.memberCount,
+					})
 				: t('confirmDeleteGroup', { name: detail.group.name });
-		if (!window.confirm(msg)) {
-			return;
-		}
-		try {
-			await deleteIdentityGroup(id);
-			showToast(t('toastGroupDeleted'));
-			navigate(`${IDENTITY_ROUTE_PREFIX}/groups`);
-		} catch (err) {
-			setError(
-				err instanceof AdminApiError
-					? formatAdminApiError(err.statusCode, err.message, resolveI18nKey, 'errors.deleteFailed')
-					: resolveI18nKey('errors.deleteFailed'),
-			);
-		}
+		await confirmAction({
+			title: t('confirmDeleteGroupTitle'),
+			description,
+			detail: buildIdentityMemberDeleteDetail(detail.members, detail.memberCount, t),
+			tone: 'danger',
+			showAuditNote: true,
+			confirmLabel: tCommon('delete'),
+			onConfirm: async () => {
+				try {
+					await deleteIdentityGroup(id);
+					showToast(t('toastGroupDeleted'));
+					navigate(`${IDENTITY_ROUTE_PREFIX}/groups`);
+				} catch (err) {
+					setError(
+						err instanceof AdminApiError
+							? formatAdminApiError(
+									err.statusCode,
+									err.message,
+									resolveI18nKey,
+									'errors.deleteFailed',
+								)
+							: resolveI18nKey('errors.deleteFailed'),
+					);
+				}
+			},
+		});
 	}
 
 	if (loading) {

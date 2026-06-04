@@ -25,17 +25,16 @@ import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
 import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
-import { Button, CodeBlock, Panel, Select, TextArea, TextInput, useToast } from '../../ui';
-
-function copyText(label: string, value: string): void {
-	void (async () => {
-		try {
-			await navigator.clipboard.writeText(value);
-		} catch {
-			window.prompt(`Copy ${label}:`, value);
-		}
-	})();
-}
+import {
+	Button,
+	CodeBlock,
+	Panel,
+	Select,
+	TextArea,
+	TextInput,
+	useConfirm,
+	useToast,
+} from '../../ui';
 
 function isExpiringSoon(notAfter: string | null): boolean {
 	if (!notAfter) {
@@ -78,6 +77,8 @@ export function IdpSettingsPage() {
 	const { t } = useTranslation('idpSettings');
 	const { t: tNav } = useTranslation('nav');
 	const { t: tCommon } = useTranslation('common');
+	const confirm = useConfirm();
+	const { showToast } = useToast();
 	useAdminDocumentTitle(t('title'));
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
@@ -90,7 +91,6 @@ export function IdpSettingsPage() {
 	const [uploadCert, setUploadCert] = useState('');
 	const [uploadKey, setUploadKey] = useState('');
 	const [busy, setBusy] = useState(false);
-	const { showToast } = useToast();
 
 	async function reload(): Promise<IdpSettingsPublicDto> {
 		const data = await getIdpSettings();
@@ -171,8 +171,24 @@ export function IdpSettingsPage() {
 		});
 	}
 
+	async function copyText(_label: string, value: string) {
+		try {
+			await navigator.clipboard.writeText(value);
+		} catch {
+			showToast(tCommon('copyFailed'));
+		}
+	}
+
 	async function handleGeneratePrimary() {
-		if (!window.confirm(t('confirmGeneratePrimary'))) {
+		const ok = await confirm({
+			title: t('confirmGeneratePrimaryTitle'),
+			description: t('confirmGeneratePrimary'),
+			tone: 'warning',
+			showAuditNote: true,
+			typeToConfirm: { challenge: 'REPLACE', label: t('typeReplaceToConfirm') },
+			confirmLabel: t('generateCertificate'),
+		});
+		if (!ok) {
 			return;
 		}
 		await runMutation(async () => {
@@ -185,7 +201,15 @@ export function IdpSettingsPage() {
 
 	async function handleUploadPrimary(event: FormEvent) {
 		event.preventDefault();
-		if (!window.confirm(t('confirmUploadPrimary'))) {
+		const ok = await confirm({
+			title: t('confirmUploadPrimaryTitle'),
+			description: t('confirmUploadPrimary'),
+			tone: 'warning',
+			showAuditNote: true,
+			typeToConfirm: { challenge: 'REPLACE', label: t('typeReplaceToConfirm') },
+			confirmLabel: t('uploadPrimary'),
+		});
+		if (!ok) {
 			return;
 		}
 		await runMutation(async () => {
@@ -203,7 +227,14 @@ export function IdpSettingsPage() {
 	}
 
 	async function handleStartRotationGenerate() {
-		if (!window.confirm(t('confirmStartRotation'))) {
+		const ok = await confirm({
+			title: t('confirmStartRotationTitle'),
+			description: t('confirmStartRotation'),
+			tone: 'warning',
+			showAuditNote: true,
+			confirmLabel: t('startRotationGenerate'),
+		});
+		if (!ok) {
 			return;
 		}
 		await runMutation(async () => {
@@ -215,7 +246,15 @@ export function IdpSettingsPage() {
 	}
 
 	async function handleCompleteRotation() {
-		if (!window.confirm(t('confirmCompleteRotation'))) {
+		const ok = await confirm({
+			title: t('confirmCompleteRotationTitle'),
+			description: t('confirmCompleteRotation'),
+			tone: 'warning',
+			showAuditNote: true,
+			typeToConfirm: { challenge: 'COMPLETE', label: t('typeCompleteToConfirm') },
+			confirmLabel: t('completeRotation'),
+		});
+		if (!ok) {
 			return;
 		}
 		await runMutation(async () => {
@@ -227,7 +266,13 @@ export function IdpSettingsPage() {
 	}
 
 	async function handleCancelRotation() {
-		if (!window.confirm(t('confirmCancelRotation'))) {
+		const ok = await confirm({
+			title: t('confirmCancelRotationTitle'),
+			description: t('confirmCancelRotation'),
+			tone: 'warning',
+			confirmLabel: t('cancelRotation'),
+		});
+		if (!ok) {
 			return;
 		}
 		await runMutation(async () => {

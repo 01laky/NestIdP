@@ -430,28 +430,58 @@ After shell layout changes, re-run **`pnpm --filter @nestidp/web test:e2e:visual
 
 ### Component chooser
 
-| Need                 | Component                   | Notes                                                              |
-| -------------------- | --------------------------- | ------------------------------------------------------------------ |
-| Page title + actions | `PageHeader`                | Actions slot right; wrap on mobile                                 |
-| Section grouping     | `Panel`                     | Bordered; optional `id` for anchors (e.g. `#change-password`)      |
-| Text / password      | `TextInput`                 | `requiredMark`; list filters use visible labels + `fieldClassName` |
-| Router CTA           | `ButtonLink`                | Same variants as `Button` on `<Link>` (identity headers, nav)      |
-| Multi-line / PEM     | `TextArea`                  | Paste PEM on IdP settings (no file picker in v1.1.3)               |
-| Dropdown             | `Select`                    | NameID format, audit category, mapping presets                     |
-| Boolean flag         | `Checkbox`                  | SP active, sync dry-run                                            |
-| Grouped mapping      | `Fieldset`                  | Attribute mapping editor legend + fields                           |
-| Submit / actions     | `Button`                    | `primary` / `secondary` / `danger` / `link`; `size="sm"` in tables |
-| Highlight metric     | `StatCard`                  | Dashboard stat grid                                                |
-| Floating feedback    | `Toast` via `useToast()`    | Success after POST; not for field validation                       |
-| Inline page errors   | `ErrorBanner`               | Top of form; persists until fixed                                  |
-| Empty list           | `EmptyState`                | Optional CTA                                                       |
-| Loading list/page    | `LoadingState`              | Centred spinner + message                                          |
-| Tabular data         | `Table`                     | Horizontal scroll wrapper; wide tables on small viewports          |
-| PEM / JSON / logs    | `CodeBlock`                 | Scrollable monospace                                               |
-| Sync/cert/API status | `Badge` + `status-badge.ts` | Do not hand-pick colours per page                                  |
-| Operator identity    | `OperatorSessionBar`        | Admin shell only, not login pages                                  |
+| Need                 | Component                             | Notes                                                                     |
+| -------------------- | ------------------------------------- | ------------------------------------------------------------------------- |
+| Page title + actions | `PageHeader`                          | Actions slot right; wrap on mobile                                        |
+| Section grouping     | `Panel`                               | Bordered; optional `id` for anchors (e.g. `#change-password`)             |
+| Text / password      | `TextInput`                           | `requiredMark`; list filters use visible labels + `fieldClassName`        |
+| Router CTA           | `ButtonLink`                          | Same variants as `Button` on `<Link>` (identity headers, nav)             |
+| Multi-line / PEM     | `TextArea`                            | Paste PEM on IdP settings (no file picker in v1.1.3)                      |
+| Dropdown             | `Select`                              | NameID format, audit category, mapping presets                            |
+| Boolean flag         | `Checkbox`                            | SP active, sync dry-run                                                   |
+| Grouped mapping      | `Fieldset`                            | Attribute mapping editor legend + fields                                  |
+| Submit / actions     | `Button`                              | `primary` / `secondary` / `danger` / `link`; `size="sm"` in tables        |
+| Highlight metric     | `StatCard`                            | Dashboard stat grid                                                       |
+| Floating feedback    | `Toast` via `useToast()`              | Success after POST; not for field validation                              |
+| Destructive confirm  | `useConfirm()` / `useConfirmAction()` | Replaces `window.confirm`; modal above drawer/toast (`--evg-z-modal: 60`) |
+| Inline page errors   | `ErrorBanner`                         | Top of form; persists until fixed                                         |
+| Empty list           | `EmptyState`                          | Optional CTA                                                              |
+| Loading list/page    | `LoadingState`                        | Centred spinner + message                                                 |
+| Tabular data         | `Table`                               | Horizontal scroll wrapper; wide tables on small viewports                 |
+| PEM / JSON / logs    | `CodeBlock`                           | Scrollable monospace                                                      |
+| Sync/cert/API status | `Badge` + `status-badge.ts`           | Do not hand-pick colours per page                                         |
+| Operator identity    | `OperatorSessionBar`                  | Admin shell only, not login pages                                         |
 
 Form busy state: wrap fields in `<fieldset disabled={busy}>` and set `aria-busy` on `<form>` during saves.
+
+### Confirm dialog (v1.4.3)
+
+Admin routes under `AdminLayout` wrap content in **`ConfirmProvider`** (inside `AppShell`, sibling to
+`Routes`). Use **`useConfirm()`** for yes/no gates (`Promise<boolean>`) or **`useConfirmAction()`**
+for deletes (`onConfirm` runs only after confirm).
+
+| Option            | Purpose                                                                                  |
+| ----------------- | ---------------------------------------------------------------------------------------- |
+| `tone: 'warning'` | Cert replace/rotation, full identity sync — amber `.evg-modal--warning`, primary confirm |
+| `tone: 'danger'`  | Irreversible deletes — `.evg-modal--danger`, `evg-btn--danger`                           |
+| `typeToConfirm`   | High-risk cert ops: type `REPLACE` (generate/upload) or `COMPLETE` (finish rotation)     |
+| `detail`          | React node under body — e.g. up to 5 member usernames on group/role delete               |
+| `showAuditNote`   | Renders `common.confirmAuditNote` on destructive / high-risk actions                     |
+
+On open, the provider calls **`closeMobileNav()`** from `ShellUiContext` so the mobile drawer does not
+cover the modal. Keyboard: **Esc** and backdrop → cancel; **Enter** does not submit when `tone` is
+`danger` or `typeToConfirm` is set.
+
+Flow: [admin-confirm-dialog.svg](./img/admin-confirm-dialog.svg). Optional design-review PNGs:
+`admin-confirm-dialog-desktop.png`, `admin-confirm-dialog-mobile.png` (capture from Playwright at
+1280×800 and 390×844).
+
+Vitest: **`WEB-EVG-CONF-01`–`44`** (`confirm-dialog.test.tsx`,
+`confirm-dialog-edge-extended.test.tsx`, `evergreen-styles.test.ts`, static guards
+`admin-confirm-static.test.ts`), **`WEB-ADM-CONF-01`–`28`** (IdP settings, identity delete/sync,
+`identity-delete-detail.test.ts`, `admin-confirm-pages.test.tsx`). Playwright:
+**`e2e/admin-confirm-dialog.spec.ts`** (`WEB-ADM-E2E-CONF-01`–`08`; includes native `dialog` event
+guard).
 
 ### Inline list filters vs audit filters
 
@@ -540,6 +570,9 @@ Existing **`WEB-ADM-*`** / **`WEB-AUTH-*`** must stay green.
 | `WEB-ADM-100`–`101`        | `adminApi` identity list default `limit=10` (`adminApi.test.ts`)                                                                                                                                          |
 | `WEB-ADM-102`–`104`        | `loginAdmin` rememberMe JSON body variants (`adminApi.test.ts`)                                                                                                                                           |
 | `WEB-ADM-RM-01`–`28`       | Remember username / stay signed in: storage, login page, layout redirect (`adminRememberUsername.test.ts`, `admin-login-remember.edge.test.tsx`, `AdminLayout.test.tsx`)                                  |
+| `WEB-EVG-CONF-01`–`20`     | Confirm dialog primitives, provider, static no-`window.confirm` guards (`confirm-dialog.test.tsx`, `admin-confirm-static.test.ts`)                                                                        |
+| `WEB-ADM-CONF-01`–`16`     | Page flows: IdP cert, deletes, full sync (`IdpSettingsPage.test.tsx`, `admin-confirm-pages.test.tsx`, `AdminUsersPage.test.tsx`, `identity-manual-edge.test.tsx`)                                         |
+| `WEB-ADM-E2E-CONF-01`–`05` | Playwright Evergreen confirm + native dialog guard (`e2e/admin-confirm-dialog.spec.ts`)                                                                                                                   |
 | `WEB-ADM-E2E-RM-01`–`05`   | Playwright admin login remember (`e2e/admin-login-remember.spec.ts`)                                                                                                                                      |
 | `API-ADM-AUTH-24`–`34`     | Admin login `rememberMe` cookie TTL, coercion, session payload (`admin-auth.integration.spec.ts`)                                                                                                         |
 | `API-ADM-DTO-RM-01`–`08`   | `AdminLoginBodyDto` rememberMe coercion and validation (`admin-login-body.dto.spec.ts`)                                                                                                                   |

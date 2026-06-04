@@ -64,6 +64,8 @@
 	--evg-topbar-min-height: 3.5rem;
 	--evg-z-drawer: 40;
 	--evg-z-toast: 50;
+	--evg-z-modal: 60;
+	--evg-modal-warning-border: #b45309;
 }
 
 /* v1.2.0: dark theme tokens (--evg-color-surface-0 dark, etc.) */

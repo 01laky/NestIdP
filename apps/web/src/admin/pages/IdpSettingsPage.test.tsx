@@ -1,13 +1,16 @@
-import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { renderWithUi } from '../../test/renderWithUi';
+import {
+	acceptDialogWithChallenge,
+	clickDialogCancel,
+	clickDialogConfirm,
+} from '../../test/confirm-dialog-helpers';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { IdpSettingsPublicDto } from '@nestidp/shared';
 import { IDP_SETTINGS_ROUTE_PREFIX } from '@nestidp/shared';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as adminApi from '../adminApi';
 import { IdpSettingsPage } from './IdpSettingsPage';
-
-const confirmMock = vi.fn();
 
 function baseSettings(overrides: Partial<IdpSettingsPublicDto> = {}): IdpSettingsPublicDto {
 	return {
@@ -40,15 +43,9 @@ function renderPage() {
 	);
 }
 
-beforeEach(() => {
-	confirmMock.mockReturnValue(true);
-	vi.stubGlobal('confirm', confirmMock);
-});
-
 afterEach(() => {
 	cleanup();
 	vi.restoreAllMocks();
-	confirmMock.mockReset();
 });
 
 describe('IdpSettingsPage', () => {
@@ -119,6 +116,7 @@ describe('IdpSettingsPage', () => {
 		renderPage();
 		await waitFor(() => screen.getByRole('button', { name: 'Complete rotation' }));
 		fireEvent.click(screen.getByRole('button', { name: 'Complete rotation' }));
+		await acceptDialogWithChallenge('COMPLETE', 'Complete rotation');
 
 		await waitFor(() => {
 			expect(completeSpy).toHaveBeenCalled();
@@ -141,13 +139,15 @@ describe('IdpSettingsPage', () => {
 		renderPage();
 		await waitFor(() => screen.getByRole('button', { name: 'Cancel rotation' }));
 		fireEvent.click(screen.getByRole('button', { name: 'Cancel rotation' }));
+		await screen.findByRole('dialog');
+		clickDialogConfirm('Cancel rotation');
 
 		await waitFor(() => {
 			expect(cancelSpy).toHaveBeenCalled();
 		});
 	});
 
-	it('WEB-ADM-44: generate cert button calls API', async () => {
+	it('WEB-ADM-CONF-01: generate cert dialog confirm calls API (was WEB-ADM-44)', async () => {
 		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(baseSettings());
 		const generateSpy = vi
 			.spyOn(adminApi, 'generateIdpSigningCert')
@@ -156,6 +156,7 @@ describe('IdpSettingsPage', () => {
 		renderPage();
 		await waitFor(() => screen.getByRole('button', { name: 'Generate certificate' }));
 		fireEvent.click(screen.getByRole('button', { name: 'Generate certificate' }));
+		await acceptDialogWithChallenge('REPLACE', 'Generate certificate');
 
 		await waitFor(() => {
 			expect(generateSpy).toHaveBeenCalled();
@@ -177,6 +178,7 @@ describe('IdpSettingsPage', () => {
 			target: { value: '-----BEGIN PRIVATE KEY-----\nkey\n-----END PRIVATE KEY-----' },
 		});
 		fireEvent.click(screen.getByRole('button', { name: 'Upload' }));
+		await acceptDialogWithChallenge('REPLACE', 'Upload primary certificate');
 
 		await waitFor(() => {
 			expect(uploadSpy).toHaveBeenCalledWith({
@@ -202,11 +204,10 @@ describe('IdpSettingsPage', () => {
 		});
 	});
 
-	it('WEB-ADM-47: copy metadata URL invokes clipboard or prompt fallback', async () => {
+	it('WEB-EVG-CONF-13: copy metadata URL shows toast when clipboard fails', async () => {
 		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(baseSettings());
 		const writeText = vi.fn().mockRejectedValue(new Error('denied'));
 		Object.assign(navigator, { clipboard: { writeText } });
-		const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue(null);
 
 		renderPage();
 		await waitFor(() => screen.getAllByRole('button', { name: 'Copy' }).length > 0);
@@ -214,7 +215,7 @@ describe('IdpSettingsPage', () => {
 
 		await waitFor(() => {
 			expect(writeText).toHaveBeenCalledWith('http://localhost:3000/saml/metadata');
-			expect(promptSpy).toHaveBeenCalled();
+			expect(screen.getByText(/Could not copy to clipboard/i)).toBeDefined();
 		});
 	});
 
@@ -227,6 +228,7 @@ describe('IdpSettingsPage', () => {
 		renderPage();
 		await waitFor(() => screen.getByRole('button', { name: 'Start rotation (generate)' }));
 		fireEvent.click(screen.getByRole('button', { name: 'Start rotation (generate)' }));
+		clickDialogConfirm('Start rotation (generate)');
 
 		await waitFor(() => {
 			expect(screen.getByRole('alert').textContent).toContain('Rotation already in progress');
@@ -317,6 +319,8 @@ describe('IdpSettingsPage', () => {
 		renderPage();
 		await waitFor(() => screen.getByRole('button', { name: 'Start rotation (generate)' }));
 		fireEvent.click(screen.getByRole('button', { name: 'Start rotation (generate)' }));
+		await screen.findByRole('dialog');
+		clickDialogConfirm('Start rotation (generate)');
 
 		await waitFor(() => {
 			expect(startSpy).toHaveBeenCalledWith({ mode: 'generate' });
@@ -324,6 +328,7 @@ describe('IdpSettingsPage', () => {
 		});
 
 		fireEvent.click(screen.getByRole('button', { name: 'Complete rotation' }));
+		await acceptDialogWithChallenge('COMPLETE', 'Complete rotation');
 
 		await waitFor(() => {
 			expect(completeSpy).toHaveBeenCalledTimes(1);
@@ -331,20 +336,20 @@ describe('IdpSettingsPage', () => {
 		});
 	});
 
-	it('WEB-ADM-54: generate confirm false skips API', async () => {
-		confirmMock.mockReturnValue(false);
+	it('WEB-ADM-CONF-02: generate cancel skips API (was WEB-ADM-54)', async () => {
 		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(baseSettings());
 		const generateSpy = vi.spyOn(adminApi, 'generateIdpSigningCert');
 
 		renderPage();
 		await waitFor(() => screen.getByRole('button', { name: 'Generate certificate' }));
 		fireEvent.click(screen.getByRole('button', { name: 'Generate certificate' }));
+		await screen.findByRole('dialog');
+		clickDialogCancel();
 
 		expect(generateSpy).not.toHaveBeenCalled();
 	});
 
-	it('WEB-ADM-55: upload confirm false skips API', async () => {
-		confirmMock.mockReturnValue(false);
+	it('WEB-ADM-CONF-03: upload cancel skips API (was WEB-ADM-55)', async () => {
 		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(baseSettings());
 		const uploadSpy = vi.spyOn(adminApi, 'uploadIdpSigningCert');
 
@@ -359,12 +364,13 @@ describe('IdpSettingsPage', () => {
 			target: { value: 'key-pem' },
 		});
 		fireEvent.click(screen.getByRole('button', { name: 'Upload' }));
+		await screen.findByRole('dialog');
+		clickDialogCancel();
 
 		expect(uploadSpy).not.toHaveBeenCalled();
 	});
 
-	it('WEB-ADM-56: complete rotation confirm false skips API', async () => {
-		confirmMock.mockReturnValue(false);
+	it('WEB-ADM-CONF-04: complete rotation cancel skips API (was WEB-ADM-56)', async () => {
 		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(
 			baseSettings({
 				rotation: {
@@ -380,12 +386,13 @@ describe('IdpSettingsPage', () => {
 		renderPage();
 		await waitFor(() => screen.getByRole('button', { name: 'Complete rotation' }));
 		fireEvent.click(screen.getByRole('button', { name: 'Complete rotation' }));
+		await screen.findByRole('dialog');
+		clickDialogCancel();
 
 		expect(completeSpy).not.toHaveBeenCalled();
 	});
 
-	it('WEB-ADM-57: cancel rotation confirm false skips API', async () => {
-		confirmMock.mockReturnValue(false);
+	it('WEB-ADM-CONF-05: cancel rotation dialog cancel skips API (was WEB-ADM-57)', async () => {
 		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(
 			baseSettings({
 				rotation: {
@@ -401,6 +408,8 @@ describe('IdpSettingsPage', () => {
 		renderPage();
 		await waitFor(() => screen.getByRole('button', { name: 'Cancel rotation' }));
 		fireEvent.click(screen.getByRole('button', { name: 'Cancel rotation' }));
+		await screen.findByRole('dialog');
+		clickDialogCancel();
 
 		expect(cancelSpy).not.toHaveBeenCalled();
 	});
@@ -471,14 +480,15 @@ describe('IdpSettingsPage', () => {
 		});
 	});
 
-	it('WEB-ADM-67: start rotation confirm false skips API', async () => {
-		confirmMock.mockReturnValue(false);
+	it('WEB-ADM-CONF-06: start rotation cancel skips API (was WEB-ADM-67)', async () => {
 		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(baseSettings());
 		const startSpy = vi.spyOn(adminApi, 'startIdpCertRotation');
 
 		renderPage();
 		await waitFor(() => screen.getByRole('button', { name: 'Start rotation (generate)' }));
 		fireEvent.click(screen.getByRole('button', { name: 'Start rotation (generate)' }));
+		await screen.findByRole('dialog');
+		clickDialogCancel();
 
 		expect(startSpy).not.toHaveBeenCalled();
 	});
@@ -513,5 +523,114 @@ describe('IdpSettingsPage', () => {
 			const uploadBtn = screen.getByRole('button', { name: 'Upload certificate' });
 			expect((uploadBtn as HTMLButtonElement).disabled).toBe(true);
 		});
+	});
+
+	it('WEB-ADM-CONF-13: generate cert Confirm disabled until REPLACE typed', async () => {
+		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(baseSettings());
+		const generateSpy = vi.spyOn(adminApi, 'generateIdpSigningCert');
+
+		renderPage();
+		await waitFor(() => screen.getByRole('button', { name: 'Generate certificate' }));
+		fireEvent.click(screen.getByRole('button', { name: 'Generate certificate' }));
+		const dialog = await screen.findByRole('dialog');
+		const confirmBtn = within(dialog).getByRole('button', { name: 'Generate certificate' });
+		expect(confirmBtn).toHaveProperty('disabled', true);
+		fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: 'REPLACE' } });
+		fireEvent.click(confirmBtn);
+		await waitFor(() => expect(generateSpy).toHaveBeenCalled());
+	});
+
+	it('WEB-ADM-CONF-15: generate dialog shows warning tone and audit note', async () => {
+		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(baseSettings());
+
+		renderPage();
+		await waitFor(() => screen.getByRole('button', { name: 'Generate certificate' }));
+		fireEvent.click(screen.getByRole('button', { name: 'Generate certificate' }));
+		const dialog = await screen.findByRole('dialog');
+		expect(document.querySelector('.evg-modal--warning')).not.toBeNull();
+		expect(within(dialog).getByText(/audit log/i)).toBeDefined();
+		expect(within(dialog).getByText(/Replace signing certificate/i)).toBeDefined();
+	});
+
+	it('WEB-ADM-CONF-16: generate wrong partial REPLACE keeps confirm disabled', async () => {
+		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(baseSettings());
+		const generateSpy = vi.spyOn(adminApi, 'generateIdpSigningCert');
+
+		renderPage();
+		await waitFor(() => screen.getByRole('button', { name: 'Generate certificate' }));
+		fireEvent.click(screen.getByRole('button', { name: 'Generate certificate' }));
+		const dialog = await screen.findByRole('dialog');
+		const confirmBtn = within(dialog).getByRole('button', { name: 'Generate certificate' });
+		fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: 'REPL' } });
+		fireEvent.click(confirmBtn);
+		expect(generateSpy).not.toHaveBeenCalled();
+	});
+
+	it('WEB-ADM-CONF-17: cancel rotation confirm calls API', async () => {
+		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(
+			baseSettings({
+				rotation: {
+					active: true,
+					startedAt: '2026-01-15T00:00:00.000Z',
+					hasPendingCertificate: true,
+					pendingCertFingerprintSha256: 'dd:ee:ff',
+				},
+			}),
+		);
+		const cancelSpy = vi.spyOn(adminApi, 'cancelIdpCertRotation').mockResolvedValue(baseSettings());
+
+		renderPage();
+		await waitFor(() => screen.getByRole('button', { name: 'Cancel rotation' }));
+		fireEvent.click(screen.getByRole('button', { name: 'Cancel rotation' }));
+		await screen.findByRole('dialog');
+		clickDialogConfirm('Cancel rotation');
+
+		await waitFor(() => expect(cancelSpy).toHaveBeenCalled());
+	});
+
+	it('WEB-ADM-CONF-18: start rotation confirm calls API after dialog', async () => {
+		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(baseSettings());
+		const startSpy = vi.spyOn(adminApi, 'startIdpCertRotation').mockResolvedValue(
+			baseSettings({
+				rotation: {
+					active: true,
+					startedAt: '2026-01-15T00:00:00.000Z',
+					hasPendingCertificate: true,
+					pendingCertFingerprintSha256: 'dd:ee:ff',
+				},
+			}),
+		);
+
+		renderPage();
+		await waitFor(() => screen.getByRole('button', { name: 'Start rotation (generate)' }));
+		fireEvent.click(screen.getByRole('button', { name: 'Start rotation (generate)' }));
+		await screen.findByRole('dialog');
+		clickDialogConfirm('Start rotation (generate)');
+
+		await waitFor(() => expect(startSpy).toHaveBeenCalledWith({ mode: 'generate' }));
+	});
+
+	it('WEB-ADM-CONF-14: complete rotation Confirm disabled until COMPLETE typed', async () => {
+		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(
+			baseSettings({
+				rotation: {
+					active: true,
+					startedAt: '2026-01-15T00:00:00.000Z',
+					hasPendingCertificate: true,
+					pendingCertFingerprintSha256: 'dd:ee:ff',
+				},
+			}),
+		);
+		const completeSpy = vi.spyOn(adminApi, 'completeIdpCertRotation');
+
+		renderPage();
+		await waitFor(() => screen.getByRole('button', { name: 'Complete rotation' }));
+		fireEvent.click(screen.getByRole('button', { name: 'Complete rotation' }));
+		const dialog = await screen.findByRole('dialog');
+		const confirmBtn = within(dialog).getByRole('button', { name: 'Complete rotation' });
+		expect(confirmBtn).toHaveProperty('disabled', true);
+		fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: 'COMPLETE' } });
+		fireEvent.click(confirmBtn);
+		await waitFor(() => expect(completeSpy).toHaveBeenCalled());
 	});
 });

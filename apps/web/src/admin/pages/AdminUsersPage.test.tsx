@@ -2,11 +2,11 @@ import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import { renderWithUi } from '../../test/renderWithUi';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { ADMIN_USERS_ROUTE_PREFIX } from '@nestidp/shared';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as adminApi from '../adminApi';
 import { AdminUsersPage } from './AdminUsersPage';
 
-const confirmMock = vi.fn();
+import { clickDialogCancel, clickDialogConfirm } from '../../test/confirm-dialog-helpers';
 
 function renderPage() {
 	return renderWithUi(
@@ -18,15 +18,9 @@ function renderPage() {
 	);
 }
 
-beforeEach(() => {
-	confirmMock.mockReturnValue(true);
-	vi.stubGlobal('confirm', confirmMock);
-});
-
 afterEach(() => {
 	cleanup();
 	vi.restoreAllMocks();
-	confirmMock.mockReset();
 });
 
 describe('AdminUsersPage', () => {
@@ -168,10 +162,41 @@ describe('AdminUsersPage', () => {
 		await waitFor(() => screen.getByText('ops'));
 
 		fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+		await screen.findByRole('dialog');
+		clickDialogConfirm('Delete');
 
 		await waitFor(() => {
 			expect(deleteSpy).toHaveBeenCalledWith('a2');
 		});
+	});
+
+	it('WEB-ADM-CONF-10: delete admin cancel skips deleteAdminUser', async () => {
+		vi.spyOn(adminApi, 'listAdminUsers').mockResolvedValue([
+			{
+				id: 'a1',
+				username: 'admin',
+				createdAt: '2026-01-01T00:00:00.000Z',
+				updatedAt: '2026-01-01T00:00:00.000Z',
+			},
+			{
+				id: 'a2',
+				username: 'ops',
+				createdAt: '2026-01-02T00:00:00.000Z',
+				updatedAt: '2026-01-02T00:00:00.000Z',
+			},
+		]);
+		vi.spyOn(adminApi, 'getAdminMe').mockResolvedValue({
+			admin: { id: 'a1', username: 'admin' },
+			csrfToken: 'csrf',
+		});
+		const deleteSpy = vi.spyOn(adminApi, 'deleteAdminUser');
+
+		renderPage();
+		await waitFor(() => screen.getByText('ops'));
+		fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+		await screen.findByRole('dialog');
+		clickDialogCancel();
+		expect(deleteSpy).not.toHaveBeenCalled();
 	});
 
 	it('WEB-ADM-75: cannot delete self shows em dash in actions', async () => {

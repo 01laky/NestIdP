@@ -15,13 +15,14 @@ import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
 import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
-import { Button, Panel, Table, TextInput, useToast } from '../../ui';
+import { Button, Panel, Table, TextInput, useConfirmAction, useToast } from '../../ui';
 
 export function AdminUsersPage() {
 	const { t } = useTranslation('adminUsers');
 	const { t: tNav } = useTranslation('nav');
 	const { t: tCommon } = useTranslation('common');
 	const { t: tErrors } = useTranslation('errors');
+	const confirmAction = useConfirmAction();
 	useAdminDocumentTitle(t('title'));
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
@@ -165,11 +166,19 @@ export function AdminUsersPage() {
 													size="sm"
 													variant="danger"
 													onClick={() => {
-														if (
-															window.confirm(t('confirmDeleteAdmin', { username: admin.username }))
-														) {
-															void deleteAdminUser(admin.id).then(() => reload());
-														}
+														void confirmAction({
+															title: t('confirmDeleteAdminTitle'),
+															description: t('confirmDeleteAdmin', {
+																username: admin.username,
+															}),
+															tone: 'danger',
+															showAuditNote: true,
+															confirmLabel: tCommon('delete'),
+															onConfirm: async () => {
+																await deleteAdminUser(admin.id);
+																await reload();
+															},
+														});
 													}}
 												>
 													{tCommon('delete')}

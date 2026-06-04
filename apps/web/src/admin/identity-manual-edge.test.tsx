@@ -335,8 +335,7 @@ describe('Identity manual CRUD — web edge', () => {
 		await waitFor(() => expect(screen.getByText(/controlled by identity sync/)).toBeDefined());
 	});
 
-	it('WEB-IDN-MAN-13: delete user skipped when confirm cancelled', async () => {
-		const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+	it('WEB-ADM-CONF-07: delete user skipped when dialog cancelled (was WEB-IDN-MAN-13)', async () => {
 		const deleteSpy = vi.spyOn(adminApi, 'deleteIdentityUser');
 		vi.spyOn(adminApi, 'getIdentityUser').mockResolvedValue({
 			user: manualUserStub,
@@ -358,12 +357,13 @@ describe('Identity manual CRUD — web edge', () => {
 		);
 		await waitFor(() => screen.getByRole('button', { name: 'Delete' }));
 		fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
-		expect(confirmSpy).toHaveBeenCalled();
+		const { clickDialogCancel } = await import('../test/confirm-dialog-helpers');
+		await screen.findByRole('dialog');
+		clickDialogCancel();
 		expect(deleteSpy).not.toHaveBeenCalled();
 	});
 
-	it('WEB-IDN-MAN-14: delete user calls API when confirm accepted', async () => {
-		vi.spyOn(window, 'confirm').mockReturnValue(true);
+	it('WEB-ADM-CONF-07b: delete user calls API when dialog confirmed (was WEB-IDN-MAN-14)', async () => {
 		const deleteSpy = vi.spyOn(adminApi, 'deleteIdentityUser').mockResolvedValue(undefined);
 		vi.spyOn(adminApi, 'getIdentityUser').mockResolvedValue({
 			user: manualUserStub,
@@ -385,6 +385,9 @@ describe('Identity manual CRUD — web edge', () => {
 		);
 		await waitFor(() => screen.getByRole('button', { name: 'Delete' }));
 		fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+		const { clickDialogConfirm } = await import('../test/confirm-dialog-helpers');
+		await screen.findByRole('dialog');
+		clickDialogConfirm('Delete');
 		await waitFor(() => expect(deleteSpy).toHaveBeenCalledWith('u-man'));
 	});
 

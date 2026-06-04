@@ -177,6 +177,9 @@ describe('Evergreen toast integration — mutation flows', () => {
 
 		await waitFor(() => screen.getByRole('button', { name: /Run full sync/i }));
 		fireEvent.click(screen.getByRole('button', { name: /Run full sync/i }));
+		const { clickDialogConfirm } = await import('../test/confirm-dialog-helpers');
+		await screen.findByRole('dialog');
+		clickDialogConfirm('Run full sync');
 
 		await waitFor(() => {
 			expect(toastMessages().some((t) => t.includes('Sync finished'))).toBe(true);

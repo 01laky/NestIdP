@@ -39,6 +39,22 @@ describe('Evergreen styles', () => {
 		expect(css).toMatch(/\.evg-textarea:focus-visible/);
 	});
 
+	it('WEB-EVG-CONF-43: tokens.css defines --evg-z-modal above toast and drawer', () => {
+		const tokens = readFileSync(join(evergreenDir, 'tokens.css'), 'utf8');
+		expect(tokens).toContain('--evg-z-modal: 60');
+		expect(tokens).toContain('--evg-z-toast: 50');
+		expect(tokens).toContain('--evg-z-drawer: 40');
+	});
+
+	it('WEB-EVG-CONF-44: components.css defines evg-modal BEM and mobile stacked footer', () => {
+		const css = readFileSync(join(evergreenDir, 'components.css'), 'utf8');
+		expect(css).toContain('.evg-modal');
+		expect(css).toContain('.evg-modal__backdrop');
+		expect(css).toContain('.evg-modal--warning');
+		expect(css).toContain('.evg-modal--danger');
+		expect(css).toMatch(/column-reverse/);
+	});
+
 	it('WEB-EVG-60: tokens.css does not ship dark theme (deferred v1.2)', () => {
 		const tokens = readFileSync(join(evergreenDir, 'tokens.css'), 'utf8');
 		expect(tokens).not.toMatch(/prefers-color-scheme:\s*dark/);

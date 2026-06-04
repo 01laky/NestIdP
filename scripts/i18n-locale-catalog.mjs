@@ -45,6 +45,13 @@ const en = {
 	common: {
 		apply: 'Apply',
 		cancel: 'Cancel',
+		confirm: 'Confirm',
+		confirmTitle: 'Confirm action',
+		confirmAuditNote: 'This action is recorded in the audit log.',
+		typeToConfirmLabel: 'Type {{challenge}} to confirm',
+		typeToConfirmMismatch: 'Text does not match.',
+		dismissDialog: 'Dismiss dialog',
+		copyFailed: 'Could not copy to clipboard. Select the text and copy manually.',
 		save: 'Save',
 		delete: 'Delete',
 		back: 'Back',
@@ -223,6 +230,7 @@ const en = {
 		syncLink: 'Sync',
 		toastSaved: 'Connection saved',
 		confirmDelete: 'Delete this API connection?',
+		confirmDeleteTitle: 'Delete API connection?',
 		loadFailed: 'Failed to load connection',
 		loadListFailed: 'Failed to load connections',
 		saveFailed: 'Save failed',
@@ -265,6 +273,7 @@ const en = {
 		jsonAdvanced: 'JSON (advanced)',
 		jsonHint: 'Optional custom mapping object; invalid JSON is ignored until fixed.',
 		toastSaved: 'SP connection saved',
+		confirmDeactivateDeleteTitle: 'Deactivate and delete SP?',
 		confirmDeactivateDelete: 'Deactivate SP first, then delete?',
 		loadFailed: 'Failed to load SP',
 		loadListFailed: 'Failed to load SP connections',
@@ -326,6 +335,13 @@ const en = {
 		certStatusMissing: 'No signing certificate',
 		certStatusExpiresSoon: 'Expires soon',
 		certStatusOk: 'Certificate OK',
+		confirmGeneratePrimaryTitle: 'Replace signing certificate?',
+		confirmUploadPrimaryTitle: 'Upload new signing certificate?',
+		confirmStartRotationTitle: 'Start certificate rotation?',
+		confirmCompleteRotationTitle: 'Complete certificate rotation?',
+		confirmCancelRotationTitle: 'Cancel certificate rotation?',
+		typeReplaceToConfirm: 'Type REPLACE to confirm',
+		typeCompleteToConfirm: 'Type COMPLETE to confirm',
 		confirmGeneratePrimary:
 			'Generate a new primary certificate? This replaces the existing primary immediately.',
 		confirmUploadPrimary:
@@ -416,6 +432,11 @@ const en = {
 			'To remove users from this synced group, edit each manual user’s group memberships. Synced users’ memberships are controlled by identity sync.',
 		syncedRoleCallout:
 			'To remove users from this synced role, edit each manual user’s role memberships. Synced users’ memberships are controlled by identity sync.',
+		confirmDeleteUserTitle: 'Delete manual user?',
+		confirmDeleteGroupTitle: 'Delete group?',
+		confirmDeleteRoleTitle: 'Delete role?',
+		confirmDeleteMembersPreview: '{{count}} members',
+		andNMoreMembers: '…and {{count}} more',
 		confirmDeleteUser: 'Delete manual user "{{name}}"?',
 		confirmDeleteGroup: 'Delete group "{{name}}"?',
 		confirmDeleteGroupWithMembers:
@@ -469,6 +490,7 @@ const en = {
 		changePasswordHint:
 			'Uses a separate endpoint; other admins can reset your password via PATCH without knowing your current password.',
 		updateMyPassword: 'Update my password',
+		confirmDeleteAdminTitle: 'Delete admin account?',
 		confirmDeleteAdmin: 'Delete admin "{{username}}"?',
 		toastAdminCreated: 'Admin account created',
 		toastPasswordChanged: 'Password changed',
@@ -483,6 +505,9 @@ const en = {
 		dryRunLabel: 'Dry run (no DB writes)',
 		runDrySync: 'Run dry sync',
 		runFullSync: 'Run full sync',
+		confirmFullSyncTitle: 'Run full sync?',
+		confirmFullSync:
+			'Run full sync? This overwrites local users, groups, and roles from the API.',
 		recentLogs: 'Recent logs',
 		noSyncLogs: 'No sync logs yet.',
 		syncFinished: 'Sync finished ({{id}})',

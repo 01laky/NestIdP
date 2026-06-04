@@ -17,7 +17,16 @@ import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
 import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
-import { Button, Checkbox, Panel, Select, TextArea, TextInput, useToast } from '../../ui';
+import {
+	Button,
+	Checkbox,
+	Panel,
+	Select,
+	TextArea,
+	TextInput,
+	useConfirmAction,
+	useToast,
+} from '../../ui';
 
 export function SpConnectionFormPage() {
 	const { id } = useParams();
@@ -26,6 +35,7 @@ export function SpConnectionFormPage() {
 	const { t } = useTranslation('spConnections');
 	const { t: tNav } = useTranslation('nav');
 	const { t: tCommon } = useTranslation('common');
+	const confirmAction = useConfirmAction();
 	useAdminDocumentTitle(isNew ? t('formNew') : t('formEdit'));
 	const [loading, setLoading] = useState(!isNew);
 	const [error, setError] = useState<string | null>(null);
@@ -122,27 +132,33 @@ export function SpConnectionFormPage() {
 		if (!id) {
 			return;
 		}
-		if (!window.confirm(t('confirmDeactivateDelete'))) {
-			return;
-		}
-		try {
-			if (active) {
-				await updateSpConnection(id, { active: false });
-			}
-			await deleteSpConnection(id);
-			navigate(SP_CONNECTION_ROUTE_PREFIX);
-		} catch (err) {
-			setError(
-				err instanceof AdminApiError
-					? formatAdminApiError(
-							err.statusCode,
-							err.message,
-							resolveI18nKey,
-							'spConnections.deleteFailed',
-						)
-					: t('deleteFailed'),
-			);
-		}
+		await confirmAction({
+			title: t('confirmDeactivateDeleteTitle'),
+			description: t('confirmDeactivateDelete'),
+			tone: 'danger',
+			showAuditNote: true,
+			confirmLabel: tCommon('delete'),
+			onConfirm: async () => {
+				try {
+					if (active) {
+						await updateSpConnection(id, { active: false });
+					}
+					await deleteSpConnection(id);
+					navigate(SP_CONNECTION_ROUTE_PREFIX);
+				} catch (err) {
+					setError(
+						err instanceof AdminApiError
+							? formatAdminApiError(
+									err.statusCode,
+									err.message,
+									resolveI18nKey,
+									'spConnections.deleteFailed',
+								)
+							: t('deleteFailed'),
+					);
+				}
+			},
+		});
 	}
 
 	async function handleTestAcs() {
