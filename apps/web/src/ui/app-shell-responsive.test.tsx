@@ -140,7 +140,7 @@ describe('Responsive app shell (WEB-RSP)', () => {
 		const sidebar = screen.getByTestId('evg-sidebar');
 		fireEvent.click(screen.getByRole('button', { name: /menu/i }));
 		expect(sidebar.className).toContain('evg-sidebar--open');
-		fireEvent.click(screen.getByRole('link', { name: 'Audit log' }));
+		fireEvent.click(screen.getByRole('link', { name: 'SP connections' }));
 		expect(sidebar.className).not.toContain('evg-sidebar--open');
 	});
 

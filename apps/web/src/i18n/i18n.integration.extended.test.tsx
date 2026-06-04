@@ -29,14 +29,14 @@ afterEach(() => {
 });
 
 describe('i18n integration — extended (WEB-I18N-99–115)', () => {
-	it('WEB-I18N-99: SidebarNav German API-Verbindungen', async () => {
+	it('WEB-I18N-99: SidebarNav German SP-Verbindungen', async () => {
 		await initI18n('de');
 		renderWithUi(
 			<MemoryRouter>
 				<SidebarNav operatorUsername="op" onLogout={() => undefined} />
 			</MemoryRouter>,
 		);
-		expect(screen.getByRole('link', { name: 'API-Verbindungen' })).toBeDefined();
+		expect(screen.getByRole('link', { name: 'SP-Verbindungen' })).toBeDefined();
 	});
 
 	it('WEB-I18N-100: LanguageSelect exposes eleven options', async () => {

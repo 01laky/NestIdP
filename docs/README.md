@@ -1,30 +1,49 @@
 # NestIdP documentation
 
-Product and developer documentation. Diagram sources live in [`img/`](./img/) (Mermaid `.mmd` + committed `.svg`).
+Product and developer documentation. Visual assets live in [`img/`](./img/) (UI `.png` screenshots + Mermaid `.mmd` / `.svg` diagrams).
 
-**Current release:** v1.0.0 (Phase 1 MVP complete)
+**Current release:** v1.4.5
 
-## Core
+## Start here
 
-| Document                                   | Description                                                        |
-| ------------------------------------------ | ------------------------------------------------------------------ |
-| [proposal.MD](./proposal.MD)               | Product scope, architecture, data model, roadmap (source of truth) |
-| [development.md](./development.md)         | Local setup, routing, REST reference, testing                      |
-| [database.md](./database.md)               | SQLite vs PostgreSQL, migrations, portable schema                  |
-| [integration-api.md](./integration-api.md) | External identity API v1 contract (bcrypt, endpoints)              |
-| [deployment.md](./deployment.md)           | Docker Compose, migrations, backup/restore                         |
-| [RELEASE.md](./RELEASE.md)                 | Production go-live checklist                                       |
+| Document                                   | Description                                                                      |
+| ------------------------------------------ | -------------------------------------------------------------------------------- |
+| [tutorial.md](./tutorial.md)               | **Operator walkthrough** — admin UI with screenshots (IdP, sync, SP, SAML login) |
+| [proposal.MD](./proposal.MD)               | Product scope, architecture, data model, roadmap (source of truth)               |
+| [development.md](./development.md)         | Local setup, routing, REST reference, testing, UI registries                     |
+| [integration-api.md](./integration-api.md) | External identity API v1 contract (bcrypt, endpoints)                            |
+| [database.md](./database.md)               | SQLite vs PostgreSQL, migrations, bootstrap admin                                |
+| [deployment.md](./deployment.md)           | Docker Compose, migrations, backup/restore                                       |
+| [RELEASE.md](./RELEASE.md)                 | Production go-live checklist                                                     |
 
-## Diagrams
+## Screenshots
 
-See [img/README.md](./img/README.md) for the full index. Key figures:
+All UI captures: [img/screenshots.md](./img/screenshots.md) · Guided tour: [tutorial.md](./tutorial.md)
 
-![Architecture overview](./img/architecture.svg)
+## Key diagrams
 
-![API connection vs SP connection](./img/connection-types.svg)
+| Topic                    | Diagram                                               |
+| ------------------------ | ----------------------------------------------------- |
+| Monolith layout          | ![Architecture](./img/architecture.svg)               |
+| API vs SP connections    | ![Connection types](./img/connection-types.svg)       |
+| SP-initiated SSO         | ![SSO flow](./img/sso-flow.svg)                       |
+| Sync contract (v1)       | ![Sync flow](./img/sync-flow.svg)                     |
+| Data model               | ![Schema](./img/schema-entities.svg)                  |
+| Confirm dialog UX        | ![Confirm dialog](./img/admin-confirm-dialog.svg)     |
+| Identity list pagination | ![Identity lists](./img/identity-list-pagination.svg) |
 
-![SP-initiated SSO flow](./img/sso-flow.svg)
+Full diagram index and regenerate commands: [img/README.md](./img/README.md)
 
-![Data model (ER diagram)](./img/schema-entities.svg)
+```bash
+pnpm diagrams:build   # .mmd → .svg
+pnpm diagrams:check   # verify SVGs match sources
+```
 
-Regenerate: `pnpm diagrams:build` · verify: `pnpm diagrams:check`
+## Examples
+
+| File                                                                                 | Purpose                                       |
+| ------------------------------------------------------------------------------------ | --------------------------------------------- |
+| [examples/mock-identity-api.mjs](./examples/mock-identity-api.mjs)                   | Standalone mock identity API (legacy script)  |
+| [examples/saml-sp-initiated-redirect.mjs](./examples/saml-sp-initiated-redirect.mjs) | Build AuthnRequest URL for manual SSO testing |
+
+Prefer **`mock-app/`** at repo root for the maintained mock server used in Docker dev (`pnpm start` on port 4010).

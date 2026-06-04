@@ -13,6 +13,11 @@ import { Button } from './Button';
 import { IconSprig } from './icons';
 import { LanguageSelect } from './LanguageSelect';
 
+/** Sidebar API connections link — hidden while operators use bootstrap/local directory only. */
+export const SHOW_API_CONNECTIONS_NAV = false;
+/** Sidebar audit link — hidden until we expose the full audit UX to operators. */
+export const SHOW_AUDIT_LOG_NAV = false;
+
 export function SidebarNav({
 	operatorUsername,
 	onLogout,
@@ -40,13 +45,15 @@ export function SidebarNav({
 				>
 					{t('dashboard')}
 				</NavLink>
-				<NavLink
-					to={API_CONNECTION_ROUTE_PREFIX}
-					className={({ isActive }) => `evg-nav__link${isActive ? ' evg-nav__link--active' : ''}`}
-					onClick={onNavigate}
-				>
-					{t('apiConnections')}
-				</NavLink>
+				{SHOW_API_CONNECTIONS_NAV ? (
+					<NavLink
+						to={API_CONNECTION_ROUTE_PREFIX}
+						className={({ isActive }) => `evg-nav__link${isActive ? ' evg-nav__link--active' : ''}`}
+						onClick={onNavigate}
+					>
+						{t('apiConnections')}
+					</NavLink>
+				) : null}
 				<NavLink
 					to={SP_CONNECTION_ROUTE_PREFIX}
 					className={({ isActive }) => `evg-nav__link${isActive ? ' evg-nav__link--active' : ''}`}
@@ -89,13 +96,15 @@ export function SidebarNav({
 				>
 					{t('adminAccounts')}
 				</NavLink>
-				<NavLink
-					to={AUDIT_ROUTE_PREFIX}
-					className={({ isActive }) => `evg-nav__link${isActive ? ' evg-nav__link--active' : ''}`}
-					onClick={onNavigate}
-				>
-					{t('auditLog')}
-				</NavLink>
+				{SHOW_AUDIT_LOG_NAV ? (
+					<NavLink
+						to={AUDIT_ROUTE_PREFIX}
+						className={({ isActive }) => `evg-nav__link${isActive ? ' evg-nav__link--active' : ''}`}
+						onClick={onNavigate}
+					>
+						{t('auditLog')}
+					</NavLink>
+				) : null}
 				<NavLink to="/login" className="evg-nav__link" onClick={onNavigate}>
 					{t('samlLogin')}
 				</NavLink>

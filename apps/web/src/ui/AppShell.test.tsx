@@ -1,11 +1,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-	AUDIT_ROUTE_PREFIX,
-	API_CONNECTION_ROUTE_PREFIX,
-	SP_CONNECTION_ROUTE_PREFIX,
-} from '@nestidp/shared';
+import { SP_CONNECTION_ROUTE_PREFIX } from '@nestidp/shared';
 import { AppShell } from './AppShell';
 
 afterEach(() => {
@@ -100,7 +96,7 @@ describe('AppShell', () => {
 		expect(links.some((l) => l.getAttribute('href')?.includes('#change-password'))).toBe(true);
 	});
 
-	it('WEB-EVG-09: sidebar contains nav link hrefs for API, SP, and audit', () => {
+	it('WEB-EVG-09: sidebar contains SP connections nav link', () => {
 		render(
 			<MemoryRouter>
 				<AppShell operatorUsername="admin" onLogout={vi.fn()}>
@@ -109,14 +105,10 @@ describe('AppShell', () => {
 			</MemoryRouter>,
 		);
 
-		expect(screen.getByRole('link', { name: 'API connections' }).getAttribute('href')).toBe(
-			API_CONNECTION_ROUTE_PREFIX,
-		);
+		expect(screen.queryByRole('link', { name: 'API connections' })).toBeNull();
 		expect(screen.getByRole('link', { name: 'SP connections' }).getAttribute('href')).toBe(
 			SP_CONNECTION_ROUTE_PREFIX,
 		);
-		expect(screen.getByRole('link', { name: 'Audit log' }).getAttribute('href')).toBe(
-			AUDIT_ROUTE_PREFIX,
-		);
+		expect(screen.queryByRole('link', { name: 'Audit log' })).toBeNull();
 	});
 });

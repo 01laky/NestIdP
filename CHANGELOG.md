@@ -4,6 +4,21 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.4.5]
+
+### Added
+
+- Operator [tutorial.md](docs/tutorial.md) with renamed UI screenshots under `docs/img/*.png`
+  (admin, IdP settings, API sync, identity lists, SP connections, SAML login).
+- Root README product tour (eight presentation snapshots) and [docs/img/screenshots.md](docs/img/screenshots.md) index.
+
+### Changed
+
+- Root [README.md](README.md) reworked as a landing-style overview (hero, features, diagrams, product tour,
+  quick start, doc links) while keeping the eight UI snapshots.
+- [docs/README.md](docs/README.md) and [docs/img/README.md](docs/img/README.md) updated: release v1.4.5,
+  full diagram index including `admin-confirm-dialog` and `identity-list-pagination`.
+
 ## [1.4.4]
 
 ### Fixed

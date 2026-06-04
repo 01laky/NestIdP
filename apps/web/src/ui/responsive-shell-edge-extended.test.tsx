@@ -155,7 +155,7 @@ describe('Responsive shell — extended component (WEB-RSP-40–69)', () => {
 		expect(screen.getByText('Operator console')).toBeDefined();
 	});
 
-	it('WEB-RSP-47: SidebarNav API connections link closes drawer via onNavigate', () => {
+	it('WEB-RSP-47: SidebarNav SP connections link closes drawer via onNavigate', () => {
 		render(
 			<MemoryRouter>
 				<AppShell operatorUsername="admin" onLogout={vi.fn()}>
@@ -165,7 +165,7 @@ describe('Responsive shell — extended component (WEB-RSP-40–69)', () => {
 		);
 		const sidebar = screen.getByTestId('evg-sidebar');
 		fireEvent.click(screen.getByRole('button', { name: /menu/i }));
-		fireEvent.click(screen.getByRole('link', { name: 'API connections' }));
+		fireEvent.click(screen.getByRole('link', { name: 'SP connections' }));
 		expect(sidebar.className).not.toContain('evg-sidebar--open');
 	});
 
