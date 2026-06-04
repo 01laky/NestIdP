@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.3.12]
+
+### Changed
+
+- **Dev hot reload**: root `pnpm dev` runs `@nestidp/shared` `tsc -w` alongside API and web so
+  shared/API changes rebuild without manual steps; API dev uses `run-dev.mjs` with TypeScript
+  polling watchers when `CHOKIDAR_USEPOLLING` / Docker dev is active.
+
 ## [1.3.11]
 
 ### Fixed

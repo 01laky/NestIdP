@@ -15,6 +15,9 @@ pnpm --filter @nestidp/shared exec tsc -w -p tsconfig.json &
 export NODE_ENV=development
 export CHOKIDAR_USEPOLLING="${CHOKIDAR_USEPOLLING:-true}"
 export WATCHPACK_POLLING="${WATCHPACK_POLLING:-true}"
+export FORCE_TSC_POLLING="${FORCE_TSC_POLLING:-true}"
+export TSC_WATCHFILE="${TSC_WATCHFILE:-UseFsEventsWithFallbackDynamicPolling}"
+export TSC_WATCHDIRECTORY="${TSC_WATCHDIRECTORY:-UseFsEventsWithFallbackDynamicPolling}"
 export VITE_API_PROXY_TARGET="${VITE_API_PROXY_TARGET:-http://127.0.0.1:3000}"
 
 echo "NestIdP [dev]: API http://localhost:3000 — Web (HMR) http://localhost:5173"
