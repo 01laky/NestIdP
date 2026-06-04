@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.3.13]
+
+### Fixed
+
+- **`docker-compose.dev.yml`**: replaced tab indentation with spaces so `pnpm dev:docker` /
+  `dev:docker:down` parse under Docker Compose (same class of error as CI workflow YAML).
+
 ## [1.3.12]
 
 ### Changed
