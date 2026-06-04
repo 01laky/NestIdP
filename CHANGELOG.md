@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.3.16]
+
+### Changed
+
+- **Docker dev** (`docker-compose.dev.yml`): `extra_hosts: localhost:host-gateway` on
+  `nestidp-dev` so API connections and sync can use **`http://localhost:4010`** for a mock
+  identity API running on the host (no `host.docker.internal` required).
+
 ## [1.3.15]
 
 ### Fixed

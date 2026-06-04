@@ -4,6 +4,9 @@
 #
 # Open http://localhost:5173 for the admin SPA (proxies /api and /saml to the API).
 # API alone: http://localhost:3000
+#
+# localhost inside nestidp-dev resolves to the host (see extra_hosts) so a mock API on
+# the host at http://localhost:4010 is reachable with that same URL from sync/tests.
 
 services:
   # Disable production image when using --profile dev (see pnpm dev:docker).
@@ -38,6 +41,8 @@ services:
       - dev_api_node_modules:/app/apps/api/node_modules
       - dev_web_node_modules:/app/apps/web/node_modules
       - dev_shared_node_modules:/app/packages/shared/node_modules
+    extra_hosts:
+      - localhost:host-gateway
     depends_on:
       postgres:
         condition: service_healthy
