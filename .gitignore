@@ -4,6 +4,9 @@
 # Local prompts — not shared via git
 prompts/
 
+# Local mock identity API for manual sync testing — remove when done
+mock-app/
+
 # Dependencies and build output
 node_modules/
 dist/

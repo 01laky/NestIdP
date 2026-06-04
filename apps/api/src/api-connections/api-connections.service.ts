@@ -52,7 +52,9 @@ export class ApiConnectionsService {
 	}
 
 	async create(body: CreateApiConnectionRequestDto): Promise<ApiConnectionResponseDto> {
-		const count = await this.prisma.apiConnection.count();
+		const count = await this.prisma.apiConnection.count({
+			where: { isLocalDirectory: false },
+		});
 		if (count >= 1) {
 			throw new ConflictException('Only one API connection is supported in v1');
 		}

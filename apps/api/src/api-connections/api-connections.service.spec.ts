@@ -98,7 +98,8 @@ describe('ApiConnectionsService', () => {
 	});
 
 	it('API-CON-04: create rejects http baseUrl when NODE_ENV production', async () => {
-		(configService.get as jest.Mock).mockImplementation((key: string) =>
+		const getMock = configService.get as jest.Mock;
+		getMock.mockImplementation((key: string) =>
 			key === 'NODE_ENV' ? 'production' : undefined,
 		);
 
@@ -109,9 +110,11 @@ describe('ApiConnectionsService', () => {
 				bearerToken: 't',
 			}),
 		).rejects.toThrow(BadRequestException);
+
+		getMock.mockImplementation((key: string) => (key === 'NODE_ENV' ? 'test' : undefined));
 	});
 
-	it('API-CON-05: create second connection → ConflictException', async () => {
+	it('API-CON-05: create second external connection → ConflictException', async () => {
 		prisma.apiConnection.count.mockResolvedValue(1);
 
 		await expect(
@@ -121,6 +124,25 @@ describe('ApiConnectionsService', () => {
 				bearerToken: 't',
 			}),
 		).rejects.toThrow(ConflictException);
+
+		expect(prisma.apiConnection.count).toHaveBeenCalledWith({
+			where: { isLocalDirectory: false },
+		});
+	});
+
+	it('API-CON-05b: create allowed when only local directory row exists', async () => {
+		prisma.apiConnection.count.mockResolvedValue(0);
+		prisma.apiConnection.create.mockResolvedValue(sampleRow);
+
+		await service.create({
+			name: 'Mock API',
+			baseUrl: 'http://localhost:4010',
+			bearerToken: 'mock-sync-dev-token',
+		});
+
+		expect(prisma.apiConnection.count).toHaveBeenCalledWith({
+			where: { isLocalDirectory: false },
+		});
 	});
 
 	it('API-CON-06: update changes name only; token unchanged', async () => {

@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.3.11]
+
+### Fixed
+
+- **API connections create**: v1 limit now counts only external connections (`isLocalDirectory:
+  false`), not the hidden bootstrap **Local directory** row — operators could see an empty list yet
+  get "Only one API connection is supported in v1" on first create.
+
 ## [1.3.10]
 
 ### Fixed
