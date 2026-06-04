@@ -4,6 +4,15 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.3.14]
+
+### Fixed
+
+- **`Dockerfile.dev`**: run `pnpm install --ignore-scripts` before copying full source so root
+  postinstall does not fail with missing `packages/shared/tsconfig.json` during image build.
+- **`.dockerignore`**: exclude `node_modules`, `mock-app`, and build artifacts so dev image
+  builds stay fast and context stays small.
+
 ## [1.3.13]
 
 ### Fixed
