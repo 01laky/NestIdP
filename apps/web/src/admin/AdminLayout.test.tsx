@@ -159,7 +159,7 @@ describe('AdminLayout', () => {
 		});
 	});
 
-	it('WEB-ADM-21: sidebar links to API and SP sections', async () => {
+	it('WEB-ADM-21: sidebar links to SP section when API nav hidden', async () => {
 		vi.spyOn(adminApi, 'getAdminMe').mockResolvedValue({
 			admin: { id: '1', username: 'admin' },
 			csrfToken: 'test-csrf-token',
@@ -169,9 +169,8 @@ describe('AdminLayout', () => {
 		renderAdminAt('/admin');
 
 		await waitFor(() => {
-			expect(screen.getByRole('link', { name: 'API connections' }).getAttribute('href')).toBe(
-				API_CONNECTION_ROUTE_PREFIX,
-			);
+			expect(screen.queryByRole('link', { name: 'API connections' })).toBeNull();
+			expect(screen.queryByRole('link', { name: 'Audit log' })).toBeNull();
 			expect(screen.getByRole('link', { name: 'SP connections' }).getAttribute('href')).toBe(
 				SP_CONNECTION_ROUTE_PREFIX,
 			);

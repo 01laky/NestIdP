@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.4.6]
+
+### Fixed
+
+- `WEB-ADM-21` in `AdminLayout.test.tsx` matches sidebar nav flags: API connections and audit log
+  links are not rendered when `SHOW_API_CONNECTIONS_NAV` / `SHOW_AUDIT_LOG_NAV` are false; SP
+  connections link assertion retained so CI `pnpm test` passes after the temporary nav hide.
+
 ## [1.4.5]
 
 ### Added
