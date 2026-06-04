@@ -2,6 +2,20 @@
 set -eu
 cd /app
 
+# node_modules live in named volumes (docker-compose.dev.yml), not on the bind mount.
+# Rebuild/restart alone does not refresh them when pnpm-lock.yaml changes — install here.
+LOCK_HASH_FILE=/app/node_modules/.pnpm-lock-hash
+CURRENT_HASH=$(node -e "const fs=require('fs');const c=require('crypto');console.log(c.createHash('sha256').update(fs.readFileSync('pnpm-lock.yaml')).digest('hex'))")
+STORED_HASH=
+if [ -f "$LOCK_HASH_FILE" ]; then
+	STORED_HASH=$(cat "$LOCK_HASH_FILE")
+fi
+if [ "$CURRENT_HASH" != "$STORED_HASH" ]; then
+	echo "NestIdP [dev]: pnpm install (lockfile changed or stale node_modules volume)..."
+	pnpm install
+	echo "$CURRENT_HASH" > "$LOCK_HASH_FILE"
+fi
+
 echo "NestIdP [dev]: preparing Prisma for ${DATABASE_PROVIDER:-postgresql}..."
 node ./apps/api/scripts/sync-prisma-provider.mjs
 

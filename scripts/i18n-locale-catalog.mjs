@@ -154,6 +154,14 @@ const en = {
 		checkingSession: 'Checking session…',
 		endUserSamlLink: 'End-user SAML SSO login',
 		loginFailed: 'Login failed',
+		rememberUsername: 'Remember username on this device',
+		rememberUsernameHint:
+			'Fills in your username next time you open this page. Does not save your password.',
+		staySignedIn: 'Stay signed in',
+		staySignedInHint: 'Keeps your admin session active longer (up to {{days}} days).',
+		sharedComputerWarning:
+			'Do not enable on shared or public computers. Anyone with access to this browser may open the admin console.',
+		sessionExpired: 'Your admin session has expired. Sign in again.',
 	},
 	login: {
 		title: 'SAML Login',

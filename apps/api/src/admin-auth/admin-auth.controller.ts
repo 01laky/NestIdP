@@ -55,9 +55,21 @@ export class AdminAuthController {
 		}
 
 		try {
-			const admin = await this.adminAuthService.login(body.username, body.password, clientIp);
-			const payload = this.adminSessionService.createPayload(admin.id, admin.username);
-			this.adminSessionService.setCookie(res, payload);
+			const persistent = body.rememberMe === true;
+			const admin = await this.adminAuthService.login(
+				body.username,
+				body.password,
+				clientIp,
+				persistent,
+			);
+			const ttl = this.adminSessionService.getSessionTtlSeconds(persistent);
+			const payload = this.adminSessionService.createPayload(
+				admin.id,
+				admin.username,
+				undefined,
+				ttl,
+			);
+			this.adminSessionService.setCookie(res, payload, { persistent });
 			this.loginRateLimiter.reset(clientIp);
 			return { ok: true, admin, csrfToken: payload.csrfToken };
 		} catch (error) {

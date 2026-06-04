@@ -93,7 +93,8 @@ Copy `.env.example` to `.env` and adjust values. Required variables:
 Optional bootstrap (first admin + IdpSettings on API start when tables are empty):
 
 - `ADMIN_USERNAME`, `ADMIN_PASSWORD` — see [docs/database.md](docs/database.md#first-admin-bootstrap-v030)
-- `ADMIN_SESSION_TTL_SECONDS` — operator session lifetime (default 8h)
+- `ADMIN_SESSION_TTL_SECONDS` — operator session signed TTL when stay signed in is off (default 8h)
+- `ADMIN_SESSION_REMEMBER_TTL_SECONDS` — persistent session when stay signed in is on (default 30d, max 90d)
 
 Operator login: **http://localhost:5173/admin/login** (separate from end-user SAML `/login`).
 

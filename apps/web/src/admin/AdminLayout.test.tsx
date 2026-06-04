@@ -87,9 +87,34 @@ describe('AdminLayout', () => {
 		renderAdminAt('/admin');
 
 		await waitFor(() => {
-			expect(screen.getByTestId('navigate').textContent).toBe('/admin/login');
+			expect(screen.getByTestId('navigate').textContent).toBe(
+				'/admin/login?reason=session_expired',
+			);
 		});
 		expect(logoutSpy).toHaveBeenCalled();
+	});
+
+	it('WEB-ADM-RM-16: unauthenticated Navigate includes session_expired reason', async () => {
+		vi.spyOn(adminApi, 'logoutAdmin').mockResolvedValue({ ok: true });
+		vi.spyOn(adminApi, 'getAdminMe').mockRejectedValue(
+			new adminApi.AdminApiError(401, 'Unauthorized'),
+		);
+		renderAdminAt('/admin');
+		await waitFor(() => {
+			expect(screen.getByTestId('navigate').textContent).toContain('session_expired');
+		});
+	});
+
+	it('WEB-ADM-RM-29: non-401 getAdminMe error still redirects with session_expired', async () => {
+		vi.spyOn(adminApi, 'getAdminMe').mockRejectedValue(
+			new adminApi.AdminApiError(500, 'Internal error'),
+		);
+		const logoutSpy = vi.spyOn(adminApi, 'logoutAdmin');
+		renderAdminAt('/admin');
+		await waitFor(() => {
+			expect(screen.getByTestId('navigate').textContent).toContain('session_expired');
+		});
+		expect(logoutSpy).not.toHaveBeenCalled();
 	});
 
 	it('WEB-ADM-09: clears stale session via logout on 401', async () => {

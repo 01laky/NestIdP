@@ -25,6 +25,26 @@ import { runMigrationsOnTestDb } from '../prisma/test-db.helper';
 
 jest.setTimeout(60_000);
 
+function adminSessionCookieLine(headers: Record<string, string | string[] | undefined>): string {
+	const setCookie = headers['set-cookie'];
+	const cookies = Array.isArray(setCookie) ? setCookie : setCookie ? [setCookie] : [];
+	return cookies.find((value) => value.includes(ADMIN_SESSION_COOKIE_NAME)) ?? '';
+}
+
+async function waitForLatestAuditEvent(prisma: PrismaService, event: string, after: Date) {
+	for (let attempt = 0; attempt < 30; attempt += 1) {
+		const row = await prisma.auditEvent.findFirst({
+			where: { event, createdAt: { gte: after } },
+			orderBy: { createdAt: 'desc' },
+		});
+		if (row) {
+			return row;
+		}
+		await new Promise((resolve) => setTimeout(resolve, 25));
+	}
+	return null;
+}
+
 describe('admin-auth integration (SQLite)', () => {
 	let app: INestApplication;
 	let prisma: PrismaService;
@@ -338,6 +358,165 @@ describe('admin-auth integration (SQLite)', () => {
 			.post('/api/admin/auth/login')
 			.send({ username: 'fixture-user', password: 'fixture-known-pass' })
 			.expect(200);
+	});
+
+	it('API-ADM-AUTH-24: rememberMe true sets long Max-Age on session cookie', async () => {
+		const response = await request(app.getHttpServer() as App)
+			.post('/api/admin/auth/login')
+			.send({ username: 'admin', password: adminPassword, rememberMe: true })
+			.expect(200);
+		const line = adminSessionCookieLine(response.headers);
+		const match = line.match(/Max-Age=(\d+)/i);
+		expect(match).not.toBeNull();
+		expect(Number.parseInt(match![1], 10)).toBeGreaterThanOrEqual(2_500_000);
+	});
+
+	it('API-ADM-AUTH-25: login without rememberMe omits Max-Age (session cookie)', async () => {
+		const response = await request(app.getHttpServer() as App)
+			.post('/api/admin/auth/login')
+			.send({ username: 'admin', password: adminPassword })
+			.expect(200);
+		const line = adminSessionCookieLine(response.headers);
+		expect(line.toLowerCase()).not.toContain('max-age=');
+	});
+
+	it('API-ADM-AUTH-26: rememberMe true with wrong password returns 401 without cookie', async () => {
+		const response = await request(app.getHttpServer() as App)
+			.post('/api/admin/auth/login')
+			.send({ username: 'admin', password: 'wrong', rememberMe: true })
+			.expect(401);
+		expect(adminSessionCookieLine(response.headers)).toBe('');
+	});
+
+	it('API-ADM-AUTH-27: invalid rememberMe type returns 400', async () => {
+		await request(app.getHttpServer() as App)
+			.post('/api/admin/auth/login')
+			.send({ username: 'admin', password: adminPassword, rememberMe: 'yes' })
+			.expect(400);
+	});
+
+	it('API-ADM-AUTH-28: persistent session works on GET /me until tampered', async () => {
+		const loginRes = await request(app.getHttpServer() as App)
+			.post('/api/admin/auth/login')
+			.send({ username: 'admin', password: adminPassword, rememberMe: true })
+			.expect(200);
+		const line = adminSessionCookieLine(loginRes.headers);
+		const match = line.match(new RegExp(`${ADMIN_SESSION_COOKIE_NAME}=([^;]+)`));
+		expect(match).toBeDefined();
+		await request(app.getHttpServer() as App)
+			.get('/api/admin/auth/me')
+			.set('Cookie', `${ADMIN_SESSION_COOKIE_NAME}=${match![1]}`)
+			.expect(200);
+		await request(app.getHttpServer() as App)
+			.get('/api/admin/auth/me')
+			.set('Cookie', `${ADMIN_SESSION_COOKIE_NAME}=${match![1]}tampered`)
+			.expect(401);
+	});
+
+	it('API-ADM-AUTH-29: change-password keeps session valid', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const login = await agent
+			.post('/api/admin/auth/login')
+			.send({ username: 'admin', password: adminPassword, rememberMe: true })
+			.expect(200);
+		await agent
+			.post('/api/admin/auth/change-password')
+			.set(ADMIN_CSRF_HEADER_NAME, login.body.csrfToken as string)
+			.send({ currentPassword: adminPassword, newPassword: adminPassword })
+			.expect(400);
+		await agent.get('/api/admin/auth/me').expect(200);
+	});
+
+	it('API-ADM-AUTH-30: logout clears cookie then login works again', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const login = await agent
+			.post('/api/admin/auth/login')
+			.send({ username: 'admin', password: adminPassword })
+			.expect(200);
+		await agent
+			.post('/api/admin/auth/logout')
+			.set(ADMIN_CSRF_HEADER_NAME, login.body.csrfToken as string)
+			.expect(200);
+		await agent.get('/api/admin/auth/me').expect(401);
+		await agent
+			.post('/api/admin/auth/login')
+			.send({ username: 'admin', password: adminPassword })
+			.expect(200);
+	});
+
+	it('API-AUD-ADM-RM-01: rememberMe true records audit metadata', async () => {
+		const after = new Date();
+		await request(app.getHttpServer() as App)
+			.post('/api/admin/auth/login')
+			.send({ username: 'admin', password: adminPassword, rememberMe: true })
+			.expect(200);
+		const row = await waitForLatestAuditEvent(prisma, 'admin_login_success', after);
+		expect(row?.metadata).toEqual({ rememberMe: true });
+	});
+
+	it('API-AUD-ADM-RM-02: login without rememberMe omits rememberMe metadata', async () => {
+		const after = new Date();
+		await request(app.getHttpServer() as App)
+			.post('/api/admin/auth/login')
+			.send({ username: 'admin', password: adminPassword })
+			.expect(200);
+		const row = await waitForLatestAuditEvent(prisma, 'admin_login_success', after);
+		const metadata = row?.metadata as Record<string, unknown> | null;
+		expect(metadata?.rememberMe).toBeUndefined();
+	});
+
+	it('API-ADM-AUTH-31: rememberMe false explicit still omits Max-Age', async () => {
+		const response = await request(app.getHttpServer() as App)
+			.post('/api/admin/auth/login')
+			.send({ username: 'admin', password: adminPassword, rememberMe: false })
+			.expect(200);
+		expect(adminSessionCookieLine(response.headers).toLowerCase()).not.toContain('max-age=');
+	});
+
+	it('API-ADM-AUTH-32: rememberMe string true coerces to persistent cookie', async () => {
+		const response = await request(app.getHttpServer() as App)
+			.post('/api/admin/auth/login')
+			.send({ username: 'admin', password: adminPassword, rememberMe: 'true' })
+			.expect(200);
+		expect(adminSessionCookieLine(response.headers).toLowerCase()).toContain('max-age=');
+	});
+
+	it('API-ADM-AUTH-33: persistent session payload exp reflects long TTL', async () => {
+		const loginRes = await request(app.getHttpServer() as App)
+			.post('/api/admin/auth/login')
+			.send({ username: 'admin', password: adminPassword, rememberMe: true })
+			.expect(200);
+		const line = adminSessionCookieLine(loginRes.headers);
+		const match = line.match(new RegExp(`${ADMIN_SESSION_COOKIE_NAME}=([^;]+)`));
+		expect(match).toBeDefined();
+		const sessionService = app.get(AdminSessionService);
+		const payload = sessionService.verify(match![1]);
+		expect(payload).not.toBeNull();
+		const ttl = payload!.exp - payload!.iat;
+		expect(ttl).toBeGreaterThanOrEqual(2_500_000);
+		expect(ttl).toBeLessThanOrEqual(7_776_000);
+	});
+
+	it('API-ADM-AUTH-34: wrong password with rememberMe true returns 401 without cookie', async () => {
+		const response = await request(app.getHttpServer() as App)
+			.post('/api/admin/auth/login')
+			.send({ username: 'admin', password: 'wrong-pass', rememberMe: true })
+			.expect(401);
+		expect(adminSessionCookieLine(response.headers)).toBe('');
+	});
+
+	it('API-AUD-ADM-RM-03: failed login with rememberMe records failure not success metadata', async () => {
+		const after = new Date();
+		await request(app.getHttpServer() as App)
+			.post('/api/admin/auth/login')
+			.send({ username: 'admin', password: 'wrong-pass', rememberMe: true })
+			.expect(401);
+		const failure = await waitForLatestAuditEvent(prisma, 'admin_login_failure', after);
+		expect(failure?.actorLabel).toBe('admin');
+		const success = await prisma.auditEvent.findFirst({
+			where: { event: 'admin_login_success', createdAt: { gte: after } },
+		});
+		expect(success).toBeNull();
 	});
 
 	it('API-CSRF-03: GET list connections without CSRF → 200 when authenticated', async () => {

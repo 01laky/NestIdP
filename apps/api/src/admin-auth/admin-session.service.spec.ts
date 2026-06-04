@@ -154,4 +154,87 @@ describe('AdminSessionService', () => {
 		const b = service.createPayload('a1', 'admin');
 		expect(a.csrfToken).not.toBe(b.csrfToken);
 	});
+
+	it('API-SES-16: getSessionTtlSeconds(true) uses remember default', () => {
+		expect(service.getSessionTtlSeconds(true)).toBe(2_592_000);
+	});
+
+	it('API-SES-17: getSessionTtlSeconds(false) uses short TTL', () => {
+		expect(service.getSessionTtlSeconds(false)).toBe(28_800);
+	});
+
+	it('API-SES-18: createPayload with custom ttl sets exp - iat', () => {
+		const payload = service.createPayload('a1', 'admin', undefined, 600);
+		expect(payload.exp - payload.iat).toBe(600);
+	});
+
+	it('API-SES-19: setCookie persistent uses maxAge from payload', () => {
+		const payload = service.createPayload('a1', 'admin', undefined, 3600);
+		const cookie = jest.fn();
+		const res = { cookie, clearCookie: jest.fn() } as unknown as Response;
+		service.setCookie(res, payload, { persistent: true });
+		expect(cookie).toHaveBeenCalledWith(
+			ADMIN_SESSION_COOKIE_NAME,
+			expect.any(String),
+			expect.objectContaining({ maxAge: 3_600_000 }),
+		);
+	});
+
+	it('API-SES-20: setCookie non-persistent omits maxAge', () => {
+		const payload = service.createPayload('a1', 'admin');
+		const cookie = jest.fn();
+		const res = { cookie, clearCookie: jest.fn() } as unknown as Response;
+		service.setCookie(res, payload, { persistent: false });
+		const options = cookie.mock.calls[0]?.[2] as { maxAge?: number };
+		expect(options.maxAge).toBeUndefined();
+	});
+
+	it('API-SES-21: remember TTL from env is clamped to 90 days', () => {
+		const hugeConfig = {
+			get: jest.fn((key: string) => {
+				if (key === 'SESSION_SECRET') return 'test-session-secret-min-16';
+				if (key === 'ADMIN_SESSION_REMEMBER_TTL_SECONDS') return '9000000';
+				return 'test';
+			}),
+		} as unknown as ConfigService;
+		const hugeService = new AdminSessionService(hugeConfig);
+		expect(hugeService.getSessionRememberTtlSeconds()).toBe(7_776_000);
+	});
+
+	it('API-SES-22: invalid remember TTL env falls back to default', () => {
+		const badConfig = {
+			get: jest.fn((key: string) => {
+				if (key === 'SESSION_SECRET') return 'test-session-secret-min-16';
+				if (key === 'ADMIN_SESSION_REMEMBER_TTL_SECONDS') return 'nope';
+				return undefined;
+			}),
+		} as unknown as ConfigService;
+		const badService = new AdminSessionService(badConfig);
+		expect(badService.getSessionRememberTtlSeconds()).toBe(2_592_000);
+	});
+
+	it('API-SES-23: persistent maxAge matches payload exp minus iat', () => {
+		const payload = service.createPayload('a1', 'admin', undefined, 7200);
+		const cookie = jest.fn();
+		const res = { cookie, clearCookie: jest.fn() } as unknown as Response;
+		service.setCookie(res, payload, { persistent: true });
+		expect(cookie).toHaveBeenCalledWith(
+			ADMIN_SESSION_COOKIE_NAME,
+			expect.any(String),
+			expect.objectContaining({ maxAge: 7_200_000 }),
+		);
+	});
+
+	it('API-SES-24: getSessionTtlSeconds(true) does not use short ADMIN_SESSION_TTL', () => {
+		const mixedConfig = {
+			get: jest.fn((key: string) => {
+				if (key === 'SESSION_SECRET') return 'test-session-secret-min-16';
+				if (key === 'ADMIN_SESSION_TTL_SECONDS') return '600';
+				return undefined;
+			}),
+		} as unknown as ConfigService;
+		const mixedService = new AdminSessionService(mixedConfig);
+		expect(mixedService.getSessionTtlSeconds(true)).toBe(2_592_000);
+		expect(mixedService.getSessionTtlSeconds(false)).toBe(600);
+	});
 });

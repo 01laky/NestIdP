@@ -30,6 +30,15 @@ fi
 echo "CI-DCK-02: admin me"
 curl -sf -b "$COOKIE_JAR" "${BASE_URL}/api/admin/auth/me" >/dev/null
 
+echo "CI-DCK-02-RM-01: admin login rememberMe sets Max-Age"
+REMEMBER_HEADERS=$(curl -s -D - -o /dev/null -X POST "${BASE_URL}/api/admin/auth/login" \
+	-H 'Content-Type: application/json' \
+	-d "{\"username\":\"${ADMIN_USER}\",\"password\":\"${ADMIN_PASS}\",\"rememberMe\":true}")
+echo "$REMEMBER_HEADERS" | grep -qi 'Max-Age=' || {
+	echo "rememberMe login missing Max-Age" >&2
+	exit 1
+}
+
 echo "CI-DCK-02: audit events"
 AUDIT_BODY=$(curl -sf -b "$COOKIE_JAR" "${BASE_URL}/api/admin/audit-events?limit=5")
 echo "$AUDIT_BODY" | grep -q admin_login_success

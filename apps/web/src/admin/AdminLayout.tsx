@@ -81,7 +81,7 @@ export function AdminLayout() {
 	}
 
 	if (authState === 'unauthenticated') {
-		return <Navigate to="/admin/login" replace />;
+		return <Navigate to="/admin/login?reason=session_expired" replace />;
 	}
 
 	return (

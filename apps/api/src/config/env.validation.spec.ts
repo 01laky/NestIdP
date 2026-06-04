@@ -152,6 +152,29 @@ describe('validateEnv', () => {
 		expect(() => validateEnv({ ...validConfig, ADMIN_SESSION_TTL_SECONDS: '0' })).toThrow();
 	});
 
+	it('API-ENV-ADM-RM-01: accepts ADMIN_SESSION_REMEMBER_TTL_SECONDS', () => {
+		const result = validateEnv({
+			...validConfig,
+			ADMIN_SESSION_REMEMBER_TTL_SECONDS: '2592000',
+		});
+		expect(result.ADMIN_SESSION_REMEMBER_TTL_SECONDS).toBe(2_592_000);
+	});
+
+	it('API-ENV-ADM-RM-02: rejects invalid ADMIN_SESSION_REMEMBER_TTL_SECONDS', () => {
+		expect(() =>
+			validateEnv({ ...validConfig, ADMIN_SESSION_REMEMBER_TTL_SECONDS: '0' }),
+		).toThrow();
+		expect(() =>
+			validateEnv({ ...validConfig, ADMIN_SESSION_REMEMBER_TTL_SECONDS: 'nope' }),
+		).toThrow();
+	});
+
+	it('API-ENV-ADM-RM-03: rejects ADMIN_SESSION_REMEMBER_TTL_SECONDS above 90 days', () => {
+		expect(() =>
+			validateEnv({ ...validConfig, ADMIN_SESSION_REMEMBER_TTL_SECONDS: '9000000' }),
+		).toThrow();
+	});
+
 	it('accepts optional SYNC_HTTP_TIMEOUT_MS within range', () => {
 		const result = validateEnv({ ...validConfig, SYNC_HTTP_TIMEOUT_MS: '15000' });
 		expect(result.SYNC_HTTP_TIMEOUT_MS).toBe(15_000);

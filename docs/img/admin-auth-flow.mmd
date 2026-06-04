@@ -4,24 +4,33 @@ sequenceDiagram
     participant API as NestJS admin-auth
     participant DB as AdminUser table
 
-    Op->>Web: Enter username + password
-    Web->>API: POST /api/admin/auth/login
+    Op->>Web: Username, password, optional checkboxes
+    Note over Web: Remember username → localStorage only
+    Note over Web: Stay signed in → rememberMe in JSON body
+    Web->>API: POST /api/admin/auth/login { username, password, rememberMe? }
     API->>DB: Find AdminUser by username
     DB-->>API: passwordHash (or null)
     API->>API: verifyPasswordTimingSafe (bcrypt)
     alt valid credentials
-        API->>API: Sign session cookie (HMAC + SESSION_SECRET, csrfToken in payload)
+        alt rememberMe true
+            API->>API: Long TTL payload + Set-Cookie Max-Age (persistent)
+        else rememberMe false / omitted
+            API->>API: Short TTL payload + session cookie (no Max-Age)
+        end
+        API->>API: Audit admin_login_success (metadata.rememberMe if long)
         API-->>Web: Set-Cookie + ok, admin, csrfToken
-        Web->>Web: store csrfToken in memory
+        Web->>Web: Optional localStorage username
         Web->>Web: navigate to /admin
         Web->>API: GET /api/admin/auth/me (credentials)
         API-->>Web: { admin, csrfToken }
-        Web->>API: GET /api/admin (credentials)
-        API-->>Web: dashboard stub + counts
     else invalid credentials
         API-->>Web: 401 Invalid credentials
     end
 
+    Op->>Web: Session expired / 401 on admin route
+    Web->>Web: Redirect /admin/login?reason=session_expired
+
     Op->>Web: Logout
     Web->>API: POST /api/admin/auth/logout (X-CSRF-Token when session present)
     API-->>Web: Clear cookie + { ok: true }
+    Note over Web: Remembered username kept in localStorage

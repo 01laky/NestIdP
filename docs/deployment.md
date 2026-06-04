@@ -44,6 +44,17 @@ curl -sf http://localhost:3000/ready
 
 The entrypoint runs `prisma migrate deploy` before starting the API. Bootstrap creates the first `AdminUser` when the table is empty and `ADMIN_USERNAME` / `ADMIN_PASSWORD` are set.
 
+### Admin session lifetime
+
+| Login choice                     | Cookie behavior                                                                                  | Typical use                              |
+| -------------------------------- | ------------------------------------------------------------------------------------------------ | ---------------------------------------- |
+| Default (stay signed in **off**) | Browser **session** cookie (no `Max-Age`); signed validity **8 h** (`ADMIN_SESSION_TTL_SECONDS`) | Shared workstation, daily operator shift |
+| **Stay signed in** checked       | Persistent cookie; `ADMIN_SESSION_REMEMBER_TTL_SECONDS` (default **30 days**, max **90 days**)   | Trusted private laptop                   |
+
+**Remember username** stores only the operator name in browser `localStorage` on that device — never the password. Do not enable remember options on shared or public PCs (the login page shows a warning).
+
+After session expiry, the admin UI redirects to `/admin/login?reason=session_expired`.
+
 ---
 
 ## Migrations

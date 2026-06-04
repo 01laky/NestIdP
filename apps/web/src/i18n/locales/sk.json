@@ -110,7 +110,13 @@
 		"signingIn": "Přihlašování…",
 		"checkingSession": "Kontrola relácie…",
 		"endUserSamlLink": "SAML SSO přihlášení koncového používateľe",
-		"loginFailed": "Prihlásenýí sa nepodarilo"
+		"loginFailed": "Prihlásenýí sa nepodarilo",
+		"rememberUsername": "Zapamätať prihlásenie",
+		"rememberUsernameHint": "Fills in your username next time you open this page. Does not save your password.",
+		"staySignedIn": "Zostať prihlásený",
+		"staySignedInHint": "Keeps your admin session active longer (up to {{days}} days).",
+		"sharedComputerWarning": "Do not enable on shared or public computers. Anyone with access to this browser may open the admin console.",
+		"sessionExpired": "Vaša admin relácia vypršala. Prihláste sa znova."
 	},
 	"login": {
 		"title": "SAML přihlášení",

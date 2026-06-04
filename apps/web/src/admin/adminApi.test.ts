@@ -280,6 +280,66 @@ describe('adminApi', () => {
 		expect(getCsrfToken()).toBe('login-csrf-token');
 	});
 
+	it('WEB-ADM-102: loginAdmin JSON includes rememberMe when passed', async () => {
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({
+				ok: true,
+				admin: { id: '1', username: 'admin' },
+				csrfToken: 'csrf',
+			}),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		await loginAdmin({ username: 'admin', password: 'secret', rememberMe: true });
+
+		const body = fetchMock.mock.calls[0][1]?.body as string;
+		expect(JSON.parse(body)).toEqual({
+			username: 'admin',
+			password: 'secret',
+			rememberMe: true,
+		});
+	});
+
+	it('WEB-ADM-103: loginAdmin JSON includes rememberMe false when passed', async () => {
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({
+				ok: true,
+				admin: { id: '1', username: 'admin' },
+				csrfToken: 'csrf',
+			}),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		await loginAdmin({ username: 'admin', password: 'secret', rememberMe: false });
+
+		const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string) as {
+			rememberMe?: boolean;
+		};
+		expect(body.rememberMe).toBe(false);
+	});
+
+	it('WEB-ADM-104: loginAdmin without rememberMe omits field from JSON', async () => {
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({
+				ok: true,
+				admin: { id: '1', username: 'admin' },
+				csrfToken: 'csrf',
+			}),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		await loginAdmin({ username: 'admin', password: 'secret' });
+
+		const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string) as Record<string, unknown>;
+		expect(body).not.toHaveProperty('rememberMe');
+	});
+
 	it('WEB-ADM-18: getAdminMe stores csrfToken from response', async () => {
 		vi.stubGlobal(
 			'fetch',

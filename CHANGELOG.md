@@ -4,6 +4,31 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.4.2]
+
+### Added
+
+- Extended **remember-me** edge coverage: storage/localStorage failures (`WEB-ADM-RM-17`–`22`),
+  login page combinations and rate limits (`WEB-ADM-RM-23`–`28`), API coercion (`API-ADM-DTO-RM-05`–`08`,
+  `API-ADM-AUTH-31`–`34`, `API-SES-22`–`24`, `API-AUD-ADM-RM-03`–`06`, `API-CTL-12`), Playwright
+  `WEB-ADM-E2E-RM-04`–`05`, and `WEB-ADM-103`–`104` / `SH-ADM-07`.
+
+## [1.4.1]
+
+### Added
+
+- **Admin login**: **Remember username** (device `localStorage` only) and **Stay signed in**
+  (`rememberMe` → longer session up to 90 days via `ADMIN_SESSION_REMEMBER_TTL_SECONDS`).
+  Shared-computer warning, session-expired redirect (`/admin/login?reason=session_expired`),
+  audit `metadata.rememberMe` on persistent logins, CI smoke `CI-DCK-02-RM-01`, and Playwright
+  `WEB-ADM-E2E-RM-01`–`03`. Vitest `WEB-ADM-RM-*`, `API-ADM-AUTH-24`–`30`, `API-SES-16`–`21`.
+
+### Changed
+
+- Default admin login uses a **browser session cookie** (no `Max-Age`); stay signed in sets
+  persistent `Max-Age` aligned with signed payload `exp`. `POST /api/admin/auth/login` accepts
+  optional `rememberMe`. Docker dev entrypoint runs `pnpm install` when `pnpm-lock.yaml` changes.
+
 ## [1.4.0]
 
 ### Added

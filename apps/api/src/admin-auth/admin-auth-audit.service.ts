@@ -5,7 +5,7 @@ import { AuditPersistenceService } from '../audit/audit-persistence.service';
 export class AdminAuthAuditService {
 	constructor(private readonly audit: AuditPersistenceService) {}
 
-	logLoginSuccess(adminId: string, username: string, clientIp: string): void {
+	logLoginSuccess(adminId: string, username: string, clientIp: string, rememberMe = false): void {
 		this.audit.recordSafe({
 			category: 'admin_auth',
 			event: 'admin_login_success',
@@ -13,6 +13,7 @@ export class AdminAuthAuditService {
 			actorId: adminId,
 			actorLabel: username,
 			clientIp,
+			metadata: rememberMe ? { rememberMe: true } : undefined,
 		});
 	}
 

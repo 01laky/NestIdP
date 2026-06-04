@@ -6,6 +6,7 @@ import {
 	IsNotEmpty,
 	IsOptional,
 	IsString,
+	Max,
 	Min,
 	validateSync,
 } from 'class-validator';
@@ -13,6 +14,7 @@ import {
 	DATABASE_PROVIDERS,
 	DatabaseProvider,
 	DEFAULT_DATABASE_PROVIDER,
+	MAX_ADMIN_SESSION_REMEMBER_TTL_SECONDS,
 	validateDatabaseUrlForProvider,
 } from '@nestidp/shared';
 import { resolveDatabaseProvider } from './database.config';
@@ -66,6 +68,19 @@ export class EnvironmentVariables {
 	@IsInt()
 	@Min(1)
 	ADMIN_SESSION_TTL_SECONDS?: number;
+
+	@IsOptional()
+	@Transform(({ value }) => {
+		if (value === undefined || value === null || value === '') {
+			return undefined;
+		}
+		const parsed = Number.parseInt(String(value), 10);
+		return Number.isFinite(parsed) ? parsed : value;
+	})
+	@IsInt()
+	@Min(3600)
+	@Max(MAX_ADMIN_SESSION_REMEMBER_TTL_SECONDS)
+	ADMIN_SESSION_REMEMBER_TTL_SECONDS?: number;
 
 	@IsOptional()
 	@Transform(({ value }) => {

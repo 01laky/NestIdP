@@ -15,7 +15,12 @@ export class AdminAuthService {
 		private readonly audit: AdminAuthAuditService,
 	) {}
 
-	async login(username: string, password: string, clientIp: string): Promise<AdminMeDto> {
+	async login(
+		username: string,
+		password: string,
+		clientIp: string,
+		rememberMe = false,
+	): Promise<AdminMeDto> {
 		const normalizedUsername = username.trim();
 		const admin = await this.prisma.adminUser.findUnique({
 			where: { username: normalizedUsername },
@@ -30,7 +35,7 @@ export class AdminAuthService {
 			throw new UnauthorizedException('Invalid credentials');
 		}
 
-		this.audit.logLoginSuccess(admin.id, admin.username, clientIp);
+		this.audit.logLoginSuccess(admin.id, admin.username, clientIp, rememberMe);
 		return { id: admin.id, username: admin.username };
 	}
 

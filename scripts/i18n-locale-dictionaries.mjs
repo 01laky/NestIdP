@@ -772,6 +772,9 @@ export const skWords = {
 };
 
 export const skPaths = {
+	"adminAuth.rememberUsername": "Zapamätať prihlásenie",
+	"adminAuth.staySignedIn": "Zostať prihlásený",
+	"adminAuth.sessionExpired": "Vaša admin relácia vypršala. Prihláste sa znova.",
 	"identity.formNewRole": "Vytvoriť manuálnu rolu",
 	"identity.formEditRole": "Upraviť manuálnu rolu",
 	"nav.idpSettings": "Nastavenia IdP",

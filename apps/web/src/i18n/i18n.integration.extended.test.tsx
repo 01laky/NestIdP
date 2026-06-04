@@ -149,6 +149,22 @@ describe('i18n integration — extended (WEB-I18N-99–115)', () => {
 		});
 	});
 
+	it('WEB-I18N-116: AdminLoginPage Slovak remember labels', async () => {
+		vi.spyOn(adminApi, 'getAdminMe').mockRejectedValue(
+			new adminApi.AdminApiError(401, 'Unauthorized'),
+		);
+		await initI18n('sk');
+		renderWithUi(
+			<MemoryRouter>
+				<AdminLoginPage />
+			</MemoryRouter>,
+		);
+		await waitFor(() => {
+			expect(screen.getByRole('checkbox', { name: /Zapamätať prihlásenie/i })).toBeDefined();
+			expect(screen.getByRole('checkbox', { name: /Zostať prihlásený/i })).toBeDefined();
+		});
+	});
+
 	it('WEB-I18N-109: login LanguageSelect change to cs', async () => {
 		vi.spyOn(authApi, 'getEndUserSession').mockResolvedValue({
 			authenticated: false,

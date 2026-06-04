@@ -14,6 +14,20 @@ vi.mock('react-router-dom', async () => {
 	};
 });
 
+vi.mock('./adminRememberUsername', () => ({
+	readRememberedAdminUsername: vi.fn(() => null),
+	writeRememberedAdminUsername: vi.fn(),
+	clearRememberedAdminUsername: vi.fn(),
+}));
+
+function usernameField() {
+	return screen.getByRole('textbox', { name: /^Username/i });
+}
+
+function passwordField() {
+	return screen.getByLabelText(/^Password/i);
+}
+
 afterEach(() => {
 	cleanup();
 	vi.restoreAllMocks();
@@ -33,8 +47,8 @@ describe('AdminLoginPage', () => {
 		);
 
 		await waitFor(() => {
-			expect(screen.getByLabelText(/Username/i)).toBeDefined();
-			expect(screen.getByLabelText(/Password/i)).toBeDefined();
+			expect(usernameField()).toBeDefined();
+			expect(passwordField()).toBeDefined();
 		});
 	});
 
@@ -54,14 +68,18 @@ describe('AdminLoginPage', () => {
 			</MemoryRouter>,
 		);
 
-		await waitFor(() => screen.getByLabelText(/Username/i));
+		await waitFor(() => usernameField());
 
-		fireEvent.change(screen.getByLabelText(/Username/i), { target: { value: 'admin' } });
-		fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: 'secret' } });
+		fireEvent.change(usernameField(), { target: { value: 'admin' } });
+		fireEvent.change(passwordField(), { target: { value: 'secret' } });
 		fireEvent.click(screen.getByRole('button', { name: /Sign in/i }));
 
 		await waitFor(() => {
-			expect(loginSpy).toHaveBeenCalledWith({ username: 'admin', password: 'secret' });
+			expect(loginSpy).toHaveBeenCalledWith({
+				username: 'admin',
+				password: 'secret',
+				rememberMe: false,
+			});
 		});
 	});
 
@@ -107,9 +125,9 @@ describe('AdminLoginPage', () => {
 			</MemoryRouter>,
 		);
 
-		await waitFor(() => screen.getByLabelText(/Username/i));
-		fireEvent.change(screen.getByLabelText(/Username/i), { target: { value: 'admin' } });
-		fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: 'secret' } });
+		await waitFor(() => usernameField());
+		fireEvent.change(usernameField(), { target: { value: 'admin' } });
+		fireEvent.change(passwordField(), { target: { value: 'secret' } });
 		fireEvent.click(screen.getByRole('button', { name: /Sign in/i }));
 
 		expect(screen.getByRole('button', { name: /Signing in/i }).hasAttribute('disabled')).toBe(true);
@@ -133,9 +151,9 @@ describe('AdminLoginPage', () => {
 			</MemoryRouter>,
 		);
 
-		await waitFor(() => screen.getByLabelText(/Username/i));
-		fireEvent.change(screen.getByLabelText(/Username/i), { target: { value: 'admin' } });
-		fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: 'wrong' } });
+		await waitFor(() => usernameField());
+		fireEvent.change(usernameField(), { target: { value: 'admin' } });
+		fireEvent.change(passwordField(), { target: { value: 'wrong' } });
 		fireEvent.click(screen.getByRole('button', { name: /Sign in/i }));
 
 		await waitFor(() => {
@@ -157,9 +175,9 @@ describe('AdminLoginPage', () => {
 			</MemoryRouter>,
 		);
 
-		await waitFor(() => screen.getByLabelText(/Username/i));
-		fireEvent.change(screen.getByLabelText(/Username/i), { target: { value: 'admin' } });
-		fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: 'wrong' } });
+		await waitFor(() => usernameField());
+		fireEvent.change(usernameField(), { target: { value: 'admin' } });
+		fireEvent.change(passwordField(), { target: { value: 'wrong' } });
 		fireEvent.click(screen.getByRole('button', { name: /Sign in/i }));
 
 		await waitFor(() => {
