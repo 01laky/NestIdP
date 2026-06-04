@@ -6,7 +6,7 @@
 [![Node](https://img.shields.io/badge/node-%3E%3D18-green)](package.json)
 [![pnpm](https://img.shields.io/badge/pnpm-%3E%3D9-orange)](package.json)
 
-> Not Okta. Not Keycloak. A focused **SAML 2.0 IdP monolith** (NestJS + React + PostgreSQL/SQLite) for teams that already have users in an internal API and need standards-based SSO to Grafana, custom apps, and other service providers.
+> **SAML 2.0 Identity Provider** (NestJS + React + PostgreSQL/SQLite) for teams that already have users in an internal API and need standards-based SSO to Grafana, custom apps, and other service providers.
 
 ---
 
