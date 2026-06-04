@@ -28,7 +28,7 @@ export function ApiConnectionSyncPage() {
 	const [error, setError] = useState<string | null>(null);
 	const [status, setStatus] = useState<string>('');
 	const [logs, setLogs] = useState<Awaited<ReturnType<typeof listSyncLogs>>['syncLogs']>([]);
-	const [dryRun, setDryRun] = useState(true);
+	const [dryRun, setDryRun] = useState(false);
 	const [syncing, setSyncing] = useState(false);
 	const [message, setMessage] = useState<string | null>(null);
 	const { showToast } = useToast();

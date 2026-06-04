@@ -518,6 +518,41 @@ describe('adminApi', () => {
 		);
 	});
 
+	it('WEB-ADM-100: listIdentityUsers defaults limit to 10', async () => {
+		const { listIdentityUsers } = await import('./adminApi');
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ items: [], total: 0 }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		await listIdentityUsers();
+		expect(fetchMock).toHaveBeenCalledWith(
+			`${IDENTITY_USERS_API_PATH}?limit=10`,
+			expect.any(Object),
+		);
+	});
+
+	it('WEB-ADM-101: listIdentityGroups and listIdentityRoles default limit to 10', async () => {
+		const { listIdentityGroups, listIdentityRoles } = await import('./adminApi');
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ items: [], total: 0 }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		await listIdentityGroups();
+		await listIdentityRoles();
+		expect(fetchMock).toHaveBeenCalledWith(
+			'/api/admin/identity/groups?limit=10',
+			expect.any(Object),
+		);
+		expect(fetchMock).toHaveBeenCalledWith(
+			'/api/admin/identity/roles?limit=10',
+			expect.any(Object),
+		);
+	});
+
 	it('WEB-ADM-26: listIdentityUsers builds search query', async () => {
 		const { listIdentityUsers } = await import('./adminApi');
 		const fetchMock = vi.fn().mockResolvedValue({
@@ -528,7 +563,7 @@ describe('adminApi', () => {
 		vi.stubGlobal('fetch', fetchMock);
 		await listIdentityUsers({ search: 'alice' });
 		expect(fetchMock).toHaveBeenCalledWith(
-			`${IDENTITY_USERS_API_PATH}?search=alice`,
+			`${IDENTITY_USERS_API_PATH}?limit=10&search=alice`,
 			expect.any(Object),
 		);
 	});

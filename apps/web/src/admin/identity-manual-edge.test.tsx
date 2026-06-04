@@ -226,6 +226,8 @@ describe('Identity manual CRUD — web edge', () => {
 				</Routes>
 			</MemoryRouter>,
 		);
+		await waitFor(() => expect(listSpy.mock.calls.length).toBeGreaterThanOrEqual(1));
+		listSpy.mockClear();
 		fireEvent.change(screen.getByLabelText('Origin'), { target: { value: 'manual' } });
 		fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
 		await waitFor(() => {
@@ -460,6 +462,8 @@ describe('Identity manual CRUD — web edge', () => {
 				</Routes>
 			</MemoryRouter>,
 		);
+		await waitFor(() => expect(listSpy.mock.calls.length).toBeGreaterThanOrEqual(1));
+		listSpy.mockClear();
 		fireEvent.change(screen.getByLabelText('Origin'), { target: { value: 'synced' } });
 		fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
 		await waitFor(() => {
@@ -688,6 +692,8 @@ describe('Identity manual CRUD — web edge', () => {
 				</Routes>
 			</MemoryRouter>,
 		);
+		await waitFor(() => expect(listSpy.mock.calls.length).toBeGreaterThanOrEqual(1));
+		listSpy.mockClear();
 		const select = screen.getByLabelText('Origin');
 		fireEvent.change(select, { target: { value: 'manual' } });
 		fireEvent.click(screen.getByRole('button', { name: 'Apply' }));

@@ -175,11 +175,11 @@ describe('Evergreen toast integration — mutation flows', () => {
 			</MemoryRouter>,
 		);
 
-		await waitFor(() => screen.getByRole('button', { name: /Run dry sync/i }));
-		fireEvent.click(screen.getByRole('button', { name: /Run dry sync/i }));
+		await waitFor(() => screen.getByRole('button', { name: /Run full sync/i }));
+		fireEvent.click(screen.getByRole('button', { name: /Run full sync/i }));
 
 		await waitFor(() => {
-			expect(toastMessages().some((t) => t.includes('Dry run finished'))).toBe(true);
+			expect(toastMessages().some((t) => t.includes('Sync finished'))).toBe(true);
 		});
 	});
 

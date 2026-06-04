@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	IDENTITY_LIST_PAGE_SIZE,
 	IDENTITY_GROUPS_API_PATH,
 	IDENTITY_GROUP_NEW_ROUTE,
 	IDENTITY_ROLES_API_PATH,
@@ -13,6 +14,10 @@ import {
 } from './identity-admin.js';
 
 describe('identity-admin shared', () => {
+	it('SH-IDN-04: browse list page size constant', () => {
+		expect(IDENTITY_LIST_PAGE_SIZE).toBe(10);
+	});
+
 	it('SH-IDN-01: API paths under /api/admin/identity', () => {
 		expect(IDENTITY_USERS_API_PATH).toBe('/api/admin/identity/users');
 		expect(IDENTITY_GROUPS_API_PATH).toBe('/api/admin/identity/groups');

@@ -1,5 +1,8 @@
 import { API_CONNECTION_ROUTE_PREFIX } from './connections.js';
 
+/** Default page size for admin identity browse lists (users, groups, roles). */
+export const IDENTITY_LIST_PAGE_SIZE = 10 as const;
+
 export const IDENTITY_USERS_API_PATH = '/api/admin/identity/users';
 export const IDENTITY_GROUPS_API_PATH = '/api/admin/identity/groups';
 export const IDENTITY_ROLES_API_PATH = '/api/admin/identity/roles';

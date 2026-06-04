@@ -259,6 +259,45 @@
 	background: var(--evg-color-surface-2);
 }
 
+.evg-table-pagination {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--evg-space-3);
+	margin-top: var(--evg-space-4);
+}
+
+.evg-table-pagination__meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--evg-space-2) var(--evg-space-4);
+	margin: 0;
+	font-size: var(--evg-text-sm);
+	color: var(--evg-color-text-muted);
+}
+
+.evg-table-pagination__actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--evg-space-2);
+}
+
+@media (max-width: 480px) {
+	.evg-table-pagination {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.evg-table-pagination__actions {
+		width: 100%;
+	}
+
+	.evg-table-pagination__actions .evg-btn {
+		flex: 1 1 auto;
+	}
+}
+
 /* Badge */
 .evg-badge {
 	display: inline-block;

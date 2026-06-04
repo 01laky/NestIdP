@@ -1,73 +1,113 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, Suspense, useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import type { ColumnDef } from '@tanstack/react-table';
+import type { IdentityGroupListItemDto } from '@nestidp/shared';
 import { IDENTITY_GROUP_NEW_ROUTE, identityGroupDetailRoute } from '@nestidp/shared';
 import { AdminApiError, listIdentityGroups } from '../adminApi';
 import { AdminPageHeader } from '../components/AdminPageHeader';
 import { IdentitySectionNav } from '../components/IdentitySectionNav';
+import { createLazyIdentityListTable } from '../components/identityListTableLazy';
+import { EmptyState } from '../components/EmptyState';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
+import { useIdentityListQuery } from '../hooks/useIdentityListQuery';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
 import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
 import { identityOriginFilterLabel } from '../../i18n/enum-labels';
 import { identityOriginLabel, identityOriginToBadge } from '../status-badge';
-import { Badge, Button, ButtonLink, Select, Table } from '../../ui';
+import { Badge, Button, ButtonLink, Select } from '../../ui';
+
+const IdentityListTable = createLazyIdentityListTable<IdentityGroupListItemDto>();
 
 export function IdentityGroupsPage() {
 	const { t } = useTranslation('identity');
 	const { t: tNav } = useTranslation('nav');
 	const { t: tCommon } = useTranslation('common');
 	useAdminDocumentTitle(t('groupsTitle'));
-	const [loading, setLoading] = useState(true);
-	const [filterBusy, setFilterBusy] = useState(false);
-	const [error, setError] = useState<string | null>(null);
 	const [origin, setOrigin] = useState('');
-	const [items, setItems] = useState<Awaited<ReturnType<typeof listIdentityGroups>>['items']>([]);
 
-	async function load(originFilter: string, options?: { fromFilter?: boolean }) {
-		if (options?.fromFilter) {
-			setFilterBusy(true);
-		}
-		setLoading(true);
-		setError(null);
-		try {
+	const mapError = useCallback(
+		(err: unknown) =>
+			err instanceof AdminApiError
+				? formatAdminApiError(
+						err.statusCode,
+						err.message,
+						resolveI18nKey,
+						'identity.loadGroupsFailed',
+					)
+				: t('loadGroupsFailed'),
+		[t],
+	);
+
+	const fetchPage = useCallback(
+		async ({
+			offset,
+			limit,
+			filters,
+		}: {
+			offset: number;
+			limit: number;
+			filters: Record<string, string | undefined>;
+		}) => {
 			const data = await listIdentityGroups({
-				limit: 100,
-				origin: originFilter || undefined,
+				offset,
+				limit,
+				origin: filters.origin,
 			});
-			setItems(data.items);
-		} catch (err) {
-			setError(
-				err instanceof AdminApiError
-					? formatAdminApiError(
-							err.statusCode,
-							err.message,
-							resolveI18nKey,
-							'identity.loadGroupsFailed',
-						)
-					: t('loadGroupsFailed'),
-			);
-		} finally {
-			setLoading(false);
-			setFilterBusy(false);
-		}
-	}
+			return { items: data.items, total: data.total };
+		},
+		[],
+	);
 
-	useEffect(() => {
-		void load('');
-	}, []);
+	const { pageIndex, total, items, error, initialLoading, refetching, applyFilters, goToPage } =
+		useIdentityListQuery<IdentityGroupListItemDto>({
+			fetchPage,
+			initialFilters: { origin: undefined },
+			mapError,
+		});
+
+	const columns = useMemo<ColumnDef<IdentityGroupListItemDto, unknown>[]>(
+		() => [
+			{
+				id: 'name',
+				header: () => tCommon('name'),
+				cell: ({ row }) => (
+					<Link to={identityGroupDetailRoute(row.original.id)}>{row.original.name}</Link>
+				),
+			},
+			{
+				id: 'origin',
+				header: () => tCommon('origin'),
+				cell: ({ row }) => (
+					<Badge variant={identityOriginToBadge(row.original.origin)}>
+						{identityOriginLabel(row.original.origin)}
+					</Badge>
+				),
+			},
+			{
+				id: 'members',
+				header: () => tCommon('members'),
+				cell: ({ row }) => row.original.memberCount ?? tCommon('emDash'),
+			},
+		],
+		[tCommon],
+	);
 
 	function handleFilter(event: FormEvent) {
 		event.preventDefault();
-		void load(origin, { fromFilter: true });
+		applyFilters({ origin: origin || undefined });
 	}
 
-	const filterDisabled = filterBusy;
+	const filterDisabled = refetching;
+	const showEmpty = !initialLoading && !error && total === 0;
+	const showTable = !initialLoading && total > 0;
 
 	return (
 		<section>
 			<AdminPageHeader
 				title={t('groupsTitle')}
+				subtitle={tCommon('total', { count: total })}
 				breadcrumbs={[
 					{ label: tNav('dashboard'), to: '/admin' },
 					{ label: tCommon('identity') },
@@ -82,7 +122,7 @@ export function IdentityGroupsPage() {
 			<form
 				className="evg-inline-form"
 				aria-label={t('filterGroups')}
-				aria-busy={filterBusy}
+				aria-busy={refetching}
 				onSubmit={handleFilter}
 			>
 				<Select
@@ -100,35 +140,30 @@ export function IdentityGroupsPage() {
 					{tCommon('apply')}
 				</Button>
 			</form>
-			{loading ? <LoadingState /> : null}
+			{initialLoading ? <LoadingState /> : null}
 			{error ? <ErrorBanner message={error} /> : null}
-			{!loading && !error ? (
-				<div className="evg-table-wrap">
-					<Table>
-						<thead>
-							<tr>
-								<th>{tCommon('name')}</th>
-								<th>{tCommon('origin')}</th>
-								<th>{tCommon('members')}</th>
-							</tr>
-						</thead>
-						<tbody>
-							{items.map((group) => (
-								<tr key={group.id}>
-									<td>
-										<Link to={identityGroupDetailRoute(group.id)}>{group.name}</Link>
-									</td>
-									<td>
-										<Badge variant={identityOriginToBadge(group.origin)}>
-											{identityOriginLabel(group.origin)}
-										</Badge>
-									</td>
-									<td>{group.memberCount ?? tCommon('emDash')}</td>
-								</tr>
-							))}
-						</tbody>
-					</Table>
-				</div>
+			{showEmpty ? (
+				<EmptyState
+					title={t('noGroups')}
+					description={t('noGroupsDescription')}
+					action={
+						<ButtonLink to={IDENTITY_GROUP_NEW_ROUTE} variant="primary">
+							{t('createManualGroup')}
+						</ButtonLink>
+					}
+				/>
+			) : null}
+			{showTable ? (
+				<Suspense fallback={null}>
+					<IdentityListTable
+						columns={columns}
+						data={items}
+						total={total}
+						pageIndex={pageIndex}
+						onPageChange={goToPage}
+						loading={refetching}
+					/>
+				</Suspense>
 			) : null}
 			<IdentitySectionNav current="groups" />
 		</section>

@@ -110,15 +110,19 @@ describe('Responsive shell — extended CSS and static guards (WEB-RSP-50–99)'
 		);
 	});
 
-	it('WEB-RSP-66: identity list pages wrap tables', () => {
+	it('WEB-RSP-66: identity list pages use IdentityListTable with table wrap', () => {
+		const tableSrc = readFileSync(
+			join(webRoot, 'src/admin/components/IdentityListTable.tsx'),
+			'utf8',
+		);
+		expect(tableSrc).toContain('IdentityListTable');
+		expect(tableSrc).toMatch(/<Table[\s>]/);
 		for (const file of [
 			'IdentityUsersPage.tsx',
 			'IdentityGroupsPage.tsx',
 			'IdentityRolesPage.tsx',
 		]) {
-			const src = pageSource(file);
-			expect(src).toContain('evg-table-wrap');
-			expect(tableWrapBeforeTable(src)).toBe(true);
+			expect(pageSource(file)).toContain('IdentityListTable');
 		}
 	});
 
@@ -145,20 +149,25 @@ describe('Responsive shell — extended CSS and static guards (WEB-RSP-50–99)'
 	});
 
 	it('WEB-RSP-72: nine admin pages use evg-table-wrap with Table', () => {
-		const wrapped = [
+		const wrappedWithLocalWrap = [
 			'ApiConnectionsListPage.tsx',
 			'SpConnectionsListPage.tsx',
 			'AuditLogPage.tsx',
 			'AdminUsersPage.tsx',
 			'IdentityGroupDetailPage.tsx',
 			'IdentityRoleDetailPage.tsx',
+		];
+		const wrappedViaListTable = [
 			'IdentityUsersPage.tsx',
 			'IdentityGroupsPage.tsx',
 			'IdentityRolesPage.tsx',
 		];
-		expect(wrapped.length).toBe(9);
-		for (const file of wrapped) {
+		expect(wrappedWithLocalWrap.length + wrappedViaListTable.length).toBe(9);
+		for (const file of wrappedWithLocalWrap) {
 			expect(pageSource(file)).toContain('evg-table-wrap');
+		}
+		for (const file of wrappedViaListTable) {
+			expect(pageSource(file)).toContain('createLazyIdentityListTable');
 		}
 	});
 

@@ -1,77 +1,121 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, Suspense, useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import type { ColumnDef } from '@tanstack/react-table';
+import type { IdentityUserListItemDto } from '@nestidp/shared';
 import {
 	API_CONNECTION_ROUTE_PREFIX,
-	IDENTITY_ROUTE_PREFIX,
 	IDENTITY_USER_NEW_ROUTE,
+	identityUserDetailRoute,
 } from '@nestidp/shared';
 import { AdminApiError, listIdentityUsers } from '../adminApi';
 import { AdminPageHeader } from '../components/AdminPageHeader';
 import { IdentitySectionNav } from '../components/IdentitySectionNav';
+import { createLazyIdentityListTable } from '../components/identityListTableLazy';
 import { EmptyState } from '../components/EmptyState';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
+import { useIdentityListQuery } from '../hooks/useIdentityListQuery';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
 import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
 import { identityOriginFilterLabel } from '../../i18n/enum-labels';
 import { identityOriginLabel, identityOriginToBadge } from '../status-badge';
-import { Badge, Button, ButtonLink, Panel, Select, Table, TextInput } from '../../ui';
+import { Badge, Button, ButtonLink, Panel, Select, TextInput } from '../../ui';
+
+const IdentityListTable = createLazyIdentityListTable<IdentityUserListItemDto>();
 
 export function IdentityUsersPage() {
 	const { t } = useTranslation('identity');
 	const { t: tNav } = useTranslation('nav');
 	const { t: tCommon } = useTranslation('common');
 	useAdminDocumentTitle(t('usersTitle'));
-	const [loading, setLoading] = useState(true);
-	const [filterBusy, setFilterBusy] = useState(false);
-	const [error, setError] = useState<string | null>(null);
 	const [search, setSearch] = useState('');
 	const [origin, setOrigin] = useState('');
-	const [items, setItems] = useState<Awaited<ReturnType<typeof listIdentityUsers>>['items']>([]);
-	const [total, setTotal] = useState(0);
 
-	async function load(query: string, originFilter: string, options?: { fromFilter?: boolean }) {
-		if (options?.fromFilter) {
-			setFilterBusy(true);
-		}
-		setLoading(true);
-		setError(null);
-		try {
+	const mapError = useCallback(
+		(err: unknown) =>
+			err instanceof AdminApiError
+				? formatAdminApiError(
+						err.statusCode,
+						err.message,
+						resolveI18nKey,
+						'identity.loadUsersFailed',
+					)
+				: t('loadUsersFailed'),
+		[t],
+	);
+
+	const fetchPage = useCallback(
+		async ({
+			offset,
+			limit,
+			filters,
+		}: {
+			offset: number;
+			limit: number;
+			filters: Record<string, string | undefined>;
+		}) => {
 			const data = await listIdentityUsers({
-				search: query || undefined,
-				origin: originFilter || undefined,
-				limit: 50,
+				offset,
+				limit,
+				search: filters.search,
+				origin: filters.origin,
 			});
-			setItems(data.items);
-			setTotal(data.total);
-		} catch (err) {
-			setError(
-				err instanceof AdminApiError
-					? formatAdminApiError(
-							err.statusCode,
-							err.message,
-							resolveI18nKey,
-							'identity.loadUsersFailed',
-						)
-					: t('loadUsersFailed'),
-			);
-		} finally {
-			setLoading(false);
-			setFilterBusy(false);
-		}
-	}
+			return { items: data.items, total: data.total };
+		},
+		[],
+	);
 
-	useEffect(() => {
-		void load('', '');
-	}, []);
+	const { pageIndex, total, items, error, initialLoading, refetching, applyFilters, goToPage } =
+		useIdentityListQuery<IdentityUserListItemDto>({
+			fetchPage,
+			initialFilters: { search: undefined, origin: undefined },
+			mapError,
+		});
+
+	const columns = useMemo<ColumnDef<IdentityUserListItemDto, unknown>[]>(
+		() => [
+			{
+				id: 'username',
+				header: () => tCommon('username'),
+				cell: ({ row }) => (
+					<Link to={identityUserDetailRoute(row.original.id)}>{row.original.username}</Link>
+				),
+			},
+			{
+				id: 'email',
+				header: () => tCommon('email'),
+				cell: ({ row }) => row.original.email ?? tCommon('emDash'),
+			},
+			{
+				id: 'origin',
+				header: () => tCommon('origin'),
+				cell: ({ row }) => (
+					<Badge variant={identityOriginToBadge(row.original.origin)}>
+						{identityOriginLabel(row.original.origin)}
+					</Badge>
+				),
+			},
+			{
+				id: 'active',
+				header: () => t('tableActive'),
+				cell: ({ row }) => (row.original.active ? tCommon('yes') : tCommon('no')),
+			},
+		],
+		[t, tCommon],
+	);
 
 	function handleSearch(event: FormEvent) {
 		event.preventDefault();
-		void load(search, origin, { fromFilter: true });
+		applyFilters({
+			search: search || undefined,
+			origin: origin || undefined,
+		});
 	}
 
-	const filterDisabled = filterBusy;
+	const filterDisabled = refetching;
+	const showEmpty = !initialLoading && !error && total === 0;
+	const showTable = !initialLoading && total > 0;
 
 	return (
 		<section>
@@ -80,7 +124,7 @@ export function IdentityUsersPage() {
 				subtitle={tCommon('total', { count: total })}
 				breadcrumbs={[
 					{ label: tNav('dashboard'), to: '/admin' },
-					{ label: tCommon('identity'), to: `${IDENTITY_ROUTE_PREFIX}/users` },
+					{ label: tCommon('identity'), to: '/admin/identity/users' },
 					{ label: tNav('users') },
 				]}
 				actions={
@@ -101,7 +145,7 @@ export function IdentityUsersPage() {
 				className="evg-inline-form"
 				role="search"
 				aria-label={t('filterUsers')}
-				aria-busy={filterBusy}
+				aria-busy={refetching}
 				onSubmit={handleSearch}
 			>
 				<TextInput
@@ -127,9 +171,9 @@ export function IdentityUsersPage() {
 					{tCommon('apply')}
 				</Button>
 			</form>
-			{loading ? <LoadingState /> : null}
+			{initialLoading ? <LoadingState /> : null}
 			{error ? <ErrorBanner message={error} /> : null}
-			{!loading && !error && items.length === 0 ? (
+			{showEmpty ? (
 				<EmptyState
 					title={t('noUsers')}
 					description={t('noUsersDescription')}
@@ -140,35 +184,17 @@ export function IdentityUsersPage() {
 					}
 				/>
 			) : null}
-			{!loading && !error && items.length > 0 ? (
-				<div className="evg-table-wrap">
-					<Table>
-						<thead>
-							<tr>
-								<th>{tCommon('username')}</th>
-								<th>{tCommon('email')}</th>
-								<th>{tCommon('origin')}</th>
-								<th>{t('tableActive')}</th>
-							</tr>
-						</thead>
-						<tbody>
-							{items.map((user) => (
-								<tr key={user.id}>
-									<td>
-										<Link to={`${IDENTITY_ROUTE_PREFIX}/users/${user.id}`}>{user.username}</Link>
-									</td>
-									<td>{user.email ?? tCommon('emDash')}</td>
-									<td>
-										<Badge variant={identityOriginToBadge(user.origin)}>
-											{identityOriginLabel(user.origin)}
-										</Badge>
-									</td>
-									<td>{user.active ? tCommon('yes') : tCommon('no')}</td>
-								</tr>
-							))}
-						</tbody>
-					</Table>
-				</div>
+			{showTable ? (
+				<Suspense fallback={null}>
+					<IdentityListTable
+						columns={columns}
+						data={items}
+						total={total}
+						pageIndex={pageIndex}
+						onPageChange={goToPage}
+						loading={refetching}
+					/>
+				</Suspense>
 			) : null}
 			<IdentitySectionNav current="users" />
 		</section>

@@ -1,0 +1,25 @@
+sequenceDiagram
+	participant Op as Operator
+	participant Page as Identity list page
+	participant Hook as useIdentityListQuery
+	participant API as GET /api/admin/identity/*
+
+	Op->>Page: Open Users / Groups / Roles
+	Page->>Hook: mount (pageIndex 0)
+	Hook->>API: limit=10 offset=0 + filters
+	API-->>Hook: items + total
+	Hook-->>Page: render table page 1
+
+	Op->>Page: Next
+	Page->>Hook: goToPage(1)
+	Hook->>API: limit=10 offset=10
+	API-->>Hook: items + total
+	Hook-->>Page: aria-live range + rows
+
+	Op->>Page: Apply filter
+	Page->>Hook: applyFilters (reset pageIndex 0)
+	Hook->>API: limit=10 offset=0
+	API-->>Hook: items + total
+
+	Note over Hook: Stale responses ignored via requestId
+	Note over Hook: If pageIndex >= pageCount, clamp and refetch once

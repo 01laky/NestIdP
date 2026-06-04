@@ -4,6 +4,33 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.4.0]
+
+### Added
+
+- **Identity admin lists** (users, groups, roles): TanStack Table v8 with server-side pagination
+  (10 rows per page), shared `IdentityListTable` (lazy-loaded chunk), and `useIdentityListQuery`
+  (race-safe fetch via request generation, page clamp when `total` shrinks, errors keep the current
+  page and last rows). Pagination UI includes i18n Previous/Next, visible range, and `aria-live`
+  announcements; groups and roles gain `EmptyState` when `total === 0`. Vitest edge registry
+  `WEB-IDN-TBL-01`–`24`, `WEB-IDN-TBL-HK-01`–`10`, `WEB-IDN-TBL-CMP-01`–`11`, `WEB-ADM-100`–`101`;
+  Playwright `WEB-IDN-TBL-E2E-01`; diagram `docs/img/identity-list-pagination.mmd`.
+
+### Changed
+
+- Identity browse pages fetch `limit=10` with `offset` instead of 50–100 rows per request;
+  `listIdentityUsers` / `listIdentityGroups` / `listIdentityRoles` in `adminApi` default
+  `limit` to `IDENTITY_LIST_PAGE_SIZE` from `@nestidp/shared`; groups/roles headers show total
+  count like users. TanStack ships in a lazy `IdentityListTable` chunk to keep the main bundle
+  under the 650 KB budget. Evergreen `.evg-table-pagination` styles for narrow viewports.
+
+## [1.3.17]
+
+### Changed
+
+- **Admin sync page**: default **dry run** off so a normal “Run sync” writes users, groups, and
+  roles to the database; dry run remains available via checkbox for validation only.
+
 ## [1.3.16]
 
 ### Changed
@@ -50,7 +77,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 ### Fixed
 
 - **API connections create**: v1 limit now counts only external connections (`isLocalDirectory:
-  false`), not the hidden bootstrap **Local directory** row — operators could see an empty list yet
+false`), not the hidden bootstrap **Local directory** row — operators could see an empty list yet
   get "Only one API connection is supported in v1" on first create.
 
 ## [1.3.10]

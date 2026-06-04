@@ -380,7 +380,18 @@ export const csWords = {
 export const csPaths = {
 	"identity.formNewRole": "Vytvořit ruční roli",
 	"identity.formEditRole": "Upravit ruční roli",
-	"nav.idpSettings": "Nastavení IdP"
+	"nav.idpSettings": "Nastavení IdP",
+	"common.paginationNav": "Stránkování tabulky",
+	"common.paginationPrevious": "Předchozí",
+	"common.paginationNext": "Další",
+	"common.paginationPage": "Strana {{current}} z {{totalPages}}",
+	"common.paginationRange": "{{from}}–{{to}} z {{total}}",
+	"identity.noGroups": "Žádné skupiny",
+	"identity.noGroupsDescription":
+		"Spusťte synchronizaci identit z API připojení nebo vytvořte ruční skupinu v lokálním adresáři.",
+	"identity.noRoles": "Žádné role",
+	"identity.noRolesDescription":
+		"Spusťte synchronizaci identit z API připojení nebo vytvořte ruční roli v lokálním adresáři."
 };
 
 export const skWords = {
@@ -763,7 +774,18 @@ export const skWords = {
 export const skPaths = {
 	"identity.formNewRole": "Vytvoriť manuálnu rolu",
 	"identity.formEditRole": "Upraviť manuálnu rolu",
-	"nav.idpSettings": "Nastavenia IdP"
+	"nav.idpSettings": "Nastavenia IdP",
+	"common.paginationNav": "Stránkovanie tabuľky",
+	"common.paginationPrevious": "Predchádzajúca",
+	"common.paginationNext": "Ďalšia",
+	"common.paginationPage": "Strana {{current}} z {{totalPages}}",
+	"common.paginationRange": "{{from}}–{{to}} z {{total}}",
+	"identity.noGroups": "Žiadne skupiny",
+	"identity.noGroupsDescription":
+		"Spustite synchronizáciu identít z API pripojenia alebo vytvorte manuálnu skupinu v lokálnom adresári.",
+	"identity.noRoles": "Žiadne roly",
+	"identity.noRolesDescription":
+		"Spustite synchronizáciu identít z API pripojenia alebo vytvorte manuálnu rolu v lokálnom adresári."
 };
 
 export const deWords = {
@@ -2659,7 +2681,9 @@ export const itWords = {
 	"—": "—"
 };
 
-export const itPaths = {};
+export const itPaths = {
+	'common.status': 'Stato',
+};
 
 export const ptWords = {
 	"(default)": "(default)",

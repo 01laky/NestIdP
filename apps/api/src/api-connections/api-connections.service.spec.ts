@@ -99,9 +99,7 @@ describe('ApiConnectionsService', () => {
 
 	it('API-CON-04: create rejects http baseUrl when NODE_ENV production', async () => {
 		const getMock = configService.get as jest.Mock;
-		getMock.mockImplementation((key: string) =>
-			key === 'NODE_ENV' ? 'production' : undefined,
-		);
+		getMock.mockImplementation((key: string) => (key === 'NODE_ENV' ? 'production' : undefined));
 
 		await expect(
 			service.create({

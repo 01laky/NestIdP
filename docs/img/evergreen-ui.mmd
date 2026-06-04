@@ -27,6 +27,8 @@ flowchart TB
 		auditFilters["AuditLogPage filters"]
 		identitySearch["IdentityUsersPage filters"]
 		identityLists["IdentityGroupsPage / RolesPage filters"]
+		identityTable["IdentityListTable + TanStack v8"]
+		identityHook["useIdentityListQuery"]
 		identityNav["IdentitySectionNav"]
 	end
 	subgraph primitives["ui/ form primitives"]
@@ -61,5 +63,8 @@ flowchart TB
 	inlineForm --> sel
 	inlineForm --> btn
 	identityLists --> inlineForm
+	identitySearch --> identityHook
+	identityLists --> identityHook
+	identityHook --> identityTable
 	identitySearch --> btnLink
 	identityNav --> btnLink

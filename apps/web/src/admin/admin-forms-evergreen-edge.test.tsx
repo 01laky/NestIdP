@@ -274,9 +274,9 @@ describe('Admin forms Evergreen — extended edge cases', () => {
 		it('WEB-EVG-125: dry-run checkbox toggles label on submit button', async () => {
 			await renderSync();
 			const checkbox = screen.getByRole('checkbox', { name: /Dry run/i });
-			expect(screen.getByRole('button', { name: /Run dry sync/i })).toBeDefined();
-			fireEvent.click(checkbox);
 			expect(screen.getByRole('button', { name: /Run full sync/i })).toBeDefined();
+			fireEvent.click(checkbox);
+			expect(screen.getByRole('button', { name: /Run dry sync/i })).toBeDefined();
 		});
 
 		it('WEB-EVG-127: sync page shows current status from API', async () => {
@@ -298,7 +298,7 @@ describe('Admin forms Evergreen — extended edge cases', () => {
 						resolveSync = resolve;
 					}),
 			);
-			fireEvent.click(screen.getByRole('button', { name: /Run dry sync/i }));
+			fireEvent.click(screen.getByRole('button', { name: /Run full sync/i }));
 			await waitFor(() => {
 				expect(screen.getByRole('button', { name: /Running/i })).toBeDefined();
 			});

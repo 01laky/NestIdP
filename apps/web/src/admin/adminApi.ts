@@ -51,6 +51,7 @@ import type { IdpMetadataUrlResponseDto, SpConnectionListResponseDto } from '@ne
 import {
 	ADMIN_CSRF_HEADER_NAME,
 	API_CONNECTIONS_API_PATH,
+	IDENTITY_LIST_PAGE_SIZE,
 	IDENTITY_GROUPS_API_PATH,
 	IDENTITY_ROLES_API_PATH,
 	IDENTITY_USERS_API_PATH,
@@ -284,7 +285,12 @@ export function listIdentityUsers(
 	params: { limit?: number; offset?: number; search?: string; origin?: string } = {},
 ): Promise<IdentityUserListResponseDto> {
 	return adminFetch<IdentityUserListResponseDto>(
-		`${IDENTITY_USERS_API_PATH}${identityQuery(params)}`,
+		`${IDENTITY_USERS_API_PATH}${identityQuery({
+			limit: params.limit ?? IDENTITY_LIST_PAGE_SIZE,
+			offset: params.offset,
+			search: params.search,
+			origin: params.origin,
+		})}`,
 	);
 }
 
@@ -324,7 +330,11 @@ export function listIdentityGroups(
 	params: { limit?: number; offset?: number; origin?: string } = {},
 ): Promise<IdentityGroupListResponseDto> {
 	return adminFetch<IdentityGroupListResponseDto>(
-		`${IDENTITY_GROUPS_API_PATH}${identityQuery(params)}`,
+		`${IDENTITY_GROUPS_API_PATH}${identityQuery({
+			limit: params.limit ?? IDENTITY_LIST_PAGE_SIZE,
+			offset: params.offset,
+			origin: params.origin,
+		})}`,
 	);
 }
 
@@ -359,7 +369,11 @@ export function listIdentityRoles(
 	params: { limit?: number; offset?: number; origin?: string } = {},
 ): Promise<IdentityRoleListResponseDto> {
 	return adminFetch<IdentityRoleListResponseDto>(
-		`${IDENTITY_ROLES_API_PATH}${identityQuery(params)}`,
+		`${IDENTITY_ROLES_API_PATH}${identityQuery({
+			limit: params.limit ?? IDENTITY_LIST_PAGE_SIZE,
+			offset: params.offset,
+			origin: params.origin,
+		})}`,
 	);
 }
 
