@@ -214,14 +214,22 @@ model AuditEvent {
 }
 
 model IdpSettings {
-	id                          String    @id @default("default")
-	entityId                    String
-	signingCertPem              String?
-	signingKeyEncrypted         String?
-	pendingSigningCertPem       String?
-	pendingSigningKeyEncrypted  String?
-	rotationStartedAt           DateTime?
-	nameIdFormat                String    @default("urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress")
-	createdAt                   DateTime  @default(now())
-	updatedAt                   DateTime  @updatedAt
+	id                                String    @id @default("default")
+	entityId                          String
+	signingCertPem                    String?
+	signingKeyEncrypted               String?
+	signingKeyFamily                  String?
+	signingSignatureAlgorithmId       String?
+	signingRsaModulusBits             Int?
+	signingEcCurve                    String?
+	pendingSigningCertPem             String?
+	pendingSigningKeyEncrypted        String?
+	pendingSigningKeyFamily           String?
+	pendingSigningSignatureAlgorithmId String?
+	pendingSigningRsaModulusBits      Int?
+	pendingSigningEcCurve             String?
+	rotationStartedAt                 DateTime?
+	nameIdFormat                      String    @default("urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress")
+	createdAt                         DateTime  @default(now())
+	updatedAt                         DateTime  @updatedAt
 }

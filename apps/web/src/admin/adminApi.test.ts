@@ -720,6 +720,34 @@ describe('adminApi', () => {
 		);
 	});
 
+	it('WEB-IDP-API-05: generateIdpSigningCert serializes full crypto body', async () => {
+		setCsrfToken('csrf-idp-gen-full');
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ hasSigningCertificate: true }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		await generateIdpSigningCert({
+			keyFamily: 'ec',
+			ecCurve: 'P-384',
+			signatureAlgorithmId: 'ecdsa-sha384',
+			notAfter: '2029-05-20',
+		});
+		expect(fetchMock).toHaveBeenCalledWith(
+			`${IDP_SETTINGS_API_PATH}/signing-cert/generate`,
+			expect.objectContaining({
+				method: 'POST',
+				body: JSON.stringify({
+					keyFamily: 'ec',
+					ecCurve: 'P-384',
+					signatureAlgorithmId: 'ecdsa-sha384',
+					notAfter: '2029-05-20',
+				}),
+			}),
+		);
+	});
+
 	it('WEB-IDP-API-03: generateIdpSigningCert POSTs generate endpoint with CSRF', async () => {
 		setCsrfToken('csrf-idp-gen');
 		const fetchMock = vi.fn().mockResolvedValue({
@@ -728,11 +756,12 @@ describe('adminApi', () => {
 			json: async () => ({ hasSigningCertificate: true }),
 		});
 		vi.stubGlobal('fetch', fetchMock);
-		await generateIdpSigningCert();
+		await generateIdpSigningCert({});
 		expect(fetchMock).toHaveBeenCalledWith(
 			`${IDP_SETTINGS_API_PATH}/signing-cert/generate`,
 			expect.objectContaining({
 				method: 'POST',
+				body: '{}',
 				headers: expect.objectContaining({ [ADMIN_CSRF_HEADER_NAME]: 'csrf-idp-gen' }),
 			}),
 		);

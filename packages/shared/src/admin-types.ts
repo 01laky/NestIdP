@@ -17,6 +17,10 @@ export interface AdminDashboardIdpStatusDto {
 	hasSigningCertificate: boolean;
 	rotationActive: boolean;
 	signingCertNotAfter: string | null;
+	signingKeyFamily: 'rsa' | 'ec' | null;
+	signingSignatureAlgorithmId: string | null;
+	signingRsaModulusBits: number | null;
+	signingEcCurve: string | null;
 	certStatus: AdminDashboardIdpCertStatus;
 }
 

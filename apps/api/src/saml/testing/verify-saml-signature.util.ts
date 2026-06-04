@@ -1,6 +1,7 @@
 import { DOMParser } from '@xmldom/xmldom';
 import { SignedXml } from 'xml-crypto';
 import * as xpath from 'xpath';
+import { applyNestIdpXmlCryptoExtensions } from '../xml-crypto-extended-algorithms';
 
 /** Returns true when xml-crypto validates the XML signature with the given cert PEM. */
 export function verifySamlXmlSignature(signedXml: string, certPem: string): boolean {
@@ -11,6 +12,7 @@ export function verifySamlXmlSignature(signedXml: string, certPem: string): bool
 			return false;
 		}
 		const sig = new SignedXml({ publicCert: certPem });
+		applyNestIdpXmlCryptoExtensions(sig);
 		sig.loadSignature(signatureNode as Node);
 		return sig.checkSignature(signedXml);
 	} catch {

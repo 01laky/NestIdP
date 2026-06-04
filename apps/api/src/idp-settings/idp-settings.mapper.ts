@@ -56,15 +56,31 @@ export function deriveCertStatus(settings: IdpSettings): AdminDashboardIdpCertSt
 	return 'ok';
 }
 
+function mapSigningCryptoFields(settings: IdpSettings): {
+	signingKeyFamily: 'rsa' | 'ec' | null;
+	signingSignatureAlgorithmId: string | null;
+	signingRsaModulusBits: number | null;
+	signingEcCurve: string | null;
+} {
+	return {
+		signingKeyFamily: (settings.signingKeyFamily as 'rsa' | 'ec' | null) ?? null,
+		signingSignatureAlgorithmId: settings.signingSignatureAlgorithmId ?? null,
+		signingRsaModulusBits: settings.signingRsaModulusBits ?? null,
+		signingEcCurve: settings.signingEcCurve ?? null,
+	};
+}
+
 export function toDashboardIdpStatus(settings: IdpSettings): AdminDashboardIdpStatusDto {
 	const rotationActive = Boolean(
 		settings.pendingSigningCertPem || settings.pendingSigningKeyEncrypted,
 	);
+	const crypto = mapSigningCryptoFields(settings);
 	return {
 		idpSettingsRoute: IDP_SETTINGS_ROUTE_PREFIX,
 		hasSigningCertificate: Boolean(settings.signingCertPem && settings.signingKeyEncrypted),
 		rotationActive,
 		signingCertNotAfter: parseCertNotAfterIso(settings.signingCertPem),
+		...crypto,
 		certStatus: deriveCertStatus(settings),
 	};
 }
@@ -77,6 +93,7 @@ export function toIdpSettingsPublicDto(
 	const rotationActive = Boolean(
 		settings.pendingSigningCertPem || settings.pendingSigningKeyEncrypted,
 	);
+	const crypto = mapSigningCryptoFields(settings);
 	return {
 		entityId: settings.entityId,
 		nameIdFormat: settings.nameIdFormat,
@@ -85,6 +102,7 @@ export function toIdpSettingsPublicDto(
 			? fingerprintSha256Hex(settings.signingCertPem)
 			: null,
 		signingCertNotAfter: parseCertNotAfterIso(settings.signingCertPem),
+		...crypto,
 		metadataUrl: urls.metadataUrl,
 		ssoUrl: urls.ssoUrl,
 		idpBaseUrl: urls.idpBaseUrl,
@@ -95,6 +113,11 @@ export function toIdpSettingsPublicDto(
 			pendingCertFingerprintSha256: settings.pendingSigningCertPem
 				? fingerprintSha256Hex(settings.pendingSigningCertPem)
 				: null,
+			pendingSigningKeyFamily: (settings.pendingSigningKeyFamily as 'rsa' | 'ec' | null) ?? null,
+			pendingSigningSignatureAlgorithmId: settings.pendingSigningSignatureAlgorithmId ?? null,
+			pendingSigningRsaModulusBits: settings.pendingSigningRsaModulusBits ?? null,
+			pendingSigningEcCurve: settings.pendingSigningEcCurve ?? null,
+			pendingSigningCertNotAfter: parseCertNotAfterIso(settings.pendingSigningCertPem),
 		},
 		updatedAt: settings.updatedAt.toISOString(),
 	};

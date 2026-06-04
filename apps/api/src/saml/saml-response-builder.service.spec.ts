@@ -6,6 +6,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaClient } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { EncryptionService } from '../encryption/encryption.service';
+import { encrypt } from '../encryption/encryption.util';
 import { runMigrationsOnTestDb } from '../prisma/test-db.helper';
 import {
 	createTestIdpSettingsWithSigningKey,
@@ -245,5 +246,35 @@ describe('SamlResponseBuilderService (SQLite)', () => {
 		const settings = await prisma.idpSettings.findUnique({ where: { id: 'default' } });
 		const { samlResponseXml } = await buildForSp();
 		expect(verifySamlXmlSignature(samlResponseXml, settings!.signingCertPem!)).toBe(true);
+	});
+
+	it('API-SAML-SIGN-18: stored rsa-sha384 primary appears in signed Response', async () => {
+		const generated = new IdpSigningService(
+			prisma as never,
+			new EncryptionService({
+				get: (key: string) => (key === 'ENCRYPTION_KEY' ? TEST_ENCRYPTION_KEY : undefined),
+			} as never),
+			{ get: () => undefined } as never,
+			new SamlAuthAuditService({ recordSafe: jest.fn() } as never),
+		).generateKeyPairAndCert('http://localhost:3000', {
+			keyFamily: 'rsa',
+			rsaModulusBits: 2048,
+			signatureAlgorithmId: 'rsa-sha384',
+			notAfter: '2030-06-01',
+		});
+		await prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: {
+				signingCertPem: generated.certPem,
+				signingKeyEncrypted: encrypt(generated.privateKeyPem, TEST_ENCRYPTION_KEY),
+				signingKeyFamily: 'rsa',
+				signingSignatureAlgorithmId: 'rsa-sha384',
+				signingRsaModulusBits: 2048,
+				signingEcCurve: null,
+			},
+		});
+		const { samlResponseXml } = await buildForSp();
+		expect(samlResponseXml).toContain('xmldsig-more#rsa-sha384');
+		expect(verifySamlXmlSignature(samlResponseXml, generated.certPem)).toBe(true);
 	});
 });

@@ -1,4 +1,6 @@
 /** Admin REST — global IdP settings (v0.9.0). */
+import type { GenerateIdpSigningCertRequestDto } from './idp-signing-crypto.js';
+
 export const IDP_SETTINGS_API_PATH = '/api/admin/idp/settings';
 
 /** Admin SPA — settings section. */
@@ -20,6 +22,11 @@ export interface IdpSigningRotationStatusDto {
 	startedAt: string | null;
 	hasPendingCertificate: boolean;
 	pendingCertFingerprintSha256: string | null;
+	pendingSigningKeyFamily: 'rsa' | 'ec' | null;
+	pendingSigningSignatureAlgorithmId: string | null;
+	pendingSigningRsaModulusBits: number | null;
+	pendingSigningEcCurve: string | null;
+	pendingSigningCertNotAfter: string | null;
 }
 
 export interface IdpSettingsPublicDto {
@@ -28,6 +35,10 @@ export interface IdpSettingsPublicDto {
 	hasSigningCertificate: boolean;
 	signingCertFingerprintSha256: string | null;
 	signingCertNotAfter: string | null;
+	signingKeyFamily: 'rsa' | 'ec' | null;
+	signingSignatureAlgorithmId: string | null;
+	signingRsaModulusBits: number | null;
+	signingEcCurve: string | null;
 	metadataUrl: string;
 	ssoUrl: string;
 	idpBaseUrl: string;
@@ -45,8 +56,10 @@ export interface UploadIdpSigningCertRequestDto {
 	signingPrivateKeyPem: string;
 }
 
+export type { GenerateIdpSigningCertRequestDto };
+
 export type StartIdpCertRotationRequestDto =
-	| { mode: 'generate' }
+	| ({ mode: 'generate' } & GenerateIdpSigningCertRequestDto)
 	| { mode: 'upload'; signingCertPem: string; signingPrivateKeyPem: string };
 
 export interface IdpMetadataPreviewResponseDto {

@@ -70,6 +70,39 @@ describe('IdpSettingsAuditService', () => {
 		});
 	});
 
+	it('API-IDP-AUDIT-09: logSigningCertGenerated includes crypto metadata without PEM', () => {
+		service.logSigningCertGenerated(false, {
+			keyFamily: 'rsa',
+			signatureAlgorithmId: 'rsa-sha256',
+			rsaModulusBits: 2048,
+			notAfter: '2028-06-01',
+		});
+		expect(JSON.parse(String(logSpy.mock.calls[0][0]))).toMatchObject({
+			event: 'idp_signing_cert_generated',
+			keyFamily: 'rsa',
+			signatureAlgorithmId: 'rsa-sha256',
+			rsaModulusBits: 2048,
+			notAfter: '2028-06-01',
+		});
+	});
+
+	it('API-IDP-AUDIT-10: logRotationStarted generate includes crypto metadata', () => {
+		service.logRotationStarted('generate', {
+			keyFamily: 'ec',
+			signatureAlgorithmId: 'ecdsa-sha256',
+			ecCurve: 'P-256',
+			notAfter: '2029-01-01',
+		});
+		expect(JSON.parse(String(logSpy.mock.calls[0][0]))).toEqual({
+			event: 'idp_signing_rotation_started',
+			mode: 'generate',
+			keyFamily: 'ec',
+			signatureAlgorithmId: 'ecdsa-sha256',
+			ecCurve: 'P-256',
+			notAfter: '2029-01-01',
+		});
+	});
+
 	it('API-IDP-AUDIT-08: no audit payload contains PEM markers', () => {
 		const samplePem = '-----BEGIN PRIVATE KEY-----\nsecret\n-----END PRIVATE KEY-----';
 		service.logSettingsUpdated(['entityId']);

@@ -5,7 +5,16 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { GenerateIdpSigningCertRequestDto, StoredSigningCrypto } from '@nestidp/shared';
+import {
+	daysFromTodayUntilNotAfter,
+	ecCurveToNamedCurve,
+	resolveGenerateIdpSigningCertRequest,
+	resolveSignatureAlgorithmIdForSigning,
+	toStoredSigningCrypto,
+} from '@nestidp/shared';
 import { SignedXml } from 'xml-crypto';
+import { applyNestIdpXmlCryptoExtensions } from './xml-crypto-extended-algorithms';
 import { EncryptionService } from '../encryption/encryption.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SamlAuthAuditService } from './saml-auth-audit.service';
@@ -13,6 +22,13 @@ import { SamlAuthAuditService } from './saml-auth-audit.service';
 export interface SigningMaterial {
 	certPem: string;
 	privateKeyPem: string;
+	signatureAlgorithmId?: string | null;
+}
+
+export interface GeneratedSigningKeyPair {
+	privateKeyPem: string;
+	certPem: string;
+	metadata: StoredSigningCrypto;
 }
 
 @Injectable()
@@ -34,6 +50,7 @@ export class IdpSigningService {
 			return {
 				certPem: settings.signingCertPem,
 				privateKeyPem: this.encryptionService.decrypt(settings.signingKeyEncrypted),
+				signatureAlgorithmId: settings.signingSignatureAlgorithmId,
 			};
 		}
 
@@ -41,25 +58,35 @@ export class IdpSigningService {
 			throw new Error('IdP signing certificate not configured');
 		}
 
-		const { privateKeyPem, certPem } = this.generateKeyPairAndCert(settings.entityId);
+		const generated = this.generateKeyPairAndCert(settings.entityId);
 		await this.prisma.idpSettings.update({
 			where: { id: 'default' },
 			data: {
-				signingCertPem: certPem,
-				signingKeyEncrypted: this.encryptionService.encrypt(privateKeyPem),
+				signingCertPem: generated.certPem,
+				signingKeyEncrypted: this.encryptionService.encrypt(generated.privateKeyPem),
+				signingKeyFamily: generated.metadata.signingKeyFamily,
+				signingSignatureAlgorithmId: generated.metadata.signingSignatureAlgorithmId,
+				signingRsaModulusBits: generated.metadata.signingRsaModulusBits,
+				signingEcCurve: generated.metadata.signingEcCurve,
 			},
 		});
 		this.audit.logSigningKeyGenerated();
-		return { certPem, privateKeyPem };
+		return {
+			certPem: generated.certPem,
+			privateKeyPem: generated.privateKeyPem,
+			signatureAlgorithmId: generated.metadata.signingSignatureAlgorithmId,
+		};
 	}
 
 	signAssertion(assertionXml: string, material: SigningMaterial, assertionId: string): string {
+		const option = resolveSignatureAlgorithmIdForSigning(material.signatureAlgorithmId);
 		const sig = new SignedXml({
 			privateKey: material.privateKeyPem,
 			publicCert: material.certPem,
-			signatureAlgorithm: 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256',
+			signatureAlgorithm: option.xmlSignatureAlgorithm,
 			canonicalizationAlgorithm: 'http://www.w3.org/2001/10/xml-exc-c14n#',
 		});
+		applyNestIdpXmlCryptoExtensions(sig);
 		const stripped = assertionXml.replace(/^<\?xml[^?]*\?>\s*/i, '').trim();
 		const wrapper = `<container>${stripped}</container>`;
 		sig.addReference({
@@ -68,7 +95,7 @@ export class IdpSigningService {
 				'http://www.w3.org/2000/09/xmldsig#enveloped-signature',
 				'http://www.w3.org/2001/10/xml-exc-c14n#',
 			],
-			digestAlgorithm: 'http://www.w3.org/2001/04/xmlenc#sha256',
+			digestAlgorithm: option.xmlDigestAlgorithm,
 		});
 		sig.computeSignature(wrapper, {
 			location: { reference: `//*[@ID='${assertionId}']`, action: 'after' },
@@ -103,8 +130,11 @@ export class IdpSigningService {
 		return [material.certPem];
 	}
 
-	generateKeyPairAndCert(entityId: string): { privateKeyPem: string; certPem: string } {
-		return this.createKeyPairAndCert(entityId);
+	generateKeyPairAndCert(
+		entityId: string,
+		options?: GenerateIdpSigningCertRequestDto,
+	): GeneratedSigningKeyPair {
+		return this.createKeyPairAndCert(entityId, options);
 	}
 
 	extractX509CertificatePem(certPem: string): string {
@@ -129,26 +159,41 @@ export class IdpSigningService {
 		return fragment;
 	}
 
-	private createKeyPairAndCert(entityId: string): { privateKeyPem: string; certPem: string } {
-		const { privateKey } = generateKeyPairSync('rsa', {
-			modulusLength: 2048,
-			privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
-			publicKeyEncoding: { type: 'spki', format: 'pem' },
-		});
+	private createKeyPairAndCert(
+		entityId: string,
+		options?: GenerateIdpSigningCertRequestDto,
+	): GeneratedSigningKeyPair {
+		const resolved = resolveGenerateIdpSigningCertRequest(options ?? {});
+		const metadata = toStoredSigningCrypto(resolved);
+
+		const privateKeyPem =
+			resolved.keyFamily === 'rsa'
+				? generateKeyPairSync('rsa', {
+						modulusLength: resolved.rsaModulusBits,
+						privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+						publicKeyEncoding: { type: 'spki', format: 'pem' },
+					}).privateKey
+				: generateKeyPairSync('ec', {
+						namedCurve: ecCurveToNamedCurve(resolved.ecCurve),
+						privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+						publicKeyEncoding: { type: 'spki', format: 'pem' },
+					}).privateKey;
 
 		const tmp = mkdtempSync(join(tmpdir(), 'nestidp-cert-'));
 		try {
 			const keyPath = join(tmp, 'key.pem');
 			const certPath = join(tmp, 'cert.pem');
-			writeFileSync(keyPath, privateKey);
+			writeFileSync(keyPath, privateKeyPem);
 			const cn = entityId.replace(/^https?:\/\//, '').slice(0, 64) || 'nestidp';
+			const days = daysFromTodayUntilNotAfter(resolved.notAfter);
 			execSync(
-				`openssl req -new -x509 -key "${keyPath}" -out "${certPath}" -days 3650 -subj "/CN=${cn}" -nodes`,
+				`openssl req -new -x509 -key "${keyPath}" -out "${certPath}" -days ${days} -subj "/CN=${cn}" -nodes`,
 				{ stdio: 'pipe' },
 			);
 			return {
-				privateKeyPem: privateKey,
+				privateKeyPem,
 				certPem: readFileSync(certPath, 'utf8'),
+				metadata,
 			};
 		} finally {
 			rmSync(tmp, { recursive: true, force: true });

@@ -1,4 +1,16 @@
-import { createHash, createSign, createVerify, X509Certificate } from 'node:crypto';
+import {
+	createHash,
+	createPrivateKey,
+	createSign,
+	createVerify,
+	X509Certificate,
+	type KeyObject,
+} from 'node:crypto';
+import type { IdpSigningEcCurve, IdpSigningKeyFamily, StoredSigningCrypto } from '@nestidp/shared';
+import {
+	defaultSignatureAlgorithmIdForKeyFamily,
+	getIdpSigningSignatureOption,
+} from '@nestidp/shared';
 
 export class IdpCertValidationError extends Error {
 	constructor(message: string) {
@@ -37,23 +49,116 @@ export function assertValidSigningPrivateKeyPem(value: string): string {
 	return trimmed;
 }
 
-export function assertMatchingKeyPair(certPem: string, privateKeyPem: string): void {
+function detectKeyFamily(keyObject: KeyObject): IdpSigningKeyFamily {
+	const type = keyObject.asymmetricKeyType;
+	if (type === 'rsa') {
+		return 'rsa';
+	}
+	if (type === 'ec') {
+		return 'ec';
+	}
+	throw new IdpCertValidationError('Private key must be RSA or EC');
+}
+
+function detectRsaModulusBits(keyObject: KeyObject): number {
+	const details = keyObject.asymmetricKeyDetails;
+	const length = details?.modulusLength;
+	if (!length) {
+		return 2048;
+	}
+	return length;
+}
+
+function namedCurveToLabel(namedCurve: string | undefined): IdpSigningEcCurve {
+	switch (namedCurve) {
+		case 'prime256v1':
+			return 'P-256';
+		case 'secp384r1':
+			return 'P-384';
+		case 'secp521r1':
+			return 'P-521';
+		default:
+			return 'P-256';
+	}
+}
+
+function detectEcCurve(keyObject: KeyObject): IdpSigningEcCurve {
+	const details = keyObject.asymmetricKeyDetails;
+	return namedCurveToLabel(details?.namedCurve);
+}
+
+function detectCertKeyFamily(certPem: string): IdpSigningKeyFamily {
+	const cert = new X509Certificate(certPem);
+	const keyObject = cert.publicKey;
+	const type = keyObject.asymmetricKeyType;
+	if (type === 'rsa') {
+		return 'rsa';
+	}
+	if (type === 'ec') {
+		return 'ec';
+	}
+	throw new IdpCertValidationError('Certificate public key must be RSA or EC');
+}
+
+function probeSignVerify(
+	certPem: string,
+	privateKeyPem: string,
+	nodeSignAlgorithm: string,
+): boolean {
 	const payload = 'nestidp-keypair-check';
 	try {
-		const signer = createSign('RSA-SHA256');
+		const signer = createSign(nodeSignAlgorithm);
 		signer.update(payload);
 		signer.end();
 		const signature = signer.sign(privateKeyPem);
-		const verifier = createVerify('RSA-SHA256');
+		const verifier = createVerify(nodeSignAlgorithm);
 		verifier.update(payload);
 		verifier.end();
-		if (verifier.verify(certPem, signature)) {
-			return;
-		}
+		return verifier.verify(certPem, signature);
 	} catch {
-		// fall through to mismatch error
+		return false;
 	}
-	throw new IdpCertValidationError('Certificate and private key do not match');
+}
+
+export function inferStoredSigningCryptoFromPem(
+	certPem: string,
+	privateKeyPem: string,
+): StoredSigningCrypto {
+	const normalizedCert = assertValidSigningCertPem(certPem);
+	const normalizedKey = assertValidSigningPrivateKeyPem(privateKeyPem);
+	const certFamily = detectCertKeyFamily(normalizedCert);
+	const keyObject = createPrivateKey(normalizedKey);
+	const keyFamily = detectKeyFamily(keyObject);
+	if (certFamily !== keyFamily) {
+		throw new IdpCertValidationError('Certificate and private key use different key types');
+	}
+
+	const signatureAlgorithmId = defaultSignatureAlgorithmIdForKeyFamily(keyFamily);
+	const option = getIdpSigningSignatureOption(signatureAlgorithmId)!;
+	if (!probeSignVerify(normalizedCert, normalizedKey, option.nodeSignAlgorithm)) {
+		throw new IdpCertValidationError('Certificate and private key do not match');
+	}
+
+	if (keyFamily === 'rsa') {
+		return {
+			signingKeyFamily: 'rsa',
+			signingSignatureAlgorithmId: signatureAlgorithmId,
+			signingRsaModulusBits: detectRsaModulusBits(keyObject),
+			signingEcCurve: null,
+		};
+	}
+
+	return {
+		signingKeyFamily: 'ec',
+		signingSignatureAlgorithmId: signatureAlgorithmId,
+		signingRsaModulusBits: null,
+		signingEcCurve: detectEcCurve(keyObject),
+	};
+}
+
+/** @deprecated use inferStoredSigningCryptoFromPem */
+export function assertMatchingKeyPair(certPem: string, privateKeyPem: string): void {
+	inferStoredSigningCryptoFromPem(certPem, privateKeyPem);
 }
 
 export function fingerprintSha256Hex(certPem: string): string {
@@ -91,9 +196,28 @@ export function validateSigningCertPair(
 ): {
 	certPem: string;
 	privateKeyPem: string;
+	crypto: StoredSigningCrypto;
 } {
 	const normalizedCert = assertValidSigningCertPem(certPem);
 	const normalizedKey = assertValidSigningPrivateKeyPem(privateKeyPem);
-	assertMatchingKeyPair(normalizedCert, normalizedKey);
-	return { certPem: normalizedCert, privateKeyPem: normalizedKey };
+	const crypto = inferStoredSigningCryptoFromPem(normalizedCert, normalizedKey);
+	return { certPem: normalizedCert, privateKeyPem: normalizedKey, crypto };
+}
+
+export function prismaCryptoPrimaryData(crypto: StoredSigningCrypto) {
+	return {
+		signingKeyFamily: crypto.signingKeyFamily,
+		signingSignatureAlgorithmId: crypto.signingSignatureAlgorithmId,
+		signingRsaModulusBits: crypto.signingRsaModulusBits,
+		signingEcCurve: crypto.signingEcCurve,
+	};
+}
+
+export function prismaCryptoPendingData(crypto: StoredSigningCrypto) {
+	return {
+		pendingSigningKeyFamily: crypto.signingKeyFamily,
+		pendingSigningSignatureAlgorithmId: crypto.signingSignatureAlgorithmId,
+		pendingSigningRsaModulusBits: crypto.signingRsaModulusBits,
+		pendingSigningEcCurve: crypto.signingEcCurve,
+	};
 }

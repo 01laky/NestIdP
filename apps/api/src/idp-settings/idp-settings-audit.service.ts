@@ -20,8 +20,18 @@ export class IdpSettingsAuditService {
 		});
 	}
 
-	logSigningCertGenerated(rotation: boolean): void {
-		const payload = { event: 'idp_signing_cert_generated', rotation };
+	logSigningCertGenerated(
+		rotation: boolean,
+		crypto?: {
+			keyFamily: string;
+			signatureAlgorithmId: string;
+			rsaModulusBits?: number;
+			ecCurve?: string;
+			notAfter?: string;
+		},
+	): void {
+		const metadata = { rotation, ...crypto };
+		const payload = { event: 'idp_signing_cert_generated', ...metadata };
 		this.logger.log(JSON.stringify(payload));
 		this.audit.recordSafe({
 			category: 'admin_config',
@@ -29,7 +39,7 @@ export class IdpSettingsAuditService {
 			actorType: 'admin',
 			subjectType: 'IdpSettings',
 			subjectId: 'default',
-			metadata: { rotation },
+			metadata,
 		});
 	}
 
@@ -46,8 +56,18 @@ export class IdpSettingsAuditService {
 		});
 	}
 
-	logRotationStarted(mode: 'generate' | 'upload'): void {
-		const payload = { event: 'idp_signing_rotation_started', mode };
+	logRotationStarted(
+		mode: 'generate' | 'upload',
+		crypto?: {
+			keyFamily: string;
+			signatureAlgorithmId: string;
+			rsaModulusBits?: number;
+			ecCurve?: string;
+			notAfter?: string;
+		},
+	): void {
+		const metadata = { mode, ...crypto };
+		const payload = { event: 'idp_signing_rotation_started', ...metadata };
 		this.logger.log(JSON.stringify(payload));
 		this.audit.recordSafe({
 			category: 'admin_config',
@@ -55,7 +75,7 @@ export class IdpSettingsAuditService {
 			actorType: 'admin',
 			subjectType: 'IdpSettings',
 			subjectId: 'default',
-			metadata: { mode },
+			metadata,
 		});
 	}
 

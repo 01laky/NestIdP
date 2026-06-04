@@ -450,7 +450,9 @@ Attribute mapping is configurable per SP connection in the admin UI.
 
 ### 8.4 Certificate Management
 
-- IdP signing key pair generated on first setup (or uploaded by admin).
+- IdP signing material is **self-signed only** (in-app generate) or **operator-uploaded PEM** — no external CA in v1.
+- Operators generate certificates in admin with selectable **RSA or EC** key, **XML-DSig signature algorithm** (RSA/ECDSA with SHA-1/256/384/512), and **expiry date** (today through +10 years; default ~2 years).
+- Upload infers key family and algorithm from PEM; SAML assertions sign with the **primary** algorithm until rotation completes.
 - Support for two active signing certificates during rotation (old + new both published in metadata until cutover).
 - Private keys stored encrypted at rest in the database or in a secrets manager.
 

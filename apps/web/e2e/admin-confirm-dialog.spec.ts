@@ -92,6 +92,44 @@ test.describe('Admin confirm dialog (WEB-ADM-E2E-CONF)', () => {
 		await expect(page.getByRole('button', { name: 'Cancel' })).toBeVisible();
 	});
 
+	test('E2E-IDP-CRYPTO-02: select EC and POST generate sends ec body', async ({ page }) => {
+		let postedBody: Record<string, unknown> | null = null;
+		await page.route(GENERATE_CERT_ROUTE, async (route) => {
+			postedBody = route.request().postDataJSON() as Record<string, unknown>;
+			await route.fulfill({ status: 200, body: JSON.stringify(idpSettings) });
+		});
+		await page.goto('/admin/settings/idp');
+		await page.getByLabel('Key type').selectOption('ec');
+		await page.getByLabel('EC curve').selectOption('P-384');
+		await page.getByLabel('Signature algorithm').selectOption('ecdsa-sha384');
+		await page.getByRole('button', { name: 'Generate certificate' }).click();
+		const dialog = page.getByRole('dialog');
+		await dialog.getByRole('textbox').fill('REPLACE');
+		await dialog.getByRole('button', { name: 'Generate certificate' }).click();
+		await expect.poll(() => postedBody).not.toBeNull();
+		expect(postedBody!.keyFamily).toBe('ec');
+		expect(postedBody!.ecCurve).toBe('P-384');
+		expect(postedBody!.signatureAlgorithmId).toBe('ecdsa-sha384');
+	});
+
+	test('E2E-IDP-CRYPTO-01: POST generate captures JSON body with defaults', async ({ page }) => {
+		let postedBody: Record<string, unknown> | null = null;
+		await page.route(GENERATE_CERT_ROUTE, async (route) => {
+			postedBody = route.request().postDataJSON() as Record<string, unknown>;
+			await route.fulfill({ status: 200, body: JSON.stringify(idpSettings) });
+		});
+		await page.goto('/admin/settings/idp');
+		await page.getByRole('button', { name: 'Generate certificate' }).click();
+		const dialog = page.getByRole('dialog');
+		await dialog.getByRole('textbox').fill('REPLACE');
+		await dialog.getByRole('button', { name: 'Generate certificate' }).click();
+		await expect.poll(() => postedBody).not.toBeNull();
+		expect(postedBody!.keyFamily).toBe('rsa');
+		expect(postedBody!.rsaModulusBits).toBe(2048);
+		expect(postedBody!.signatureAlgorithmId).toBe('rsa-sha256');
+		expect(String(postedBody!.notAfter)).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+	});
+
 	test('WEB-ADM-E2E-CONF-03: REPLACE required then POST generate', async ({ page }) => {
 		let generateCalled = false;
 		await page.route(GENERATE_CERT_ROUTE, async (route) => {

@@ -20,6 +20,7 @@ import type {
 	DeleteApiConnectionResponseDto,
 	DeleteSpConnectionResponseDto,
 	IdpMetadataPreviewResponseDto,
+	GenerateIdpSigningCertRequestDto,
 	IdpSettingsPublicDto,
 	CreateManualIdentityGroupDto,
 	CreateManualIdentityRoleDto,
@@ -417,9 +418,12 @@ export function updateIdpSettings(
 	});
 }
 
-export function generateIdpSigningCert(): Promise<IdpSettingsPublicDto> {
+export function generateIdpSigningCert(
+	body: GenerateIdpSigningCertRequestDto = {},
+): Promise<IdpSettingsPublicDto> {
 	return adminFetch<IdpSettingsPublicDto>(`${IDP_SETTINGS_API_PATH}/signing-cert/generate`, {
 		method: 'POST',
+		body: JSON.stringify(body),
 	});
 }
 

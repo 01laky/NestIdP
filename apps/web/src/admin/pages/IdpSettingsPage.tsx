@@ -1,8 +1,9 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import type { IdpSettingsPublicDto } from '@nestidp/shared';
+import type { GenerateIdpSigningCertRequestDto, IdpSettingsPublicDto } from '@nestidp/shared';
 import {
+	getDefaultGenerateIdpSigningCertRequest,
 	IDP_ROTATION_STALE_WARNING_DAYS,
 	IDP_CERT_EXPIRY_WARNING_DAYS,
 	SAML_NAME_ID_FORMATS,
@@ -19,6 +20,10 @@ import {
 	updateIdpSettings,
 	uploadIdpSigningCert,
 } from '../adminApi';
+import {
+	buildCertOptionsConfirmSummary,
+	IdpSigningCertOptionsFields,
+} from '../components/IdpSigningCertOptionsFields';
 import { AdminBreadcrumbs } from '../components/AdminBreadcrumbs';
 import { AdminPageHeader } from '../components/AdminPageHeader';
 import { ErrorBanner } from '../components/ErrorBanner';
@@ -27,6 +32,7 @@ import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
 import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
 import {
 	Button,
+	Callout,
 	CodeBlock,
 	Panel,
 	Select,
@@ -91,6 +97,9 @@ export function IdpSettingsPage() {
 	const [uploadCert, setUploadCert] = useState('');
 	const [uploadKey, setUploadKey] = useState('');
 	const [busy, setBusy] = useState(false);
+	const [certOptions, setCertOptions] = useState<GenerateIdpSigningCertRequestDto>(() =>
+		getDefaultGenerateIdpSigningCertRequest(),
+	);
 
 	async function reload(): Promise<IdpSettingsPublicDto> {
 		const data = await getIdpSettings();
@@ -179,10 +188,15 @@ export function IdpSettingsPage() {
 		}
 	}
 
+	async function refreshMetadataPreview() {
+		const preview = await getIdpMetadataPreview();
+		setMetadataPreview(preview.xml);
+	}
+
 	async function handleGeneratePrimary() {
 		const ok = await confirm({
 			title: t('confirmGeneratePrimaryTitle'),
-			description: t('confirmGeneratePrimary'),
+			description: `${t('confirmGeneratePrimary')}\n\n${buildCertOptionsConfirmSummary(certOptions, t)}`,
 			tone: 'warning',
 			showAuditNote: true,
 			typeToConfirm: { challenge: 'REPLACE', label: t('typeReplaceToConfirm') },
@@ -192,10 +206,11 @@ export function IdpSettingsPage() {
 			return;
 		}
 		await runMutation(async () => {
-			await generateIdpSigningCert();
+			await generateIdpSigningCert(certOptions);
 			await reload();
+			await refreshMetadataPreview();
 			setSuccess(t('successPrimaryGenerated'));
-			showToast(t('toastPrimaryGenerated'));
+			showToast(t('toastCertGeneratedViewMetadata'));
 		});
 	}
 
@@ -229,7 +244,7 @@ export function IdpSettingsPage() {
 	async function handleStartRotationGenerate() {
 		const ok = await confirm({
 			title: t('confirmStartRotationTitle'),
-			description: t('confirmStartRotation'),
+			description: `${t('confirmStartRotation')}\n\n${buildCertOptionsConfirmSummary(certOptions, t)}`,
 			tone: 'warning',
 			showAuditNote: true,
 			confirmLabel: t('startRotationGenerate'),
@@ -238,8 +253,9 @@ export function IdpSettingsPage() {
 			return;
 		}
 		await runMutation(async () => {
-			await startIdpCertRotation({ mode: 'generate' });
+			await startIdpCertRotation({ mode: 'generate', ...certOptions });
 			await reload();
+			await refreshMetadataPreview();
 			setSuccess(t('successRotationStarted'));
 			showToast(t('toastRotationStarted'));
 		});
@@ -285,8 +301,7 @@ export function IdpSettingsPage() {
 
 	async function handleRefreshMetadataPreview() {
 		await runMutation(async () => {
-			const preview = await getIdpMetadataPreview();
-			setMetadataPreview(preview.xml);
+			await refreshMetadataPreview();
 		});
 	}
 
@@ -409,7 +424,32 @@ export function IdpSettingsPage() {
 						<span>{t('notAfter')}</span>
 						<code>{settings.signingCertNotAfter ?? tCommon('emDash')}</code>
 					</li>
+					{settings.signingKeyFamily ? (
+						<li>
+							<span>{t('crypto.keyFamily')}</span>
+							<code>
+								{settings.signingKeyFamily === 'rsa'
+									? `RSA ${settings.signingRsaModulusBits ?? 2048}`
+									: `EC ${settings.signingEcCurve ?? 'P-256'}`}
+							</code>
+						</li>
+					) : null}
+					{settings.signingSignatureAlgorithmId ? (
+						<li>
+							<span>{t('crypto.signatureAlgorithm')}</span>
+							<code>
+								{t(`crypto.algorithms.${settings.signingSignatureAlgorithmId}`, {
+									defaultValue: settings.signingSignatureAlgorithmId,
+								})}
+							</code>
+						</li>
+					) : null}
 				</ul>
+				<IdpSigningCertOptionsFields
+					value={certOptions}
+					onChange={setCertOptions}
+					disabled={busy || settings.rotation.active}
+				/>
 				<div className="evg-cluster">
 					<Button
 						type="button"
@@ -485,11 +525,31 @@ export function IdpSettingsPage() {
 							{t('rotationStale', { date: settings.rotation.startedAt })}
 						</p>
 					) : null}
+					<h3 className="evg-panel__title">{t('pendingCertTitle')}</h3>
 					<p className="evg-muted">
 						{t('pendingFingerprint', {
 							fingerprint: settings.rotation.pendingCertFingerprintSha256 ?? tCommon('emDash'),
 						})}
 					</p>
+					{settings.rotation.pendingSigningKeyFamily ? (
+						<p className="evg-muted">
+							{t('crypto.keyFamily')}: {settings.rotation.pendingSigningKeyFamily}
+							{settings.rotation.pendingSigningKeyFamily === 'rsa'
+								? ` ${settings.rotation.pendingSigningRsaModulusBits ?? 2048}`
+								: ` ${settings.rotation.pendingSigningEcCurve ?? 'P-256'}`}
+							{' · '}
+							{t('crypto.signatureAlgorithm')}:{' '}
+							{settings.rotation.pendingSigningSignatureAlgorithmId ?? tCommon('emDash')}
+							{' · '}
+							{t('notAfter')}: {settings.rotation.pendingSigningCertNotAfter ?? tCommon('emDash')}
+						</p>
+					) : null}
+					{settings.rotation.pendingSigningSignatureAlgorithmId &&
+					settings.signingSignatureAlgorithmId &&
+					settings.rotation.pendingSigningSignatureAlgorithmId !==
+						settings.signingSignatureAlgorithmId ? (
+						<Callout variant="warning">{t('rotationAlgorithmMismatchWarning')}</Callout>
+					) : null}
 					<ol className="evg-checklist">
 						<li>{t('rotationStep1')}</li>
 						<li>
@@ -520,7 +580,7 @@ export function IdpSettingsPage() {
 				</Panel>
 			) : null}
 
-			<Panel title={t('metadataPreview')}>
+			<Panel title={t('metadataPreview')} id="idp-metadata-preview">
 				<Button
 					type="button"
 					variant="secondary"

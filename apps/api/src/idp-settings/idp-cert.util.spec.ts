@@ -3,12 +3,16 @@ import {
 	assertValidSigningCertPem,
 	assertValidSigningPrivateKeyPem,
 	fingerprintSha256Hex,
+	inferStoredSigningCryptoFromPem,
 	isCertExpiringSoon,
 	parseCertNotAfterIso,
 	validateSigningCertPair,
 	IdpCertValidationError,
 } from './idp-cert.util';
+import { ConfigService } from '@nestjs/config';
 import { getTestSigningMaterial } from '../prisma/test-fixtures';
+import { IdpSigningService } from '../saml/idp-signing.service';
+import { SamlAuthAuditService } from '../saml/saml-auth-audit.service';
 
 describe('idp-cert.util', () => {
 	let certPem: string;
@@ -84,5 +88,53 @@ describe('idp-cert.util', () => {
 	it('API-IDP-VAL-14: rejects oversized PEM', () => {
 		const huge = `-----BEGIN CERTIFICATE-----\n${'A'.repeat(20_000)}\n-----END CERTIFICATE-----`;
 		expect(() => assertValidSigningCertPem(huge)).toThrow('too large');
+	});
+
+	it('API-IDP-VAL-15: inferStoredSigningCryptoFromPem returns rsa defaults for RSA pair', () => {
+		const crypto = inferStoredSigningCryptoFromPem(certPem, privateKeyPem);
+		expect(crypto.signingKeyFamily).toBe('rsa');
+		expect(crypto.signingSignatureAlgorithmId).toBe('rsa-sha256');
+		expect(crypto.signingRsaModulusBits).toBeGreaterThanOrEqual(2048);
+		expect(crypto.signingEcCurve).toBeNull();
+	});
+
+	it('API-IDP-VAL-16: validateSigningCertPair includes crypto metadata', () => {
+		const result = validateSigningCertPair(certPem, privateKeyPem);
+		expect(result.crypto.signingKeyFamily).toBe('rsa');
+	});
+
+	it('API-IDP-VAL-17: inferStoredSigningCryptoFromPem detects EC material', () => {
+		const signing = new IdpSigningService(
+			{} as never,
+			{} as never,
+			{ get: () => undefined } as unknown as ConfigService,
+			new SamlAuthAuditService({ recordSafe: jest.fn() } as never),
+		);
+		const ec = signing.generateKeyPairAndCert('https://ec-infer.example', {
+			keyFamily: 'ec',
+			ecCurve: 'P-256',
+			signatureAlgorithmId: 'ecdsa-sha256',
+			notAfter: '2030-01-01',
+		});
+		const crypto = inferStoredSigningCryptoFromPem(ec.certPem, ec.privateKeyPem);
+		expect(crypto.signingKeyFamily).toBe('ec');
+		expect(crypto.signingEcCurve).toBe('P-256');
+		expect(crypto.signingRsaModulusBits).toBeNull();
+	});
+
+	it('API-IDP-VAL-18: mismatched RSA cert and EC key rejected', () => {
+		const signing = new IdpSigningService(
+			{} as never,
+			{} as never,
+			{ get: () => undefined } as unknown as ConfigService,
+			new SamlAuthAuditService({ recordSafe: jest.fn() } as never),
+		);
+		const ec = signing.generateKeyPairAndCert('https://ec-mismatch.example', {
+			keyFamily: 'ec',
+			notAfter: '2030-01-01',
+		});
+		expect(() => inferStoredSigningCryptoFromPem(certPem, ec.privateKeyPem)).toThrow(
+			/different key types/,
+		);
 	});
 });

@@ -15,6 +15,10 @@ const defaultIdp = {
 	hasSigningCertificate: true,
 	rotationActive: false,
 	signingCertNotAfter: '2030-01-01T00:00:00.000Z',
+	signingKeyFamily: 'rsa' as const,
+	signingSignatureAlgorithmId: 'rsa-sha256',
+	signingRsaModulusBits: 2048,
+	signingEcCurve: null,
 	certStatus: 'ok' as const,
 };
 
@@ -94,6 +98,20 @@ describe('DashboardPage', () => {
 
 		await waitFor(() => {
 			expect(screen.getByRole('alert').textContent).toContain('Server error');
+		});
+	});
+
+	it('WEB-DASH-CRYPTO-01: dashboard renders idpSigningSummary when cert configured', async () => {
+		vi.spyOn(adminApi, 'getAdminDashboard').mockResolvedValue(dashboardStub());
+
+		render(
+			<MemoryRouter>
+				<DashboardPage />
+			</MemoryRouter>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByText(/RSA 2048 bit · rsa-sha256 · expires/i)).toBeDefined();
 		});
 	});
 

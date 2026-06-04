@@ -45,6 +45,10 @@ export class AdminDashboardService {
 					hasSigningCertificate: false,
 					rotationActive: false,
 					signingCertNotAfter: null,
+					signingKeyFamily: null,
+					signingSignatureAlgorithmId: null,
+					signingRsaModulusBits: null,
+					signingEcCurve: null,
 					certStatus: 'missing' as const,
 				};
 

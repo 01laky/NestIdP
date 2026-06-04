@@ -42,7 +42,7 @@ Set **Entity ID** to the public base URL operators and SPs will trust (here `htt
 
 ### Signing certificate and metadata preview
 
-Generate or upload a signing certificate before production SSO. The metadata preview shows the XML to give to SPs (e.g. Grafana Cloud).
+Generate or upload a signing certificate before production SSO. **Generate** lets you pick RSA or EC key type, XML-DSig algorithm (eight options), and a calendar expiry date (up to ten years); defaults are RSA-2048, rsa-sha256, and about two years. The metadata preview shows the XML to give to SPs (e.g. Grafana Cloud).
 
 ![IdP settings — signing certificate and metadata preview](./img/idp-settings-certificate-metadata.png)
 

@@ -164,7 +164,8 @@
 		"metadataUrl": "Metadaten",
 		"operations": "Operations",
 		"releaseNote": "See docs/RELEASE.md in the repository before production go-live.",
-		"browseUsers": "Browse users"
+		"browseUsers": "Browse users",
+		"idpSigningSummary": "{{family}} {{detail}} · {{algorithm}} · expires {{date}}"
 	},
 	"apiConnections": {
 		"listTitle": "API-Verbindungen",
@@ -307,7 +308,35 @@
 		"successPrimaryUploaded": "Primary signing certificate uploaded.",
 		"successRotationStarted": "Rotation started with a newly generated pending certificate.",
 		"successRotationCompleted": "Certificate rotation completed.",
-		"successRotationCancelled": "Certificate rotation cancelled."
+		"successRotationCancelled": "Certificate rotation cancelled.",
+		"pendingCertTitle": "Pending certificate",
+		"rotationAlgorithmMismatchWarning": "Pending certificate uses a different signature algorithm than the active primary. SAML assertions still sign with the primary key until you complete rotation.",
+		"confirmGenerateSummary": "Key: {{family}} {{detail}} · Algorithm: {{algorithm}} · Expires: {{notAfter}}",
+		"toastCertGeneratedViewMetadata": "Signing certificate generated — refresh metadata preview below.",
+		"crypto": {
+			"panelTitle": "Certificate options",
+			"resetDefaults": "Reset to defaults",
+			"keyFamily": "Key type",
+			"keyFamilyRsa": "RSA",
+			"keyFamilyEc": "EC (ECDSA)",
+			"rsaModulus": "RSA key size (bits)",
+			"ecCurve": "EC curve",
+			"signatureAlgorithm": "Signature algorithm",
+			"notAfter": "Certificate expiry date",
+			"sha1Deprecated": "SHA-1 signatures are deprecated. Confirm your service providers accept this algorithm before continuing.",
+			"spCompatibilityWarning": "ECDSA signatures are not supported by all service providers. Verify SP compatibility before generating.",
+			"deprecatedSuffix": "deprecated",
+			"algorithms": {
+				"rsa-sha256": "RSA-SHA256",
+				"rsa-sha384": "RSA-SHA384",
+				"rsa-sha512": "RSA-SHA512",
+				"rsa-sha1": "RSA-SHA1",
+				"ecdsa-sha256": "ECDSA-SHA256",
+				"ecdsa-sha384": "ECDSA-SHA384",
+				"ecdsa-sha512": "ECDSA-SHA512",
+				"ecdsa-sha1": "ECDSA-SHA1"
+			}
+		}
 	},
 	"identity": {
 		"usersTitle": "Benutzer",

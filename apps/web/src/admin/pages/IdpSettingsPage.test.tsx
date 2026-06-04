@@ -6,11 +6,42 @@ import {
 	clickDialogConfirm,
 } from '../../test/confirm-dialog-helpers';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import type { IdpSettingsPublicDto } from '@nestidp/shared';
+import type { IdpSettingsPublicDto, IdpSigningRotationStatusDto } from '@nestidp/shared';
 import { IDP_SETTINGS_ROUTE_PREFIX } from '@nestidp/shared';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as adminApi from '../adminApi';
 import { IdpSettingsPage } from './IdpSettingsPage';
+
+function inactiveRotation(): IdpSigningRotationStatusDto {
+	return {
+		active: false,
+		startedAt: null,
+		hasPendingCertificate: false,
+		pendingCertFingerprintSha256: null,
+		pendingSigningKeyFamily: null,
+		pendingSigningSignatureAlgorithmId: null,
+		pendingSigningRsaModulusBits: null,
+		pendingSigningEcCurve: null,
+		pendingSigningCertNotAfter: null,
+	};
+}
+
+function activeRotation(
+	overrides: Partial<IdpSigningRotationStatusDto> = {},
+): IdpSigningRotationStatusDto {
+	return {
+		active: true,
+		startedAt: '2026-01-15T00:00:00.000Z',
+		hasPendingCertificate: true,
+		pendingCertFingerprintSha256: 'dd:ee:ff',
+		pendingSigningKeyFamily: null,
+		pendingSigningSignatureAlgorithmId: null,
+		pendingSigningRsaModulusBits: null,
+		pendingSigningEcCurve: null,
+		pendingSigningCertNotAfter: null,
+		...overrides,
+	};
+}
 
 function baseSettings(overrides: Partial<IdpSettingsPublicDto> = {}): IdpSettingsPublicDto {
 	return {
@@ -19,15 +50,14 @@ function baseSettings(overrides: Partial<IdpSettingsPublicDto> = {}): IdpSetting
 		hasSigningCertificate: true,
 		signingCertFingerprintSha256: 'aa:bb:cc',
 		signingCertNotAfter: '2030-01-01T00:00:00.000Z',
+		signingKeyFamily: 'rsa',
+		signingSignatureAlgorithmId: 'rsa-sha256',
+		signingRsaModulusBits: 2048,
+		signingEcCurve: null,
 		metadataUrl: 'http://localhost:3000/saml/metadata',
 		ssoUrl: 'http://localhost:3000/saml/sso',
 		idpBaseUrl: 'http://localhost:3000',
-		rotation: {
-			active: false,
-			startedAt: null,
-			hasPendingCertificate: false,
-			pendingCertFingerprintSha256: null,
-		},
+		rotation: inactiveRotation(),
 		updatedAt: '2026-01-01T00:00:00.000Z',
 		...overrides,
 	};
@@ -82,12 +112,7 @@ describe('IdpSettingsPage', () => {
 	it('WEB-ADM-41: shows rotation panel when rotation.active', async () => {
 		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(
 			baseSettings({
-				rotation: {
-					active: true,
-					startedAt: '2026-01-15T00:00:00.000Z',
-					hasPendingCertificate: true,
-					pendingCertFingerprintSha256: 'dd:ee:ff',
-				},
+				rotation: activeRotation(),
 			}),
 		);
 
@@ -101,12 +126,7 @@ describe('IdpSettingsPage', () => {
 	it('WEB-ADM-42: complete rotation button calls API', async () => {
 		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(
 			baseSettings({
-				rotation: {
-					active: true,
-					startedAt: '2026-01-15T00:00:00.000Z',
-					hasPendingCertificate: true,
-					pendingCertFingerprintSha256: 'dd:ee:ff',
-				},
+				rotation: activeRotation(),
 			}),
 		);
 		const completeSpy = vi
@@ -126,12 +146,7 @@ describe('IdpSettingsPage', () => {
 	it('WEB-ADM-43: cancel rotation calls API', async () => {
 		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(
 			baseSettings({
-				rotation: {
-					active: true,
-					startedAt: '2026-01-15T00:00:00.000Z',
-					hasPendingCertificate: true,
-					pendingCertFingerprintSha256: 'dd:ee:ff',
-				},
+				rotation: activeRotation(),
 			}),
 		);
 		const cancelSpy = vi.spyOn(adminApi, 'cancelIdpCertRotation').mockResolvedValue(baseSettings());
@@ -160,7 +175,127 @@ describe('IdpSettingsPage', () => {
 
 		await waitFor(() => {
 			expect(generateSpy).toHaveBeenCalled();
+			const body = generateSpy.mock.calls[0]?.[0];
+			expect(body).toBeDefined();
+			expect(body?.notAfter).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+			expect(body?.keyFamily).toBe('rsa');
 		});
+	});
+
+	it('WEB-IDP-CRYPTO-03: generate POST body includes notAfter from form', async () => {
+		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(baseSettings());
+		const generateSpy = vi
+			.spyOn(adminApi, 'generateIdpSigningCert')
+			.mockResolvedValue(baseSettings());
+
+		renderPage();
+		await waitFor(() => screen.getByLabelText(/Certificate expiry/i));
+		const expiry = screen.getByLabelText(/Certificate expiry/i) as HTMLInputElement;
+		fireEvent.change(expiry, { target: { value: '2029-03-20' } });
+		fireEvent.click(screen.getByRole('button', { name: 'Generate certificate' }));
+		await acceptDialogWithChallenge('REPLACE', 'Generate certificate');
+
+		await waitFor(() => {
+			expect(generateSpy).toHaveBeenCalledWith(expect.objectContaining({ notAfter: '2029-03-20' }));
+		});
+	});
+
+	it('WEB-IDP-CRYPTO-08: rotation panel shows pending crypto and expiry', async () => {
+		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(
+			baseSettings({
+				rotation: activeRotation({
+					pendingSigningKeyFamily: 'ec',
+					pendingSigningSignatureAlgorithmId: 'ecdsa-sha256',
+					pendingSigningEcCurve: 'P-256',
+					pendingSigningCertNotAfter: '2031-06-01T00:00:00.000Z',
+				}),
+			}),
+		);
+
+		renderPage();
+		await waitFor(() => {
+			expect(screen.getByText(/ecdsa-sha256/i)).toBeDefined();
+			expect(screen.getByText(/2031-06-01/)).toBeDefined();
+		});
+	});
+
+	it('WEB-IDP-CRYPTO-09: upload rotation shows algorithm mismatch callout', async () => {
+		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(
+			baseSettings({
+				signingSignatureAlgorithmId: 'rsa-sha256',
+				rotation: activeRotation({
+					pendingSigningKeyFamily: 'rsa',
+					pendingSigningSignatureAlgorithmId: 'rsa-sha512',
+					pendingSigningRsaModulusBits: 2048,
+					pendingSigningCertNotAfter: '2031-01-01T00:00:00.000Z',
+				}),
+			}),
+		);
+
+		renderPage();
+		await waitFor(() => {
+			expect(
+				screen.getByText(/different signature algorithm than the active primary/i),
+			).toBeDefined();
+		});
+	});
+
+	it('WEB-IDP-CRYPTO-11: IdpSettingsPage imports signing options from shared', async () => {
+		const mod = await import('@nestidp/shared');
+		expect(mod.IDP_SIGNING_SIGNATURE_ALGORITHMS.length).toBe(8);
+		expect(mod.getDefaultGenerateIdpSigningCertRequest).toBeTypeOf('function');
+	});
+
+	it('WEB-IDP-CRYPTO-12: rsa-sha1 shows deprecation before generate confirm', async () => {
+		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(baseSettings());
+		vi.spyOn(adminApi, 'generateIdpSigningCert').mockResolvedValue(baseSettings());
+
+		renderPage();
+		await waitFor(() => screen.getByLabelText(/Signature algorithm/i));
+		fireEvent.change(screen.getByLabelText(/Signature algorithm/i), {
+			target: { value: 'rsa-sha1' },
+		});
+		expect(screen.getByText(/SHA-1 signatures are deprecated/i)).toBeDefined();
+		fireEvent.click(screen.getByRole('button', { name: 'Generate certificate' }));
+		const dialog = await screen.findByRole('dialog');
+		expect(dialog.textContent).toMatch(/rsa-sha1/i);
+	});
+
+	it('WEB-IDP-CRYPTO-13: start rotation (generate) sends certOptions in body', async () => {
+		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(baseSettings());
+		const startSpy = vi.spyOn(adminApi, 'startIdpCertRotation').mockResolvedValue(
+			baseSettings({
+				rotation: activeRotation(),
+			}),
+		);
+
+		renderPage();
+		await waitFor(() => screen.getByLabelText(/RSA key size/i));
+		fireEvent.change(screen.getByLabelText(/RSA key size/i), { target: { value: '4096' } });
+		fireEvent.click(screen.getByRole('button', { name: 'Start rotation (generate)' }));
+		clickDialogConfirm('Start rotation (generate)');
+
+		await waitFor(() =>
+			expect(startSpy).toHaveBeenCalledWith(
+				expect.objectContaining({ mode: 'generate', rsaModulusBits: 4096 }),
+			),
+		);
+	});
+
+	it('WEB-IDP-CRYPTO-10: after generate, metadata preview refetch runs', async () => {
+		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(baseSettings());
+		const previewSpy = vi.spyOn(adminApi, 'getIdpMetadataPreview').mockResolvedValue({
+			xml: '<EntityDescriptor/>',
+			contentType: 'application/xml',
+		});
+		vi.spyOn(adminApi, 'generateIdpSigningCert').mockResolvedValue(baseSettings());
+
+		renderPage();
+		await waitFor(() => screen.getByRole('button', { name: 'Generate certificate' }));
+		fireEvent.click(screen.getByRole('button', { name: 'Generate certificate' }));
+		await acceptDialogWithChallenge('REPLACE', 'Generate certificate');
+
+		await waitFor(() => expect(previewSpy).toHaveBeenCalled());
 	});
 
 	it('WEB-ADM-45: upload modal submits PEM fields', async () => {
@@ -263,12 +398,7 @@ describe('IdpSettingsPage', () => {
 	it('WEB-ADM-51: generate disabled during active rotation', async () => {
 		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(
 			baseSettings({
-				rotation: {
-					active: true,
-					startedAt: '2026-01-15T00:00:00.000Z',
-					hasPendingCertificate: true,
-					pendingCertFingerprintSha256: 'dd:ee:ff',
-				},
+				rotation: activeRotation(),
 			}),
 		);
 
@@ -301,12 +431,7 @@ describe('IdpSettingsPage', () => {
 	it('WEB-ADM-53: full flow load → start rotation → complete rotation', async () => {
 		const inactive = baseSettings();
 		const active = baseSettings({
-			rotation: {
-				active: true,
-				startedAt: '2026-01-15T00:00:00.000Z',
-				hasPendingCertificate: true,
-				pendingCertFingerprintSha256: 'dd:ee:ff',
-			},
+			rotation: activeRotation(),
 		});
 
 		vi.spyOn(adminApi, 'getIdpSettings')
@@ -323,7 +448,13 @@ describe('IdpSettingsPage', () => {
 		clickDialogConfirm('Start rotation (generate)');
 
 		await waitFor(() => {
-			expect(startSpy).toHaveBeenCalledWith({ mode: 'generate' });
+			expect(startSpy).toHaveBeenCalledWith(
+				expect.objectContaining({
+					mode: 'generate',
+					keyFamily: 'rsa',
+					notAfter: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+				}),
+			);
 			expect(screen.getByRole('heading', { name: 'Certificate rotation' })).toBeDefined();
 		});
 
@@ -373,12 +504,7 @@ describe('IdpSettingsPage', () => {
 	it('WEB-ADM-CONF-04: complete rotation cancel skips API (was WEB-ADM-56)', async () => {
 		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(
 			baseSettings({
-				rotation: {
-					active: true,
-					startedAt: '2026-01-15T00:00:00.000Z',
-					hasPendingCertificate: true,
-					pendingCertFingerprintSha256: 'dd:ee:ff',
-				},
+				rotation: activeRotation(),
 			}),
 		);
 		const completeSpy = vi.spyOn(adminApi, 'completeIdpCertRotation');
@@ -395,12 +521,7 @@ describe('IdpSettingsPage', () => {
 	it('WEB-ADM-CONF-05: cancel rotation dialog cancel skips API (was WEB-ADM-57)', async () => {
 		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(
 			baseSettings({
-				rotation: {
-					active: true,
-					startedAt: '2026-01-15T00:00:00.000Z',
-					hasPendingCertificate: true,
-					pendingCertFingerprintSha256: 'dd:ee:ff',
-				},
+				rotation: activeRotation(),
 			}),
 		);
 		const cancelSpy = vi.spyOn(adminApi, 'cancelIdpCertRotation');
@@ -431,12 +552,7 @@ describe('IdpSettingsPage', () => {
 		const stale = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString();
 		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(
 			baseSettings({
-				rotation: {
-					active: true,
-					startedAt: stale,
-					hasPendingCertificate: true,
-					pendingCertFingerprintSha256: 'dd:ee:ff',
-				},
+				rotation: activeRotation({ startedAt: stale }),
 			}),
 		);
 
@@ -450,12 +566,7 @@ describe('IdpSettingsPage', () => {
 	it('WEB-ADM-60: rotation panel renders numbered checklist (4 steps)', async () => {
 		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(
 			baseSettings({
-				rotation: {
-					active: true,
-					startedAt: '2026-01-15T00:00:00.000Z',
-					hasPendingCertificate: true,
-					pendingCertFingerprintSha256: 'dd:ee:ff',
-				},
+				rotation: activeRotation(),
 			}),
 		);
 
@@ -508,12 +619,7 @@ describe('IdpSettingsPage', () => {
 	it('WEB-ADM-69: upload button disabled during active rotation', async () => {
 		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(
 			baseSettings({
-				rotation: {
-					active: true,
-					startedAt: '2026-01-15T00:00:00.000Z',
-					hasPendingCertificate: true,
-					pendingCertFingerprintSha256: 'dd:ee:ff',
-				},
+				rotation: activeRotation(),
 			}),
 		);
 
@@ -569,12 +675,7 @@ describe('IdpSettingsPage', () => {
 	it('WEB-ADM-CONF-17: cancel rotation confirm calls API', async () => {
 		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(
 			baseSettings({
-				rotation: {
-					active: true,
-					startedAt: '2026-01-15T00:00:00.000Z',
-					hasPendingCertificate: true,
-					pendingCertFingerprintSha256: 'dd:ee:ff',
-				},
+				rotation: activeRotation(),
 			}),
 		);
 		const cancelSpy = vi.spyOn(adminApi, 'cancelIdpCertRotation').mockResolvedValue(baseSettings());
@@ -592,12 +693,7 @@ describe('IdpSettingsPage', () => {
 		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(baseSettings());
 		const startSpy = vi.spyOn(adminApi, 'startIdpCertRotation').mockResolvedValue(
 			baseSettings({
-				rotation: {
-					active: true,
-					startedAt: '2026-01-15T00:00:00.000Z',
-					hasPendingCertificate: true,
-					pendingCertFingerprintSha256: 'dd:ee:ff',
-				},
+				rotation: activeRotation(),
 			}),
 		);
 
@@ -607,18 +703,21 @@ describe('IdpSettingsPage', () => {
 		await screen.findByRole('dialog');
 		clickDialogConfirm('Start rotation (generate)');
 
-		await waitFor(() => expect(startSpy).toHaveBeenCalledWith({ mode: 'generate' }));
+		await waitFor(() =>
+			expect(startSpy).toHaveBeenCalledWith(
+				expect.objectContaining({
+					mode: 'generate',
+					signatureAlgorithmId: 'rsa-sha256',
+					notAfter: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+				}),
+			),
+		);
 	});
 
 	it('WEB-ADM-CONF-14: complete rotation Confirm disabled until COMPLETE typed', async () => {
 		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(
 			baseSettings({
-				rotation: {
-					active: true,
-					startedAt: '2026-01-15T00:00:00.000Z',
-					hasPendingCertificate: true,
-					pendingCertFingerprintSha256: 'dd:ee:ff',
-				},
+				rotation: activeRotation(),
 			}),
 		);
 		const completeSpy = vi.spyOn(adminApi, 'completeIdpCertRotation');

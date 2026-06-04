@@ -4,6 +4,30 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.4.7]
+
+### Added
+
+- IdP signing certificate **generate options** in admin: RSA/EC key family, modulus or curve, eight XML-DSig
+  signature algorithms, and calendar **expiry date** (UTC, today..10 years) with shared catalog in
+  `@nestidp/shared` (`idp-signing-crypto.ts`).
+- `IdpSettings` crypto metadata columns (primary + pending rotation): key family, algorithm id, RSA bits, EC curve.
+- Pending certificate panel during rotation (algorithm, expiry, fingerprint); dashboard one-line signing summary;
+  SP compatibility callouts for EC and SHA-1; metadata preview refresh after generate.
+- xml-crypto extensions for RSA-SHA384 and all ECDSA XML-DSig URIs used by the signing catalog (Node `crypto` backends).
+
+### Changed
+
+- `POST /api/admin/idp/settings/signing-cert/generate` and rotation `mode: generate` accept optional JSON body
+  (empty `{}` keeps defaults: RSA-2048, rsa-sha256).
+- SAML assertion signing uses stored primary `signingSignatureAlgorithmId` (legacy rows fall back to rsa-sha256).
+- Lazy auto-generate and default operator generate validity: **730 days** (was 3650 days for silent generate).
+- Upload/rotation upload infers and stores crypto metadata from PEM pairs.
+
+### Fixed
+
+- Certificate rotation `complete`/`cancel` now copies or clears pending crypto columns, not only PEM fields.
+
 ## [1.4.6]
 
 ### Fixed

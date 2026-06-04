@@ -125,6 +125,21 @@ export function DashboardPage() {
 						{t('configureIdpSettings')}
 					</Link>
 				</p>
+				{dashboard.idp.hasSigningCertificate &&
+				dashboard.idp.signingKeyFamily &&
+				dashboard.idp.signingSignatureAlgorithmId ? (
+					<p className="evg-muted">
+						{t('idpSigningSummary', {
+							family: dashboard.idp.signingKeyFamily.toUpperCase(),
+							detail:
+								dashboard.idp.signingKeyFamily === 'rsa'
+									? `${dashboard.idp.signingRsaModulusBits ?? 2048} bit`
+									: (dashboard.idp.signingEcCurve ?? 'P-256'),
+							algorithm: dashboard.idp.signingSignatureAlgorithmId,
+							date: dashboard.idp.signingCertNotAfter ?? tCommon('emDash'),
+						})}
+					</p>
+				) : null}
 				{dashboard.idp.rotationActive ? (
 					<p className="evg-muted">{t('completeRotationCallout')}</p>
 				) : null}

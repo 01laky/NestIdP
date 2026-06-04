@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { IdpSigningCryptoValidationError } from '@nestidp/shared';
 import { IdpSettingsService } from './idp-settings.service';
 import { getTestSigningMaterial } from '../prisma/test-fixtures';
 
@@ -26,7 +27,16 @@ describe('IdpSettingsService', () => {
 	const idpSigningService = {
 		generateKeyPairAndCert: jest.fn(() => {
 			const generated = getTestSigningMaterial('https://generated.example.com');
-			return { certPem: generated.certPem, privateKeyPem: generated.privateKeyPem };
+			return {
+				certPem: generated.certPem,
+				privateKeyPem: generated.privateKeyPem,
+				metadata: {
+					signingKeyFamily: 'rsa' as const,
+					signingSignatureAlgorithmId: 'rsa-sha256',
+					signingRsaModulusBits: 2048,
+					signingEcCurve: null,
+				},
+			};
 		}),
 	};
 
@@ -131,9 +141,18 @@ describe('IdpSettingsService', () => {
 
 	it('API-IDP-SVC-06: generatePrimaryCert replaces signing material', async () => {
 		const result = await service.generatePrimaryCert();
-		expect(idpSigningService.generateKeyPairAndCert).toHaveBeenCalledWith(baseSettings.entityId);
+		expect(idpSigningService.generateKeyPairAndCert).toHaveBeenCalledWith(
+			baseSettings.entityId,
+			{},
+		);
 		expect(encryptionService.encrypt).toHaveBeenCalled();
-		expect(audit.logSigningCertGenerated).toHaveBeenCalledWith(false);
+		expect(audit.logSigningCertGenerated).toHaveBeenCalledWith(false, {
+			keyFamily: 'rsa',
+			signatureAlgorithmId: 'rsa-sha256',
+			rsaModulusBits: 2048,
+			ecCurve: undefined,
+			notAfter: undefined,
+		});
 		expect(result.hasSigningCertificate).toBe(true);
 	});
 
@@ -165,7 +184,13 @@ describe('IdpSettingsService', () => {
 
 	it('API-IDP-SVC-10: startRotation generate stores pending cert', async () => {
 		const result = await service.startRotation({ mode: 'generate' });
-		expect(audit.logRotationStarted).toHaveBeenCalledWith('generate');
+		expect(audit.logRotationStarted).toHaveBeenCalledWith('generate', {
+			keyFamily: 'rsa',
+			signatureAlgorithmId: 'rsa-sha256',
+			rsaModulusBits: 2048,
+			ecCurve: undefined,
+			notAfter: undefined,
+		});
 		expect(result.rotation.active).toBe(true);
 		expect(result.rotation.hasPendingCertificate).toBe(true);
 	});
@@ -197,18 +222,81 @@ describe('IdpSettingsService', () => {
 			...baseSettings,
 			pendingSigningCertPem: otherMaterial.certPem,
 			pendingSigningKeyEncrypted: 'enc-pending',
+			pendingSigningKeyFamily: 'ec',
+			pendingSigningSignatureAlgorithmId: 'ecdsa-sha384',
+			pendingSigningRsaModulusBits: null,
+			pendingSigningEcCurve: 'P-384',
 		});
 		await service.completeRotation();
 		expect(prisma.idpSettings.update).toHaveBeenCalledWith(
 			expect.objectContaining({
 				data: expect.objectContaining({
 					signingCertPem: otherMaterial.certPem,
+					signingKeyFamily: 'ec',
+					signingSignatureAlgorithmId: 'ecdsa-sha384',
+					signingEcCurve: 'P-384',
+					pendingSigningKeyFamily: null,
+					pendingSigningSignatureAlgorithmId: null,
 					pendingSigningCertPem: null,
 					rotationStartedAt: null,
 				}),
 			}),
 		);
 		expect(audit.logRotationCompleted).toHaveBeenCalled();
+	});
+
+	it('API-IDP-SVC-19: generatePrimaryCert forwards custom options to signing service', async () => {
+		await service.generatePrimaryCert({
+			rsaModulusBits: 3072,
+			signatureAlgorithmId: 'rsa-sha384',
+			notAfter: '2029-03-01',
+		});
+		expect(idpSigningService.generateKeyPairAndCert).toHaveBeenCalledWith(
+			baseSettings.entityId,
+			expect.objectContaining({
+				rsaModulusBits: 3072,
+				signatureAlgorithmId: 'rsa-sha384',
+				notAfter: '2029-03-01',
+			}),
+		);
+	});
+
+	it('API-IDP-SVC-20: generatePrimaryCert maps IdpSigningCryptoValidationError to 400', async () => {
+		idpSigningService.generateKeyPairAndCert.mockImplementation(() => {
+			throw new IdpSigningCryptoValidationError(
+				'incompatible',
+				'idp_signing_key_algorithm_mismatch',
+			);
+		});
+		await expect(
+			service.generatePrimaryCert({
+				keyFamily: 'ec',
+				signatureAlgorithmId: 'rsa-sha256',
+				notAfter: '2028-01-01',
+			}),
+		).rejects.toThrow(BadRequestException);
+	});
+
+	it('API-IDP-SVC-21: cancelRotation clears pending crypto columns', async () => {
+		prisma.idpSettings.findUnique.mockResolvedValue({
+			...baseSettings,
+			pendingSigningCertPem: otherMaterial.certPem,
+			pendingSigningKeyEncrypted: 'enc-pending',
+			pendingSigningKeyFamily: 'rsa',
+			pendingSigningSignatureAlgorithmId: 'rsa-sha512',
+			pendingSigningRsaModulusBits: 2048,
+		});
+		await service.cancelRotation();
+		expect(prisma.idpSettings.update).toHaveBeenCalledWith(
+			expect.objectContaining({
+				data: expect.objectContaining({
+					pendingSigningKeyFamily: null,
+					pendingSigningSignatureAlgorithmId: null,
+					pendingSigningRsaModulusBits: null,
+					pendingSigningEcCurve: null,
+				}),
+			}),
+		);
 	});
 
 	it('API-IDP-SVC-14: completeRotation without pending → ConflictException', async () => {

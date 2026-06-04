@@ -8,6 +8,7 @@ import {
 import { AdminAuthGuard } from '../admin-auth/admin-auth.guard';
 import { AdminCsrfGuard } from '../admin-auth/admin-csrf.guard';
 import { IdpSettingsService } from './idp-settings.service';
+import { GenerateIdpSigningCertBodyDto } from './generate-idp-signing-cert.dto';
 import { StartIdpCertRotationBodyDto } from './start-idp-cert-rotation.dto';
 import { UpdateIdpSettingsBodyDto } from './update-idp-settings.dto';
 import { UploadIdpSigningCertBodyDto } from './upload-idp-signing-cert.dto';
@@ -33,8 +34,11 @@ export class IdpSettingsController {
 
 	@Post('signing-cert/generate')
 	@UseGuards(AdminCsrfGuard)
-	generatePrimaryCert(): Promise<IdpSettingsPublicDto> {
-		return this.idpSettingsService.generatePrimaryCert();
+	generatePrimaryCert(
+		@Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+		body: GenerateIdpSigningCertBodyDto,
+	): Promise<IdpSettingsPublicDto> {
+		return this.idpSettingsService.generatePrimaryCert(body);
 	}
 
 	@Post('signing-cert/upload')

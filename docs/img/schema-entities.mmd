@@ -72,7 +72,13 @@ erDiagram
 		string id PK
 		string entityId
 		string signingCertPem
+		string signingKeyFamily
+		string signingSignatureAlgorithmId
+		int signingRsaModulusBits
+		string signingEcCurve
 		string pendingSigningCertPem
 		string pendingSigningKeyEncrypted
+		string pendingSigningKeyFamily
+		string pendingSigningSignatureAlgorithmId
 		datetime rotationStartedAt
 	}

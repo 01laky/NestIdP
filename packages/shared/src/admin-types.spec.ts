@@ -16,6 +16,10 @@ const defaultIdp = {
 	hasSigningCertificate: true,
 	rotationActive: false,
 	signingCertNotAfter: '2030-01-01T00:00:00.000Z',
+	signingKeyFamily: 'rsa' as const,
+	signingSignatureAlgorithmId: 'rsa-sha256',
+	signingRsaModulusBits: 2048,
+	signingEcCurve: null,
 	certStatus: 'ok' as const,
 };
 
@@ -125,6 +129,10 @@ describe('AdminDashboardResponseDto', () => {
 				hasSigningCertificate: false,
 				rotationActive: true,
 				signingCertNotAfter: null,
+				signingKeyFamily: null,
+				signingSignatureAlgorithmId: null,
+				signingRsaModulusBits: null,
+				signingEcCurve: null,
 				certStatus: 'rotation_active',
 			},
 			apiConnection: null,

@@ -40,6 +40,10 @@ describe('idp-settings shared', () => {
 			hasSigningCertificate: true,
 			signingCertFingerprintSha256: 'abc123',
 			signingCertNotAfter: '2030-01-01T00:00:00.000Z',
+			signingKeyFamily: 'rsa',
+			signingSignatureAlgorithmId: 'rsa-sha256',
+			signingRsaModulusBits: 2048,
+			signingEcCurve: null,
 			metadataUrl: 'https://idp.example.com/saml/metadata',
 			ssoUrl: 'https://idp.example.com/saml/sso',
 			idpBaseUrl: 'https://idp.example.com',
@@ -48,6 +52,11 @@ describe('idp-settings shared', () => {
 				startedAt: null,
 				hasPendingCertificate: false,
 				pendingCertFingerprintSha256: null,
+				pendingSigningKeyFamily: null,
+				pendingSigningSignatureAlgorithmId: null,
+				pendingSigningRsaModulusBits: null,
+				pendingSigningEcCurve: null,
+				pendingSigningCertNotAfter: null,
 			},
 			updatedAt: '2026-01-01T00:00:00.000Z',
 		};
@@ -60,6 +69,11 @@ describe('idp-settings shared', () => {
 			startedAt: null,
 			hasPendingCertificate: false,
 			pendingCertFingerprintSha256: null,
+			pendingSigningKeyFamily: null,
+			pendingSigningSignatureAlgorithmId: null,
+			pendingSigningRsaModulusBits: null,
+			pendingSigningEcCurve: null,
+			pendingSigningCertNotAfter: null,
 		};
 		expect(rotation.active).toBe(false);
 	});
@@ -70,6 +84,11 @@ describe('idp-settings shared', () => {
 			startedAt: '2026-01-01T00:00:00.000Z',
 			hasPendingCertificate: true,
 			pendingCertFingerprintSha256: 'pending-fp',
+			pendingSigningKeyFamily: 'rsa',
+			pendingSigningSignatureAlgorithmId: 'rsa-sha384',
+			pendingSigningRsaModulusBits: 3072,
+			pendingSigningEcCurve: null,
+			pendingSigningCertNotAfter: '2031-01-01T00:00:00.000Z',
 		};
 		expect(rotation.pendingCertFingerprintSha256).toBe('pending-fp');
 	});

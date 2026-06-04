@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type {
+	GenerateIdpSigningCertRequestDto,
 	IdpMetadataPreviewResponseDto,
 	IdpMetadataUrlResponseDto,
 	IdpSettingsPublicDto,
@@ -14,12 +15,18 @@ import type {
 	UploadIdpSigningCertRequestDto,
 } from '@nestidp/shared';
 import type { AdminDashboardIdpStatusDto } from '@nestidp/shared';
+import { IdpSigningCryptoValidationError } from '@nestidp/shared';
 import type { IdpSettings } from '@prisma/client';
 import { EncryptionService } from '../encryption/encryption.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { IdpSigningService } from '../saml/idp-signing.service';
 import { SamlMetadataService } from '../saml/saml-metadata.service';
-import { IdpCertValidationError, validateSigningCertPair } from './idp-cert.util';
+import {
+	IdpCertValidationError,
+	prismaCryptoPendingData,
+	prismaCryptoPrimaryData,
+	validateSigningCertPair,
+} from './idp-cert.util';
 import {
 	assertValidIdpEntityId,
 	assertValidIdpNameIdFormat,
@@ -32,6 +39,14 @@ import {
 	toDashboardIdpStatus,
 	toIdpSettingsPublicDto,
 } from './idp-settings.mapper';
+
+export interface SigningCertGeneratedAuditMeta {
+	keyFamily: string;
+	signatureAlgorithmId: string;
+	rsaModulusBits?: number;
+	ecCurve?: string;
+	notAfter?: string;
+}
 
 @Injectable()
 export class IdpSettingsService {
@@ -89,21 +104,25 @@ export class IdpSettingsService {
 		return toIdpSettingsPublicDto(updated, this.getIdpBaseUrl());
 	}
 
-	async generatePrimaryCert(): Promise<IdpSettingsPublicDto> {
+	async generatePrimaryCert(
+		body: GenerateIdpSigningCertRequestDto = {},
+	): Promise<IdpSettingsPublicDto> {
 		const settings = await this.findSettingsOrThrow();
 		this.assertNoActiveRotation(settings);
 
-		const { privateKeyPem, certPem } = this.idpSigningService.generateKeyPairAndCert(
-			settings.entityId,
-		);
+		const generated = this.generateWithOptions(settings.entityId, body);
 		const updated = await this.prisma.idpSettings.update({
 			where: { id: 'default' },
 			data: {
-				signingCertPem: certPem,
-				signingKeyEncrypted: this.encryptionService.encrypt(privateKeyPem),
+				signingCertPem: generated.certPem,
+				signingKeyEncrypted: this.encryptionService.encrypt(generated.privateKeyPem),
+				...prismaCryptoPrimaryData(generated.metadata),
 			},
 		});
-		this.audit.logSigningCertGenerated(false);
+		this.audit.logSigningCertGenerated(
+			false,
+			this.auditMetaFromGenerated(body, generated.metadata),
+		);
 		return toIdpSettingsPublicDto(updated, this.getIdpBaseUrl());
 	}
 
@@ -117,6 +136,7 @@ export class IdpSettingsService {
 			data: {
 				signingCertPem: pair.certPem,
 				signingKeyEncrypted: this.encryptionService.encrypt(pair.privateKeyPem),
+				...prismaCryptoPrimaryData(pair.crypto),
 			},
 		});
 		this.audit.logSigningCertUploaded(false);
@@ -134,16 +154,24 @@ export class IdpSettingsService {
 
 		let pendingCertPem: string;
 		let pendingKeyPem: string;
+		let pendingCrypto;
 
 		if (body.mode === 'generate') {
-			const generated = this.idpSigningService.generateKeyPairAndCert(settings.entityId);
+			const { mode, ...generateOptions } = body;
+			void mode;
+			const generated = this.generateWithOptions(settings.entityId, generateOptions);
 			pendingCertPem = generated.certPem;
 			pendingKeyPem = generated.privateKeyPem;
-			this.audit.logRotationStarted('generate');
+			pendingCrypto = generated.metadata;
+			this.audit.logRotationStarted(
+				'generate',
+				this.auditMetaFromGenerated(generateOptions, pendingCrypto),
+			);
 		} else {
 			const pair = this.validateCertPair(body.signingCertPem, body.signingPrivateKeyPem);
 			pendingCertPem = pair.certPem;
 			pendingKeyPem = pair.privateKeyPem;
+			pendingCrypto = pair.crypto;
 			this.audit.logRotationStarted('upload');
 		}
 
@@ -153,6 +181,7 @@ export class IdpSettingsService {
 				pendingSigningCertPem: pendingCertPem,
 				pendingSigningKeyEncrypted: this.encryptionService.encrypt(pendingKeyPem),
 				rotationStartedAt: new Date(),
+				...prismaCryptoPendingData(pendingCrypto),
 			},
 		});
 		return toIdpSettingsPublicDto(updated, this.getIdpBaseUrl());
@@ -169,8 +198,16 @@ export class IdpSettingsService {
 			data: {
 				signingCertPem: settings.pendingSigningCertPem,
 				signingKeyEncrypted: settings.pendingSigningKeyEncrypted,
+				signingKeyFamily: settings.pendingSigningKeyFamily,
+				signingSignatureAlgorithmId: settings.pendingSigningSignatureAlgorithmId,
+				signingRsaModulusBits: settings.pendingSigningRsaModulusBits,
+				signingEcCurve: settings.pendingSigningEcCurve,
 				pendingSigningCertPem: null,
 				pendingSigningKeyEncrypted: null,
+				pendingSigningKeyFamily: null,
+				pendingSigningSignatureAlgorithmId: null,
+				pendingSigningRsaModulusBits: null,
+				pendingSigningEcCurve: null,
 				rotationStartedAt: null,
 			},
 		});
@@ -189,6 +226,10 @@ export class IdpSettingsService {
 			data: {
 				pendingSigningCertPem: null,
 				pendingSigningKeyEncrypted: null,
+				pendingSigningKeyFamily: null,
+				pendingSigningSignatureAlgorithmId: null,
+				pendingSigningRsaModulusBits: null,
+				pendingSigningEcCurve: null,
 				rotationStartedAt: null,
 			},
 		});
@@ -214,6 +255,33 @@ export class IdpSettingsService {
 		return this.findSettingsOrThrow().then((settings) => toDashboardIdpStatus(settings));
 	}
 
+	private generateWithOptions(entityId: string, options: GenerateIdpSigningCertRequestDto) {
+		try {
+			return this.idpSigningService.generateKeyPairAndCert(entityId, options);
+		} catch (error) {
+			this.rethrowCryptoValidation(error);
+			throw error;
+		}
+	}
+
+	private auditMetaFromGenerated(
+		options: GenerateIdpSigningCertRequestDto,
+		metadata: {
+			signingKeyFamily: string;
+			signingSignatureAlgorithmId: string;
+			signingRsaModulusBits: number | null;
+			signingEcCurve: string | null;
+		},
+	): SigningCertGeneratedAuditMeta {
+		return {
+			keyFamily: metadata.signingKeyFamily,
+			signatureAlgorithmId: metadata.signingSignatureAlgorithmId,
+			rsaModulusBits: metadata.signingRsaModulusBits ?? undefined,
+			ecCurve: metadata.signingEcCurve ?? undefined,
+			notAfter: options.notAfter,
+		};
+	}
+
 	private assertNoActiveRotation(settings: IdpSettings): void {
 		if (settings.pendingSigningCertPem || settings.pendingSigningKeyEncrypted) {
 			throw new ConflictException('Finish or cancel certificate rotation first');
@@ -227,7 +295,14 @@ export class IdpSettingsService {
 			if (error instanceof IdpCertValidationError) {
 				throw new BadRequestException(error.message);
 			}
+			this.rethrowCryptoValidation(error);
 			throw error;
+		}
+	}
+
+	private rethrowCryptoValidation(error: unknown): void {
+		if (error instanceof IdpSigningCryptoValidationError) {
+			throw new BadRequestException(error.message);
 		}
 	}
 

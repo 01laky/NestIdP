@@ -13,12 +13,13 @@ import {
 	getTestSigningMaterial,
 	TEST_ENCRYPTION_KEY,
 } from '../prisma/test-fixtures';
+import { IDP_SIGNING_SIGNATURE_ALGORITHMS } from '@nestidp/shared';
 import { IdpSigningService } from './idp-signing.service';
 import { SamlAuthAuditService } from './saml-auth-audit.service';
 import { verifySamlXmlSignature } from './testing/verify-saml-signature.util';
 import { create } from 'xmlbuilder2';
 
-jest.setTimeout(60_000);
+jest.setTimeout(120_000);
 
 describe('IdpSigningService (SQLite)', () => {
 	let prisma: PrismaClient;
@@ -169,6 +170,90 @@ describe('IdpSigningService (SQLite)', () => {
 		const signed = service.signAssertion(buildAssertionXml(assertionId), material, assertionId);
 		expect(signed).toContain('Signature');
 		expect(signed).toContain('SignatureValue');
+	});
+
+	it('API-SAML-SIGN-16: EC P-256 ecdsa-sha256 assertion verifies', () => {
+		const generated = service.generateKeyPairAndCert('https://ec.example.com', {
+			keyFamily: 'ec',
+			ecCurve: 'P-256',
+			signatureAlgorithmId: 'ecdsa-sha256',
+			notAfter: '2030-01-01',
+		});
+		const assertionId = '_ec-sig';
+		const signed = service.signAssertion(
+			buildAssertionXml(assertionId),
+			{
+				certPem: generated.certPem,
+				privateKeyPem: generated.privateKeyPem,
+				signatureAlgorithmId: 'ecdsa-sha256',
+			},
+			assertionId,
+		);
+		expect(verifySamlXmlSignature(`<container>${signed}</container>`, generated.certPem)).toBe(
+			true,
+		);
+	});
+
+	it('API-SAML-SIGN-19: each catalog algorithm signs and verifies', () => {
+		for (const algo of IDP_SIGNING_SIGNATURE_ALGORITHMS) {
+			const options =
+				algo.keyFamily === 'rsa'
+					? {
+							keyFamily: 'rsa' as const,
+							rsaModulusBits: 2048 as const,
+							signatureAlgorithmId: algo.id,
+							notAfter: '2030-12-31',
+						}
+					: {
+							keyFamily: 'ec' as const,
+							ecCurve: 'P-256' as const,
+							signatureAlgorithmId: algo.id,
+							notAfter: '2030-12-31',
+						};
+			const generated = service.generateKeyPairAndCert(`https://algo-${algo.id}.example`, options);
+			const assertionId = `_algo-${algo.id.replace(/[^a-z0-9]/gi, '')}`;
+			const signed = service.signAssertion(
+				buildAssertionXml(assertionId),
+				{
+					certPem: generated.certPem,
+					privateKeyPem: generated.privateKeyPem,
+					signatureAlgorithmId: algo.id,
+				},
+				assertionId,
+			);
+			expect(signed).toContain(algo.xmlSignatureAlgorithm.split('#').pop() ?? algo.id);
+			expect(verifySamlXmlSignature(`<container>${signed}</container>`, generated.certPem)).toBe(
+				true,
+			);
+		}
+	});
+
+	it('API-SAML-SIGN-20: unknown stored algorithm id falls back to rsa-sha256 in signature', () => {
+		const generated = service.generateKeyPairAndCert('https://fallback.example', {
+			notAfter: '2030-01-01',
+		});
+		const assertionId = '_unknown-algo';
+		const signed = service.signAssertion(
+			buildAssertionXml(assertionId),
+			{
+				certPem: generated.certPem,
+				privateKeyPem: generated.privateKeyPem,
+				signatureAlgorithmId: 'totally-unknown',
+			},
+			assertionId,
+		);
+		expect(signed).toContain('rsa-sha256');
+	});
+
+	it('API-SAML-SIGN-17: signAssertion falls back to rsa-sha256 when algorithm id null', async () => {
+		const material = await service.ensureSigningMaterial();
+		const assertionId = '_legacy';
+		const signed = service.signAssertion(
+			buildAssertionXml(assertionId),
+			{ ...material, signatureAlgorithmId: null },
+			assertionId,
+		);
+		expect(signed).toContain('xmldsig-more#rsa-sha256');
 	});
 
 	it('API-SAML-SIGN-13: ensureSigningMaterial throws when only pending cert exists (rotation)', async () => {

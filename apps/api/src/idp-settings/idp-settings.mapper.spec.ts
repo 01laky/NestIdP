@@ -21,8 +21,16 @@ describe('idp-settings.mapper', () => {
 			nameIdFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
 			signingCertPem: certPem,
 			signingKeyEncrypted: 'enc-key',
+			signingKeyFamily: 'rsa',
+			signingSignatureAlgorithmId: 'rsa-sha256',
+			signingRsaModulusBits: 2048,
+			signingEcCurve: null,
 			pendingSigningCertPem: null,
 			pendingSigningKeyEncrypted: null,
+			pendingSigningKeyFamily: null,
+			pendingSigningSignatureAlgorithmId: null,
+			pendingSigningRsaModulusBits: null,
+			pendingSigningEcCurve: null,
 			rotationStartedAt: null,
 			createdAt: new Date('2026-01-01T00:00:00.000Z'),
 			updatedAt: new Date('2026-01-02T00:00:00.000Z'),
@@ -131,6 +139,38 @@ describe('idp-settings.mapper', () => {
 		expect(
 			deriveCertStatus(settingsRow({ signingCertPem: certPem, signingKeyEncrypted: 'enc' })),
 		).toBe('expiring_soon');
+	});
+
+	it('API-IDP-MAP-16: rotation DTO maps pending signing crypto and expiry', () => {
+		const pending = getTestSigningMaterial('https://pending.example.com');
+		const dto = toIdpSettingsPublicDto(
+			settingsRow({
+				pendingSigningCertPem: pending.certPem,
+				pendingSigningKeyEncrypted: 'pending-enc',
+				pendingSigningKeyFamily: 'ec',
+				pendingSigningSignatureAlgorithmId: 'ecdsa-sha384',
+				pendingSigningRsaModulusBits: null,
+				pendingSigningEcCurve: 'P-384',
+				rotationStartedAt: new Date('2026-04-01T00:00:00.000Z'),
+			}),
+			'http://localhost:3000',
+		);
+		expect(dto.rotation.pendingSigningKeyFamily).toBe('ec');
+		expect(dto.rotation.pendingSigningSignatureAlgorithmId).toBe('ecdsa-sha384');
+		expect(dto.rotation.pendingSigningEcCurve).toBe('P-384');
+		expect(dto.rotation.pendingSigningCertNotAfter).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+	});
+
+	it('API-IDP-MAP-17: dashboard maps primary signing crypto fields', () => {
+		const dto = toDashboardIdpStatus(
+			settingsRow({
+				signingKeyFamily: 'rsa',
+				signingSignatureAlgorithmId: 'rsa-sha512',
+				signingRsaModulusBits: 3072,
+			}),
+		);
+		expect(dto.signingSignatureAlgorithmId).toBe('rsa-sha512');
+		expect(dto.signingRsaModulusBits).toBe(3072);
 	});
 
 	it('API-IDP-MAP-15: rotation_active takes precedence over expiring_soon', () => {

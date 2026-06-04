@@ -44,6 +44,10 @@ describe('AdminDashboardService', () => {
 			hasSigningCertificate: true,
 			rotationActive: false,
 			signingCertNotAfter: '2030-01-01T00:00:00.000Z',
+			signingKeyFamily: 'rsa',
+			signingSignatureAlgorithmId: 'rsa-sha256',
+			signingRsaModulusBits: 2048,
+			signingEcCurve: null,
 			certStatus: 'ok',
 		});
 	});
@@ -58,6 +62,13 @@ describe('AdminDashboardService', () => {
 		expect(result.identityUsersRoute).toContain('/admin/identity/users');
 		expect(result.auditEventsRoute).toBe('/admin/audit');
 		expect(result.adminUsersRoute).toBe('/admin/settings/admins');
+	});
+
+	it('API-ADM-DASH-16: dashboard idp block exposes signing crypto summary fields', async () => {
+		const result = await service.getDashboard();
+		expect(result.idp.signingKeyFamily).toBe('rsa');
+		expect(result.idp.signingSignatureAlgorithmId).toBe('rsa-sha256');
+		expect(result.idp.signingRsaModulusBits).toBe(2048);
 	});
 
 	it('API-ADM-DASH-SVC-02: includes apiConnection and sync fields', async () => {
@@ -99,6 +110,10 @@ describe('AdminDashboardService', () => {
 			hasSigningCertificate: true,
 			rotationActive: false,
 			signingCertNotAfter: '2030-01-01T00:00:00.000Z',
+			signingKeyFamily: 'rsa',
+			signingSignatureAlgorithmId: 'rsa-sha256',
+			signingRsaModulusBits: 2048,
+			signingEcCurve: null,
 			certStatus: 'ok',
 		});
 	});
@@ -114,6 +129,10 @@ describe('AdminDashboardService', () => {
 			hasSigningCertificate: false,
 			rotationActive: false,
 			signingCertNotAfter: null,
+			signingKeyFamily: null,
+			signingSignatureAlgorithmId: null,
+			signingRsaModulusBits: null,
+			signingEcCurve: null,
 			certStatus: 'missing',
 		});
 	});

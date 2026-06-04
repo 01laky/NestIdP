@@ -164,7 +164,8 @@
 		"metadataUrl": "Metadáta",
 		"operations": "Provoz",
 		"releaseNote": "Před produkčním nasazením si přečtěte docs/RELEASE.md v repozitáři.",
-		"browseUsers": "Prechádzať používateľe"
+		"browseUsers": "Prechádzať používateľe",
+		"idpSigningSummary": "{{family}} {{detail}} · {{algorithm}} · expires {{date}}"
 	},
 	"apiConnections": {
 		"listTitle": "API pripojenia",
@@ -307,7 +308,35 @@
 		"successPrimaryUploaded": "Primární podpisový certifikát nahrán.",
 		"successRotationStarted": "Rotácia začatá s nově vygenerovaným čakajúcim certifikátem.",
 		"successRotationCompleted": "Rotácia certifikátu dokončená.",
-		"successRotationCancelled": "Rotácia certifikátu zrušena."
+		"successRotationCancelled": "Rotácia certifikátu zrušena.",
+		"pendingCertTitle": "Pending certificate",
+		"rotationAlgorithmMismatchWarning": "Pending certificate uses a different signature algorithm than the active primary. SAML assertions still sign with the primary key until you complete rotation.",
+		"confirmGenerateSummary": "Key: {{family}} {{detail}} · Algorithm: {{algorithm}} · Expires: {{notAfter}}",
+		"toastCertGeneratedViewMetadata": "Signing certificate generated — refresh metadata preview below.",
+		"crypto": {
+			"panelTitle": "Certificate options",
+			"resetDefaults": "Reset to defaults",
+			"keyFamily": "Key type",
+			"keyFamilyRsa": "RSA",
+			"keyFamilyEc": "EC (ECDSA)",
+			"rsaModulus": "RSA key size (bits)",
+			"ecCurve": "EC curve",
+			"signatureAlgorithm": "Signature algorithm",
+			"notAfter": "Certificate expiry date",
+			"sha1Deprecated": "SHA-1 signatures are deprecated. Confirm your service providers accept this algorithm before continuing.",
+			"spCompatibilityWarning": "ECDSA signatures are not supported by all service providers. Verify SP compatibility before generating.",
+			"deprecatedSuffix": "deprecated",
+			"algorithms": {
+				"rsa-sha256": "RSA-SHA256",
+				"rsa-sha384": "RSA-SHA384",
+				"rsa-sha512": "RSA-SHA512",
+				"rsa-sha1": "RSA-SHA1",
+				"ecdsa-sha256": "ECDSA-SHA256",
+				"ecdsa-sha384": "ECDSA-SHA384",
+				"ecdsa-sha512": "ECDSA-SHA512",
+				"ecdsa-sha1": "ECDSA-SHA1"
+			}
+		}
 	},
 	"identity": {
 		"usersTitle": "Používateľé",

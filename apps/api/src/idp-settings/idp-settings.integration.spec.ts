@@ -12,6 +12,7 @@ import {
 	ADMIN_CSRF_HEADER_NAME,
 	IDP_METADATA_URL_API_PATH,
 	IDP_SETTINGS_API_PATH,
+	IDP_SIGNING_SIGNATURE_ALGORITHMS,
 } from '@nestidp/shared';
 import { AdminAuthModule } from '../admin-auth/admin-auth.module';
 import { AdminModule } from '../admin/admin.module';
@@ -20,7 +21,7 @@ import { SamlModule } from '../saml/saml.module';
 import { SpConnectionsModule } from '../sp-connections/sp-connections.module';
 import { IdpSettingsModule } from './idp-settings.module';
 import { IdpSigningService } from '../saml/idp-signing.service';
-import { fingerprintSha256Hex } from './idp-cert.util';
+import { fingerprintSha256Hex, parseCertNotAfterIso } from './idp-cert.util';
 import { PrismaModule } from '../prisma/prisma.module';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -87,6 +88,10 @@ describe('IdP settings admin API (SQLite)', () => {
 			data: {
 				pendingSigningCertPem: null,
 				pendingSigningKeyEncrypted: null,
+				pendingSigningKeyFamily: null,
+				pendingSigningSignatureAlgorithmId: null,
+				pendingSigningRsaModulusBits: null,
+				pendingSigningEcCurve: null,
 				rotationStartedAt: null,
 			},
 		});
@@ -712,5 +717,392 @@ describe('IdP settings admin API (SQLite)', () => {
 			.expect(201);
 		expect(res.body.rotation.active).toBe(false);
 		expect(res.body.rotation.startedAt).toBeNull();
+	});
+
+	it('API-IDP-CRYPTO-01: generate with RSA options sets crypto columns', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: {
+				signingCertPem: null,
+				signingKeyEncrypted: null,
+				signingKeyFamily: null,
+				signingSignatureAlgorithmId: null,
+				signingRsaModulusBits: null,
+			},
+		});
+		const res = await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/generate`)
+			.set(csrfHeader(csrf))
+			.send({
+				keyFamily: 'rsa',
+				rsaModulusBits: 2048,
+				signatureAlgorithmId: 'rsa-sha256',
+				notAfter: '2028-12-31',
+			})
+			.expect(201);
+		expect(res.body.signingKeyFamily).toBe('rsa');
+		expect(res.body.signingSignatureAlgorithmId).toBe('rsa-sha256');
+		expect(res.body.signingRsaModulusBits).toBe(2048);
+	});
+
+	it('API-IDP-CRYPTO-05: notAfter in the past → 400', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/generate`)
+			.set(csrfHeader(csrf))
+			.send({ notAfter: '1999-01-01' })
+			.expect(400);
+	});
+
+	it('API-IDP-CRYPTO-08: rotation generate stores pending crypto in DTO', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		const res = await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/start`)
+			.set(csrfHeader(csrf))
+			.send({
+				mode: 'generate',
+				rsaModulusBits: 3072,
+				signatureAlgorithmId: 'rsa-sha384',
+				notAfter: '2029-06-01',
+			})
+			.expect(201);
+		expect(res.body.rotation.pendingSigningKeyFamily).toBe('rsa');
+		expect(res.body.rotation.pendingSigningSignatureAlgorithmId).toBe('rsa-sha384');
+		expect(res.body.rotation.pendingSigningRsaModulusBits).toBe(3072);
+		expect(res.body.rotation.pendingSigningCertNotAfter).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+	});
+
+	it('API-IDP-ADM-REG-01: POST generate with empty body still succeeds (backward compatible)', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: { signingCertPem: null, signingKeyEncrypted: null },
+		});
+		const res = await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/generate`)
+			.set(csrfHeader(csrf))
+			.send({})
+			.expect(201);
+		expect(res.body.signingSignatureAlgorithmId).toBe('rsa-sha256');
+	});
+
+	it('API-IDP-CRYPTO-02: generate EC P-256 + ecdsa-sha256', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: { signingCertPem: null, signingKeyEncrypted: null },
+		});
+		const res = await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/generate`)
+			.set(csrfHeader(csrf))
+			.send({
+				keyFamily: 'ec',
+				ecCurve: 'P-256',
+				signatureAlgorithmId: 'ecdsa-sha256',
+				notAfter: '2029-06-01',
+			})
+			.expect(201);
+		expect(res.body.signingKeyFamily).toBe('ec');
+		expect(res.body.signingEcCurve).toBe('P-256');
+		expect(res.body.signingSignatureAlgorithmId).toBe('ecdsa-sha256');
+	});
+
+	it('API-IDP-CRYPTO-03: each signature id with matching key family succeeds', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		for (const algo of IDP_SIGNING_SIGNATURE_ALGORITHMS) {
+			await prisma.idpSettings.update({
+				where: { id: 'default' },
+				data: {
+					signingCertPem: null,
+					signingKeyEncrypted: null,
+					pendingSigningCertPem: null,
+					pendingSigningKeyEncrypted: null,
+					rotationStartedAt: null,
+				},
+			});
+			const body =
+				algo.keyFamily === 'rsa'
+					? {
+							keyFamily: 'rsa',
+							rsaModulusBits: 2048,
+							signatureAlgorithmId: algo.id,
+							notAfter: '2028-01-01',
+						}
+					: {
+							keyFamily: 'ec',
+							ecCurve: 'P-256',
+							signatureAlgorithmId: algo.id,
+							notAfter: '2028-01-01',
+						};
+			const res = await agent
+				.post(`${IDP_SETTINGS_API_PATH}/signing-cert/generate`)
+				.set(csrfHeader(csrf))
+				.send(body)
+				.expect(201);
+			expect(res.body.signingSignatureAlgorithmId).toBe(algo.id);
+			expect(res.body.signingKeyFamily).toBe(algo.keyFamily);
+		}
+	});
+
+	it('API-IDP-CRYPTO-04: RSA signature with EC key family → 400', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/generate`)
+			.set(csrfHeader(csrf))
+			.send({
+				keyFamily: 'ec',
+				ecCurve: 'P-256',
+				signatureAlgorithmId: 'rsa-sha256',
+				notAfter: '2028-01-01',
+			})
+			.expect(400);
+	});
+
+	it('API-IDP-CRYPTO-06: notAfter more than 10 years → 400', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/generate`)
+			.set(csrfHeader(csrf))
+			.send({ notAfter: '2040-01-01' })
+			.expect(400);
+	});
+
+	it('API-IDP-CRYPTO-07: omitted notAfter uses ~730-day cert validity', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: { signingCertPem: null, signingKeyEncrypted: null },
+		});
+		const res = await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/generate`)
+			.set(csrfHeader(csrf))
+			.send({ keyFamily: 'rsa', rsaModulusBits: 2048, signatureAlgorithmId: 'rsa-sha256' })
+			.expect(201);
+		const row = await prisma.idpSettings.findUnique({ where: { id: 'default' } });
+		const notAfterIso = parseCertNotAfterIso(row!.signingCertPem);
+		expect(notAfterIso).not.toBeNull();
+		const days = (new Date(notAfterIso!).getTime() - Date.now()) / (24 * 60 * 60 * 1000);
+		expect(days).toBeGreaterThan(700);
+		expect(days).toBeLessThan(760);
+		expect(res.body.signingRsaModulusBits).toBe(2048);
+	});
+
+	it('API-IDP-CRYPTO-09: complete rotation promotes pending crypto to primary', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/start`)
+			.set(csrfHeader(csrf))
+			.send({
+				mode: 'generate',
+				keyFamily: 'ec',
+				ecCurve: 'P-384',
+				signatureAlgorithmId: 'ecdsa-sha384',
+				notAfter: '2029-12-31',
+			})
+			.expect(201);
+		const res = await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/complete`)
+			.set(csrfHeader(csrf))
+			.expect(201);
+		expect(res.body.signingKeyFamily).toBe('ec');
+		expect(res.body.signingEcCurve).toBe('P-384');
+		expect(res.body.signingSignatureAlgorithmId).toBe('ecdsa-sha384');
+		expect(res.body.rotation.pendingSigningKeyFamily).toBeNull();
+	});
+
+	it('API-IDP-CRYPTO-10: cancel rotation clears pending crypto columns', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/start`)
+			.set(csrfHeader(csrf))
+			.send({ mode: 'generate', signatureAlgorithmId: 'rsa-sha512', notAfter: '2028-06-01' })
+			.expect(201);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/cancel`)
+			.set(csrfHeader(csrf))
+			.expect(201);
+		const row = await prisma.idpSettings.findUnique({ where: { id: 'default' } });
+		expect(row!.pendingSigningKeyFamily).toBeNull();
+		expect(row!.pendingSigningSignatureAlgorithmId).toBeNull();
+		expect(row!.pendingSigningRsaModulusBits).toBeNull();
+		expect(row!.pendingSigningEcCurve).toBeNull();
+	});
+
+	it('API-IDP-CRYPTO-11: POST generate with {} uses rsa-2048 defaults', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: { signingCertPem: null, signingKeyEncrypted: null },
+		});
+		const res = await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/generate`)
+			.set(csrfHeader(csrf))
+			.send({})
+			.expect(201);
+		expect(res.body.signingKeyFamily).toBe('rsa');
+		expect(res.body.signingRsaModulusBits).toBe(2048);
+		expect(res.body.signingSignatureAlgorithmId).toBe('rsa-sha256');
+	});
+
+	it('API-IDP-CRYPTO-12: upload RSA PEM infers signing crypto columns', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		const { certPem, privateKeyPem } = getTestSigningMaterial('http://localhost:3000');
+		const res = await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/upload`)
+			.set(csrfHeader(csrf))
+			.send({ signingCertPem: certPem, signingPrivateKeyPem: privateKeyPem })
+			.expect(201);
+		expect(res.body.signingKeyFamily).toBe('rsa');
+		expect(res.body.signingSignatureAlgorithmId).toBe('rsa-sha256');
+		expect(res.body.signingRsaModulusBits).toBeGreaterThanOrEqual(2048);
+	});
+
+	it('API-IDP-CRYPTO-13: rotation generate pending EC while primary RSA differs', async () => {
+		await createTestIdpSettingsWithSigningKey(prisma, { entityId: 'http://localhost:3000' });
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		const res = await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/start`)
+			.set(csrfHeader(csrf))
+			.send({
+				mode: 'generate',
+				keyFamily: 'ec',
+				ecCurve: 'P-256',
+				signatureAlgorithmId: 'ecdsa-sha256',
+				notAfter: '2030-03-15',
+			})
+			.expect(201);
+		expect(res.body.signingKeyFamily).toBe('rsa');
+		expect(res.body.rotation.pendingSigningKeyFamily).toBe('ec');
+		expect(res.body.rotation.pendingSigningSignatureAlgorithmId).toBe('ecdsa-sha256');
+		expect(res.body.rotation.pendingSigningEcCurve).toBe('P-256');
+	});
+
+	it('API-IDP-CRYPTO-14: rotation upload pending EC while primary RSA differs', async () => {
+		await createTestIdpSettingsWithSigningKey(prisma, { entityId: 'http://localhost:3000' });
+		const signing = app.get(IdpSigningService);
+		const ec = signing.generateKeyPairAndCert('https://pending-ec.example', {
+			keyFamily: 'ec',
+			ecCurve: 'P-256',
+			signatureAlgorithmId: 'ecdsa-sha256',
+			notAfter: '2031-08-01',
+		});
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		const res = await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/start`)
+			.set(csrfHeader(csrf))
+			.send({
+				mode: 'upload',
+				signingCertPem: ec.certPem,
+				signingPrivateKeyPem: ec.privateKeyPem,
+			})
+			.expect(201);
+		expect(res.body.signingKeyFamily).toBe('rsa');
+		expect(res.body.rotation.pendingSigningKeyFamily).toBe('ec');
+		expect(res.body.rotation.pendingSigningSignatureAlgorithmId).toBe('ecdsa-sha256');
+	});
+
+	it('API-IDP-CRYPTO-15: unknown signatureAlgorithmId → 400', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/generate`)
+			.set(csrfHeader(csrf))
+			.send({ signatureAlgorithmId: 'hmac-sha999', notAfter: '2028-01-01' })
+			.expect(400);
+	});
+
+	it('API-IDP-CRYPTO-16: notAfter exactly 10 years from today → 201', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		const max = new Date();
+		max.setUTCFullYear(max.getUTCFullYear() + 10);
+		const iso = `${max.getUTCFullYear()}-${String(max.getUTCMonth() + 1).padStart(2, '0')}-${String(max.getUTCDate()).padStart(2, '0')}`;
+		await prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: { signingCertPem: null, signingKeyEncrypted: null },
+		});
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/generate`)
+			.set(csrfHeader(csrf))
+			.send({ notAfter: iso })
+			.expect(201);
+	});
+
+	it('API-IDP-CRYPTO-17: generate during active rotation → 409', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/start`)
+			.set(csrfHeader(csrf))
+			.send({ mode: 'generate', notAfter: '2029-01-01' })
+			.expect(201);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/generate`)
+			.set(csrfHeader(csrf))
+			.send({ notAfter: '2029-02-01' })
+			.expect(409);
+	});
+
+	it('API-IDP-CRYPTO-18: invalid rsaModulusBits → 400', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/generate`)
+			.set(csrfHeader(csrf))
+			.send({ rsaModulusBits: 1024, notAfter: '2028-01-01' })
+			.expect(400);
+	});
+
+	it('API-IDP-CRYPTO-19: RSA 4096 + rsa-sha512 persists modulus and algorithm', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: { signingCertPem: null, signingKeyEncrypted: null },
+		});
+		const res = await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/generate`)
+			.set(csrfHeader(csrf))
+			.send({
+				rsaModulusBits: 4096,
+				signatureAlgorithmId: 'rsa-sha512',
+				notAfter: '2029-12-01',
+			})
+			.expect(201);
+		expect(res.body.signingRsaModulusBits).toBe(4096);
+		expect(res.body.signingSignatureAlgorithmId).toBe('rsa-sha512');
+	});
+
+	it('API-IDP-CRYPTO-20: CRYPTO-08 extended — pending DTO includes notAfter ISO', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		const res = await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/start`)
+			.set(csrfHeader(csrf))
+			.send({
+				mode: 'generate',
+				signatureAlgorithmId: 'rsa-sha384',
+				notAfter: '2030-04-15',
+			})
+			.expect(201);
+		expect(res.body.rotation.pendingSigningSignatureAlgorithmId).toBe('rsa-sha384');
+		expect(res.body.rotation.pendingSigningCertNotAfter).toMatch(/^2030-04-15T/);
+		expect(res.body.rotation.pendingSigningRsaModulusBits).toBe(2048);
 	});
 });
