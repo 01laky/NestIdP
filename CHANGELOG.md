@@ -4,6 +4,15 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.4.4]
+
+### Fixed
+
+- Playwright CI: correct API route mocks for IdP cert generate (`/api/admin/idp/settings/signing-cert/generate`)
+  and identity sync (`/api/admin/sync/*`); admin-login E2E no longer clears `localStorage` on every
+  navigation (`addInitScript`); username fields use `getByRole('textbox')` to avoid checkbox label collision;
+  post-login `waitForURL` excludes `/admin/login`; mobile delete-with-drawer uses DOM click on inert main.
+
 ## [1.4.3]
 
 ### Added

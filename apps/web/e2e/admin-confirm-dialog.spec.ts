@@ -18,8 +18,28 @@ const idpSettings = {
 	updatedAt: '2026-01-01T00:00:00.000Z',
 };
 
+const apiConnectionBody = {
+	connection: {
+		id: 'c1',
+		name: 'HR API',
+		baseUrl: 'https://api.example.com',
+		authType: 'BEARER',
+		hasBearerToken: true,
+		lastSyncAt: null,
+		lastSyncStatus: 'NEVER',
+		createdAt: '2026-01-01T00:00:00.000Z',
+		updatedAt: '2026-01-01T00:00:00.000Z',
+	},
+};
+
+/** Matches adminApi generateIdpSigningCert path under IDP_SETTINGS_API_PATH. */
+const GENERATE_CERT_ROUTE = '**/api/admin/idp/settings/signing-cert/generate';
+
 test.describe('Admin confirm dialog (WEB-ADM-E2E-CONF)', () => {
 	test.beforeEach(async ({ page }) => {
+		await page.addInitScript(() => {
+			localStorage.setItem('nestidp.locale', 'en');
+		});
 		page.on('dialog', () => {
 			throw new Error('Native window.confirm/alert must not be used in admin');
 		});
@@ -48,7 +68,7 @@ test.describe('Admin confirm dialog (WEB-ADM-E2E-CONF)', () => {
 
 	test('WEB-ADM-E2E-CONF-01: generate cert modal cancel skips POST', async ({ page }) => {
 		let generateCalled = false;
-		await page.route('**/api/admin/idp/signing-cert/generate', async (route) => {
+		await page.route(GENERATE_CERT_ROUTE, async (route) => {
 			generateCalled = true;
 			await route.fulfill({ status: 200, body: JSON.stringify(idpSettings) });
 		});
@@ -74,7 +94,7 @@ test.describe('Admin confirm dialog (WEB-ADM-E2E-CONF)', () => {
 
 	test('WEB-ADM-E2E-CONF-03: REPLACE required then POST generate', async ({ page }) => {
 		let generateCalled = false;
-		await page.route('**/api/admin/idp/signing-cert/generate', async (route) => {
+		await page.route(GENERATE_CERT_ROUTE, async (route) => {
 			generateCalled = true;
 			await route.fulfill({ status: 200, body: JSON.stringify(idpSettings) });
 		});
@@ -84,6 +104,7 @@ test.describe('Admin confirm dialog (WEB-ADM-E2E-CONF)', () => {
 		const confirmBtn = dialog.getByRole('button', { name: 'Generate certificate' });
 		await expect(confirmBtn).toBeDisabled();
 		await dialog.getByRole('textbox').fill('REPLACE');
+		await expect(confirmBtn).toBeEnabled();
 		await confirmBtn.click();
 		await expect.poll(() => generateCalled).toBe(true);
 	});
@@ -96,7 +117,7 @@ test.describe('Admin confirm dialog (WEB-ADM-E2E-CONF)', () => {
 
 	test('WEB-ADM-E2E-CONF-06: Escape closes generate modal without POST', async ({ page }) => {
 		let generateCalled = false;
-		await page.route('**/api/admin/idp/signing-cert/generate', async (route) => {
+		await page.route(GENERATE_CERT_ROUTE, async (route) => {
 			generateCalled = true;
 			await route.fulfill({ status: 200, body: JSON.stringify(idpSettings) });
 		});
@@ -110,7 +131,7 @@ test.describe('Admin confirm dialog (WEB-ADM-E2E-CONF)', () => {
 
 	test('WEB-ADM-E2E-CONF-07: wrong REPLACE text keeps generate disabled', async ({ page }) => {
 		let generateCalled = false;
-		await page.route('**/api/admin/idp/signing-cert/generate', async (route) => {
+		await page.route(GENERATE_CERT_ROUTE, async (route) => {
 			generateCalled = true;
 			await route.fulfill({ status: 200, body: JSON.stringify(idpSettings) });
 		});
@@ -127,27 +148,20 @@ test.describe('Admin confirm dialog (WEB-ADM-E2E-CONF)', () => {
 	test('WEB-ADM-E2E-CONF-08: full sync modal cancel skips sync POST', async ({ page }) => {
 		let syncCalled = false;
 		await page.route('**/api/admin/api-connections/c1', async (route) => {
+			if (route.request().method() === 'GET') {
+				await route.fulfill({
+					status: 200,
+					contentType: 'application/json',
+					body: JSON.stringify(apiConnectionBody),
+				});
+				return;
+			}
+			await route.continue();
+		});
+		await page.route('**/api/admin/sync/c1/status', async (route) => {
 			await route.fulfill({
 				status: 200,
 				contentType: 'application/json',
-				body: JSON.stringify({
-					connection: {
-						id: 'c1',
-						name: 'HR',
-						baseUrl: 'https://api.example.com',
-						authType: 'BEARER',
-						hasBearerToken: true,
-						lastSyncAt: null,
-						lastSyncStatus: 'NEVER',
-						createdAt: '',
-						updatedAt: '',
-					},
-				}),
-			});
-		});
-		await page.route('**/api/admin/api-connections/c1/sync/status', async (route) => {
-			await route.fulfill({
-				status: 200,
 				body: JSON.stringify({
 					connectionId: 'c1',
 					lastSyncStatus: 'NEVER',
@@ -157,10 +171,14 @@ test.describe('Admin confirm dialog (WEB-ADM-E2E-CONF)', () => {
 				}),
 			});
 		});
-		await page.route('**/api/admin/api-connections/c1/sync/logs*', async (route) => {
-			await route.fulfill({ status: 200, body: JSON.stringify({ syncLogs: [] }) });
+		await page.route('**/api/admin/sync/c1/logs*', async (route) => {
+			await route.fulfill({
+				status: 200,
+				contentType: 'application/json',
+				body: JSON.stringify({ syncLogs: [] }),
+			});
 		});
-		await page.route('**/api/admin/api-connections/c1/sync', async (route) => {
+		await page.route('**/api/admin/sync/c1', async (route) => {
 			if (route.request().method() === 'POST') {
 				syncCalled = true;
 			}
@@ -176,24 +194,23 @@ test.describe('Admin confirm dialog (WEB-ADM-E2E-CONF)', () => {
 	test('WEB-ADM-E2E-CONF-05: mobile nav closes before delete modal', async ({ page }) => {
 		await page.setViewportSize({ width: 390, height: 844 });
 		await page.route('**/api/admin/api-connections/c1', async (route) => {
-			await route.fulfill({
-				status: 200,
-				contentType: 'application/json',
-				body: JSON.stringify({
-					connection: {
-						id: 'c1',
-						name: 'HR API',
-						baseUrl: 'https://api.example.com',
-						createdAt: '',
-						updatedAt: '',
-					},
-				}),
-			});
+			if (route.request().method() === 'GET') {
+				await route.fulfill({
+					status: 200,
+					contentType: 'application/json',
+					body: JSON.stringify(apiConnectionBody),
+				});
+				return;
+			}
+			await route.continue();
 		});
 		await page.goto('/admin/api-connections/c1');
+		const deleteBtn = page.locator('#evg-main button.evg-btn--danger');
+		await expect(deleteBtn).toHaveText('Delete', { timeout: 15_000 });
 		await page.getByRole('button', { name: 'Menu' }).click();
 		await expect(page.locator('#evg-sidebar.evg-sidebar--open')).toBeVisible();
-		await page.getByRole('button', { name: 'Delete' }).click();
+		// Inert #evg-main is removed from the a11y tree while the drawer is open; use DOM click.
+		await deleteBtn.evaluate((el) => (el as HTMLButtonElement).click());
 		await expect(page.locator('#evg-sidebar.evg-sidebar--open')).toHaveCount(0);
 		await expect(page.getByRole('dialog')).toBeVisible();
 	});
