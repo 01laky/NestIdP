@@ -294,6 +294,14 @@ export function getTestSigningMaterial(entityId = 'http://localhost:3000'): {
 	return generateTestRsaCert(entityId);
 }
 
+/** RSA key pair for SP assertion encryption round-trip tests. */
+export function getTestSpEncryptionKeyPair(entityId = 'urn:test:sp:encryption'): {
+	privateKeyPem: string;
+	certPem: string;
+} {
+	return generateTestRsaCert(entityId);
+}
+
 export function getTestSigningMaterialWithDays(
 	entityId: string,
 	days: number,

@@ -72,7 +72,7 @@ Choose key type (RSA or EC), EC curve or RSA modulus, key-transport algorithm, a
 
 This is **not** the certificate used to encrypt SAML assertions **to** a service provider — that is each SP connection’s **SP certificate** PEM. The admin UI explains the distinction; see [idp-certificates.svg](./img/idp-certificates.svg).
 
-Copy signing options or download/copy the public encryption PEM from the panel. Encrypted assertions at runtime are not enabled yet; `wantAssertionsEncrypted` on SP connections is stored for a future release.
+Copy signing options or download/copy the public encryption PEM from the panel. To encrypt assertions **to** a service provider, enable **Encrypt SAML assertions** on the SP connection and paste that SP’s public certificate PEM (uses AES-256-CBC; distinct from the IdP encryption cert in metadata).
 
 ## 4. API connection (identity source)
 

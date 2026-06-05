@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { create } from 'xmlbuilder2';
 import type { EndUserPublicDto, ParsedAuthnRequestDto } from '@nestidp/shared';
@@ -7,6 +7,10 @@ import { randomBytes } from 'node:crypto';
 import { SamlAttributeMapperService } from './saml-attribute-mapper.service';
 import { IdpSigningService } from './idp-signing.service';
 import type { SpAttributeMappingConfig } from '@nestidp/shared';
+import {
+	encryptSignedAssertionForSp,
+	SamlAssertionEncryptionError,
+} from '../utils/saml-assertion-encryption.util';
 
 export interface BuildLoginResponseInput {
 	authnRequest: ParsedAuthnRequestDto;
@@ -107,7 +111,10 @@ export class SamlResponseBuilderService {
 		const assertionXml = assertionDoc.end({ prettyPrint: false, headless: true });
 		const signedAssertionXml = this.idpSigning.signAssertion(assertionXml, material, assertionId);
 
-		const assertionBody = signedAssertionXml.replace(/^<\?xml[^?]*\?>\s*/i, '').trim();
+		const assertionBody = this.buildAssertionBodyForResponse(
+			signedAssertionXml,
+			input.spConnection,
+		);
 
 		const responseXml = `<?xml version="1.0" encoding="UTF-8"?>
 <saml2p:Response xmlns:saml2p="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion" ID="${responseId}" Version="2.0" IssueInstant="${issueInstant}" Destination="${escapeXmlAttr(input.spConnection.acsUrl)}" InResponseTo="${escapeXmlAttr(input.authnRequest.id)}">
@@ -116,10 +123,39 @@ export class SamlResponseBuilderService {
   ${assertionBody}
 </saml2p:Response>`;
 
+		const outwardAssertionXml = input.spConnection.wantAssertionsEncrypted
+			? assertionBody
+			: signedAssertionXml;
+
 		return {
 			samlResponseXml: responseXml,
-			assertionXml: signedAssertionXml,
+			assertionXml: outwardAssertionXml,
 		};
+	}
+
+	private buildAssertionBodyForResponse(
+		signedAssertionXml: string,
+		spConnection: SpConnection,
+	): string {
+		if (!spConnection.wantAssertionsEncrypted) {
+			return signedAssertionXml.replace(/^<\?xml[^?]*\?>\s*/i, '').trim();
+		}
+
+		const spCertificate = spConnection.spCertificate?.trim();
+		if (!spCertificate) {
+			throw new BadRequestException(
+				'SP certificate PEM is required when encrypted assertions are enabled',
+			);
+		}
+
+		try {
+			return encryptSignedAssertionForSp(signedAssertionXml, spCertificate);
+		} catch (error) {
+			if (error instanceof SamlAssertionEncryptionError) {
+				throw new BadRequestException(error.message);
+			}
+			throw error;
+		}
 	}
 
 	private getAssertionTtlSeconds(): number {

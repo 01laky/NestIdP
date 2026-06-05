@@ -209,7 +209,6 @@ Included in v1:
 
 Deferred (Phase 2+):
 
-- Encrypted assertions
 - Single Logout (SLO)
 - IdP-initiated SSO
 - SAMLRequest signature verification (optional hardening)
@@ -434,8 +433,8 @@ SAML protocol behaviour is implemented by the custom NestJS `SamlModule` (Sectio
 |---------|-------------|
 | SP Entity ID | Unique identifier of the Service Provider |
 | ACS URL | Assertion Consumer Service URL (POST binding) |
-| SP certificate | SP public key PEM; required when `wantAssertionsEncrypted` is enabled (runtime encryption in a follow-up prompt) |
-| wantAssertionsEncrypted | Stored per SP (v1.5.0); outbound XML Encryption not implemented yet |
+| SP certificate | SP public key PEM; required when `wantAssertionsEncrypted` is enabled — IdP encrypts assertions to this key (v1.7.0) |
+| wantAssertionsEncrypted | Per SP; when true, IdP encrypts signed assertions with SP certificate PEM (AES-256-CBC, RSA-OAEP-MGF1P key transport, v1.7.0) |
 | NameID format | Override per SP if needed |
 | Attribute mapping | Map local fields → SAML attributes (see below) |
 

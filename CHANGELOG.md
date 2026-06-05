@@ -4,6 +4,24 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.7.0]
+
+### Added
+
+- **Runtime encrypted SAML assertions (Prompt 23):** when `SpConnection.wantAssertionsEncrypted` is true,
+  `SamlResponseBuilderService` signs the assertion then wraps it in `saml2:EncryptedAssertion` using
+  **AES-256-CBC** content encryption and **RSA-OAEP-MGF1P** key transport to the SP public certificate
+  PEM on the connection. IdP encryption metadata cert is not used for outbound assertion encryption.
+- `saml-assertion-encryption.util.ts` plus test decrypt helper for round-trip verification.
+- Tests: `API-SAML-ENC-01`–`04`, `API-SAML-ENC-UTIL-01`–`04`, `API-IDP-SAML-ENC-02` (full complete-sso).
+
+### Changed
+
+- SP connection i18n `wantAssertionsEncryptedHint` documents runtime behaviour (SP cert PEM, not IdP
+  encryption cert).
+- [docs/img/idp-certificates.mmd](./docs/img/idp-certificates.mmd), [tutorial.md](./docs/tutorial.md),
+  [proposal.MD](./proposal.MD), [README.md](./README.md) — encrypted assertions marked implemented.
+
 ## [1.6.0]
 
 ### Changed

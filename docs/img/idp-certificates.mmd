@@ -5,9 +5,9 @@ flowchart LR
 	end
 	subgraph sp [SP Connection]
 		SPB[SP certificate PEM]
-		WA[wantAssertionsEncrypted stub]
+		WA[wantAssertionsEncrypted]
 	end
 	SK -->|XML-DSig| Assert[Signed SAML Assertion]
 	EK -->|metadata KeyDescriptor use=encryption| Meta[GET /saml/metadata]
-	SPB -->|Prompt 23: encrypt session key to SP| Assert
-	WA -.->|v1.5.0 stored only| Assert
+	SPB -->|RSA-OAEP wraps AES key| Assert
+	WA -->|AES-256-CBC encrypt| Assert

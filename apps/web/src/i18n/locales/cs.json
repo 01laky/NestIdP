@@ -240,7 +240,7 @@
 		"deleteFailed": "Smazání se nezdařilo",
 		"acsTestFailed": "ACS test se nezdařil",
 		"wantAssertionsEncrypted": "Encrypt SAML assertions",
-		"wantAssertionsEncryptedHint": "Requires a configured IdP encryption certificate. SP certificate PEM is still used for signature verification when present."
+		"wantAssertionsEncryptedHint": "Encrypt SAML assertions to this SP using the SP certificate PEM below (AES-256-CBC key transport). IdP encryption cert in metadata is separate."
 	},
 	"idpSettings": {
 		"title": "Nastavení IdP",

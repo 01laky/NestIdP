@@ -20,12 +20,15 @@ import {
 	createTestSamlSession,
 	createTestSpConnection,
 	createTestUserWithPassword,
+	getTestSpEncryptionKeyPair,
 } from '@test/support/prisma/test-fixtures';
 import { runMigrationsOnTestDb } from '@test/support/prisma/test-db.helper';
 import { SamlModule } from '@api/saml/saml.module';
+import { decryptEncryptedAssertion } from '@test/support/saml/decrypt-saml-assertion.util';
 import {
 	decodeSamlResponseBase64,
 	extractSamlResponseFromHtml,
+	verifySignedAssertionFragment,
 } from '@test/support/saml/verify-saml-signature.util';
 
 jest.setTimeout(90_000);
@@ -300,5 +303,45 @@ describe('SAML complete-sso integration (SQLite)', () => {
 			.send({ samlSessionId })
 			.expect(200);
 		expect(res.headers['content-type']).toMatch(/text\/html/);
+	});
+
+	it('API-IDP-SAML-ENC-02: complete-sso returns EncryptedAssertion when SP requests encryption', async () => {
+		const spKeys = getTestSpEncryptionKeyPair('urn:test:sp:encrypted-complete');
+		const encryptedSp = await createTestSpConnection(prisma, {
+			spEntityId: 'urn:test:sp:encrypted-complete',
+			acsUrl: 'https://sp-encrypted.example.com/acs',
+			wantAssertionsEncrypted: true,
+			spCertificate: spKeys.certPem,
+		});
+		const requestId = `_enc-req-${Date.now()}`;
+		const { samlRequest } = buildTestAuthnRequestRedirectPayload({
+			issuer: encryptedSp.spEntityId,
+			id: requestId,
+		});
+		const redirect = await request(app.getHttpServer() as App)
+			.get(`/saml/sso?${SAML_REQUEST_QUERY_PARAM}=${samlRequest}`)
+			.expect(302);
+		const samlSessionId = new URL(
+			redirect.headers.location as string,
+			'http://localhost',
+		).searchParams.get(SAML_SESSION_QUERY_PARAM)!;
+		const agent = request.agent(app.getHttpServer() as App);
+		await agent
+			.post(`${AUTH_API_PATH}/login`)
+			.send({ username: 'alice', password, samlSessionId })
+			.expect(200);
+		const res = await agent
+			.post(`${AUTH_API_PATH}/login/complete-sso`)
+			.send({ samlSessionId })
+			.expect(200);
+		const xml = decodeSamlResponseBase64(extractSamlResponseFromHtml(res.text)!);
+		expect(xml).toContain('saml2:EncryptedAssertion');
+		expect(xml).not.toMatch(/<saml2:Assertion[^>]/);
+		const encryptedMatch = xml.match(/<saml2:EncryptedAssertion[\s\S]*<\/saml2:EncryptedAssertion>/);
+		expect(encryptedMatch).toBeTruthy();
+		const decrypted = decryptEncryptedAssertion(encryptedMatch![0], spKeys.privateKeyPem);
+		const settings = await prisma.idpSettings.findUnique({ where: { id: 'default' } });
+		expect(verifySignedAssertionFragment(decrypted, settings!.signingCertPem!)).toBe(true);
+		expect(decrypted).toContain(`InResponseTo="${requestId}"`);
 	});
 });

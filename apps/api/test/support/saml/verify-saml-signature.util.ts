@@ -3,6 +3,12 @@ import { SignedXml } from 'xml-crypto';
 import * as xpath from 'xpath';
 import { applyNestIdpXmlCryptoExtensions } from '@api/saml/xml-crypto-extended-algorithms';
 
+/** Validates a signed assertion fragment (Assertion + enveloped Signature sibling). */
+export function verifySignedAssertionFragment(assertionWithSignatureXml: string, certPem: string): boolean {
+	const stripped = assertionWithSignatureXml.replace(/^<\?xml[^?]*\?>\s*/i, '').trim();
+	return verifySamlXmlSignature(`<wrapper>${stripped}</wrapper>`, certPem);
+}
+
 /** Returns true when xml-crypto validates the XML signature with the given cert PEM. */
 export function verifySamlXmlSignature(signedXml: string, certPem: string): boolean {
 	try {

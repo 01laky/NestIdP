@@ -11,13 +11,18 @@ import { runMigrationsOnTestDb } from '@test/support/prisma/test-db.helper';
 import {
 	createTestIdpSettingsWithSigningKey,
 	createTestSpConnection,
+	getTestSpEncryptionKeyPair,
 	TEST_ENCRYPTION_KEY,
 } from '@test/support/prisma/test-fixtures';
+import { decryptEncryptedAssertion } from '@test/support/saml/decrypt-saml-assertion.util';
 import { IdpSigningService } from '@api/saml/services/idp-signing.service';
 import { SamlAuthAuditService } from '@api/saml/services/saml-auth-audit.service';
 import { SamlAttributeMapperService } from '@api/saml/services/saml-attribute-mapper.service';
 import { SamlResponseBuilderService } from '@api/saml/services/saml-response-builder.service';
-import { verifySamlXmlSignature } from '@test/support/saml/verify-saml-signature.util';
+import {
+	verifySignedAssertionFragment,
+	verifySamlXmlSignature,
+} from '@test/support/saml/verify-saml-signature.util';
 
 jest.setTimeout(60_000);
 
@@ -246,6 +251,50 @@ describe('SamlResponseBuilderService (SQLite)', () => {
 		const settings = await prisma.idpSettings.findUnique({ where: { id: 'default' } });
 		const { samlResponseXml } = await buildForSp();
 		expect(verifySamlXmlSignature(samlResponseXml, settings!.signingCertPem!)).toBe(true);
+	});
+
+	it('API-SAML-ENC-01: wantAssertionsEncrypted emits EncryptedAssertion in Response', async () => {
+		const spKeys = getTestSpEncryptionKeyPair('urn:sp:enc-response');
+		const { samlResponseXml } = await buildForSp({
+			wantAssertionsEncrypted: true,
+			spCertificate: spKeys.certPem,
+		});
+		expect(samlResponseXml).toContain('saml2:EncryptedAssertion');
+		expect(samlResponseXml).not.toMatch(/<saml2:Assertion[^>]/);
+	});
+
+	it('API-SAML-ENC-02: encrypted assertion decrypts and signature still inside plaintext', async () => {
+		const spKeys = getTestSpEncryptionKeyPair('urn:sp:enc-decrypt');
+		const settings = await prisma.idpSettings.findUnique({ where: { id: 'default' } });
+		const { samlResponseXml, assertionXml } = await buildForSp({
+			wantAssertionsEncrypted: true,
+			spCertificate: spKeys.certPem,
+		});
+		const decrypted = decryptEncryptedAssertion(assertionXml, spKeys.privateKeyPem);
+		expect(verifySignedAssertionFragment(decrypted, settings!.signingCertPem!)).toBe(true);
+		expect(samlResponseXml).toContain('saml2:EncryptedAssertion');
+	});
+
+	it('API-SAML-ENC-03: wantAssertionsEncrypted false keeps plain Assertion', async () => {
+		const { samlResponseXml } = await buildForSp({ wantAssertionsEncrypted: false });
+		expect(samlResponseXml).toContain('saml2:Assertion');
+		expect(samlResponseXml).not.toContain('EncryptedAssertion');
+	});
+
+	it('API-SAML-ENC-04: wantAssertionsEncrypted without SP cert throws', async () => {
+		const sp = await createTestSpConnection(prisma, {
+			spEntityId: `urn:sp:enc-missing-cert-${Date.now()}`,
+			wantAssertionsEncrypted: true,
+			spCertificate: null,
+		});
+		await expect(
+			builder.buildLoginResponse({
+				authnRequest: { id: '_enc-err', issuer: sp.spEntityId, issueInstant: new Date().toISOString() },
+				user,
+				spConnection: sp,
+				idpEntityId: 'http://localhost:3000',
+			}),
+		).rejects.toThrow('SP certificate PEM is required');
 	});
 
 	it('API-SAML-SIGN-18: stored rsa-sha384 primary appears in signed Response', async () => {

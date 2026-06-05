@@ -83,7 +83,7 @@ Singleton row `id = default`. Bootstrap creates **`entityId`** only (from `IDP_B
 
 **Invariants:** for each rotation kind (signing vs encryption), pending cert and key must both be set or both null; `complete` promotes pending → primary including crypto columns; `cancel` clears pending fields. Signing and encryption rotations may be active **at the same time**. Encryption cert is **never** lazy-generated on SSO. Private keys encrypted with `EncryptionService` (`v1:` prefix).
 
-**SpConnection (v1.5.0):** `wantAssertionsEncrypted` defaults `false`; API rejects enabling without `spCertificate` PEM (runtime encrypted assertions deferred).
+**SpConnection (v1.5.0+):** `wantAssertionsEncrypted` defaults `false`; API rejects enabling without `spCertificate` PEM. When true (v1.7.0), SSO encrypts signed assertions to the SP cert (AES-256-CBC).
 
 Deploy: `pnpm db:migrate:deploy` applies migrations through `20260605130000_idp_encryption_crypto` on both SQLite and PostgreSQL.
 
