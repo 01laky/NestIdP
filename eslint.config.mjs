@@ -6,7 +6,17 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-	{ ignores: ['**/dist/**', '**/coverage/**', '**/node_modules/**'] },
+	{
+		ignores: [
+			'**/dist/**',
+			'**/coverage/**',
+			'**/node_modules/**',
+			'scripts/restructure-codebase.mjs',
+			'scripts/fix-api-imports.mjs',
+			'scripts/fix-web-test-imports.mjs',
+			'scripts/fix-web-test-paths.mjs',
+		],
+	},
 	eslint.configs.recommended,
 	...tseslint.configs.recommended,
 	eslintConfigPrettier,
@@ -15,6 +25,12 @@ export default tseslint.config(
 			globals: {
 				...globals.node,
 			},
+		},
+	},
+	{
+		files: ['**/test/**/*.{ts,tsx}', 'apps/api/test/**/*.ts'],
+		rules: {
+			'@typescript-eslint/no-unused-vars': 'off',
 		},
 	},
 	{

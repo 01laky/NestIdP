@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
-import { applyHttpSecurity } from './http-security';
+import { applyHttpSecurity } from './common/utils/http-security';
 
 async function bootstrap() {
 	const app = await NestFactory.create(AppModule);

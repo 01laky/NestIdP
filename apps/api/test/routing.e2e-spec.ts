@@ -11,15 +11,15 @@ import {
 	IDP_SETTINGS_API_PATH,
 	SP_CONNECTIONS_API_PATH,
 } from '@nestidp/shared';
-import { AdminModule } from '../src/admin/admin.module';
-import { AdminAuthModule } from '../src/admin-auth/admin-auth.module';
-import { AuthModule } from '../src/auth/auth.module';
-import { HealthModule } from '../src/health/health.module';
-import { IdentityModule } from '../src/identity/identity.module';
-import { PrismaModule } from '../src/prisma/prisma.module';
-import { PrismaService } from '../src/prisma/prisma.service';
-import { SamlModule } from '../src/saml/saml.module';
-import { SpaModule } from '../src/spa/spa.module';
+import { AdminModule } from '@api/admin/admin.module';
+import { AdminAuthModule } from '@api/admin-auth/admin-auth.module';
+import { AuthModule } from '@api/auth/auth.module';
+import { HealthModule } from '@api/health/health.module';
+import { IdentityModule } from '@api/identity/identity.module';
+import { PrismaModule } from '@api/prisma/prisma.module';
+import { PrismaService } from '@api/prisma/services/prisma.service';
+import { SamlModule } from '@api/saml/saml.module';
+import { SpaModule } from '@api/spa/spa.module';
 
 describe('Routing (e2e)', () => {
 	let app: INestApplication;
@@ -77,8 +77,8 @@ describe('Routing (e2e)', () => {
 	};
 
 	beforeAll(async () => {
-		const { encrypt } = await import('../src/encryption/encryption.util');
-		const { getTestSigningMaterial } = await import('../src/prisma/test-fixtures');
+		const { encrypt } = await import('@api/encryption/utils/encryption.util');
+		const { getTestSigningMaterial } = await import('@test/support/prisma/test-fixtures');
 		const { privateKeyPem, certPem } = getTestSigningMaterial('http://localhost:3000');
 		const signingKeyEncrypted = encrypt(privateKeyPem, 'test-encryption-key-32chars!!');
 		prismaMock.idpSettings.findUnique.mockResolvedValue({
@@ -120,7 +120,7 @@ describe('Routing (e2e)', () => {
 				HealthModule,
 				PrismaModule,
 				IdentityModule,
-				(await import('../src/encryption/encryption.module')).EncryptionModule,
+				(await import('@api/encryption/encryption.module')).EncryptionModule,
 				AdminAuthModule,
 				AdminModule,
 				AuthModule,
@@ -232,7 +232,7 @@ describe('Routing (e2e)', () => {
 		prismaMock.spConnection.count.mockResolvedValue(4);
 
 		const password = 'e2e-admin-password';
-		const { hashPassword } = await import('../src/admin-auth/password.util');
+		const { hashPassword } = await import('@api/admin-auth/utils/password.util');
 		const passwordHash = await hashPassword(password);
 		prismaMock.adminUser.findUnique.mockImplementation(
 			async (args: { where: { username?: string; id?: string } }) => {
@@ -261,7 +261,7 @@ describe('Routing (e2e)', () => {
 
 	it('E2E-ADM-08-01: GET /api/admin returns dashboard DTO when authenticated', async () => {
 		const password = 'e2e-admin-password-2';
-		const { hashPassword } = await import('../src/admin-auth/password.util');
+		const { hashPassword } = await import('@api/admin-auth/utils/password.util');
 		const passwordHash = await hashPassword(password);
 		prismaMock.adminUser.findUnique.mockImplementation(
 			async (args: { where: { username?: string; id?: string } }) => {
@@ -290,7 +290,7 @@ describe('Routing (e2e)', () => {
 
 	it('E2E-ADM-08-02: GET /api/admin/sp-connections returns JSON with admin cookie', async () => {
 		const password = 'e2e-sp-admin-pass';
-		const { hashPassword } = await import('../src/admin-auth/password.util');
+		const { hashPassword } = await import('@api/admin-auth/utils/password.util');
 		const passwordHash = await hashPassword(password);
 		prismaMock.adminUser.findUnique.mockImplementation(
 			async (args: { where: { username?: string; id?: string } }) => {
@@ -346,7 +346,7 @@ describe('Routing (e2e)', () => {
 
 	it('E2E-AUTH-01: POST /api/admin/auth/login with wrong password returns 401', async () => {
 		const password = 'e2e-wrong-pass-test';
-		const { hashPassword } = await import('../src/admin-auth/password.util');
+		const { hashPassword } = await import('@api/admin-auth/utils/password.util');
 		const passwordHash = await hashPassword(password);
 		prismaMock.adminUser.findUnique.mockImplementation(
 			async (args: { where: { username?: string } }) => {
@@ -458,7 +458,7 @@ describe('Routing (e2e)', () => {
 
 	it('E2E-IDP-09-02: GET /api/admin/idp/settings with admin cookie returns JSON DTO', async () => {
 		const password = 'e2e-idp-settings-pass';
-		const { hashPassword } = await import('../src/admin-auth/password.util');
+		const { hashPassword } = await import('@api/admin-auth/utils/password.util');
 		const passwordHash = await hashPassword(password);
 		prismaMock.adminUser.findUnique.mockImplementation(
 			async (args: { where: { username?: string; id?: string } }) => {
@@ -543,7 +543,7 @@ describe('Routing (e2e)', () => {
 
 	it('E2E-10-07: GET /api/admin/admin-users with session returns JSON array', async () => {
 		const password = 'e2e-adm-usr-pass';
-		const { hashPassword } = await import('../src/admin-auth/password.util');
+		const { hashPassword } = await import('@api/admin-auth/utils/password.util');
 		const passwordHash = await hashPassword(password);
 		prismaMock.adminUser.findUnique.mockImplementation(
 			async (args: { where: { username?: string; id?: string } }) => {
@@ -565,7 +565,7 @@ describe('Routing (e2e)', () => {
 
 	it('E2E-10-08: GET /api/admin/audit-events with session returns paginated JSON', async () => {
 		const password = 'e2e-audit-pass';
-		const { hashPassword } = await import('../src/admin-auth/password.util');
+		const { hashPassword } = await import('@api/admin-auth/utils/password.util');
 		const passwordHash = await hashPassword(password);
 		prismaMock.adminUser.findUnique.mockImplementation(
 			async (args: { where: { username?: string; id?: string } }) => {
@@ -596,7 +596,7 @@ describe('Routing (e2e)', () => {
 
 	it('E2E-10-10: dashboard includes audit and admin users routes', async () => {
 		const password = 'e2e-dash-v10-pass';
-		const { hashPassword } = await import('../src/admin-auth/password.util');
+		const { hashPassword } = await import('@api/admin-auth/utils/password.util');
 		const passwordHash = await hashPassword(password);
 		prismaMock.adminUser.findUnique.mockImplementation(
 			async (args: { where: { username?: string; id?: string } }) => {

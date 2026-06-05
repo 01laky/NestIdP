@@ -7,13 +7,15 @@ export default defineConfig({
 	plugins: [react()],
 	resolve: {
 		alias: {
+			'@': path.resolve(__dirname, './src'),
+			'@test': path.resolve(__dirname, './test'),
 			'@nestidp/shared': path.resolve(__dirname, '../../packages/shared/src/index.ts'),
 		},
 	},
 	test: {
 		environment: 'jsdom',
-		include: ['src/**/*.test.{ts,tsx}'],
-		setupFiles: ['src/test/setup-i18n.ts'],
+		include: ['test/**/*.test.{ts,tsx}'],
+		setupFiles: ['test/setup/setup-i18n.ts'],
 		pool: 'forks',
 		maxWorkers: 4,
 		minWorkers: 1,

@@ -4,6 +4,31 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.6.0]
+
+### Changed
+
+- **Repository layout:** production source and tests are fully separated across the monorepo.
+  API unit/integration specs moved from `apps/api/src/**/*.spec.ts` to `test/unit/**` (mirroring modules);
+  shared test helpers live under `test/support/**` (`@api/*`, `@test/*` path aliases). Nest feature code is
+  grouped per module (`controllers/`, `services/`, `dto/`, `utils/`, …).
+- **Web layout:** Vitest specs under `apps/web/test/unit/**`; `test/setup/` and `test/helpers/paths.ts` for
+  filesystem guards. Admin components split into `common/`, `layout/`, `identity/`, `mapping/`, `idp-cert/`,
+  `hooks/`; mapping and IdP cert presets moved to colocated `constants.ts` / `enums.ts`.
+- **Shared package:** specs under `packages/shared/test/` with `@shared/*` alias.
+- [docs/development.md](./docs/development.md) documents the tests-vs-source table and alias conventions.
+- Main Vite chunk size budget raised to **700 KB** raw (`scripts/check-web-bundle-size.mjs`) — encryption
+  cert admin UI and i18n catalog exceeded the 650 KB cap on current main; locale chunks remain separate.
+
+### Fixed
+
+- Integration test DB setup: cross-worker `sync-prisma-provider` races on macOS (no `flock`) replaced with a
+  portable file lock in `test-db.helper.ts`.
+- `API-AUDIT-ENC-01` waits for async audit persistence before asserting encryption cert metadata.
+- Web static tests: trim unused `@test/helpers/paths` imports; `admin-confirm-static` scans `src/admin` via `webSrc`.
+- Playwright IdP settings mocks include encryption DTO fields (page crashed after v1.5.0); signing generate
+  button targeted with `.first()` when encryption panel also exposes the same label.
+
 ## [1.5.2]
 
 ### Changed

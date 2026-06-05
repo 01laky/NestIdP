@@ -1,0 +1,202 @@
+import { execSync } from 'node:child_process';
+import { generateKeyPairSync } from 'node:crypto';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import type { GenerateIdpSigningCertRequestDto, StoredSigningCrypto } from '@nestidp/shared';
+import {
+	daysFromTodayUntilNotAfter,
+	ecCurveToNamedCurve,
+	resolveGenerateIdpSigningCertRequest,
+	resolveSignatureAlgorithmIdForSigning,
+	toStoredSigningCrypto,
+} from '@nestidp/shared';
+import { SignedXml } from 'xml-crypto';
+import { applyNestIdpXmlCryptoExtensions } from '../xml-crypto-extended-algorithms';
+import { EncryptionService } from '../../encryption/services/encryption.service';
+import { PrismaService } from '../../prisma/services/prisma.service';
+import { SamlAuthAuditService } from './saml-auth-audit.service';
+
+export interface SigningMaterial {
+	certPem: string;
+	privateKeyPem: string;
+	signatureAlgorithmId?: string | null;
+}
+
+export interface GeneratedSigningKeyPair {
+	privateKeyPem: string;
+	certPem: string;
+	metadata: StoredSigningCrypto;
+}
+
+@Injectable()
+export class IdpSigningService {
+	constructor(
+		private readonly prisma: PrismaService,
+		private readonly encryptionService: EncryptionService,
+		private readonly configService: ConfigService,
+		private readonly audit: SamlAuthAuditService,
+	) {}
+
+	async ensureSigningMaterial(): Promise<SigningMaterial> {
+		const settings = await this.prisma.idpSettings.findUnique({ where: { id: 'default' } });
+		if (!settings) {
+			throw new Error('IdP settings not configured');
+		}
+
+		if (settings.signingCertPem && settings.signingKeyEncrypted) {
+			return {
+				certPem: settings.signingCertPem,
+				privateKeyPem: this.encryptionService.decrypt(settings.signingKeyEncrypted),
+				signatureAlgorithmId: settings.signingSignatureAlgorithmId,
+			};
+		}
+
+		if (settings.pendingSigningCertPem || settings.pendingSigningKeyEncrypted) {
+			throw new Error('IdP signing certificate not configured');
+		}
+
+		const generated = this.generateKeyPairAndCert(settings.entityId);
+		await this.prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: {
+				signingCertPem: generated.certPem,
+				signingKeyEncrypted: this.encryptionService.encrypt(generated.privateKeyPem),
+				signingKeyFamily: generated.metadata.signingKeyFamily,
+				signingSignatureAlgorithmId: generated.metadata.signingSignatureAlgorithmId,
+				signingRsaModulusBits: generated.metadata.signingRsaModulusBits,
+				signingEcCurve: generated.metadata.signingEcCurve,
+			},
+		});
+		this.audit.logSigningKeyGenerated();
+		return {
+			certPem: generated.certPem,
+			privateKeyPem: generated.privateKeyPem,
+			signatureAlgorithmId: generated.metadata.signingSignatureAlgorithmId,
+		};
+	}
+
+	signAssertion(assertionXml: string, material: SigningMaterial, assertionId: string): string {
+		const option = resolveSignatureAlgorithmIdForSigning(material.signatureAlgorithmId);
+		const sig = new SignedXml({
+			privateKey: material.privateKeyPem,
+			publicCert: material.certPem,
+			signatureAlgorithm: option.xmlSignatureAlgorithm,
+			canonicalizationAlgorithm: 'http://www.w3.org/2001/10/xml-exc-c14n#',
+		});
+		applyNestIdpXmlCryptoExtensions(sig);
+		const stripped = assertionXml.replace(/^<\?xml[^?]*\?>\s*/i, '').trim();
+		const wrapper = `<container>${stripped}</container>`;
+		sig.addReference({
+			xpath: `//*[@ID='${assertionId}']`,
+			transforms: [
+				'http://www.w3.org/2000/09/xmldsig#enveloped-signature',
+				'http://www.w3.org/2001/10/xml-exc-c14n#',
+			],
+			digestAlgorithm: option.xmlDigestAlgorithm,
+		});
+		sig.computeSignature(wrapper, {
+			location: { reference: `//*[@ID='${assertionId}']`, action: 'after' },
+		});
+		const signedWrapper = sig.getSignedXml() ?? wrapper;
+		return this.extractSignedAssertionFragment(signedWrapper) ?? stripped;
+	}
+
+	async hasSigningMaterial(): Promise<boolean> {
+		const settings = await this.prisma.idpSettings.findUnique({ where: { id: 'default' } });
+		return Boolean(settings?.signingCertPem && settings?.signingKeyEncrypted);
+	}
+
+	async getMetadataSigningCertificates(): Promise<string[]> {
+		const settings = await this.prisma.idpSettings.findUnique({ where: { id: 'default' } });
+		if (!settings) {
+			throw new Error('IdP settings not configured');
+		}
+
+		const certs: string[] = [];
+		if (settings.signingCertPem) {
+			certs.push(settings.signingCertPem);
+		}
+		if (settings.pendingSigningCertPem) {
+			certs.push(settings.pendingSigningCertPem);
+		}
+		if (certs.length > 0) {
+			return certs;
+		}
+
+		const material = await this.ensureSigningMaterial();
+		return [material.certPem];
+	}
+
+	generateKeyPairAndCert(
+		entityId: string,
+		options?: GenerateIdpSigningCertRequestDto,
+	): GeneratedSigningKeyPair {
+		return this.createKeyPairAndCert(entityId, options);
+	}
+
+	extractX509CertificatePem(certPem: string): string {
+		return certPem
+			.replace(/-----BEGIN CERTIFICATE-----/g, '')
+			.replace(/-----END CERTIFICATE-----/g, '')
+			.replace(/\s+/g, '');
+	}
+
+	private extractSignedAssertionFragment(signedWrapper: string): string | null {
+		const start = signedWrapper.indexOf('<saml2:Assertion');
+		const assertionEnd = signedWrapper.indexOf('</saml2:Assertion>');
+		if (start < 0 || assertionEnd < 0) {
+			return null;
+		}
+		let fragment = signedWrapper.slice(start, assertionEnd + '</saml2:Assertion>'.length);
+		const after = signedWrapper.slice(assertionEnd + '</saml2:Assertion>'.length);
+		const sigMatch = after.match(/<(?:[\w-]+:)?Signature[\s\S]*?<\/(?:[\w-]+:)?Signature>/);
+		if (sigMatch) {
+			fragment += sigMatch[0];
+		}
+		return fragment;
+	}
+
+	private createKeyPairAndCert(
+		entityId: string,
+		options?: GenerateIdpSigningCertRequestDto,
+	): GeneratedSigningKeyPair {
+		const resolved = resolveGenerateIdpSigningCertRequest(options ?? {});
+		const metadata = toStoredSigningCrypto(resolved);
+
+		const privateKeyPem =
+			resolved.keyFamily === 'rsa'
+				? generateKeyPairSync('rsa', {
+						modulusLength: resolved.rsaModulusBits,
+						privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+						publicKeyEncoding: { type: 'spki', format: 'pem' },
+					}).privateKey
+				: generateKeyPairSync('ec', {
+						namedCurve: ecCurveToNamedCurve(resolved.ecCurve),
+						privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+						publicKeyEncoding: { type: 'spki', format: 'pem' },
+					}).privateKey;
+
+		const tmp = mkdtempSync(join(tmpdir(), 'nestidp-cert-'));
+		try {
+			const keyPath = join(tmp, 'key.pem');
+			const certPath = join(tmp, 'cert.pem');
+			writeFileSync(keyPath, privateKeyPem);
+			const cn = entityId.replace(/^https?:\/\//, '').slice(0, 64) || 'nestidp';
+			const days = daysFromTodayUntilNotAfter(resolved.notAfter);
+			execSync(
+				`openssl req -new -x509 -key "${keyPath}" -out "${certPath}" -days ${days} -subj "/CN=${cn}" -nodes`,
+				{ stdio: 'pipe' },
+			);
+			return {
+				privateKeyPem,
+				certPem: readFileSync(certPath, 'utf8'),
+				metadata,
+			};
+		} finally {
+			rmSync(tmp, { recursive: true, force: true });
+		}
+	}
+}

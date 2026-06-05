@@ -7,9 +7,9 @@ import {
 	identityUserDetailRoute,
 } from '@nestidp/shared';
 import { AdminApiError, deleteIdentityGroup, getIdentityGroup } from '../adminApi';
-import { AdminPageHeader } from '../components/AdminPageHeader';
-import { ErrorBanner } from '../components/ErrorBanner';
-import { LoadingState } from '../components/LoadingState';
+import { AdminPageHeader } from '../components/layout/AdminPageHeader';
+import { ErrorBanner } from '../components/common/ErrorBanner';
+import { LoadingState } from '../components/common/LoadingState';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
 import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
 import { identityOriginLabel, identityOriginToBadge } from '../status-badge';

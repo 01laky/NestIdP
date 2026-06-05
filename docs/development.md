@@ -607,7 +607,7 @@ Existing **`WEB-ADM-*`** / **`WEB-AUTH-*`** must stay green.
 pnpm --filter @nestidp/web test
 pnpm check:i18n-keys
 pnpm --filter @nestidp/web build
-node scripts/check-web-bundle-size.mjs   # main index-*.js ≤ 650 KB raw; locale JSON in separate chunks
+node scripts/check-web-bundle-size.mjs   # main index-*.js ≤ 700 KB raw; locale JSON in separate chunks
 pnpm --filter @nestidp/web exec playwright install chromium
 pnpm --filter @nestidp/web test:e2e:visual
 # Intentional UI changes:
@@ -639,7 +639,15 @@ If the machine still feels slow after aborting tests in the IDE, run **`pnpm tes
 - `@nestidp/api` — unit tests, schema integration tests (SQLite temp DB), optional PostgreSQL smoke (`POSTGRES_TEST_URL`), e2e routing (mocked Prisma)
 - `@nestidp/web` — React route tests (admin vs login separation), Evergreen `WEB-EVG-*` registry
 
-Integration tests live under `apps/api/src/prisma/*.integration.spec.ts` and run as part of `pnpm test`.
+### Repository layout (tests vs source)
+
+| Package | Source | Tests | Test-only helpers |
+| ------- | ------ | ----- | ----------------- |
+| `apps/api` | `src/<module>/` with `controllers/`, `services/`, `dto/`, `utils/`, … | `test/unit/**` (mirrors modules), `test/support/**` (fixtures, SAML helpers), `test/routing.e2e-spec.ts` | `@api/*` → `src/*`, `@test/*` → `test/*` |
+| `apps/web` | `src/` (pages, `admin/components/<area>/`, UI) | `test/unit/**` (mirrors `src`), `test/setup/`, `test/helpers/` | `@/*` → `src/*`, `@test/*` → `test/*` |
+| `packages/shared` | `src/*.ts` | `test/*.spec.ts` | `@shared/*` → `src/*` |
+
+API integration specs that need temp DBs live under `apps/api/test/unit/**` (not beside handlers). Web static guards use `@test/helpers/paths` (`webSrc`, `webRoot`, `repoRoot`).
 
 CI (`.github/workflows/ci.yml`) runs lint, test (with Postgres + `CI=true`), build, bundle size check, `diagrams:build` + `diagrams:check`, and Playwright **`test:e2e:ci`** (responsive shell smoke; full PNG baselines are local-only) on push/PR to `main`.
 

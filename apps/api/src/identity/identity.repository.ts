@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Group, IdentityOrigin, Prisma, Role, User } from '@prisma/client';
-import { normalizeSyncedEmail } from './normalize-synced-email.util';
-import { PrismaService } from '../prisma/prisma.service';
+import { normalizeSyncedEmail } from './utils/normalize-synced-email.util';
+import { PrismaService } from '../prisma/services/prisma.service';
 
 export class UsernameCollisionError extends Error {
 	constructor(

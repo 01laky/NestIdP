@@ -6,6 +6,10 @@ const idpSettings = {
 	hasSigningCertificate: true,
 	signingCertFingerprintSha256: 'aa:bb',
 	signingCertNotAfter: '2030-01-01T00:00:00.000Z',
+	signingKeyFamily: 'rsa',
+	signingSignatureAlgorithmId: 'rsa-sha256',
+	signingRsaModulusBits: 2048,
+	signingEcCurve: null,
 	metadataUrl: 'http://localhost:3000/saml/metadata',
 	ssoUrl: 'http://localhost:3000/saml/sso',
 	idpBaseUrl: 'http://localhost:3000',
@@ -15,8 +19,26 @@ const idpSettings = {
 		hasPendingCertificate: false,
 		pendingCertFingerprintSha256: null,
 	},
+	hasEncryptionCertificate: false,
+	encryptionCertFingerprintSha256: null,
+	encryptionCertNotAfter: null,
+	encryptionKeyFamily: null,
+	encryptionKeyTransportAlgorithmId: null,
+	encryptionRsaModulusBits: null,
+	encryptionEcCurve: null,
+	encryptionRotation: {
+		active: false,
+		startedAt: null,
+		hasPendingCertificate: false,
+		pendingCertFingerprintSha256: null,
+	},
 	updatedAt: '2026-01-01T00:00:00.000Z',
 };
+
+/** Signing panel is first; encryption also exposes "Generate certificate". */
+function signingGenerateButton(page: import('@playwright/test').Page) {
+	return page.getByRole('button', { name: 'Generate certificate' }).first();
+}
 
 const apiConnectionBody = {
 	connection: {
@@ -73,7 +95,7 @@ test.describe('Admin confirm dialog (WEB-ADM-E2E-CONF)', () => {
 			await route.fulfill({ status: 200, body: JSON.stringify(idpSettings) });
 		});
 		await page.goto('/admin/settings/idp');
-		await page.getByRole('button', { name: 'Generate certificate' }).click();
+		await signingGenerateButton(page).click();
 		await expect(page.getByRole('dialog')).toBeVisible();
 		await page.getByRole('button', { name: 'Cancel' }).click();
 		await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -83,7 +105,7 @@ test.describe('Admin confirm dialog (WEB-ADM-E2E-CONF)', () => {
 	test('WEB-ADM-E2E-CONF-02: modal fits mobile viewport', async ({ page }) => {
 		await page.setViewportSize({ width: 390, height: 844 });
 		await page.goto('/admin/settings/idp');
-		await page.getByRole('button', { name: 'Generate certificate' }).click();
+		await signingGenerateButton(page).click();
 		const dialog = page.getByRole('dialog');
 		await expect(dialog).toBeVisible();
 		const box = await dialog.boundingBox();
@@ -102,7 +124,7 @@ test.describe('Admin confirm dialog (WEB-ADM-E2E-CONF)', () => {
 		await page.getByLabel('Key type').selectOption('ec');
 		await page.getByLabel('EC curve').selectOption('P-384');
 		await page.getByLabel('Signature algorithm').selectOption('ecdsa-sha384');
-		await page.getByRole('button', { name: 'Generate certificate' }).click();
+		await signingGenerateButton(page).click();
 		const dialog = page.getByRole('dialog');
 		await dialog.getByRole('textbox').fill('REPLACE');
 		await dialog.getByRole('button', { name: 'Generate certificate' }).click();
@@ -119,7 +141,7 @@ test.describe('Admin confirm dialog (WEB-ADM-E2E-CONF)', () => {
 			await route.fulfill({ status: 200, body: JSON.stringify(idpSettings) });
 		});
 		await page.goto('/admin/settings/idp');
-		await page.getByRole('button', { name: 'Generate certificate' }).click();
+		await signingGenerateButton(page).click();
 		const dialog = page.getByRole('dialog');
 		await dialog.getByRole('textbox').fill('REPLACE');
 		await dialog.getByRole('button', { name: 'Generate certificate' }).click();
@@ -137,7 +159,7 @@ test.describe('Admin confirm dialog (WEB-ADM-E2E-CONF)', () => {
 			await route.fulfill({ status: 200, body: JSON.stringify(idpSettings) });
 		});
 		await page.goto('/admin/settings/idp');
-		await page.getByRole('button', { name: 'Generate certificate' }).click();
+		await signingGenerateButton(page).click();
 		const dialog = page.getByRole('dialog');
 		const confirmBtn = dialog.getByRole('button', { name: 'Generate certificate' });
 		await expect(confirmBtn).toBeDisabled();
@@ -149,7 +171,7 @@ test.describe('Admin confirm dialog (WEB-ADM-E2E-CONF)', () => {
 
 	test('WEB-ADM-E2E-CONF-04: no native dialog event (guard)', async ({ page }) => {
 		await page.goto('/admin/settings/idp');
-		await page.getByRole('button', { name: 'Generate certificate' }).click();
+		await signingGenerateButton(page).click();
 		await expect(page.getByRole('dialog')).toBeVisible();
 	});
 
@@ -160,7 +182,7 @@ test.describe('Admin confirm dialog (WEB-ADM-E2E-CONF)', () => {
 			await route.fulfill({ status: 200, body: JSON.stringify(idpSettings) });
 		});
 		await page.goto('/admin/settings/idp');
-		await page.getByRole('button', { name: 'Generate certificate' }).click();
+		await signingGenerateButton(page).click();
 		await expect(page.getByRole('dialog')).toBeVisible();
 		await page.keyboard.press('Escape');
 		await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -174,7 +196,7 @@ test.describe('Admin confirm dialog (WEB-ADM-E2E-CONF)', () => {
 			await route.fulfill({ status: 200, body: JSON.stringify(idpSettings) });
 		});
 		await page.goto('/admin/settings/idp');
-		await page.getByRole('button', { name: 'Generate certificate' }).click();
+		await signingGenerateButton(page).click();
 		const dialog = page.getByRole('dialog');
 		await dialog.getByRole('textbox').fill('replace');
 		const confirmBtn = dialog.getByRole('button', { name: 'Generate certificate' });

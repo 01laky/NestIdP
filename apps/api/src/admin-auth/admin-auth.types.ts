@@ -1,6 +1,6 @@
 import type { Request } from 'express';
 import type { AdminMeDto } from '@nestidp/shared';
-import type { AdminSessionPayload } from './admin-session.service';
+import type { AdminSessionPayload } from './services/admin-session.service';
 
 export interface AuthenticatedAdmin {
 	id: string;

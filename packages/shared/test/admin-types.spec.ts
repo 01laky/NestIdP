@@ -1,0 +1,181 @@
+import { describe, expect, it } from 'vitest';
+import type { AdminDashboardResponseDto, AdminStatsDto } from '@shared/admin-types.js';
+import { API_CONNECTION_ROUTE_PREFIX, API_CONNECTIONS_API_PATH } from '@shared/connections.js';
+import {
+	IDP_CERT_EXPIRY_WARNING_DAYS,
+	IDP_ROTATION_STALE_WARNING_DAYS,
+	IDP_SETTINGS_ROUTE_PREFIX,
+} from '@shared/idp-settings.js';
+import { SAML_METADATA_PATH, SP_CONNECTIONS_API_PATH } from '@shared/saml.js';
+import { SYNC_API_PATH } from '@shared/sync.js';
+import { AUDIT_ROUTE_PREFIX } from '@shared/audit-events.js';
+import { ADMIN_USERS_ROUTE_PREFIX } from '@shared/admin-users.js';
+
+const defaultIdp = {
+	idpSettingsRoute: IDP_SETTINGS_ROUTE_PREFIX,
+	hasSigningCertificate: true,
+	rotationActive: false,
+	signingCertNotAfter: '2030-01-01T00:00:00.000Z',
+	signingKeyFamily: 'rsa' as const,
+	signingSignatureAlgorithmId: 'rsa-sha256',
+	signingRsaModulusBits: 2048,
+	signingEcCurve: null,
+	certStatus: 'ok' as const,
+	hasEncryptionCertificate: false,
+	encryptionRotationActive: false,
+	encryptionCertNotAfter: null,
+	encryptionKeyFamily: null,
+	encryptionKeyTransportAlgorithmId: null,
+	encryptionRsaModulusBits: null,
+	encryptionEcCurve: null,
+	encryptionCertStatus: 'not_configured' as const,
+};
+
+describe('AdminStatsDto', () => {
+	it('SH-ADM-01: requires all five count fields', () => {
+		const stats: AdminStatsDto = {
+			users: 1,
+			groups: 2,
+			roles: 3,
+			apiConnections: 4,
+			spConnections: 5,
+		};
+		expect(Object.keys(stats).sort()).toEqual([
+			'apiConnections',
+			'groups',
+			'roles',
+			'spConnections',
+			'users',
+		]);
+	});
+
+	it('SH-ADM-02: allows zero counts', () => {
+		const stats: AdminStatsDto = {
+			users: 0,
+			groups: 0,
+			roles: 0,
+			apiConnections: 0,
+			spConnections: 0,
+		};
+		expect(stats.users + stats.spConnections).toBe(0);
+	});
+});
+
+describe('AdminDashboardResponseDto', () => {
+	it('SH-ADM-03: includes dashboard routes and sync metadata fields', () => {
+		const response: AdminDashboardResponseDto = {
+			counts: {
+				users: 0,
+				groups: 0,
+				roles: 0,
+				apiConnections: 0,
+				spConnections: 0,
+			},
+			apiConnectionsRoute: API_CONNECTION_ROUTE_PREFIX,
+			spConnectionsRoute: '/admin/sp-connections',
+			identityUsersRoute: '/admin/identity/users',
+			apiConnectionsApiPath: API_CONNECTIONS_API_PATH,
+			syncApiPath: SYNC_API_PATH,
+			spConnectionsApiPath: SP_CONNECTIONS_API_PATH,
+			metadataUrl: `https://idp.example.com${SAML_METADATA_PATH}`,
+			entityId: 'https://idp.example.com',
+			ssoUrl: 'https://idp.example.com/saml/sso',
+			idp: defaultIdp,
+			apiConnection: null,
+			lastSyncStatus: null,
+			lastSyncAt: null,
+			auditEventsRoute: AUDIT_ROUTE_PREFIX,
+			adminUsersRoute: ADMIN_USERS_ROUTE_PREFIX,
+		};
+		expect(response.entityId).toContain('idp.example.com');
+		expect(response.lastSyncAt).toBeNull();
+	});
+
+	it('SH-ADM-04: apiConnectionsRoute points at identity source not SP', () => {
+		const response: AdminDashboardResponseDto = {
+			counts: {
+				users: 0,
+				groups: 0,
+				roles: 0,
+				apiConnections: 0,
+				spConnections: 0,
+			},
+			apiConnectionsRoute: API_CONNECTION_ROUTE_PREFIX,
+			spConnectionsRoute: '/admin/sp-connections',
+			identityUsersRoute: '/admin/identity/users',
+			apiConnectionsApiPath: API_CONNECTIONS_API_PATH,
+			syncApiPath: SYNC_API_PATH,
+			spConnectionsApiPath: SP_CONNECTIONS_API_PATH,
+			metadataUrl: `https://idp.example.com${SAML_METADATA_PATH}`,
+			entityId: 'https://idp.example.com',
+			ssoUrl: 'https://idp.example.com/saml/sso',
+			idp: defaultIdp,
+			apiConnection: null,
+			lastSyncStatus: 'NEVER',
+			lastSyncAt: null,
+			auditEventsRoute: AUDIT_ROUTE_PREFIX,
+			adminUsersRoute: ADMIN_USERS_ROUTE_PREFIX,
+		};
+		expect(response.apiConnectionsRoute).toContain('api-connections');
+		expect(response.apiConnectionsRoute).not.toContain('sp-connections');
+	});
+
+	it('SH-ADM-DASH-IDP-01: AdminDashboardResponseDto.idp nested shape assignable', () => {
+		const response: AdminDashboardResponseDto = {
+			counts: { users: 0, groups: 0, roles: 0, apiConnections: 0, spConnections: 0 },
+			apiConnectionsRoute: API_CONNECTION_ROUTE_PREFIX,
+			spConnectionsRoute: '/admin/sp-connections',
+			identityUsersRoute: '/admin/identity/users',
+			apiConnectionsApiPath: API_CONNECTIONS_API_PATH,
+			syncApiPath: SYNC_API_PATH,
+			spConnectionsApiPath: SP_CONNECTIONS_API_PATH,
+			metadataUrl: `https://idp.example.com${SAML_METADATA_PATH}`,
+			entityId: 'https://idp.example.com',
+			ssoUrl: 'https://idp.example.com/saml/sso',
+			idp: {
+				idpSettingsRoute: IDP_SETTINGS_ROUTE_PREFIX,
+				hasSigningCertificate: false,
+				rotationActive: true,
+				signingCertNotAfter: null,
+				signingKeyFamily: null,
+				signingSignatureAlgorithmId: null,
+				signingRsaModulusBits: null,
+				signingEcCurve: null,
+				certStatus: 'rotation_active',
+				hasEncryptionCertificate: false,
+				encryptionRotationActive: false,
+				encryptionCertNotAfter: null,
+				encryptionKeyFamily: null,
+				encryptionKeyTransportAlgorithmId: null,
+				encryptionRsaModulusBits: null,
+				encryptionEcCurve: null,
+				encryptionCertStatus: 'not_configured',
+			},
+			apiConnection: null,
+			lastSyncStatus: null,
+			lastSyncAt: null,
+			auditEventsRoute: AUDIT_ROUTE_PREFIX,
+			adminUsersRoute: ADMIN_USERS_ROUTE_PREFIX,
+		};
+		expect(response.idp.certStatus).toBe('rotation_active');
+	});
+
+	it('SH-ADM-DASH-IDP-02: certStatus union accepts all four literals', () => {
+		const statuses: AdminDashboardResponseDto['idp']['certStatus'][] = [
+			'missing',
+			'ok',
+			'expiring_soon',
+			'rotation_active',
+		];
+		expect(statuses).toHaveLength(4);
+	});
+
+	it('SH-ADM-DASH-IDP-03: idpSettingsRoute equals IDP_SETTINGS_ROUTE_PREFIX', () => {
+		expect(defaultIdp.idpSettingsRoute).toBe(IDP_SETTINGS_ROUTE_PREFIX);
+	});
+
+	it('SH-ADM-DASH-IDP-04: expiry/stale day constants are positive integers', () => {
+		expect(IDP_CERT_EXPIRY_WARNING_DAYS).toBeGreaterThan(0);
+		expect(IDP_ROTATION_STALE_WARNING_DAYS).toBeGreaterThan(0);
+	});
+});

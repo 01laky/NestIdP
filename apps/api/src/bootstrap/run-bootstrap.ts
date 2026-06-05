@@ -1,6 +1,6 @@
 import type { PrismaClient } from '@prisma/client';
-import { hashPassword } from '../admin-auth/password.util';
-import { ensureLocalDirectoryConnection } from '../identity/local-directory.util';
+import { hashPassword } from '../admin-auth/utils/password.util';
+import { ensureLocalDirectoryConnection } from '../identity/utils/local-directory.util';
 import {
 	assertProductionBootstrapPassword,
 	isWeakBootstrapPassword,

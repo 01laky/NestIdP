@@ -3,9 +3,9 @@ import { AdminAuthModule } from '../admin-auth/admin-auth.module';
 import { EncryptionModule } from '../encryption/encryption.module';
 import { IdentityModule } from '../identity/identity.module';
 import { PrismaModule } from '../prisma/prisma.module';
-import { IdentityAdminAuditService } from './identity-admin-audit.service';
-import { IdentityAdminController } from './identity-admin.controller';
-import { IdentityAdminService } from './identity-admin.service';
+import { IdentityAdminAuditService } from './services/identity-admin-audit.service';
+import { IdentityAdminController } from './controllers/identity-admin.controller';
+import { IdentityAdminService } from './services/identity-admin.service';
 
 @Module({
 	imports: [PrismaModule, AdminAuthModule, EncryptionModule, IdentityModule],

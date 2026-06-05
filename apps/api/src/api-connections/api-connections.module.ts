@@ -3,10 +3,10 @@ import { AuditCoreModule } from '../audit/audit-core.module';
 import { AdminAuthModule } from '../admin-auth/admin-auth.module';
 import { EncryptionModule } from '../encryption/encryption.module';
 import { PrismaModule } from '../prisma/prisma.module';
-import { ApiConnectionsAuditService } from './api-connections-audit.service';
-import { ApiConnectionTestService } from './api-connection-test.service';
-import { ApiConnectionsController } from './api-connections.controller';
-import { ApiConnectionsService } from './api-connections.service';
+import { ApiConnectionsAuditService } from './services/api-connections-audit.service';
+import { ApiConnectionTestService } from './services/api-connection-test.service';
+import { ApiConnectionsController } from './controllers/api-connections.controller';
+import { ApiConnectionsService } from './services/api-connections.service';
 
 @Module({
 	imports: [PrismaModule, AuditCoreModule, AdminAuthModule, EncryptionModule],

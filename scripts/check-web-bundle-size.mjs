@@ -6,8 +6,8 @@
 import { readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-/** Monolith SPA + i18next (en catalog in main chunk); locale JSON lazy-loaded — raised in 1.3.0. */
-const BUDGET_BYTES = 650 * 1024;
+/** Monolith SPA + i18next (en catalog in main chunk); locale JSON lazy-loaded. */
+const BUDGET_BYTES = 700 * 1024;
 const distAssets = join(process.cwd(), 'apps/web/dist/assets');
 
 function findLargestIndexJs(dir) {

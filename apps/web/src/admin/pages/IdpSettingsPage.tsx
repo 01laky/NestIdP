@@ -35,15 +35,15 @@ import {
 import {
 	buildEncryptionCertOptionsConfirmSummary,
 	IdpEncryptionCertOptionsFields,
-} from '../components/IdpEncryptionCertOptionsFields';
+} from '../components/idp-cert/IdpEncryptionCertOptionsFields';
 import {
 	buildCertOptionsConfirmSummary,
 	IdpSigningCertOptionsFields,
-} from '../components/IdpSigningCertOptionsFields';
-import { AdminBreadcrumbs } from '../components/AdminBreadcrumbs';
-import { AdminPageHeader } from '../components/AdminPageHeader';
-import { ErrorBanner } from '../components/ErrorBanner';
-import { LoadingState } from '../components/LoadingState';
+} from '../components/idp-cert/IdpSigningCertOptionsFields';
+import { AdminBreadcrumbs } from '../components/layout/AdminBreadcrumbs';
+import { AdminPageHeader } from '../components/layout/AdminPageHeader';
+import { ErrorBanner } from '../components/common/ErrorBanner';
+import { LoadingState } from '../components/common/LoadingState';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
 import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
 import {

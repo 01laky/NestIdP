@@ -7,9 +7,9 @@ import { IdpSettingsModule } from '../idp-settings/idp-settings.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { SpConnectionsModule } from '../sp-connections/sp-connections.module';
 import { SyncModule } from '../sync/sync.module';
-import { AdminController } from './admin.controller';
-import { AdminDashboardService } from './admin-dashboard.service';
-import { AdminStatsService } from './admin-stats.service';
+import { AdminController } from './controllers/admin.controller';
+import { AdminDashboardService } from './services/admin-dashboard.service';
+import { AdminStatsService } from './services/admin-stats.service';
 import { AdminUsersModule } from '../admin-users/admin-users.module';
 import { AuditModule } from '../audit/audit.module';
 

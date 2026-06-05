@@ -1,4 +1,5 @@
 import react from '@vitejs/plugin-react';
+import path from 'node:path';
 import { defineConfig } from 'vite';
 
 const apiTarget = process.env.VITE_API_PROXY_TARGET ?? 'http://localhost:3000';
@@ -7,6 +8,12 @@ const usePolling = process.env.CHOKIDAR_USEPOLLING === 'true';
 
 export default defineConfig({
 	plugins: [react()],
+	resolve: {
+		alias: {
+			'@': path.resolve(__dirname, './src'),
+			'@nestidp/shared': path.resolve(__dirname, '../../packages/shared/src/index.ts'),
+		},
+	},
 	server: {
 		host: true,
 		port: 5173,

@@ -11,10 +11,10 @@ import {
 	testSpConnectionAcs,
 	updateSpConnection,
 } from '../adminApi';
-import { AdminPageHeader } from '../components/AdminPageHeader';
-import { AttributeMappingEditor } from '../components/AttributeMappingEditor';
-import { ErrorBanner } from '../components/ErrorBanner';
-import { LoadingState } from '../components/LoadingState';
+import { AdminPageHeader } from '../components/layout/AdminPageHeader';
+import { AttributeMappingEditor } from '../components/mapping/AttributeMappingEditor';
+import { ErrorBanner } from '../components/common/ErrorBanner';
+import { LoadingState } from '../components/common/LoadingState';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
 import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
 import {

@@ -3,11 +3,11 @@ import { AuditCoreModule } from '../audit/audit-core.module';
 import { AdminAuthModule } from '../admin-auth/admin-auth.module';
 import { IdpSettingsModule } from '../idp-settings/idp-settings.module';
 import { PrismaModule } from '../prisma/prisma.module';
-import { IdpMetadataController } from './idp-metadata.controller';
-import { SpConnectionTestAcsService } from './sp-connection-test-acs.service';
-import { SpConnectionsAuditService } from './sp-connections-audit.service';
-import { SpConnectionsController } from './sp-connections.controller';
-import { SpConnectionsService } from './sp-connections.service';
+import { IdpMetadataController } from './controllers/idp-metadata.controller';
+import { SpConnectionTestAcsService } from './services/sp-connection-test-acs.service';
+import { SpConnectionsAuditService } from './services/sp-connections-audit.service';
+import { SpConnectionsController } from './controllers/sp-connections.controller';
+import { SpConnectionsService } from './services/sp-connections.service';
 
 @Module({
 	imports: [PrismaModule, AuditCoreModule, AdminAuthModule, IdpSettingsModule],

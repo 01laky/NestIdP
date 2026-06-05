@@ -6,10 +6,17 @@ module.exports = {
 	testRegex: '.e2e-spec.ts$',
 	setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
 	transform: {
-		'^.+\\.(t|j)s$': 'ts-jest',
+		'^.+\\.(t|j)s$': [
+			'ts-jest',
+			{
+				tsconfig: '<rootDir>/../tsconfig.test.json',
+			},
+		],
 	},
 	moduleNameMapper: {
 		'^@nestidp/shared$': '<rootDir>/../../../packages/shared/src/index.ts',
+		'^@api/(.*)$': '<rootDir>/../src/$1',
+		'^@test/(.*)$': '<rootDir>/$1',
 		'^(\\.{1,2}/.*)\\.js$': '$1',
 	},
 };

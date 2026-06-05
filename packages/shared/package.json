@@ -1,6 +1,6 @@
 {
 	"name": "@nestidp/shared",
-	"version": "1.5.2",
+	"version": "1.6.0",
 	"private": true,
 	"type": "module",
 	"main": "./dist/index.js",
@@ -18,7 +18,7 @@
 		"pretest": "node ../../scripts/cleanup-test-processes.mjs",
 		"posttest": "node ../../scripts/cleanup-test-processes.mjs",
 		"test": "vitest run",
-		"lint": "tsc -p tsconfig.json --noEmit"
+		"lint": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit"
 	},
 	"devDependencies": {
 		"typescript": "^5.8.2",

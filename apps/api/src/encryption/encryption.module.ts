@@ -1,6 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { CREDENTIALS_ENCRYPTION } from './credentials-encryption.port';
-import { EncryptionService } from './encryption.service';
+import { EncryptionService } from './services/encryption.service';
 
 @Global()
 @Module({

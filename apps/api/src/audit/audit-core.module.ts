@@ -1,7 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
-import { AuditPersistenceService } from './audit-persistence.service';
-import { AuditRetentionCleanupService } from './audit-retention-cleanup.service';
+import { AuditPersistenceService } from './services/audit-persistence.service';
+import { AuditRetentionCleanupService } from './services/audit-retention-cleanup.service';
 
 @Global()
 @Module({

@@ -4,9 +4,9 @@ import { AdminAuthModule } from '../admin-auth/admin-auth.module';
 import { EncryptionModule } from '../encryption/encryption.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { SamlModule } from '../saml/saml.module';
-import { IdpSettingsAuditService } from './idp-settings-audit.service';
-import { IdpSettingsController } from './idp-settings.controller';
-import { IdpSettingsService } from './idp-settings.service';
+import { IdpSettingsAuditService } from './services/idp-settings-audit.service';
+import { IdpSettingsController } from './controllers/idp-settings.controller';
+import { IdpSettingsService } from './services/idp-settings.service';
 
 @Module({
 	imports: [PrismaModule, AuditCoreModule, AdminAuthModule, EncryptionModule, SamlModule],
