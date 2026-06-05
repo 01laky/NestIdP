@@ -34,3 +34,4 @@ apps/api/prisma/*.db-journal
 apps/api/prisma/.test-migration-sync.lock
 apps/api/data/
 *.tsbuildinfo
+.claude/
