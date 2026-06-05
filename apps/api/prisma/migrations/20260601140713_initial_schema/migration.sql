@@ -1,19 +1,39 @@
+-- CreateSchema
+CREATE SCHEMA IF NOT EXISTS "public";
+
+-- CreateEnum
+CREATE TYPE "AuthType" AS ENUM ('BEARER');
+
+-- CreateEnum
+CREATE TYPE "LastSyncStatus" AS ENUM ('NEVER', 'IN_PROGRESS', 'SUCCESS', 'FAILED');
+
+-- CreateEnum
+CREATE TYPE "SyncLogStatus" AS ENUM ('RUNNING', 'SUCCESS', 'FAILED');
+
+-- CreateEnum
+CREATE TYPE "AuditActorType" AS ENUM ('admin', 'end_user', 'system');
+
+-- CreateEnum
+CREATE TYPE "AuditCategory" AS ENUM ('admin_auth', 'admin_config', 'end_user_auth', 'saml', 'sync');
+
 -- CreateTable
 CREATE TABLE "ApiConnection" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "baseUrl" TEXT NOT NULL,
-    "authType" TEXT NOT NULL DEFAULT 'BEARER',
+    "authType" "AuthType" NOT NULL DEFAULT 'BEARER',
     "authCredentialsEncrypted" TEXT NOT NULL,
-    "lastSyncAt" DATETIME,
-    "lastSyncStatus" TEXT NOT NULL DEFAULT 'NEVER',
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "lastSyncAt" TIMESTAMP(3),
+    "lastSyncStatus" "LastSyncStatus" NOT NULL DEFAULT 'NEVER',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "ApiConnection_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "User" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "externalId" TEXT NOT NULL,
     "apiConnectionId" TEXT NOT NULL,
     "username" TEXT NOT NULL,
@@ -22,31 +42,34 @@ CREATE TABLE "User" (
     "passwordHash" TEXT NOT NULL,
     "passwordHashAlgorithm" TEXT NOT NULL DEFAULT 'bcrypt',
     "active" BOOLEAN NOT NULL DEFAULT true,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "User_apiConnectionId_fkey" FOREIGN KEY ("apiConnectionId") REFERENCES "ApiConnection" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "User_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "Group" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "externalId" TEXT NOT NULL,
     "apiConnectionId" TEXT NOT NULL,
     "name" TEXT NOT NULL,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "Group_apiConnectionId_fkey" FOREIGN KEY ("apiConnectionId") REFERENCES "ApiConnection" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Group_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "Role" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "externalId" TEXT NOT NULL,
     "apiConnectionId" TEXT NOT NULL,
     "name" TEXT NOT NULL,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "Role_apiConnectionId_fkey" FOREIGN KEY ("apiConnectionId") REFERENCES "ApiConnection" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Role_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -54,9 +77,7 @@ CREATE TABLE "UserGroup" (
     "userId" TEXT NOT NULL,
     "groupId" TEXT NOT NULL,
 
-    PRIMARY KEY ("userId", "groupId"),
-    CONSTRAINT "UserGroup_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT "UserGroup_groupId_fkey" FOREIGN KEY ("groupId") REFERENCES "Group" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    CONSTRAINT "UserGroup_pkey" PRIMARY KEY ("userId","groupId")
 );
 
 -- CreateTable
@@ -64,14 +85,12 @@ CREATE TABLE "UserRole" (
     "userId" TEXT NOT NULL,
     "roleId" TEXT NOT NULL,
 
-    PRIMARY KEY ("userId", "roleId"),
-    CONSTRAINT "UserRole_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT "UserRole_roleId_fkey" FOREIGN KEY ("roleId") REFERENCES "Role" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    CONSTRAINT "UserRole_pkey" PRIMARY KEY ("userId","roleId")
 );
 
 -- CreateTable
 CREATE TABLE "SpConnection" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "spEntityId" TEXT NOT NULL,
     "acsUrl" TEXT NOT NULL,
@@ -79,55 +98,82 @@ CREATE TABLE "SpConnection" (
     "nameIdFormat" TEXT NOT NULL DEFAULT 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
     "attributeMapping" JSONB,
     "active" BOOLEAN NOT NULL DEFAULT true,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "SpConnection_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "AdminUser" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "username" TEXT NOT NULL,
     "passwordHash" TEXT NOT NULL,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "AdminUser_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "SyncLog" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "apiConnectionId" TEXT NOT NULL,
-    "startedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "finishedAt" DATETIME,
-    "status" TEXT NOT NULL,
+    "startedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "finishedAt" TIMESTAMP(3),
+    "status" "SyncLogStatus" NOT NULL,
     "usersSynced" INTEGER NOT NULL DEFAULT 0,
     "groupsSynced" INTEGER NOT NULL DEFAULT 0,
     "rolesSynced" INTEGER NOT NULL DEFAULT 0,
     "errors" JSONB,
-    CONSTRAINT "SyncLog_apiConnectionId_fkey" FOREIGN KEY ("apiConnectionId") REFERENCES "ApiConnection" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+
+    CONSTRAINT "SyncLog_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "SamlSession" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "samlRequestId" TEXT NOT NULL,
     "relayState" TEXT,
     "spConnectionId" TEXT NOT NULL,
     "userId" TEXT,
-    "expiresAt" DATETIME NOT NULL,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "SamlSession_spConnectionId_fkey" FOREIGN KEY ("spConnectionId") REFERENCES "SpConnection" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT "SamlSession_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "SamlSession_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "AuditEvent" (
+    "id" TEXT NOT NULL,
+    "category" "AuditCategory" NOT NULL,
+    "event" TEXT NOT NULL,
+    "actorType" "AuditActorType" NOT NULL,
+    "actorId" TEXT,
+    "actorLabel" TEXT,
+    "subjectType" TEXT,
+    "subjectId" TEXT,
+    "clientIp" TEXT,
+    "metadata" JSONB,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "AuditEvent_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "IdpSettings" (
-    "id" TEXT NOT NULL PRIMARY KEY DEFAULT 'default',
+    "id" TEXT NOT NULL DEFAULT 'default',
     "entityId" TEXT NOT NULL,
     "signingCertPem" TEXT,
     "signingKeyEncrypted" TEXT,
+    "pendingSigningCertPem" TEXT,
+    "pendingSigningKeyEncrypted" TEXT,
+    "rotationStartedAt" TIMESTAMP(3),
     "nameIdFormat" TEXT NOT NULL DEFAULT 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "IdpSettings_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
@@ -177,3 +223,43 @@ CREATE INDEX "SamlSession_expiresAt_idx" ON "SamlSession"("expiresAt");
 
 -- CreateIndex
 CREATE INDEX "SamlSession_spConnectionId_idx" ON "SamlSession"("spConnectionId");
+
+-- CreateIndex
+CREATE INDEX "AuditEvent_category_createdAt_idx" ON "AuditEvent"("category", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "AuditEvent_event_createdAt_idx" ON "AuditEvent"("event", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "AuditEvent_createdAt_idx" ON "AuditEvent"("createdAt");
+
+-- AddForeignKey
+ALTER TABLE "User" ADD CONSTRAINT "User_apiConnectionId_fkey" FOREIGN KEY ("apiConnectionId") REFERENCES "ApiConnection"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Group" ADD CONSTRAINT "Group_apiConnectionId_fkey" FOREIGN KEY ("apiConnectionId") REFERENCES "ApiConnection"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Role" ADD CONSTRAINT "Role_apiConnectionId_fkey" FOREIGN KEY ("apiConnectionId") REFERENCES "ApiConnection"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "UserGroup" ADD CONSTRAINT "UserGroup_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "UserGroup" ADD CONSTRAINT "UserGroup_groupId_fkey" FOREIGN KEY ("groupId") REFERENCES "Group"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "UserRole" ADD CONSTRAINT "UserRole_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "UserRole" ADD CONSTRAINT "UserRole_roleId_fkey" FOREIGN KEY ("roleId") REFERENCES "Role"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "SyncLog" ADD CONSTRAINT "SyncLog_apiConnectionId_fkey" FOREIGN KEY ("apiConnectionId") REFERENCES "ApiConnection"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "SamlSession" ADD CONSTRAINT "SamlSession_spConnectionId_fkey" FOREIGN KEY ("spConnectionId") REFERENCES "SpConnection"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "SamlSession" ADD CONSTRAINT "SamlSession_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
