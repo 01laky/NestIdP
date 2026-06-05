@@ -40,10 +40,6 @@ function patchSessionCookiesForHttp(app: INestApplication): void {
 	});
 }
 
-function flushPromises(): Promise<void> {
-	return new Promise((resolve) => setImmediate(resolve));
-}
-
 async function waitForAuditEvent(prisma: PrismaService, event: string) {
 	for (let attempt = 0; attempt < 30; attempt += 1) {
 		const row = await prisma.auditEvent.findFirst({

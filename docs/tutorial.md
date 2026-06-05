@@ -54,9 +54,21 @@ Paste PEM certificate and private key if you bring your own key material.
 
 Download or copy metadata from the preview (or open `/saml/metadata`) and register it in your SP admin UI.
 
+### Signing and encryption on one page
+
+The settings screen shows **two independent** certificate panels. Signing must be configured before production SSO; encryption is optional but recommended when SP metadata or partners expect an encryption `KeyDescriptor`.
+
+![IdP settings — active signing certificate and encryption panel](./img/idp-settings-signing-and-encryption.png)
+
+The signing panel shows fingerprint, validity, key type (RSA or EC), signature algorithm, and actions: generate, upload, or start rotation. Status **Certificate OK** means metadata and assertions can use this key.
+
 ### Encryption certificate (optional, v1.5.0)
 
 A **second** panel configures an IdP encryption certificate, independent from signing. Use it when partners expect `KeyDescriptor use="encryption"` in metadata. Defaults: RSA-2048, RSA-OAEP-MGF1P key transport, ~two-year expiry. EC keys are supported for metadata; key transport is RSA-only in the UI.
+
+![IdP settings — encryption certificate options and generate actions](./img/idp-settings-encryption-cert-options.png)
+
+Choose key type (RSA or EC), EC curve or RSA modulus, key-transport algorithm, and expiry. **Copy signing options** copies key-family choices from the signing panel. Callouts in the UI note **AES-256-CBC** for assertion content encryption (fixed in v1) and SP compatibility warnings for EC encryption keys.
 
 This is **not** the certificate used to encrypt SAML assertions **to** a service provider — that is each SP connection’s **SP certificate** PEM. The admin UI explains the distinction; see [idp-certificates.svg](./img/idp-certificates.svg).
 

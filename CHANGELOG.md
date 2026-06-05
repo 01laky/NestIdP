@@ -4,6 +4,20 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.5.1]
+
+### Fixed
+
+- ESLint CI failure: remove unused `flushPromises` from admin change-password integration spec after
+  `waitForAuditEvent` polling was introduced.
+
+### Changed
+
+- README opens with an extensive **Certificates and SAML encryption** section (three cert roles, AES-256-CBC,
+  links to diagram and tutorial).
+- Operator screenshots `idp-settings-signing-and-encryption.png` and `idp-settings-encryption-cert-options.png`
+  added to README product tour, [docs/tutorial.md](docs/tutorial.md), and [docs/img/screenshots.md](docs/img/screenshots.md).
+
 ## [1.5.0]
 
 ### Added

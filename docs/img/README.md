@@ -4,21 +4,23 @@
 
 Operator and login UI captures (`.png`) — index in [screenshots.md](./screenshots.md), full walkthrough in [tutorial.md](../tutorial.md).
 
-| File                                    | Screen                                   |
-| --------------------------------------- | ---------------------------------------- |
-| `admin-login.png`                       | Operator login                           |
-| `admin-dashboard.png`                   | Dashboard                                |
-| `idp-settings-overview.png`             | IdP settings — URLs and entity ID        |
-| `idp-settings-certificate-metadata.png` | IdP settings — cert and metadata preview |
-| `idp-settings-upload-certificate.png`   | IdP settings — upload PEM                |
-| `api-connection-edit.png`               | Edit API connection                      |
-| `api-connection-sync.png`               | Sync page                                |
-| `identity-users-list.png`               | Users list                               |
-| `identity-groups-list.png`              | Groups list                              |
-| `identity-roles-list.png`               | Roles list                               |
-| `sp-connection-new-grafana.png`         | New SP connection (Grafana example)      |
-| `sp-connections-list.png`               | SP connections list                      |
-| `saml-login.png`                        | End-user SAML login                      |
+| File                                       | Screen                                           |
+| ------------------------------------------ | ------------------------------------------------ |
+| `admin-login.png`                          | Operator login                                   |
+| `admin-dashboard.png`                      | Dashboard                                        |
+| `idp-settings-overview.png`                | IdP settings — URLs and entity ID                |
+| `idp-settings-certificate-metadata.png`    | IdP settings — signing cert and metadata preview |
+| `idp-settings-signing-and-encryption.png`  | IdP settings — signing + encryption panels       |
+| `idp-settings-encryption-cert-options.png` | IdP settings — encryption cert options           |
+| `idp-settings-upload-certificate.png`      | IdP settings — upload PEM                        |
+| `api-connection-edit.png`                  | Edit API connection                              |
+| `api-connection-sync.png`                  | Sync page                                        |
+| `identity-users-list.png`                  | Users list                                       |
+| `identity-groups-list.png`                 | Groups list                                      |
+| `identity-roles-list.png`                  | Roles list                                       |
+| `sp-connection-new-grafana.png`            | New SP connection (Grafana example)              |
+| `sp-connections-list.png`                  | SP connections list                              |
+| `saml-login.png`                           | End-user SAML login                              |
 
 ## Architecture diagrams
 
