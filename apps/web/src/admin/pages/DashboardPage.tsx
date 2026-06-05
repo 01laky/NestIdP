@@ -246,6 +246,9 @@ export function DashboardPage() {
 				spSecurity.spConnectionsRequireSignedAuthn === 0 ? (
 					<p className="evg-muted">{t('spSecurity.idpAdvertisesWithoutEnforcement')}</p>
 				) : null}
+				{spSecurity.idpEncryptionKeyIsEc ? (
+					<Callout variant="info">{t('spSecurity.ecKeyAdvisory')}</Callout>
+				) : null}
 			</Panel>
 			<p className="evg-muted">
 				<Link className="evg-btn evg-btn--link" to={`${IDENTITY_ROUTE_PREFIX}/users`}>

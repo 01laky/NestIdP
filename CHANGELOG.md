@@ -4,6 +4,50 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.7.2]
+
+### Added
+
+- **EC IdP encryption key — inbound ECDH-ES decrypt (Prompt 25, Feature 1):**
+  `SamlRequestParserService` now decrypts incoming encrypted SAMLRequest payloads when the IdP holds an
+  EC encryption key (P-256, P-384, P-521). Decryption uses XML Encryption 1.1 ECDH-ES direct key agreement
+  (`xenc11:AgreementMethod`) with ConcatKDF (NIST SP 800-56A §5.8.1, SHA-256) to derive the AES content
+  key. Routing between EC and RSA paths is automatic based on the presence of `xenc11:AgreementMethod` in
+  the encrypted request XML. Added `decryptXmlEcdhEs()`, `deriveEcdhEsKeyWithConcatKdf()`, and
+  `extractEcPublicKeyFromXenc11()` utilities; updated `IdpEncryptionKeyService` with separate
+  `getRsaDecryptionMaterial()` and `getEcDecryptionMaterial()` accessors.
+- **HTTP-POST SAMLRequest binding (Prompt 25, Feature 2):**
+  `POST /saml/sso` now accepts a `SAMLRequest` form field (Base64, no deflate) per the SAML 2.0 HTTP POST
+  binding specification. Added `SamlSsoService.handlePostSso()` and `SamlRequestParserService.parsePostBinding()`.
+  Enveloped `ds:Signature` inside the `AuthnRequest` XML is verified with `xml-crypto` when the SP
+  connection enables `wantAuthnRequestsSigned`. Encrypted POST requests are supported via the same ECDH-ES
+  path as Redirect binding. `express.urlencoded()` middleware added to `main.ts` for form body parsing.
+- **IdP metadata now includes POST binding SSO endpoint** before the Redirect binding endpoint, per SAML 2.0
+  preference ordering. `SingleSignOnService` element added with `Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"`.
+- **Admin UI — EC key awareness (Prompt 25, Ext-1/2/3):**
+  - IdP Settings page shows an informational callout when the active encryption key uses an EC curve,
+    explaining ECDH-ES key agreement and SP compatibility considerations.
+  - SP Connection Test SSO page shows a warning callout (`ec_key_agreement_sp_compat`) when the IdP
+    encryption key is EC and SP encrypted request testing is enabled.
+  - Dashboard SP Security panel shows an informational callout (`idpEncryptionKeyIsEc`) when the IdP
+    encryption key family is `ec`.
+- **Test fixtures:** `createTestIdpSettingsWithEcEncryptionKey()`, `createTestSpConnectionWithEcSigningKey()`,
+  `generateTestEcCert()` added to `test-fixtures.ts`.
+- Audit service `logRequestReceived()` and `logRequestRejected()` now record `bindingType` (`redirect` or `post`).
+- `POST_BINDING_URI` and `REDIRECT_BINDING_URI` constants and `bindingType` field added to
+  `ParsedAuthnRequestDto` in `@nestidp/shared`.
+- `idpEncryptionKeyIsEc` field added to `AdminDashboardSpSecuritySummaryDto`.
+- All 10 locale files include new keys: `idpSettings.encryptionEcKeyAgreementInfo`,
+  `spConnections.testSsoEcKeyAgreementWarning`, `dashboard.spSecurity.ecKeyAdvisory`.
+
+### Fixed
+
+- `SpaFallbackController.sendIndex` passes `{ dotfiles: 'allow' }` to `res.sendFile()` so the SPA index
+  is served correctly when the project lives under a path that contains hidden directories (e.g. `.claude`
+  worktree paths). Express 5 / `send@1.2.1` block dotfile paths by default.
+- E2E test `E2E-SAML-03` updated to expect 415 instead of 405 for `POST /saml/sso` without a form body,
+  reflecting the real HTTP POST binding endpoint.
+
 ## [1.7.1]
 
 ### Added

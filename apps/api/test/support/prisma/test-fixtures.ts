@@ -248,6 +248,36 @@ export async function createTestIdpSettings(
 	});
 }
 
+export async function createTestIdpSettingsWithEcEncryptionKey(
+	prisma: PrismaClient,
+	curve: 'P-256' | 'P-384' | 'P-521' = 'P-256',
+	overrides: IdpSettingsOverrides = {},
+): Promise<{ settings: IdpSettings; privateKeyPem: string; certPem: string }> {
+	const entityId = overrides.entityId ?? 'http://localhost:3000';
+	const { privateKeyPem, certPem } = generateTestEcCert(entityId, curve);
+	const settings = await prisma.idpSettings.upsert({
+		where: { id: 'default' },
+		create: {
+			id: 'default',
+			entityId,
+			encryptionCertPem: certPem,
+			encryptionKeyEncrypted: encrypt(privateKeyPem, TEST_ENCRYPTION_KEY),
+			encryptionKeyFamily: 'ec',
+			encryptionEcCurve: curve,
+			...overrides,
+		},
+		update: {
+			entityId,
+			encryptionCertPem: certPem,
+			encryptionKeyEncrypted: encrypt(privateKeyPem, TEST_ENCRYPTION_KEY),
+			encryptionKeyFamily: 'ec',
+			encryptionEcCurve: curve,
+			...overrides,
+		},
+	});
+	return { settings, privateKeyPem, certPem };
+}
+
 export async function createTestIdpSettingsWithEncryptionKey(
 	prisma: PrismaClient,
 	overrides: IdpSettingsOverrides = {},
@@ -333,6 +363,57 @@ export function getTestSigningMaterialWithDays(
 ): { privateKeyPem: string; certPem: string } {
 	return generateTestRsaCert(entityId, days);
 }
+
+export async function createTestSpConnectionWithEcSigningKey(
+	prisma: PrismaClient,
+	overrides: SpConnectionWithSigningKeyOverrides = {},
+): Promise<{
+	spConnection: SpConnection;
+	spPrivateKeyPem: string;
+	spCertificatePem: string;
+}> {
+	const entityId =
+		overrides.spEntityId ??
+		`urn:sp:ec:${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+	const { privateKeyPem, certPem } = generateTestEcCert(entityId, 'P-256');
+	const spConnection = await createTestSpConnection(prisma, {
+		...overrides,
+		spEntityId: entityId,
+		spCertificate: certPem,
+	});
+	return {
+		spConnection,
+		spPrivateKeyPem: privateKeyPem,
+		spCertificatePem: certPem,
+	};
+}
+
+function generateTestEcCert(
+	entityId: string,
+	curve: 'P-256' | 'P-384' | 'P-521' = 'P-256',
+): { privateKeyPem: string; certPem: string } {
+	const { privateKey } = generateKeyPairSync('ec', {
+		namedCurve: curve,
+		privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+		publicKeyEncoding: { type: 'spki', format: 'pem' },
+	});
+	const tmp = mkdtempSync(join(tmpdir(), 'nestidp-test-ec-cert-'));
+	try {
+		const keyPath = join(tmp, 'key.pem');
+		const certPath = join(tmp, 'cert.pem');
+		writeFileSync(keyPath, privateKey);
+		const cn = entityId.replace(/^https?:\/\//, '').slice(0, 64) || 'nestidp';
+		execSync(
+			`openssl req -new -x509 -key "${keyPath}" -out "${certPath}" -days 365 -subj "/CN=${cn}" -nodes`,
+			{ stdio: 'pipe' },
+		);
+		return { privateKeyPem: privateKey, certPem: readFileSync(certPath, 'utf8') };
+	} finally {
+		rmSync(tmp, { recursive: true, force: true });
+	}
+}
+
+export { generateTestEcCert };
 
 function generateTestRsaCert(
 	entityId: string,

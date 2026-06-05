@@ -85,7 +85,9 @@ export function SpConnectionTestSsoPage() {
 					setTestSsoWarning(
 						result.warning === 'signed_with_ephemeral_key_verify_sp_cert_matches'
 							? t('testSsoEphemeralKeyWarning')
-							: (result.warning ?? null),
+							: result.warning === 'ec_key_agreement_sp_compat'
+								? t('testSsoEcKeyAgreementWarning')
+								: (result.warning ?? null),
 					);
 					setCommand(
 						`node ${EXAMPLE_SCRIPT} --sso-url ${resolvedSsoUrl} --sp-entity-id ${result.spEntityId}`,

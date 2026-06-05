@@ -806,6 +806,9 @@ export function IdpSettingsPage() {
 				<p>
 					<span className="evg-badge evg-badge--info">{t(encryptionCertStatusKey(settings))}</span>
 				</p>
+				{settings.encryptionKeyFamily === 'ec' ? (
+					<Callout variant="info">{t('encryptionEcKeyAgreementInfo')}</Callout>
+				) : null}
 				<p className="evg-muted">{t('encryption.panelHint')}</p>
 				<ul className="evg-dl">
 					<li>

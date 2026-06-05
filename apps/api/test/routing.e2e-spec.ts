@@ -185,10 +185,10 @@ describe('Routing (e2e)', () => {
 			.expect(400);
 	});
 
-	it('E2E-SAML-03: POST /saml/sso returns 405', async () => {
+	it('E2E-SAML-03: POST /saml/sso without form body returns 415', async () => {
 		await request(app.getHttpServer() as App)
 			.post('/saml/sso')
-			.expect(405);
+			.expect(415);
 	});
 
 	it('GET /api/admin without session returns 401', async () => {

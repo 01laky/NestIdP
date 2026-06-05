@@ -3,6 +3,7 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
+import express from 'express';
 import { AppModule } from './app.module';
 import { applyHttpSecurity } from './common/utils/http-security';
 
@@ -13,6 +14,7 @@ async function bootstrap() {
 	applyHttpSecurity(app, configService);
 
 	app.use(cookieParser());
+	app.use(express.urlencoded({ extended: false }));
 	app.useGlobalPipes(
 		new ValidationPipe({
 			whitelist: true,

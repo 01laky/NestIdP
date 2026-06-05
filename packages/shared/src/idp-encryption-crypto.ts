@@ -113,12 +113,21 @@ export function listKeyTransportOptionsForKeyFamily(
 
 export function assertCompatibleKeyAndKeyTransport(
 	keyFamily: IdpCertKeyFamily,
-	transportId: string,
-): IdpEncryptionKeyTransportOption {
+	transportId: string | null,
+): IdpEncryptionKeyTransportOption | null {
 	if (keyFamily === 'ec') {
+		if (transportId !== null) {
+			throw new IdpEncryptionCryptoValidationError(
+				'keyTransportAlgorithmId must not be set for EC encryption keys',
+				'idp_encryption_transport_with_ec',
+			);
+		}
+		return null;
+	}
+	if (transportId === null) {
 		throw new IdpEncryptionCryptoValidationError(
-			'keyTransportAlgorithmId must not be set for EC encryption keys',
-			'idp_encryption_transport_with_ec',
+			'keyTransportAlgorithmId is required for RSA encryption keys',
+			'idp_encryption_missing_transport',
 		);
 	}
 	const option = getIdpEncryptionKeyTransportOption(transportId);
@@ -226,6 +235,35 @@ export function getDefaultGenerateIdpEncryptionCertRequest(
 		keyTransportAlgorithmId: IDP_ENCRYPTION_DEFAULT_KEY_TRANSPORT_ALGORITHM_ID,
 		notAfter: defaultNotAfterCalendarDate(now),
 	};
+}
+
+export interface IdpEcKeyAgreementOption {
+	id: string;
+	xmlAgreementMethod: string;
+	keyFamily: 'ec';
+	labelKey: string;
+}
+
+export const IDP_EC_KEY_AGREEMENT_ALGORITHMS: readonly IdpEcKeyAgreementOption[] = [
+	{
+		id: 'ecdh-es',
+		xmlAgreementMethod: 'http://www.w3.org/2009/xmlenc11#ECDH-ES',
+		keyFamily: 'ec',
+		labelKey: 'ecdh-es',
+	},
+] as const;
+
+export const IDP_ENCRYPTION_DEFAULT_EC_KEY_AGREEMENT_ALGORITHM_ID = 'ecdh-es';
+
+export function getIdpEcKeyAgreementOption(id: string): IdpEcKeyAgreementOption | undefined {
+	return IDP_EC_KEY_AGREEMENT_ALGORITHMS.find((e) => e.id === id);
+}
+
+export function listKeyAgreementOptionsForKeyFamily(
+	keyFamily: IdpCertKeyFamily,
+): IdpEcKeyAgreementOption[] {
+	if (keyFamily !== 'ec') return [];
+	return [...IDP_EC_KEY_AGREEMENT_ALGORITHMS];
 }
 
 export function buildIdpEncryptionGenerateOptionsForUi(now = new Date()) {

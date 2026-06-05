@@ -50,6 +50,7 @@ function dashboardStub(
 			spConnectionsRequireEncryptedAssertions: 0,
 			spConnectionsMissingCertWithSecurityFlags: 0,
 			idpAdvertisesSignedAuthnRequests: false,
+			idpEncryptionKeyIsEc: false,
 		},
 		apiConnection: null,
 		lastSyncStatus: null,
@@ -163,6 +164,7 @@ describe('DashboardPage', () => {
 					spConnectionsRequireEncryptedAssertions: 2,
 					spConnectionsMissingCertWithSecurityFlags: 1,
 					idpAdvertisesSignedAuthnRequests: false,
+			idpEncryptionKeyIsEc: false,
 				},
 			}),
 		);

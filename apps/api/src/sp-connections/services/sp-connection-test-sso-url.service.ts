@@ -46,6 +46,9 @@ export class SpConnectionTestSsoUrlService {
 				throw new BadRequestException('IdP encryption certificate required for encrypted test URL');
 			}
 			xml = encryptAuthnRequestForIdp(xml, settings.encryptionCertPem);
+			if (settings.encryptionKeyFamily === 'ec') {
+				warning = 'ec_key_agreement_sp_compat';
+			}
 		}
 
 		const samlRequestRaw = encodeURIComponent(encodeRedirectBinding(xml));

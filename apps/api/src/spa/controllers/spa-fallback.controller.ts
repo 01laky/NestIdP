@@ -27,6 +27,6 @@ export class SpaFallbackController {
 				message: 'Web build not found. Run pnpm build before production start.',
 			});
 		}
-		return response.sendFile(WEB_INDEX_PATH);
+		return response.sendFile(WEB_INDEX_PATH, { dotfiles: 'allow' });
 	}
 }

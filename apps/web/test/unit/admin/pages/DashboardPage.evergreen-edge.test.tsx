@@ -51,6 +51,7 @@ function dashboardStub(
 			spConnectionsRequireEncryptedAssertions: 0,
 			spConnectionsMissingCertWithSecurityFlags: 0,
 			idpAdvertisesSignedAuthnRequests: false,
+			idpEncryptionKeyIsEc: false,
 		},
 		apiConnection: null,
 		lastSyncStatus: null,

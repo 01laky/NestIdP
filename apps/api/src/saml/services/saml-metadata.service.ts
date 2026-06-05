@@ -60,6 +60,10 @@ export class SamlMetadataService {
 		idp.ele('md:NameIDFormat').txt('urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified');
 
 		idp.ele('md:SingleSignOnService', {
+			Binding: 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST',
+			Location: ssoUrl,
+		});
+		idp.ele('md:SingleSignOnService', {
 			Binding: 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect',
 			Location: ssoUrl,
 		});

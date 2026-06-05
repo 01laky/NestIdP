@@ -6,6 +6,9 @@ import {
 	Logger,
 	ServiceUnavailableException,
 } from '@nestjs/common';
+import { DOMParser } from '@xmldom/xmldom';
+import * as xpath from 'xpath';
+import { SignedXml } from 'xml-crypto';
 import { ConfigService } from '@nestjs/config';
 import {
 	LOGIN_PAGE_ROUTE,
@@ -27,6 +30,12 @@ import {
 	verifyRedirectBindingSignature,
 } from '../utils/saml-authn-request-redirect-signature.util';
 import { getSamlRedirectSignatureAlgorithm } from '@nestidp/shared';
+
+export interface SamlPostSsoInput {
+	samlRequest: string;
+	relayState?: string;
+	clientIp: string;
+}
 
 export interface SamlRedirectSsoInput {
 	decoded: {
@@ -156,10 +165,133 @@ export class SamlSsoService {
 			requestWasSigned: signatureResult.requestWasSigned,
 			requestWasEncrypted: parsed.requestWasEncrypted ?? false,
 			sigAlgUri: signatureResult.sigAlgUri,
+			bindingType: 'redirect',
 		});
 
 		const redirectUrl = `${LOGIN_PAGE_ROUTE}?${SAML_SESSION_QUERY_PARAM}=${session.id}`;
 		return { redirectUrl };
+	}
+
+	async handlePostSso(input: SamlPostSsoInput): Promise<{ redirectUrl: string }> {
+		const { samlRequest, relayState, clientIp } = input;
+		if (!samlRequest) {
+			this.audit.logRequestRejected('missing_saml_request', clientIp, 'post');
+			throw new BadRequestException('Missing SAMLRequest');
+		}
+
+		let parsed;
+		try {
+			parsed = await this.parser.parsePostBinding(samlRequest, relayState);
+		} catch (error) {
+			const reason = this.mapParseErrorToAuditReason(error);
+			this.audit.logRequestRejected(reason, clientIp, 'post');
+			throw error;
+		}
+
+		const settings = await this.prisma.idpSettings.findUnique({ where: { id: 'default' } });
+		if (!settings) {
+			this.audit.logRequestRejected('idp_not_configured', clientIp, 'post');
+			throw new ServiceUnavailableException('IdP is not configured');
+		}
+
+		const sp = await this.prisma.spConnection.findUnique({
+			where: { spEntityId: parsed.authnRequest.issuer },
+		});
+
+		if (!sp || !sp.active) {
+			this.audit.logRequestRejected('unknown_or_inactive_sp', clientIp, 'post');
+			throw new BadRequestException('Unknown or inactive Service Provider');
+		}
+
+		if (parsed.requestWasEncrypted) {
+			this.audit.logRequestDecrypted({
+				spEntityId: sp.spEntityId,
+				samlRequestId: parsed.authnRequest.id,
+				spConnectionId: sp.id,
+			});
+		}
+
+		// Verify enveloped XML-DSig if present
+		if (parsed.requestWasSigned) {
+			if (!sp.spCertificate?.trim()) {
+				this.audit.logRequestRejected('sp_certificate_required_for_signature', clientIp, 'post');
+				throw new BadRequestException('SP certificate is required to verify SAMLRequest signature');
+			}
+			// parsed.rawAuthnRequestXml is the (decrypted) AuthnRequest XML containing the signature
+			const valid = this.verifyEnvelopedXmlDsig(parsed.rawAuthnRequestXml, sp.spCertificate);
+			if (!valid) {
+				this.audit.logRequestRejected('invalid_saml_request_signature', clientIp, 'post');
+				throw new BadRequestException('Invalid SAMLRequest signature');
+			}
+			this.audit.logRequestSignatureVerified({
+				spEntityId: sp.spEntityId,
+				samlRequestId: parsed.authnRequest.id,
+				spConnectionId: sp.id,
+				sigAlgUri: 'enveloped',
+			});
+		} else if (sp.wantAuthnRequestsSigned) {
+			this.audit.logRequestRejected('unsigned_request_required', clientIp, 'post');
+			throw new BadRequestException('Signed AuthnRequest is required for this Service Provider');
+		}
+
+		const nodeEnv = this.configService.get<string>('NODE_ENV') ?? 'development';
+		try {
+			validateAcsUrl(sp.acsUrl, nodeEnv);
+		} catch {
+			this.audit.logRequestRejected('invalid_acs_url', clientIp, 'post');
+			throw new BadRequestException('Invalid Service Provider ACS URL');
+		}
+
+		const expiresAt = new Date(Date.now() + this.getSessionTtlSeconds() * 1000);
+
+		let session;
+		try {
+			session = await this.prisma.samlSession.create({
+				data: {
+					samlRequestId: parsed.authnRequest.id,
+					relayState: parsed.relayState ?? null,
+					spConnectionId: sp.id,
+					expiresAt,
+				},
+			});
+		} catch (error) {
+			if (this.isUniqueConstraintError(error)) {
+				this.audit.logRequestRejected('duplicate_saml_request_id', clientIp, 'post');
+				throw new ConflictException('Duplicate SAML request ID');
+			}
+			throw error;
+		}
+
+		this.audit.logRequestReceived({
+			spEntityId: sp.spEntityId,
+			samlRequestId: parsed.authnRequest.id,
+			spConnectionId: sp.id,
+			clientIp,
+			requestWasSigned: parsed.requestWasSigned,
+			requestWasEncrypted: parsed.requestWasEncrypted,
+			bindingType: 'post',
+		});
+
+		const redirectUrl = `${LOGIN_PAGE_ROUTE}?${SAML_SESSION_QUERY_PARAM}=${session.id}`;
+		return { redirectUrl };
+	}
+
+	private verifyEnvelopedXmlDsig(authnRequestXml: string, spCertPem: string): boolean {
+		try {
+			const doc = new DOMParser().parseFromString(authnRequestXml, 'text/xml');
+			const sigNodes = xpath.select(
+				"//*[local-name(.)='Signature']",
+				doc as unknown as Node,
+			) as Node[];
+			if (!sigNodes.length) {
+				return false;
+			}
+			const signed = new SignedXml({ publicCert: spCertPem });
+			signed.loadSignature(sigNodes[0] as Element);
+			return signed.checkSignature(authnRequestXml);
+		} catch {
+			return false;
+		}
 	}
 
 	private verifyRedirectSignature(

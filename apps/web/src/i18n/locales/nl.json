@@ -175,7 +175,8 @@
 			"openSpConnections": "Open SP connections",
 			"requireSignedAuthnCount": "Require signed AuthnRequest: {{count}}",
 			"requireEncryptedAssertionsCount": "Require encrypted assertions: {{count}}",
-			"idpAdvertisesWithoutEnforcement": "IdP metadata advertises signed AuthnRequests, but no SP connection currently enforces signature verification."
+			"idpAdvertisesWithoutEnforcement": "IdP metadata advertises signed AuthnRequests, but no SP connection currently enforces signature verification.",
+			"ecKeyAdvisory": "IdP encryption uses an EC key (ECDH-ES). Service Providers must support XML Encryption 1.1 (xenc11:AgreementMethod). Older SPs may not be compatible — consider using an RSA key for broader compatibility."
 		}
 	},
 	"apiConnections": {
@@ -267,9 +268,11 @@
 		"testSsoUrlCopied": "Test SSO URL copied",
 		"testSsoWarningCallout": "Test URLs are for operator validation only. Keep private key material out of browser history, logs, and screenshots.",
 		"testSsoEphemeralKeyWarning": "Signed URL used an ephemeral server key. Verification only succeeds if the generated key matches the uploaded SP certificate.",
+		"testSsoEcKeyAgreementWarning": "The IdP encryption key is an EC key. This encrypted test URL uses ECDH-ES (XML Encryption 1.1). The target SP must support xenc11:AgreementMethod — not all SP implementations do.",
 		"probeSigningOpenEditLink": "Open SP edit page to validate signing key/certificate pair"
 	},
 	"idpSettings": {
+		"encryptionEcKeyAgreementInfo": "EC encryption key — ECDH-ES key agreement (XML Encryption 1.1). Service Providers must support xenc11:AgreementMethod. RSA keys are more widely compatible.",
 		"title": "IdP-instellingen",
 		"subtitle": "Global SAML Identity Provider configuration",
 		"loading": "Loading IdP settings…",

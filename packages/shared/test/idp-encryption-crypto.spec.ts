@@ -5,7 +5,11 @@ import {
 	getIdpContentEncryptionOption,
 	getIdpEncryptionKeyTransportOption,
 	IDP_DEFAULT_CONTENT_ENCRYPTION_ALGORITHM_ID,
+	IDP_EC_KEY_AGREEMENT_ALGORITHMS,
+	IDP_ENCRYPTION_DEFAULT_EC_KEY_AGREEMENT_ALGORITHM_ID,
 	IdpEncryptionCryptoValidationError,
+	getIdpEcKeyAgreementOption,
+	listKeyAgreementOptionsForKeyFamily,
 	listKeyTransportOptionsForKeyFamily,
 	resolveGenerateIdpEncryptionCertRequest,
 	toStoredEncryptionCrypto,
@@ -92,5 +96,36 @@ describe('idp-encryption-crypto', () => {
 				rsaModulusBits: 2048,
 			}),
 		).toThrow(IdpEncryptionCryptoValidationError);
+	});
+
+	describe('EC key agreement catalog (SH-EC-ENC)', () => {
+		it('SH-EC-ENC-01: IDP_EC_KEY_AGREEMENT_ALGORITHMS contains ecdh-es entry', () => {
+			expect(IDP_EC_KEY_AGREEMENT_ALGORITHMS).toHaveLength(1);
+			expect(IDP_EC_KEY_AGREEMENT_ALGORITHMS[0].id).toBe('ecdh-es');
+			expect(IDP_EC_KEY_AGREEMENT_ALGORITHMS[0].xmlAgreementMethod).toBe(
+				'http://www.w3.org/2009/xmlenc11#ECDH-ES',
+			);
+			expect(IDP_EC_KEY_AGREEMENT_ALGORITHMS[0].keyFamily).toBe('ec');
+		});
+
+		it('SH-EC-ENC-02: IDP_ENCRYPTION_DEFAULT_EC_KEY_AGREEMENT_ALGORITHM_ID resolves via getIdpEcKeyAgreementOption', () => {
+			const option = getIdpEcKeyAgreementOption(IDP_ENCRYPTION_DEFAULT_EC_KEY_AGREEMENT_ALGORITHM_ID);
+			expect(option).toBeDefined();
+			expect(option?.id).toBe('ecdh-es');
+		});
+
+		it('SH-EC-ENC-03: listKeyAgreementOptionsForKeyFamily returns ecdh-es for ec family, empty for rsa', () => {
+			const ecOptions = listKeyAgreementOptionsForKeyFamily('ec');
+			expect(ecOptions).toHaveLength(1);
+			expect(ecOptions[0].id).toBe('ecdh-es');
+
+			const rsaOptions = listKeyAgreementOptionsForKeyFamily('rsa');
+			expect(rsaOptions).toHaveLength(0);
+		});
+
+		it('SH-EC-ENC-04: getIdpEcKeyAgreementOption returns undefined for unknown id', () => {
+			expect(getIdpEcKeyAgreementOption('unknown-algo')).toBeUndefined();
+			expect(getIdpEcKeyAgreementOption('')).toBeUndefined();
+		});
 	});
 });

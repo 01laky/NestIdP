@@ -57,4 +57,39 @@ describe('SamlAuthAuditService', () => {
 		expect(payload).not.toContain('BEGIN');
 		expect(payload).not.toContain('privateKey');
 	});
+
+	it('API-SAML-POST-AUDIT-01: logRequestReceived with bindingType=post emits it in payload', () => {
+		service.logRequestReceived({
+			spEntityId: 'urn:sp:post',
+			samlRequestId: '_post-audit',
+			spConnectionId: 'sp-post',
+			clientIp: '10.1.1.1',
+			requestWasSigned: false,
+			requestWasEncrypted: false,
+			bindingType: 'post',
+		});
+		const payload = logSpy.mock.calls[0][0] as string;
+		expect(payload).toContain('"bindingType":"post"');
+	});
+
+	it('API-SAML-POST-AUDIT-02: logRequestReceived with bindingType=redirect emits redirect', () => {
+		service.logRequestReceived({
+			spEntityId: 'urn:sp:redirect',
+			samlRequestId: '_redirect-audit',
+			spConnectionId: 'sp-redir',
+			clientIp: '10.1.1.2',
+			requestWasSigned: false,
+			requestWasEncrypted: false,
+			bindingType: 'redirect',
+		});
+		const payload = logSpy.mock.calls[0][0] as string;
+		expect(payload).toContain('"bindingType":"redirect"');
+	});
+
+	it('API-SAML-POST-AUDIT-03: logRequestRejected with bindingType emits it in rejected payload', () => {
+		service.logRequestRejected('invalid_destination', '10.0.0.1', 'post');
+		const payload = warnSpy.mock.calls[0][0] as string;
+		expect(payload).toContain('saml_request_rejected');
+		expect(payload).toContain('"bindingType":"post"');
+	});
 });

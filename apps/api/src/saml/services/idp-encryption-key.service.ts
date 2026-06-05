@@ -60,4 +60,80 @@ export class IdpEncryptionKeyService {
 		}
 		return settings.encryptionKeyFamily === 'ec';
 	}
+
+	async isPrimaryKeyEc(): Promise<boolean> {
+		return this.hasEcEncryptionKey();
+	}
+
+	async getEcDecryptionMaterial(): Promise<Array<{ privateKeyPem: string; ecCurve: string }>> {
+		const settings = await this.prisma.idpSettings.findUnique({ where: { id: 'default' } });
+		if (!settings) {
+			return [];
+		}
+		const materials: Array<{ privateKeyPem: string; ecCurve: string }> = [];
+
+		if (
+			settings.encryptionKeyEncrypted &&
+			settings.encryptionCertPem &&
+			settings.encryptionKeyFamily === 'ec' &&
+			settings.encryptionEcCurve
+		) {
+			materials.push({
+				privateKeyPem: this.encryptionService.decrypt(settings.encryptionKeyEncrypted),
+				ecCurve: settings.encryptionEcCurve,
+			});
+		}
+
+		if (
+			settings.pendingEncryptionKeyEncrypted &&
+			settings.pendingEncryptionCertPem &&
+			settings.encryptionRotationStartedAt &&
+			settings.pendingEncryptionKeyFamily === 'ec' &&
+			settings.pendingEncryptionEcCurve
+		) {
+			materials.push({
+				privateKeyPem: this.encryptionService.decrypt(settings.pendingEncryptionKeyEncrypted),
+				ecCurve: settings.pendingEncryptionEcCurve,
+			});
+		}
+
+		return materials;
+	}
+
+	async getRsaDecryptionMaterial(): Promise<IdpDecryptionMaterial[]> {
+		const settings = await this.prisma.idpSettings.findUnique({ where: { id: 'default' } });
+		if (!settings) {
+			return [];
+		}
+		const materials: IdpDecryptionMaterial[] = [];
+
+		if (
+			settings.encryptionKeyEncrypted &&
+			settings.encryptionCertPem &&
+			settings.encryptionKeyFamily !== 'ec'
+		) {
+			materials.push({
+				privateKeyPem: this.encryptionService.decrypt(settings.encryptionKeyEncrypted),
+				keyTransportAlgorithmId:
+					settings.encryptionKeyTransportAlgorithmId ??
+					IDP_ENCRYPTION_DEFAULT_KEY_TRANSPORT_ALGORITHM_ID,
+			});
+		}
+
+		if (
+			settings.pendingEncryptionKeyEncrypted &&
+			settings.pendingEncryptionCertPem &&
+			settings.encryptionRotationStartedAt &&
+			settings.pendingEncryptionKeyFamily !== 'ec'
+		) {
+			materials.push({
+				privateKeyPem: this.encryptionService.decrypt(settings.pendingEncryptionKeyEncrypted),
+				keyTransportAlgorithmId:
+					settings.pendingEncryptionKeyTransportAlgorithmId ??
+					IDP_ENCRYPTION_DEFAULT_KEY_TRANSPORT_ALGORITHM_ID,
+			});
+		}
+
+		return materials;
+	}
 }

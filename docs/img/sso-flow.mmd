@@ -8,7 +8,8 @@ sequenceDiagram
 	participant DB as Local DB
 
 	User->>SP: Open application
-	SP->>SAML: Redirect + SAMLRequest
+	SP->>SAML: HTTP-Redirect or HTTP-POST + SAMLRequest
+	Note over SP,SAML: Redirect: deflate+base64 query param<br/>POST: base64 form body<br/>Both support optional encryption
 	SAML->>SAML: Validate request · store session
 	SAML->>Login: Redirect to login page
 	User->>Login: Username + password

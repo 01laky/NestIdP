@@ -17,16 +17,16 @@ describe('SamlRequestParserService', () => {
 	} as unknown as ConfigService;
 
 	const idpEncryptionKey = {
-		hasEcEncryptionKey: jest.fn().mockResolvedValue(false),
-		getDecryptionMaterial: jest.fn().mockResolvedValue([]),
+		getRsaDecryptionMaterial: jest.fn().mockResolvedValue([]),
+		getEcDecryptionMaterial: jest.fn().mockResolvedValue([]),
 	} as unknown as IdpEncryptionKeyService;
 
 	const parser = new SamlRequestParserService(configService, idpEncryptionKey);
 
 	beforeEach(() => {
 		jest.clearAllMocks();
-		jest.mocked(idpEncryptionKey.hasEcEncryptionKey).mockResolvedValue(false);
-		jest.mocked(idpEncryptionKey.getDecryptionMaterial).mockResolvedValue([]);
+		jest.mocked(idpEncryptionKey.getRsaDecryptionMaterial).mockResolvedValue([]);
+		jest.mocked(idpEncryptionKey.getEcDecryptionMaterial).mockResolvedValue([]);
 	});
 
 	function validEncodedRequest(options?: {
@@ -178,27 +178,31 @@ describe('SamlRequestParserService', () => {
 	it('API-SAML-REQ-DEC-01: encrypted request without configured key material → 400', async () => {
 		const { certPem } = generateTestRsaEncryptionCert('urn:test:idp:missing-material');
 		const encryptedXml = encryptAuthnRequestForIdp(plainAuthnXml('_enc-missing'), certPem);
-		jest.mocked(idpEncryptionKey.getDecryptionMaterial).mockResolvedValue([]);
+		jest.mocked(idpEncryptionKey.getRsaDecryptionMaterial).mockResolvedValue([]);
+		jest.mocked(idpEncryptionKey.getEcDecryptionMaterial).mockResolvedValue([]);
 
 		await expect(parser.parseRedirectBinding(toEncodedRequest(encryptedXml))).rejects.toThrow(
 			'IdP encryption certificate is not configured',
 		);
 	});
 
-	it('API-SAML-REQ-DEC-02: encrypted request with EC key family is rejected', async () => {
+	it('API-SAML-REQ-DEC-02: RSA-encrypted request when IdP only has EC key → 400', async () => {
 		const { certPem } = generateTestRsaEncryptionCert('urn:test:idp:ec-not-supported');
 		const encryptedXml = encryptAuthnRequestForIdp(plainAuthnXml('_enc-ec'), certPem);
-		jest.mocked(idpEncryptionKey.hasEcEncryptionKey).mockResolvedValue(true);
+		jest.mocked(idpEncryptionKey.getRsaDecryptionMaterial).mockResolvedValue([]);
+		jest.mocked(idpEncryptionKey.getEcDecryptionMaterial).mockResolvedValue([
+			{ privateKeyPem: 'ec-key', ecCurve: 'P-256' },
+		]);
 
 		await expect(parser.parseRedirectBinding(toEncodedRequest(encryptedXml))).rejects.toThrow(
-			'Encrypted SAMLRequest not supported with EC IdP encryption key',
+			'RSA key transport payload received but IdP has EC encryption key',
 		);
 	});
 
 	it('API-SAML-REQ-DEC-03: decrypts encrypted request with provided RSA decryption material', async () => {
 		const { certPem, privateKeyPem } = generateTestRsaEncryptionCert('urn:test:idp:decrypt-ok');
 		const encryptedXml = encryptAuthnRequestForIdp(plainAuthnXml('_enc-ok'), certPem);
-		jest.mocked(idpEncryptionKey.getDecryptionMaterial).mockResolvedValue([
+		jest.mocked(idpEncryptionKey.getRsaDecryptionMaterial).mockResolvedValue([
 			{
 				privateKeyPem,
 				keyTransportAlgorithmId: 'rsa-oaep-mgf1p',

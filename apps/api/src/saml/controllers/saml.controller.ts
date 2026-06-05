@@ -1,12 +1,14 @@
 import {
+	BadRequestException,
+	Body,
 	Controller,
 	Get,
 	HttpCode,
-	MethodNotAllowedException,
 	Post,
 	Query,
 	Req,
 	Res,
+	UnsupportedMediaTypeException,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { SAML_REQUEST_QUERY_PARAM, RELAY_STATE_QUERY_PARAM } from '@nestidp/shared';
@@ -46,9 +48,28 @@ export class SamlController {
 	}
 
 	@Post('sso')
-	@HttpCode(405)
-	postSso(): never {
-		throw new MethodNotAllowedException('Use HTTP-Redirect binding for SAMLRequest');
+	async postSso(
+		@Body(SAML_REQUEST_QUERY_PARAM) samlRequest: string | undefined,
+		@Body(RELAY_STATE_QUERY_PARAM) relayState: string | undefined,
+		@Req() req: Request,
+		@Res() res: Response,
+	): Promise<void> {
+		const contentType = req.headers['content-type'] ?? '';
+		if (!contentType.startsWith('application/x-www-form-urlencoded')) {
+			throw new UnsupportedMediaTypeException(
+				'POST /saml/sso requires Content-Type: application/x-www-form-urlencoded',
+			);
+		}
+		if (!samlRequest) {
+			throw new BadRequestException('Missing SAMLRequest');
+		}
+		const clientIp = req.ip ?? 'unknown';
+		const { redirectUrl } = await this.samlSsoService.handlePostSso({
+			samlRequest,
+			relayState,
+			clientIp,
+		});
+		res.redirect(302, redirectUrl);
 	}
 
 	@Get('slo')

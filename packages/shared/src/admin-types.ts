@@ -40,6 +40,7 @@ export interface AdminDashboardSpSecuritySummaryDto {
 	spConnectionsRequireEncryptedAssertions: number;
 	spConnectionsMissingCertWithSecurityFlags: number;
 	idpAdvertisesSignedAuthnRequests: boolean;
+	idpEncryptionKeyIsEc: boolean;
 }
 
 export interface AdminDashboardResponseDto {

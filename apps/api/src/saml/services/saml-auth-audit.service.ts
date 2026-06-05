@@ -15,9 +15,10 @@ export class SamlAuthAuditService {
 		requestWasSigned: boolean;
 		requestWasEncrypted: boolean;
 		sigAlgUri?: string;
+		bindingType?: 'redirect' | 'post';
 	}): void {
-		const { sigAlgUri, ...rest } = payload;
-		const eventPayload = { event: 'saml_request_received', ...rest, sigAlgUri };
+		const { sigAlgUri, bindingType, ...rest } = payload;
+		const eventPayload = { event: 'saml_request_received', ...rest, sigAlgUri, bindingType };
 		this.logger.log(JSON.stringify(eventPayload));
 		this.audit.recordSafe({
 			category: 'saml',
@@ -32,6 +33,7 @@ export class SamlAuthAuditService {
 				requestWasSigned: payload.requestWasSigned,
 				requestWasEncrypted: payload.requestWasEncrypted,
 				...(sigAlgUri ? { sigAlgUri } : {}),
+				...(bindingType ? { bindingType } : {}),
 			},
 		});
 	}
@@ -78,15 +80,15 @@ export class SamlAuthAuditService {
 		});
 	}
 
-	logRequestRejected(reason: string, clientIp: string): void {
-		const eventPayload = { event: 'saml_request_rejected', reason, clientIp };
+	logRequestRejected(reason: string, clientIp: string, bindingType?: 'redirect' | 'post'): void {
+		const eventPayload = { event: 'saml_request_rejected', reason, clientIp, ...(bindingType ? { bindingType } : {}) };
 		this.logger.warn(JSON.stringify(eventPayload));
 		this.audit.recordSafe({
 			category: 'saml',
 			event: 'saml_request_rejected',
 			actorType: 'system',
 			clientIp,
-			metadata: { reason },
+			metadata: { reason, ...(bindingType ? { bindingType } : {}) },
 		});
 	}
 

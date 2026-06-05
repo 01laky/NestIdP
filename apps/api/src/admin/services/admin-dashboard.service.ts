@@ -84,7 +84,7 @@ export class AdminDashboardService {
 	}
 
 	private async buildSpSecuritySummary(idpAdvertisesSignedAuthnRequests: boolean) {
-		const [requireSigned, requireEncrypted, flaggedRows] = await Promise.all([
+		const [requireSigned, requireEncrypted, flaggedRows, idpSettings] = await Promise.all([
 			this.prisma.spConnection.count({ where: { wantAuthnRequestsSigned: true } }),
 			this.prisma.spConnection.count({ where: { wantAssertionsEncrypted: true } }),
 			this.prisma.spConnection.findMany({
@@ -93,6 +93,7 @@ export class AdminDashboardService {
 				},
 				select: { spCertificate: true },
 			}),
+			this.prisma.idpSettings.findUnique({ where: { id: 'default' }, select: { encryptionKeyFamily: true } }),
 		]);
 
 		const missingCertCount = flaggedRows.filter((row) => !row.spCertificate?.trim()).length;
@@ -102,6 +103,7 @@ export class AdminDashboardService {
 			spConnectionsRequireEncryptedAssertions: requireEncrypted,
 			spConnectionsMissingCertWithSecurityFlags: missingCertCount,
 			idpAdvertisesSignedAuthnRequests,
+			idpEncryptionKeyIsEc: idpSettings?.encryptionKeyFamily === 'ec',
 		};
 	}
 }

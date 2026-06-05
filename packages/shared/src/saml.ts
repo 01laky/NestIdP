@@ -2,6 +2,10 @@
 export const SAML_METADATA_PATH = '/saml/metadata';
 export const SAML_SSO_PATH = '/saml/sso';
 
+/** SAML binding URIs. */
+export const POST_BINDING_URI = 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST';
+export const REDIRECT_BINDING_URI = 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect';
+
 /** Query params on SP → IdP redirect (SAML 2.0 HTTP-Redirect). */
 export const SAML_REQUEST_QUERY_PARAM = 'SAMLRequest';
 export const RELAY_STATE_QUERY_PARAM = 'RelayState';
@@ -31,6 +35,7 @@ export interface ParsedAuthnRequestDto {
 	destination?: string;
 	issueInstant: string;
 	protocolBinding?: string;
+	bindingType?: 'redirect' | 'post';
 }
 
 export interface ParseRedirectBindingResult {

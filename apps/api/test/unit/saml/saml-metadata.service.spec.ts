@@ -227,4 +227,28 @@ describe('SamlMetadataService', () => {
 		expect((xml.match(/use="signing"/g) ?? []).length).toBe(2);
 		expect((xml.match(/use="encryption"/g) ?? []).length).toBe(2);
 	});
+
+	it('API-SAML-META-POST-01: metadata contains HTTP-POST SingleSignOnService binding', async () => {
+		const xml = await service.generateMetadata();
+		expect(xml).toContain('Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"');
+	});
+
+	it('API-SAML-META-POST-02: HTTP-POST SingleSignOnService appears before HTTP-Redirect', async () => {
+		const xml = await service.generateMetadata();
+		const postIdx = xml.indexOf('Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"');
+		const redirectIdx = xml.indexOf('Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"');
+		expect(postIdx).toBeGreaterThanOrEqual(0);
+		expect(redirectIdx).toBeGreaterThan(postIdx);
+	});
+
+	it('API-SAML-META-POST-03: both SSO bindings point to the same SSO URL', async () => {
+		const xml = await service.generateMetadata();
+		// All SingleSignOnService elements should reference the same sso URL
+		const matches = [...xml.matchAll(/SingleSignOnService[^/]*Location="([^"]+)"/g)];
+		expect(matches.length).toBeGreaterThanOrEqual(2);
+		const urls = matches.map((m) => m[1]);
+		const unique = new Set(urls);
+		expect(unique.size).toBe(1);
+		expect(urls[0]).toContain('/saml/sso');
+	});
 });
