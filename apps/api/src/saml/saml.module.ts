@@ -18,7 +18,7 @@ import { SamlSessionCleanupService } from './services/saml-session-cleanup.servi
 import { SamlSsoService } from './services/saml-sso.service';
 
 @Module({
-	imports: [PrismaModule, AuditCoreModule, IdentityModule, ConfigModule],
+	imports: [PrismaModule, AuditCoreModule, IdentityModule, ConfigModule, EncryptionModule],
 	controllers: [SamlController],
 	providers: [
 		SamlRequestParserService,
