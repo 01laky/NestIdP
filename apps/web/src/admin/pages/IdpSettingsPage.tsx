@@ -637,36 +637,41 @@ export function IdpSettingsPage() {
 				<p>
 					<span className="evg-badge evg-badge--info">{t(certStatusKey(settings))}</span>
 				</p>
-				<ul className="evg-dl">
-					<li>
-						<span>{t('fingerprint')}</span>
-						<code>{settings.signingCertFingerprintSha256 ?? tCommon('emDash')}</code>
-					</li>
-					<li>
-						<span>{t('notAfter')}</span>
-						<code>{settings.signingCertNotAfter ?? tCommon('emDash')}</code>
-					</li>
+				<dl className="evg-dl">
+					<div className="evg-dl__row">
+						<dt>{t('fingerprint')}</dt>
+						<dd><code>{settings.signingCertFingerprintSha256 ?? tCommon('emDash')}</code></dd>
+					</div>
+					<div className="evg-dl__row">
+						<dt>{t('notAfter')}</dt>
+						<dd><code>{settings.signingCertNotAfter ?? tCommon('emDash')}</code></dd>
+					</div>
 					{settings.signingKeyFamily ? (
-						<li>
-							<span>{t('crypto.keyFamily')}</span>
-							<code>
-								{settings.signingKeyFamily === 'rsa'
-									? `RSA ${settings.signingRsaModulusBits ?? 2048}`
-									: `EC ${settings.signingEcCurve ?? 'P-256'}`}
-							</code>
-						</li>
+						<div className="evg-dl__row">
+							<dt>{t('crypto.keyFamily')}</dt>
+							<dd>
+								<code>
+									{settings.signingKeyFamily === 'rsa'
+										? `RSA ${settings.signingRsaModulusBits ?? 2048}`
+										: `EC ${settings.signingEcCurve ?? 'P-256'}`}
+								</code>
+							</dd>
+						</div>
 					) : null}
 					{settings.signingSignatureAlgorithmId ? (
-						<li>
-							<span>{t('crypto.signatureAlgorithm')}</span>
-							<code>
-								{t(`crypto.algorithms.${settings.signingSignatureAlgorithmId}`, {
-									defaultValue: settings.signingSignatureAlgorithmId,
-								})}
-							</code>
-						</li>
+						<div className="evg-dl__row">
+							<dt>{t('crypto.signatureAlgorithm')}</dt>
+							<dd>
+								<code>
+									{t(`crypto.algorithms.${settings.signingSignatureAlgorithmId}`, {
+										defaultValue: settings.signingSignatureAlgorithmId,
+									})}
+								</code>
+							</dd>
+						</div>
 					) : null}
-				</ul>
+				</dl>
+				<hr className="evg-divider" />
 				<IdpSigningCertOptionsFields
 					value={certOptions}
 					onChange={setCertOptions}
@@ -806,40 +811,45 @@ export function IdpSettingsPage() {
 				<p>
 					<span className="evg-badge evg-badge--info">{t(encryptionCertStatusKey(settings))}</span>
 				</p>
+				<p className="evg-muted">{t('encryption.panelHint')}</p>
+				<dl className="evg-dl">
+					<div className="evg-dl__row">
+						<dt>{t('fingerprint')}</dt>
+						<dd><code>{settings.encryptionCertFingerprintSha256 ?? tCommon('emDash')}</code></dd>
+					</div>
+					<div className="evg-dl__row">
+						<dt>{t('notAfter')}</dt>
+						<dd><code>{settings.encryptionCertNotAfter ?? tCommon('emDash')}</code></dd>
+					</div>
+					{settings.encryptionKeyFamily ? (
+						<div className="evg-dl__row">
+							<dt>{t('encryption.crypto.keyFamily')}</dt>
+							<dd>
+								<code>
+									{settings.encryptionKeyFamily === 'rsa'
+										? `RSA ${settings.encryptionRsaModulusBits ?? 2048}`
+										: `EC ${settings.encryptionEcCurve ?? 'P-256'}`}
+								</code>
+							</dd>
+						</div>
+					) : null}
+					{settings.encryptionKeyTransportAlgorithmId ? (
+						<div className="evg-dl__row">
+							<dt>{t('encryption.crypto.keyTransportAlgorithm')}</dt>
+							<dd>
+								<code>
+									{t(`encryption.crypto.algorithms.${settings.encryptionKeyTransportAlgorithmId}`, {
+										defaultValue: settings.encryptionKeyTransportAlgorithmId,
+									})}
+								</code>
+							</dd>
+						</div>
+					) : null}
+				</dl>
 				{settings.encryptionKeyFamily === 'ec' ? (
 					<Callout variant="info">{t('encryptionEcKeyAgreementInfo')}</Callout>
 				) : null}
-				<p className="evg-muted">{t('encryption.panelHint')}</p>
-				<ul className="evg-dl">
-					<li>
-						<span>{t('fingerprint')}</span>
-						<code>{settings.encryptionCertFingerprintSha256 ?? tCommon('emDash')}</code>
-					</li>
-					<li>
-						<span>{t('notAfter')}</span>
-						<code>{settings.encryptionCertNotAfter ?? tCommon('emDash')}</code>
-					</li>
-					{settings.encryptionKeyFamily ? (
-						<li>
-							<span>{t('encryption.crypto.keyFamily')}</span>
-							<code>
-								{settings.encryptionKeyFamily === 'rsa'
-									? `RSA ${settings.encryptionRsaModulusBits ?? 2048}`
-									: `EC ${settings.encryptionEcCurve ?? 'P-256'}`}
-							</code>
-						</li>
-					) : null}
-					{settings.encryptionKeyTransportAlgorithmId ? (
-						<li>
-							<span>{t('encryption.crypto.keyTransportAlgorithm')}</span>
-							<code>
-								{t(`encryption.crypto.algorithms.${settings.encryptionKeyTransportAlgorithmId}`, {
-									defaultValue: settings.encryptionKeyTransportAlgorithmId,
-								})}
-							</code>
-						</li>
-					) : null}
-				</ul>
+				<hr className="evg-divider" />
 				<IdpEncryptionCertOptionsFields
 					value={encCertOptions}
 					onChange={setEncCertOptions}

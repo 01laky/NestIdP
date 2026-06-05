@@ -1,10 +1,11 @@
-import { generateKeyPairSync } from 'node:crypto';
-import { createHash } from 'node:crypto';
+import { execSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { encryptAuthnRequestForIdp } from '@api/saml/utils/encrypt-authn-request-for-idp.util';
 import {
 	decryptXmlEcdhEs,
 	isEcdhEsAgreement,
-	SamlXmlDecryptionError,
 } from '@api/saml/utils/saml-xml-decryption.util';
 import {
 	deriveEcdhEsKeyWithConcatKdf,
@@ -12,38 +13,17 @@ import {
 } from '@api/saml/utils/saml-xml-encryption-shared.util';
 import { buildAuthnRequestXml } from '@test/support/saml/build-authn-request.util';
 
-function generateEcKeyPair(curve: 'P-256' | 'P-384' | 'P-521'): {
-	certPem: string;
-	privateKeyPem: string;
-} {
-	const { privateKey, publicKey } = generateKeyPairSync('ec', {
-		namedCurve: curve,
-		publicKeyEncoding: { type: 'spki', format: 'pem' },
-		privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
-	});
-	// For test purposes we use a self-signed-style cert (just the key)
-	// Use a minimal PEM cert generated via openssl or use the public key directly as "cert"
-	// Actually for encryptAuthnRequestForIdp we need a real cert PEM — let's use generateTestEcCert from fixtures
-	return { certPem: publicKey as unknown as string, privateKeyPem: privateKey as unknown as string };
-}
-
-// Minimal EC cert generator for tests (uses openssl under the hood via the existing util)
 function generateTestEcCert(
 	curve: 'P-256' | 'P-384' | 'P-521',
 ): { certPem: string; privateKeyPem: string } {
-	// Use execSync to generate a self-signed cert for the given curve
-	const { execSync } = require('node:child_process');
-	const { mkdtempSync, writeFileSync, readFileSync, rmSync } = require('node:fs');
-	const { tmpdir } = require('node:os');
-	const { join } = require('node:path');
 	const tmp = mkdtempSync(join(tmpdir(), 'nestidp-ec-test-'));
 	const keyPath = join(tmp, 'key.pem');
 	const certPath = join(tmp, 'cert.pem');
 	const curveName = curve === 'P-256' ? 'prime256v1' : curve === 'P-384' ? 'secp384r1' : 'secp521r1';
 	try {
 		execSync(
-			`openssl ecparam -name ${curveName} -genkey -noout -out ${keyPath} 2>/dev/null && ` +
-				`openssl req -new -x509 -key ${keyPath} -out ${certPath} -days 365 -subj "/CN=test" 2>/dev/null`,
+			`openssl ecparam -name ${curveName} -genkey -noout -out "${keyPath}" 2>/dev/null && ` +
+				`openssl req -new -x509 -key "${keyPath}" -out "${certPath}" -days 365 -subj "/CN=test" -nodes 2>/dev/null`,
 			{ stdio: 'pipe' },
 		);
 		const privateKeyPem = readFileSync(keyPath, 'utf8');
@@ -63,8 +43,6 @@ const plainXml = buildAuthnRequestXml({
 describe('saml-xml-ec-decryption.util', () => {
 	describe('isEcdhEsAgreement', () => {
 		it('returns false for RSA-encrypted payload', () => {
-			const { execSync } = require('node:child_process');
-			// Use a simple RSA encrypted payload structure without AgreementMethod
 			const xml = `<xenc:EncryptedData xmlns:xenc="http://www.w3.org/2001/04/xmlenc#" xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
   <xenc:EncryptionMethod Algorithm="http://www.w3.org/2001/04/xmlenc#aes256-cbc"/>
   <ds:KeyInfo>

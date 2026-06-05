@@ -88,6 +88,12 @@
 	border-radius: var(--evg-radius-md);
 }
 
+.evg-divider {
+	border: none;
+	border-top: 1px solid var(--evg-color-border);
+	margin: var(--evg-space-4) 0;
+}
+
 .evg-panel__title {
 	margin: 0 0 var(--evg-space-3);
 	font-size: var(--evg-text-lg);
