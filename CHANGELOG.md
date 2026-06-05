@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.5.2]
+
+### Changed
+
+- README: place **Certificates and SAML encryption** after **How it fits together** (before Product tour).
+
 ## [1.5.1]
 
 ### Fixed

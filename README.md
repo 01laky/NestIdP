@@ -2,33 +2,11 @@
 
 **A deployable SAML Identity Provider you run yourself** — one Docker image, one admin console, identity from your REST API, SAML assertions to your apps.
 
-[![Version](https://img.shields.io/badge/version-1.5.1-blue)](package.json)
+[![Version](https://img.shields.io/badge/version-1.5.2-blue)](package.json)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-green)](package.json)
 [![pnpm](https://img.shields.io/badge/pnpm-%3E%3D9-orange)](package.json)
 
 > **SAML 2.0 Identity Provider** (NestJS + React + PostgreSQL/SQLite) for teams that already have users in an internal API and need standards-based SSO to Grafana, custom apps, and other service providers.
-
----
-
-## Certificates and SAML encryption
-
-NestIdP separates **three** kinds of X.509 material. They must not be mixed up when configuring production SSO.
-
-![Signing certificate, encryption certificate, and metadata on IdP settings](docs/img/idp-settings-signing-and-encryption.png)
-
-| Certificate        | Where configured                        | Role                                                                                                                                                                                                                                                                                  |
-| ------------------ | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **IdP signing**    | IdP settings → Signing certificate      | Signs SAML assertions and IdP metadata. Required for real SSO. Generate in admin (RSA or EC, eight XML-DSig algorithms, expiry up to 10 years) or upload PEM. Supports **dual-cert rotation** (old + new keys in metadata until cutover).                                             |
-| **IdP encryption** | IdP settings → Encryption certificate   | Optional second key pair published as `KeyDescriptor use="encryption"` in metadata. Independent lifecycle from signing: RSA or EC, RSA-OAEP key-transport catalog, generate/upload/rotation, copy or download public PEM. **Does not** encrypt assertions to a specific SP by itself. |
-| **SP certificate** | Each SP connection → SP certificate PEM | That application’s public key. Required when **Want encrypted assertions** is enabled on the connection — the IdP would use this cert to wrap assertion content for that SP (runtime encryption is prepared in v1.5.0; outbound XML Encryption ships in a follow-up).                 |
-
-**Assertion content encryption (when enabled):** fixed **AES-256-CBC** for SAML XML Encryption in v1. **Key transport** toward the SP uses the SP’s certificate, not the IdP encryption cert.
-
-**IdP encryption cert options** (generate panel): key type, EC curve or RSA modulus, key-transport algorithm, expiry, **Copy signing options**, and warnings when EC keys may not be accepted by all SPs.
-
-![Encryption certificate options — key type, transport algorithm, generate and upload](docs/img/idp-settings-encryption-cert-options.png)
-
-Diagram of how the three certificates relate: [docs/img/idp-certificates.svg](docs/img/idp-certificates.svg). Operator steps: [docs/tutorial.md#3-idp-settings-global-saml-idp](docs/tutorial.md#3-idp-settings-global-saml-idp).
 
 ---
 
@@ -62,6 +40,28 @@ SP-initiated SSO (typical flow):
 ![SP-initiated SSO sequence](docs/img/sso-flow.svg)
 
 Architecture overview: [docs/img/architecture.svg](docs/img/architecture.svg) · Full spec: [docs/proposal.MD](docs/proposal.MD)
+
+---
+
+## Certificates and SAML encryption
+
+NestIdP separates **three** kinds of X.509 material. They must not be mixed up when configuring production SSO.
+
+![Signing certificate, encryption certificate, and metadata on IdP settings](docs/img/idp-settings-signing-and-encryption.png)
+
+| Certificate        | Where configured                        | Role                                                                                                                                                                                                                                                                                  |
+| ------------------ | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **IdP signing**    | IdP settings → Signing certificate      | Signs SAML assertions and IdP metadata. Required for real SSO. Generate in admin (RSA or EC, eight XML-DSig algorithms, expiry up to 10 years) or upload PEM. Supports **dual-cert rotation** (old + new keys in metadata until cutover).                                             |
+| **IdP encryption** | IdP settings → Encryption certificate   | Optional second key pair published as `KeyDescriptor use="encryption"` in metadata. Independent lifecycle from signing: RSA or EC, RSA-OAEP key-transport catalog, generate/upload/rotation, copy or download public PEM. **Does not** encrypt assertions to a specific SP by itself. |
+| **SP certificate** | Each SP connection → SP certificate PEM | That application’s public key. Required when **Want encrypted assertions** is enabled on the connection — the IdP would use this cert to wrap assertion content for that SP (runtime encryption is prepared in v1.5.0; outbound XML Encryption ships in a follow-up).                 |
+
+**Assertion content encryption (when enabled):** fixed **AES-256-CBC** for SAML XML Encryption in v1. **Key transport** toward the SP uses the SP’s certificate, not the IdP encryption cert.
+
+**IdP encryption cert options** (generate panel): key type, EC curve or RSA modulus, key-transport algorithm, expiry, **Copy signing options**, and warnings when EC keys may not be accepted by all SPs.
+
+![Encryption certificate options — key type, transport algorithm, generate and upload](docs/img/idp-settings-encryption-cert-options.png)
+
+Diagram of how the three certificates relate: [docs/img/idp-certificates.svg](docs/img/idp-certificates.svg). Operator steps: [docs/tutorial.md#3-idp-settings-global-saml-idp](docs/tutorial.md#3-idp-settings-global-saml-idp).
 
 ---
 
