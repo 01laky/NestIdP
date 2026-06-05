@@ -4,6 +4,30 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.7.1]
+
+### Added
+
+- Admin SP connection form now supports `Require signed AuthnRequest` with certificate gating, operator callouts,
+  and a collapsible **Probe SP signing key** panel that verifies private-key/certificate matching via
+  `POST /api/admin/sp-connections/:id/probe-sp-signing`.
+- IdP settings now expose a SAML behavior toggle for `wantAuthnRequestsSigned` with an operator callout that links
+  to SP connections so teams distinguish metadata preference from per-SP enforcement.
+- SP Test SSO page now fetches `GET /api/admin/sp-connections/:id/test-sso-url`, supports signed/encrypted toggles,
+  renders a copyable URL, and shows warning callouts (including ephemeral signing-key warnings).
+- Dashboard now includes an SP security summary panel and warning callout when SP connections enable security flags
+  without an SP certificate (`spConnectionsMissingCertWithSecurityFlags > 0`).
+- Web admin API client now includes `getSpConnectionTestSsoUrl()` and `probeSpConnectionSigning()` helpers plus
+  updated shared DTO support for `wantAuthnRequestsSigned` on SP and IdP settings.
+
+### Changed
+
+- All web locale files now include the new `spConnections.*`, `idpSettings.*`, and `dashboard.spSecurity.*` keys,
+  along with audit event labels for `saml_request_signature_verified`, `saml_request_decrypted`,
+  `sp_signing_probe_performed`, and `idp_want_authn_requests_signed_updated`.
+- Web test fixtures and page/API/i18n coverage were extended with Prompt 24 IDs:
+  `WEB-SP-REQ-SIG`, `WEB-IDP-REQ-SIG`, `WEB-SP-TEST-SSO`, and `WEB-DASH-REQ` checks, while keeping i18n key parity green.
+
 ## [1.7.0]
 
 ### Added

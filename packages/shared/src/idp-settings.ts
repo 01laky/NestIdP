@@ -48,6 +48,7 @@ export interface IdpSigningRotationStatusDto {
 export interface IdpSettingsPublicDto {
 	entityId: string;
 	nameIdFormat: string;
+	wantAuthnRequestsSigned: boolean;
 	hasSigningCertificate: boolean;
 	signingCertFingerprintSha256: string | null;
 	signingCertNotAfter: string | null;
@@ -73,6 +74,7 @@ export interface IdpSettingsPublicDto {
 export interface UpdateIdpSettingsRequestDto {
 	entityId?: string;
 	nameIdFormat?: string;
+	wantAuthnRequestsSigned?: boolean;
 }
 
 export interface UploadIdpSigningCertRequestDto {

@@ -45,6 +45,12 @@ function dashboardStub(
 		entityId: 'http://localhost:3000',
 		ssoUrl: 'http://localhost:3000/saml/sso',
 		idp: defaultIdp,
+		spSecurity: {
+			spConnectionsRequireSignedAuthn: 0,
+			spConnectionsRequireEncryptedAssertions: 0,
+			spConnectionsMissingCertWithSecurityFlags: 0,
+			idpAdvertisesSignedAuthnRequests: false,
+		},
 		apiConnection: null,
 		lastSyncStatus: null,
 		lastSyncAt: null,
@@ -146,6 +152,32 @@ describe('DashboardPage', () => {
 
 		await waitFor(() => {
 			expect(screen.getByText(/RSA 2048 bit · rsa-sha256 · expires/i)).toBeDefined();
+		});
+	});
+
+	it('WEB-DASH-REQ-01: warning callout shown when SP security flags are enabled without certificates', async () => {
+		vi.spyOn(adminApi, 'getAdminDashboard').mockResolvedValue(
+			dashboardStub({
+				spSecurity: {
+					spConnectionsRequireSignedAuthn: 1,
+					spConnectionsRequireEncryptedAssertions: 2,
+					spConnectionsMissingCertWithSecurityFlags: 1,
+					idpAdvertisesSignedAuthnRequests: false,
+				},
+			}),
+		);
+
+		render(
+			<MemoryRouter>
+				<DashboardPage />
+			</MemoryRouter>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByText(/require signing and\/or encrypted assertions/i)).toBeDefined();
+			expect(screen.getByRole('link', { name: 'Open SP connections' }).getAttribute('href')).toBe(
+				'/admin/sp-connections',
+			);
 		});
 	});
 

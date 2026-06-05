@@ -44,6 +44,7 @@ import {
 	getAdminMe,
 	getIdpMetadataUrl,
 	getSpConnection,
+	getSpConnectionTestSsoUrl,
 	listSpConnections,
 	listAdminUsers,
 	createAdminUser,
@@ -51,6 +52,7 @@ import {
 	deleteAdminUser,
 	changeAdminPassword,
 	listAuditEvents,
+	probeSpConnectionSigning,
 	auditExportUrl,
 } from '@/admin/adminApi';
 
@@ -682,6 +684,46 @@ describe('adminApi', () => {
 		expect(fetchMock).toHaveBeenCalledWith(
 			`${SP_CONNECTIONS_API_PATH}/sp-1/test-acs`,
 			expect.objectContaining({ method: 'POST' }),
+		);
+	});
+
+	it('WEB-SP-TEST-SSO-API-01: getSpConnectionTestSsoUrl builds query string', async () => {
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({
+				ssoUrl: 'http://localhost:3000/saml/sso?SAMLRequest=test',
+				spEntityId: 'urn:sp:1',
+				authnRequestId: '_test-1',
+				signed: true,
+				encrypted: false,
+			}),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		await getSpConnectionTestSsoUrl('sp-1', { signed: true, encrypted: false, relayState: 'abc' });
+		expect(fetchMock).toHaveBeenCalledWith(
+			`${SP_CONNECTIONS_API_PATH}/sp-1/test-sso-url?signed=true&encrypted=false&relayState=abc`,
+			expect.any(Object),
+		);
+	});
+
+	it('WEB-SP-PROBE-SIG-API-01: probeSpConnectionSigning POSTs key body', async () => {
+		setCsrfToken('csrf-probe');
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ ok: true, fingerprintSha256: 'aa:bb' }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		await probeSpConnectionSigning('sp-1', {
+			spPrivateKeyPem: '-----BEGIN PRIVATE KEY-----\nX\n-----END PRIVATE KEY-----',
+		});
+		expect(fetchMock).toHaveBeenCalledWith(
+			`${SP_CONNECTIONS_API_PATH}/sp-1/probe-sp-signing`,
+			expect.objectContaining({
+				method: 'POST',
+				headers: expect.objectContaining({ [ADMIN_CSRF_HEADER_NAME]: 'csrf-probe' }),
+			}),
 		);
 	});
 

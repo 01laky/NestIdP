@@ -7,6 +7,11 @@ const t = ((key: string, opts?: { defaultValue?: string }) => {
 		'enums.auditEvent.idp_encryption_cert_generated': 'Encryption certificate generated',
 		'enums.auditEvent.idp_encryption_rotation_completed':
 			'Encryption certificate rotation completed',
+		'enums.auditEvent.saml_request_signature_verified': 'SAML request signature verified',
+		'enums.auditEvent.saml_request_decrypted': 'SAML request decrypted',
+		'enums.auditEvent.sp_signing_probe_performed': 'SP signing probe performed',
+		'enums.auditEvent.idp_want_authn_requests_signed_updated':
+			'IdP wantAuthnRequestsSigned updated',
 	};
 	return labels[key] ?? opts?.defaultValue ?? key;
 }) as TFunction;
@@ -18,6 +23,14 @@ describe('auditEventLabel', () => {
 		);
 		expect(auditEventLabel('idp_encryption_rotation_completed', t)).toBe(
 			'Encryption certificate rotation completed',
+		);
+		expect(auditEventLabel('saml_request_signature_verified', t)).toBe(
+			'SAML request signature verified',
+		);
+		expect(auditEventLabel('saml_request_decrypted', t)).toBe('SAML request decrypted');
+		expect(auditEventLabel('sp_signing_probe_performed', t)).toBe('SP signing probe performed');
+		expect(auditEventLabel('idp_want_authn_requests_signed_updated', t)).toBe(
+			'IdP wantAuthnRequestsSigned updated',
 		);
 	});
 

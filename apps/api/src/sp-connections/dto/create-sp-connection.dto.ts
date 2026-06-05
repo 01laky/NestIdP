@@ -48,4 +48,8 @@ export class CreateSpConnectionBodyDto {
 	@IsOptional()
 	@IsBoolean()
 	wantAssertionsEncrypted?: boolean;
+
+	@IsOptional()
+	@IsBoolean()
+	wantAuthnRequestsSigned?: boolean;
 }

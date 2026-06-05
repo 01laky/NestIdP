@@ -1,5 +1,6 @@
-# Local Cursor config and rules — not shared via git
+# Local AI assistant config — not shared via git
 .cursor/
+CLAUDE.md
 
 # Local prompts — not shared via git
 prompts/

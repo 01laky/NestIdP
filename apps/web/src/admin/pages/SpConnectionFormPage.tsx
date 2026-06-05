@@ -8,6 +8,7 @@ import {
 	createSpConnection,
 	deleteSpConnection,
 	getSpConnection,
+	probeSpConnectionSigning,
 	testSpConnectionAcs,
 	updateSpConnection,
 } from '../adminApi';
@@ -19,6 +20,7 @@ import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
 import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
 import {
 	Button,
+	Callout,
 	Checkbox,
 	Panel,
 	Select,
@@ -45,11 +47,19 @@ export function SpConnectionFormPage() {
 	const [nameIdFormat, setNameIdFormat] = useState('');
 	const [active, setActive] = useState(true);
 	const [wantAssertionsEncrypted, setWantAssertionsEncrypted] = useState(false);
+	const [wantAuthnRequestsSigned, setWantAuthnRequestsSigned] = useState(false);
 	const [attributeMapping, setAttributeMapping] = useState<SpAttributeMappingConfig | null>(null);
 	const [spCertificate, setSpCertificate] = useState('');
+	const [hasStoredSpCertificate, setHasStoredSpCertificate] = useState(false);
+	const [spCertificateTouched, setSpCertificateTouched] = useState(false);
+	const [probeSpPrivateKeyPem, setProbeSpPrivateKeyPem] = useState('');
+	const [probeSigningBusy, setProbeSigningBusy] = useState(false);
+	const [probeSigningMessage, setProbeSigningMessage] = useState<string | null>(null);
+	const [probeSigningError, setProbeSigningError] = useState<string | null>(null);
 	const [acsTestMessage, setAcsTestMessage] = useState<string | null>(null);
 	const { showToast } = useToast();
 	const [saving, setSaving] = useState(false);
+	const hasSpCertificate = spCertificate.trim().length > 0 || hasStoredSpCertificate;
 
 	useEffect(() => {
 		if (isNew || !id) {
@@ -66,7 +76,11 @@ export function SpConnectionFormPage() {
 					setNameIdFormat(item.nameIdFormat);
 					setActive(item.active);
 					setWantAssertionsEncrypted(item.wantAssertionsEncrypted);
+					setWantAuthnRequestsSigned(item.wantAuthnRequestsSigned);
 					setAttributeMapping(item.attributeMapping);
+					setHasStoredSpCertificate(item.hasSpCertificate);
+					setSpCertificateTouched(false);
+					setSpCertificate('');
 				}
 			} catch (err) {
 				if (!cancelled) {
@@ -92,10 +106,20 @@ export function SpConnectionFormPage() {
 		};
 	}, [id, isNew, t]);
 
+	useEffect(() => {
+		if (hasSpCertificate || !wantAuthnRequestsSigned) {
+			return;
+		}
+		setWantAuthnRequestsSigned(false);
+	}, [hasSpCertificate, wantAuthnRequestsSigned]);
+
 	async function handleSubmit(event: FormEvent) {
 		event.preventDefault();
 		setSaving(true);
 		setError(null);
+		const trimmedSpCertificate = spCertificate.trim();
+		const spCertificateValue =
+			isNew || spCertificateTouched ? (trimmedSpCertificate ? trimmedSpCertificate : null) : undefined;
 		const body = {
 			name,
 			spEntityId,
@@ -103,8 +127,9 @@ export function SpConnectionFormPage() {
 			nameIdFormat: nameIdFormat || undefined,
 			active,
 			wantAssertionsEncrypted,
+			wantAuthnRequestsSigned,
 			attributeMapping,
-			spCertificate: spCertificate.trim() ? spCertificate.trim() : null,
+			...(spCertificateValue !== undefined ? { spCertificate: spCertificateValue } : {}),
 		};
 		try {
 			if (isNew) {
@@ -185,6 +210,42 @@ export function SpConnectionFormPage() {
 		}
 	}
 
+	async function handleProbeSigning() {
+		if (!id) {
+			return;
+		}
+		setProbeSigningBusy(true);
+		setProbeSigningMessage(null);
+		setProbeSigningError(null);
+		try {
+			const result = await probeSpConnectionSigning(id, {
+				spPrivateKeyPem: probeSpPrivateKeyPem,
+			});
+			if (result.ok) {
+				setProbeSigningMessage(
+					t('probeSigningSuccess', {
+						fingerprint: result.fingerprintSha256 ?? tCommon('emDash'),
+					}),
+				);
+				return;
+			}
+			setProbeSigningError(result.message ?? t('probeSigningFailed'));
+		} catch (err) {
+			setProbeSigningError(
+				err instanceof AdminApiError
+					? formatAdminApiError(
+							err.statusCode,
+							err.message,
+							resolveI18nKey,
+							'spConnections.probeSigningFailed',
+						)
+					: t('probeSigningFailed'),
+			);
+		} finally {
+			setProbeSigningBusy(false);
+		}
+	}
+
 	if (loading) {
 		return <LoadingState />;
 	}
@@ -249,8 +310,21 @@ export function SpConnectionFormPage() {
 							hint={t('wantAssertionsEncryptedHint')}
 							checked={wantAssertionsEncrypted}
 							onChange={setWantAssertionsEncrypted}
-							disabled={saving || spCertificate.trim().length === 0}
+							disabled={saving || !hasSpCertificate}
 						/>
+						<Checkbox
+							label={t('wantAuthnRequestsSigned')}
+							hint={t('wantAuthnRequestsSignedHint')}
+							checked={wantAuthnRequestsSigned}
+							onChange={setWantAuthnRequestsSigned}
+							disabled={saving || !hasSpCertificate}
+						/>
+						{wantAuthnRequestsSigned || hasSpCertificate ? (
+							<>
+								<Callout variant="info">{t('wantAuthnRequestsSignedCallout')}</Callout>
+								<Callout variant="warning">{t('wantAuthnRequestsSignedMetadataHint')}</Callout>
+							</>
+						) : null}
 						<AttributeMappingEditor
 							value={attributeMapping}
 							onChange={setAttributeMapping}
@@ -261,8 +335,46 @@ export function SpConnectionFormPage() {
 							rows={4}
 							hint={t('spCertificateHint')}
 							value={spCertificate}
-							onChange={(e) => setSpCertificate(e.target.value)}
+							onChange={(e) => {
+								const value = e.target.value;
+								setSpCertificate(value);
+								setSpCertificateTouched(true);
+								setHasStoredSpCertificate(value.trim().length > 0);
+							}}
 						/>
+						{!isNew && id && hasSpCertificate ? (
+							<details
+								id="probe-sp-signing"
+								className="evg-filters-panel evg-filters-panel--collapsible"
+							>
+								<summary>{t('probeSigningTitle')}</summary>
+								<div className="evg-stack">
+									<p className="evg-muted">{t('probeSigningHint')}</p>
+									<TextArea
+										label={t('probeSigningPrivateKeyPem')}
+										rows={8}
+										value={probeSpPrivateKeyPem}
+										onChange={(event) => setProbeSpPrivateKeyPem(event.target.value)}
+									/>
+									<div className="evg-cluster">
+										<Button
+											type="button"
+											variant="secondary"
+											disabled={saving || probeSigningBusy || probeSpPrivateKeyPem.trim() === ''}
+											onClick={() => void handleProbeSigning()}
+										>
+											{probeSigningBusy
+												? t('probeSigningButtonBusy')
+												: t('probeSigningButton')}
+										</Button>
+									</div>
+									{probeSigningMessage ? (
+										<Callout variant="success">{probeSigningMessage}</Callout>
+									) : null}
+									{probeSigningError ? <ErrorBanner message={probeSigningError} /> : null}
+								</div>
+							</details>
+						) : null}
 						<Button type="submit" variant="primary" disabled={saving}>
 							{saving ? tCommon('saving') : tCommon('save')}
 						</Button>

@@ -38,6 +38,8 @@ export class AdminDashboardService {
 
 		const entityId = settings?.entityId ?? base;
 		const urls = buildIdpUrls(base);
+		const spSecurity = await this.buildSpSecuritySummary(settings?.wantAuthnRequestsSigned ?? false);
+
 		const idp = settings
 			? await this.idpSettingsService.buildDashboardIdpStatus()
 			: {
@@ -72,11 +74,34 @@ export class AdminDashboardService {
 			entityId,
 			ssoUrl: urls.ssoUrl,
 			idp,
+			spSecurity,
 			apiConnection: connectionRow ? toApiConnectionDto(connectionRow) : null,
 			lastSyncStatus: connectionRow?.lastSyncStatus ?? null,
 			lastSyncAt: connectionRow?.lastSyncAt?.toISOString() ?? null,
 			auditEventsRoute: AUDIT_ROUTE_PREFIX,
 			adminUsersRoute: ADMIN_USERS_ROUTE_PREFIX,
+		};
+	}
+
+	private async buildSpSecuritySummary(idpAdvertisesSignedAuthnRequests: boolean) {
+		const [requireSigned, requireEncrypted, flaggedRows] = await Promise.all([
+			this.prisma.spConnection.count({ where: { wantAuthnRequestsSigned: true } }),
+			this.prisma.spConnection.count({ where: { wantAssertionsEncrypted: true } }),
+			this.prisma.spConnection.findMany({
+				where: {
+					OR: [{ wantAuthnRequestsSigned: true }, { wantAssertionsEncrypted: true }],
+				},
+				select: { spCertificate: true },
+			}),
+		]);
+
+		const missingCertCount = flaggedRows.filter((row) => !row.spCertificate?.trim()).length;
+
+		return {
+			spConnectionsRequireSignedAuthn: requireSigned,
+			spConnectionsRequireEncryptedAssertions: requireEncrypted,
+			spConnectionsMissingCertWithSecurityFlags: missingCertCount,
+			idpAdvertisesSignedAuthnRequests,
 		};
 	}
 }

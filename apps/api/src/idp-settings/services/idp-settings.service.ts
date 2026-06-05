@@ -92,11 +92,16 @@ export class IdpSettingsService {
 	}
 
 	async updateSettings(body: UpdateIdpSettingsRequestDto): Promise<IdpSettingsPublicDto> {
-		if (body.entityId === undefined && body.nameIdFormat === undefined) {
+		if (
+			body.entityId === undefined &&
+			body.nameIdFormat === undefined &&
+			body.wantAuthnRequestsSigned === undefined
+		) {
 			throw new BadRequestException('At least one field is required');
 		}
 
-		const data: Partial<Pick<IdpSettings, 'entityId' | 'nameIdFormat'>> = {};
+		const data: Partial<Pick<IdpSettings, 'entityId' | 'nameIdFormat' | 'wantAuthnRequestsSigned'>> =
+			{};
 		const updatedFields: string[] = [];
 
 		if (body.entityId !== undefined) {
@@ -121,6 +126,11 @@ export class IdpSettingsService {
 				throw error;
 			}
 			updatedFields.push('nameIdFormat');
+		}
+
+		if (body.wantAuthnRequestsSigned !== undefined) {
+			data.wantAuthnRequestsSigned = body.wantAuthnRequestsSigned;
+			updatedFields.push('wantAuthnRequestsSigned');
 		}
 
 		const updated = await this.prisma.idpSettings.update({

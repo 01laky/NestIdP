@@ -12,6 +12,7 @@ export function toSpConnectionPublicDto(row: SpConnection): SpConnectionPublicDt
 		active: row.active,
 		hasSpCertificate: row.spCertificate != null && row.spCertificate.length > 0,
 		wantAssertionsEncrypted: row.wantAssertionsEncrypted,
+		wantAuthnRequestsSigned: row.wantAuthnRequestsSigned,
 		createdAt: row.createdAt.toISOString(),
 		updatedAt: row.updatedAt.toISOString(),
 	};

@@ -37,6 +37,7 @@ type SpConnectionOverrides = Partial<
 		attributeMapping?: Prisma.InputJsonValue;
 	}
 >;
+type SpConnectionWithSigningKeyOverrides = Omit<SpConnectionOverrides, 'spCertificate'>;
 type AdminUserOverrides = Partial<Omit<AdminUser, 'id' | 'createdAt' | 'updatedAt'>>;
 type SyncLogOverrides = Partial<
 	Omit<SyncLog, 'id' | 'startedAt' | 'errors'> & {
@@ -128,6 +129,30 @@ export async function createTestSpConnection(
 			...rest,
 		},
 	});
+}
+
+export async function createTestSpConnectionWithSigningKey(
+	prisma: PrismaClient,
+	overrides: SpConnectionWithSigningKeyOverrides = {},
+): Promise<{
+	spConnection: SpConnection;
+	spPrivateKeyPem: string;
+	spCertificatePem: string;
+}> {
+	const entityId =
+		overrides.spEntityId ??
+		`urn:sp:signed:${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+	const { privateKeyPem, certPem } = generateTestRsaCert(entityId);
+	const spConnection = await createTestSpConnection(prisma, {
+		...overrides,
+		spEntityId: entityId,
+		spCertificate: certPem,
+	});
+	return {
+		spConnection,
+		spPrivateKeyPem: privateKeyPem,
+		spCertificatePem: certPem,
+	};
 }
 
 export async function createTestAdminUser(

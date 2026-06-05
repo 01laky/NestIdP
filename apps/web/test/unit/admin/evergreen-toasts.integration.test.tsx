@@ -126,6 +126,7 @@ describe('Evergreen toast integration — mutation flows', () => {
 				active: true,
 				hasSpCertificate: false,
 				wantAssertionsEncrypted: false,
+				wantAuthnRequestsSigned: false,
 				createdAt: '2026-01-01T00:00:00.000Z',
 				updatedAt: '2026-01-01T00:00:00.000Z',
 			},
@@ -234,6 +235,7 @@ describe('Evergreen toast integration — mutation flows', () => {
 		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue({
 			entityId: 'http://localhost:3000',
 			nameIdFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
+			wantAuthnRequestsSigned: false,
 			hasSigningCertificate: true,
 			signingCertFingerprintSha256: 'aa:bb',
 			signingCertNotAfter: '2030-01-01T00:00:00.000Z',
@@ -278,6 +280,7 @@ describe('Evergreen toast integration — mutation flows', () => {
 		vi.spyOn(adminApi, 'updateIdpSettings').mockResolvedValue({
 			entityId: 'https://idp.example.com',
 			nameIdFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
+			wantAuthnRequestsSigned: false,
 			hasSigningCertificate: true,
 			signingCertFingerprintSha256: 'aa:bb',
 			signingCertNotAfter: '2030-01-01T00:00:00.000Z',

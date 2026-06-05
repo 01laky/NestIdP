@@ -32,6 +32,9 @@ import type {
 	IdentityRoleListResponseDto,
 	IdentityUserDetailResponseDto,
 	IdentityUserListResponseDto,
+	ProbeSpSigningRequestDto,
+	ProbeSpSigningResponseDto,
+	SpConnectionTestSsoUrlResponseDto,
 	UpdateManualIdentityGroupDto,
 	UpdateManualIdentityRoleDto,
 	UpdateManualIdentityUserDto,
@@ -272,6 +275,36 @@ export function deleteSpConnection(id: string): Promise<DeleteSpConnectionRespon
 export function testSpConnectionAcs(id: string): Promise<SpConnectionTestAcsResponseDto> {
 	return adminFetch<SpConnectionTestAcsResponseDto>(`${SP_CONNECTIONS_API_PATH}/${id}/test-acs`, {
 		method: 'POST',
+	});
+}
+
+export function getSpConnectionTestSsoUrl(
+	id: string,
+	options: { signed?: boolean; encrypted?: boolean; relayState?: string } = {},
+): Promise<SpConnectionTestSsoUrlResponseDto> {
+	const query = new URLSearchParams();
+	if (options.signed !== undefined) {
+		query.set('signed', String(options.signed));
+	}
+	if (options.encrypted !== undefined) {
+		query.set('encrypted', String(options.encrypted));
+	}
+	if (options.relayState) {
+		query.set('relayState', options.relayState);
+	}
+	const suffix = query.size > 0 ? `?${query.toString()}` : '';
+	return adminFetch<SpConnectionTestSsoUrlResponseDto>(
+		`${SP_CONNECTIONS_API_PATH}/${id}/test-sso-url${suffix}`,
+	);
+}
+
+export function probeSpConnectionSigning(
+	id: string,
+	body: ProbeSpSigningRequestDto,
+): Promise<ProbeSpSigningResponseDto> {
+	return adminFetch<ProbeSpSigningResponseDto>(`${SP_CONNECTIONS_API_PATH}/${id}/probe-sp-signing`, {
+		method: 'POST',
+		body: JSON.stringify(body),
 	});
 }
 

@@ -31,6 +31,13 @@ const defaultIdp = {
 	encryptionCertStatus: 'not_configured' as const,
 };
 
+const defaultSpSecurity = {
+	spConnectionsRequireSignedAuthn: 0,
+	spConnectionsRequireEncryptedAssertions: 0,
+	spConnectionsMissingCertWithSecurityFlags: 0,
+	idpAdvertisesSignedAuthnRequests: false,
+};
+
 describe('AdminStatsDto', () => {
 	it('SH-ADM-01: requires all five count fields', () => {
 		const stats: AdminStatsDto = {
@@ -81,6 +88,7 @@ describe('AdminDashboardResponseDto', () => {
 			entityId: 'https://idp.example.com',
 			ssoUrl: 'https://idp.example.com/saml/sso',
 			idp: defaultIdp,
+			spSecurity: defaultSpSecurity,
 			apiConnection: null,
 			lastSyncStatus: null,
 			lastSyncAt: null,
@@ -110,6 +118,7 @@ describe('AdminDashboardResponseDto', () => {
 			entityId: 'https://idp.example.com',
 			ssoUrl: 'https://idp.example.com/saml/sso',
 			idp: defaultIdp,
+			spSecurity: defaultSpSecurity,
 			apiConnection: null,
 			lastSyncStatus: 'NEVER',
 			lastSyncAt: null,
@@ -150,6 +159,12 @@ describe('AdminDashboardResponseDto', () => {
 				encryptionRsaModulusBits: null,
 				encryptionEcCurve: null,
 				encryptionCertStatus: 'not_configured',
+			},
+			spSecurity: {
+				spConnectionsRequireSignedAuthn: 1,
+				spConnectionsRequireEncryptedAssertions: 1,
+				spConnectionsMissingCertWithSecurityFlags: 0,
+				idpAdvertisesSignedAuthnRequests: true,
 			},
 			apiConnection: null,
 			lastSyncStatus: null,

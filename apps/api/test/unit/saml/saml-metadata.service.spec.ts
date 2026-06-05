@@ -51,6 +51,7 @@ describe('SamlMetadataService', () => {
 			id: 'default',
 			entityId: 'http://localhost:3000',
 			nameIdFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
+			wantAuthnRequestsSigned: false,
 			signingCertPem: certPem,
 			signingKeyEncrypted: encrypt(privateKeyPem, TEST_ENCRYPTION_KEY),
 		});
@@ -88,6 +89,34 @@ describe('SamlMetadataService', () => {
 	});
 
 	it('API-SAML-META-07: wantAuthnRequestsSigned is false', async () => {
+		const xml = await service.generateMetadata();
+		expect(xml).toContain('wantAuthnRequestsSigned="false"');
+	});
+
+	it('API-SAML-META-REQ-01: metadata advertises wantAuthnRequestsSigned=true when enabled', async () => {
+		const signing = getTestSigningMaterial('http://localhost:3000');
+		prisma.idpSettings.findUnique.mockResolvedValue({
+			id: 'default',
+			entityId: 'http://localhost:3000',
+			nameIdFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
+			wantAuthnRequestsSigned: true,
+			signingCertPem: signing.certPem,
+			signingKeyEncrypted: encrypt(signing.privateKeyPem, TEST_ENCRYPTION_KEY),
+		});
+		const xml = await service.generateMetadata();
+		expect(xml).toContain('wantAuthnRequestsSigned="true"');
+	});
+
+	it('API-SAML-META-REQ-02: metadata advertises wantAuthnRequestsSigned=false when disabled', async () => {
+		const signing = getTestSigningMaterial('http://localhost:3000');
+		prisma.idpSettings.findUnique.mockResolvedValue({
+			id: 'default',
+			entityId: 'http://localhost:3000',
+			nameIdFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
+			wantAuthnRequestsSigned: false,
+			signingCertPem: signing.certPem,
+			signingKeyEncrypted: encrypt(signing.privateKeyPem, TEST_ENCRYPTION_KEY),
+		});
 		const xml = await service.generateMetadata();
 		expect(xml).toContain('wantAuthnRequestsSigned="false"');
 	});

@@ -53,6 +53,12 @@ function dashboardStub(): AdminDashboardResponseDto {
 			encryptionEcCurve: null,
 			encryptionCertStatus: 'not_configured' as const,
 		},
+		spSecurity: {
+			spConnectionsRequireSignedAuthn: 0,
+			spConnectionsRequireEncryptedAssertions: 0,
+			spConnectionsMissingCertWithSecurityFlags: 0,
+			idpAdvertisesSignedAuthnRequests: false,
+		},
 		apiConnection: null,
 		lastSyncStatus: null,
 		lastSyncAt: null,

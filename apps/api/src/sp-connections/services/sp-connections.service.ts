@@ -56,7 +56,9 @@ export class SpConnectionsService {
 		const attributeMapping = this.validateMapping(body.attributeMapping);
 		const spCertificate = this.validateCertificate(body.spCertificate);
 		const wantAssertionsEncrypted = body.wantAssertionsEncrypted ?? false;
+		const wantAuthnRequestsSigned = body.wantAuthnRequestsSigned ?? false;
 		this.assertWantAssertionsEncryptedRequiresSpCert(wantAssertionsEncrypted, spCertificate);
+		this.assertWantAuthnRequestsSignedRequiresSpCert(wantAuthnRequestsSigned, spCertificate);
 
 		const row = await this.prisma.spConnection.create({
 			data: {
@@ -68,6 +70,7 @@ export class SpConnectionsService {
 				active: body.active ?? true,
 				spCertificate,
 				wantAssertionsEncrypted,
+				wantAuthnRequestsSigned,
 			},
 		});
 
@@ -84,7 +87,8 @@ export class SpConnectionsService {
 			body.attributeMapping === undefined &&
 			body.active === undefined &&
 			body.spCertificate === undefined &&
-			body.wantAssertionsEncrypted === undefined
+			body.wantAssertionsEncrypted === undefined &&
+			body.wantAuthnRequestsSigned === undefined
 		) {
 			throw new BadRequestException('At least one field must be provided');
 		}
@@ -136,6 +140,35 @@ export class SpConnectionsService {
 					: existing.spCertificate;
 			this.assertWantAssertionsEncryptedRequiresSpCert(body.wantAssertionsEncrypted, certForCheck);
 			data.wantAssertionsEncrypted = body.wantAssertionsEncrypted;
+		}
+
+		if (body.wantAuthnRequestsSigned !== undefined) {
+			const certForCheck =
+				body.spCertificate !== undefined
+					? this.validateCertificate(body.spCertificate)
+					: existing.spCertificate;
+			this.assertWantAuthnRequestsSignedRequiresSpCert(
+				body.wantAuthnRequestsSigned,
+				certForCheck,
+			);
+			data.wantAuthnRequestsSigned = body.wantAuthnRequestsSigned;
+		}
+
+		if (body.spCertificate !== undefined) {
+			const nextCert = this.validateCertificate(body.spCertificate);
+			const nextWantEncrypted =
+				body.wantAssertionsEncrypted !== undefined
+					? body.wantAssertionsEncrypted
+					: existing.wantAssertionsEncrypted;
+			const nextWantSigned =
+				body.wantAuthnRequestsSigned !== undefined
+					? body.wantAuthnRequestsSigned
+					: existing.wantAuthnRequestsSigned;
+			if (!nextCert?.trim() && (nextWantEncrypted || nextWantSigned)) {
+				throw new BadRequestException(
+					'Disable encrypt assertions and require signed AuthnRequest before removing SP certificate',
+				);
+			}
 		}
 
 		const row = await this.prisma.spConnection.update({
@@ -234,6 +267,20 @@ export class SpConnectionsService {
 		if (!spCertificate?.trim()) {
 			throw new BadRequestException(
 				'SP certificate PEM is required when encrypt assertions is enabled',
+			);
+		}
+	}
+
+	private assertWantAuthnRequestsSignedRequiresSpCert(
+		wantSigned: boolean,
+		spCertificate: string | null,
+	): void {
+		if (!wantSigned) {
+			return;
+		}
+		if (!spCertificate?.trim()) {
+			throw new BadRequestException(
+				'SP certificate PEM is required when require signed AuthnRequest is enabled',
 			);
 		}
 	}

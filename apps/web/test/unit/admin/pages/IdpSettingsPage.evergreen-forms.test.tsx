@@ -11,6 +11,7 @@ function baseSettings(overrides: Partial<IdpSettingsPublicDto> = {}): IdpSetting
 	return {
 		entityId: 'http://localhost:3000',
 		nameIdFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
+		wantAuthnRequestsSigned: false,
 		hasSigningCertificate: true,
 		signingCertFingerprintSha256: 'aa:bb',
 		signingCertNotAfter: '2030-01-01T00:00:00.000Z',

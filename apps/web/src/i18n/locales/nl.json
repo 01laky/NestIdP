@@ -168,7 +168,15 @@
 		"idpSigningSummary": "{{family}} {{detail}} · {{algorithm}} · expires {{date}}",
 		"completeEncryptionRotationCallout": "Complete or cancel encryption certificate rotation in IdP settings.",
 		"encryptionCertExpiresOn": "Encryption certificate expires on {{date}}.",
-		"idpEncryptionSummary": "Encryption: {{family}} {{detail}} · {{algorithm}} · expires {{date}}"
+		"idpEncryptionSummary": "Encryption: {{family}} {{detail}} · {{algorithm}} · expires {{date}}",
+		"spSecurity": {
+			"title": "SP security",
+			"missingCertWarning": "{{count}} SP connection(s) require signing and/or encrypted assertions but have no SP certificate configured.",
+			"openSpConnections": "Open SP connections",
+			"requireSignedAuthnCount": "Require signed AuthnRequest: {{count}}",
+			"requireEncryptedAssertionsCount": "Require encrypted assertions: {{count}}",
+			"idpAdvertisesWithoutEnforcement": "IdP metadata advertises signed AuthnRequests, but no SP connection currently enforces signature verification."
+		}
 	},
 	"apiConnections": {
 		"listTitle": "API-verbindingen",
@@ -240,7 +248,26 @@
 		"deleteFailed": "Verwijderen mislukt",
 		"acsTestFailed": "ACS test failed",
 		"wantAssertionsEncrypted": "Encrypt SAML assertions",
-		"wantAssertionsEncryptedHint": "Encrypt SAML assertions to this SP using the SP certificate PEM below (AES-256-CBC key transport). IdP encryption cert in metadata is separate."
+		"wantAssertionsEncryptedHint": "Encrypt SAML assertions to this SP using the SP certificate PEM below (AES-256-CBC key transport). IdP encryption cert in metadata is separate.",
+		"wantAuthnRequestsSigned": "Require signed AuthnRequest",
+		"wantAuthnRequestsSignedHint": "Require HTTP-Redirect SigAlg + Signature verification for this SP using the certificate PEM.",
+		"wantAuthnRequestsSignedCallout": "The IdP verifies detached Redirect signature parameters (SigAlg and Signature) against this SP certificate. XML signatures inside AuthnRequest are not checked here.",
+		"wantAuthnRequestsSignedMetadataHint": "IdP metadata setting wantAuthnRequestsSigned is advisory only; this SP-level flag enforces request signature verification.",
+		"probeSigningTitle": "Probe SP signing key",
+		"probeSigningHint": "Paste an SP private key to verify it matches the stored SP certificate. The key is never saved.",
+		"probeSigningPrivateKeyPem": "SP private key PEM",
+		"probeSigningButton": "Verify key matches certificate",
+		"probeSigningButtonBusy": "Verifying key…",
+		"probeSigningSuccess": "Key matches certificate. Fingerprint: {{fingerprint}}",
+		"probeSigningFailed": "Private key does not match SP certificate.",
+		"testSsoUrlTitle": "Open SSO URL",
+		"testSsoUrlLabel": "Redirect URL",
+		"testSsoSignedToggle": "Include signature",
+		"testSsoEncryptedToggle": "Include encryption",
+		"testSsoUrlCopied": "Test SSO URL copied",
+		"testSsoWarningCallout": "Test URLs are for operator validation only. Keep private key material out of browser history, logs, and screenshots.",
+		"testSsoEphemeralKeyWarning": "Signed URL used an ephemeral server key. Verification only succeeds if the generated key matches the uploaded SP certificate.",
+		"probeSigningOpenEditLink": "Open SP edit page to validate signing key/certificate pair"
 	},
 	"idpSettings": {
 		"title": "IdP-instellingen",
@@ -260,6 +287,11 @@
 		"defaultNameIdFormat": "Default NameID format",
 		"defaultNameIdHint": "Used in IdP metadata only. Assertion NameID still comes from each SP connection.",
 		"saveNameIdFormat": "Save NameID format",
+		"samlBehavior": "SAML behavior",
+		"wantAuthnRequestsSigned": "Request signed AuthnRequests",
+		"wantAuthnRequestsSignedHint": "Advertise signing preference in IdP metadata (does not enforce SP verification by itself).",
+		"wantAuthnRequestsSignedCallout": "Setting wantAuthnRequestsSigned in metadata advertises preference to SPs. Enforce signatures per SP connection.",
+		"saveWantAuthnRequestsSigned": "Save SAML behavior",
 		"signingCertificate": "Signing certificate",
 		"fingerprint": "Fingerprint (SHA-256)",
 		"notAfter": "Not after",
@@ -307,8 +339,10 @@
 		"toastRotationStarted": "Certificate rotation started",
 		"toastRotationCompleted": "Certificate rotation completed",
 		"toastRotationCancelled": "Certificate rotation cancelled",
+		"toastWantAuthnRequestsSignedUpdated": "SAML behavior updated",
 		"successEntityIdUpdated": "Entity ID updated.",
 		"successNameIdUpdated": "Default NameID format updated.",
+		"successWantAuthnRequestsSignedUpdated": "SAML behavior updated.",
 		"successPrimaryGenerated": "Primary signing certificate generated.",
 		"successPrimaryUploaded": "Primary signing certificate uploaded.",
 		"successRotationStarted": "Rotation started with a newly generated pending certificate.",
@@ -626,7 +660,11 @@
 			"idp_encryption_cert_uploaded": "Encryption certificate uploaded",
 			"idp_encryption_rotation_started": "Encryption certificate rotation started",
 			"idp_encryption_rotation_completed": "Encryption certificate rotation completed",
-			"idp_encryption_rotation_cancelled": "Encryption certificate rotation cancelled"
+			"idp_encryption_rotation_cancelled": "Encryption certificate rotation cancelled",
+			"idp_want_authn_requests_signed_updated": "IdP wantAuthnRequestsSigned updated",
+			"saml_request_signature_verified": "SAML request signature verified",
+			"saml_request_decrypted": "SAML request decrypted",
+			"sp_signing_probe_performed": "SP signing probe performed"
 		}
 	}
 }

@@ -46,6 +46,12 @@ function dashboardStub(
 		entityId: 'http://localhost:3000',
 		ssoUrl: 'http://localhost:3000/saml/sso',
 		idp: defaultIdp,
+		spSecurity: {
+			spConnectionsRequireSignedAuthn: 0,
+			spConnectionsRequireEncryptedAssertions: 0,
+			spConnectionsMissingCertWithSecurityFlags: 0,
+			idpAdvertisesSignedAuthnRequests: false,
+		},
 		apiConnection: null,
 		lastSyncStatus: null,
 		lastSyncAt: null,

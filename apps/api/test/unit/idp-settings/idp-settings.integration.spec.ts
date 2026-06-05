@@ -225,6 +225,20 @@ describe('IdP settings admin API (SQLite)', () => {
 		expect(res.body.nameIdFormat).toBe(format);
 	});
 
+	it('API-IDP-REQ-SIG-01: PATCH wantAuthnRequestsSigned updates IdP settings and metadata flag', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		const updated = await agent
+			.patch(IDP_SETTINGS_API_PATH)
+			.set(csrfHeader(csrf))
+			.send({ wantAuthnRequestsSigned: true })
+			.expect(200);
+		expect(updated.body.wantAuthnRequestsSigned).toBe(true);
+
+		const metadata = await request(app.getHttpServer() as App).get('/saml/metadata').expect(200);
+		expect(metadata.text).toContain('wantAuthnRequestsSigned="true"');
+	});
+
 	it('API-IDP-ADM-09: PATCH empty body → 400', async () => {
 		const agent = request.agent(app.getHttpServer() as App);
 		const csrf = await loginCsrf(agent);

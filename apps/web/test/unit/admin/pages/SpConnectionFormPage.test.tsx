@@ -44,6 +44,7 @@ describe('SpConnectionFormPage', () => {
 				active: true,
 				hasSpCertificate: false,
 				wantAssertionsEncrypted: false,
+				wantAuthnRequestsSigned: false,
 				createdAt: '2026-01-01T00:00:00.000Z',
 				updatedAt: '2026-01-01T00:00:00.000Z',
 			},
@@ -113,5 +114,54 @@ describe('SpConnectionFormPage', () => {
 		});
 		fireEvent.click(checkbox);
 		expect(checkbox.checked).toBe(true);
+	});
+
+	it('WEB-SP-REQ-SIG-01: wantAuthnRequestsSigned checkbox disabled without SP certificate PEM', () => {
+		renderNew();
+		const checkbox = screen.getByRole('checkbox', { name: /Require signed AuthnRequest/i });
+		expect(checkbox).toHaveProperty('disabled', true);
+	});
+
+	it('WEB-SP-REQ-SIG-02: wantAuthnRequestsSigned checkbox enabled with SP certificate', async () => {
+		const { container } = renderNew();
+		const pemField = container.querySelector('[id="sp-certificate-pem-(optional)"]');
+		expect(pemField).not.toBeNull();
+		fireEvent.change(pemField!, {
+			target: { value: '-----BEGIN CERTIFICATE-----\nX\n-----END CERTIFICATE-----' },
+		});
+		await waitFor(() => {
+			expect(screen.getByRole('checkbox', { name: /Require signed AuthnRequest/i })).toHaveProperty(
+				'disabled',
+				false,
+			);
+		});
+	});
+
+	it('WEB-SP-PROBE-SIG-01: probe signing panel appears after SP certificate is provided', async () => {
+		vi.spyOn(adminApi, 'getSpConnection').mockResolvedValue({
+			id: 'sp-1',
+			name: 'App',
+			spEntityId: 'urn:sp:1',
+			acsUrl: 'https://sp.example.com/acs',
+			nameIdFormat: '',
+			attributeMapping: null,
+			active: true,
+			hasSpCertificate: true,
+			wantAssertionsEncrypted: false,
+			wantAuthnRequestsSigned: false,
+			createdAt: '2026-01-01T00:00:00.000Z',
+			updatedAt: '2026-01-01T00:00:00.000Z',
+		});
+		renderWithUi(
+			<MemoryRouter initialEntries={['/admin/sp-connections/sp-1']}>
+				<Routes>
+					<Route path="/admin/sp-connections/:id" element={<SpConnectionFormPage />} />
+				</Routes>
+			</MemoryRouter>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByText('Probe SP signing key')).toBeDefined();
+		});
 	});
 });

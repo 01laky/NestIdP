@@ -35,6 +35,13 @@ export interface AdminDashboardIdpStatusDto {
 	encryptionCertStatus: AdminDashboardEncryptionCertStatus;
 }
 
+export interface AdminDashboardSpSecuritySummaryDto {
+	spConnectionsRequireSignedAuthn: number;
+	spConnectionsRequireEncryptedAssertions: number;
+	spConnectionsMissingCertWithSecurityFlags: number;
+	idpAdvertisesSignedAuthnRequests: boolean;
+}
+
 export interface AdminDashboardResponseDto {
 	counts: AdminStatsDto;
 	apiConnectionsRoute: string;
@@ -47,6 +54,7 @@ export interface AdminDashboardResponseDto {
 	entityId: string;
 	ssoUrl: string;
 	idp: AdminDashboardIdpStatusDto;
+	spSecurity: AdminDashboardSpSecuritySummaryDto;
 	apiConnection: ApiConnectionDto | null;
 	lastSyncStatus: LastSyncStatus | null;
 	lastSyncAt: string | null;

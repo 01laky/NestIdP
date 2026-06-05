@@ -82,6 +82,7 @@ describe('admin confirm page flows', () => {
 			attributeMapping: null,
 			hasSpCertificate: false,
 			wantAssertionsEncrypted: false,
+			wantAuthnRequestsSigned: false,
 			createdAt: '',
 			updatedAt: '',
 		});
@@ -96,6 +97,7 @@ describe('admin confirm page flows', () => {
 				attributeMapping: null,
 				hasSpCertificate: false,
 				wantAssertionsEncrypted: false,
+				wantAuthnRequestsSigned: false,
 				createdAt: '',
 				updatedAt: '',
 			},
@@ -281,6 +283,7 @@ describe('admin confirm page flows', () => {
 			attributeMapping: null,
 			hasSpCertificate: false,
 			wantAssertionsEncrypted: false,
+			wantAuthnRequestsSigned: false,
 			createdAt: '',
 			updatedAt: '',
 		});
@@ -427,6 +430,7 @@ describe('admin confirm page flows', () => {
 			attributeMapping: null,
 			hasSpCertificate: false,
 			wantAssertionsEncrypted: false,
+			wantAuthnRequestsSigned: false,
 			createdAt: '',
 			updatedAt: '',
 		});

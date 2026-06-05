@@ -54,6 +54,12 @@ const dashboardStub: AdminDashboardResponseDto = {
 		encryptionEcCurve: null,
 		encryptionCertStatus: 'not_configured' as const,
 	},
+	spSecurity: {
+		spConnectionsRequireSignedAuthn: 0,
+		spConnectionsRequireEncryptedAssertions: 0,
+		spConnectionsMissingCertWithSecurityFlags: 0,
+		idpAdvertisesSignedAuthnRequests: false,
+	},
 	apiConnection: null,
 	lastSyncStatus: null,
 	lastSyncAt: null,
@@ -245,6 +251,7 @@ describe('Responsive shell — extended integration (WEB-RSP-100–115)', () => 
 		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue({
 			entityId: 'http://localhost:3000',
 			nameIdFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
+			wantAuthnRequestsSigned: false,
 			hasSigningCertificate: true,
 			signingCertFingerprintSha256: 'aa',
 			signingCertNotAfter: '2030-01-01T00:00:00.000Z',

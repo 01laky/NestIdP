@@ -149,6 +149,7 @@ model SpConnection {
 	attributeMapping        Json?
 	active                  Boolean  @default(true)
 	wantAssertionsEncrypted Boolean  @default(false)
+	wantAuthnRequestsSigned Boolean  @default(false)
 	createdAt               DateTime @default(now())
 	updatedAt               DateTime @updatedAt
 
@@ -244,6 +245,7 @@ model IdpSettings {
 	pendingEncryptionEcCurve               String?
 	encryptionRotationStartedAt            DateTime?
 	nameIdFormat                      String    @default("urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress")
+	wantAuthnRequestsSigned           Boolean   @default(false)
 	createdAt                         DateTime  @default(now())
 	updatedAt                         DateTime  @updatedAt
 }

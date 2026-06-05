@@ -46,6 +46,19 @@ export class SpConnectionsAuditService {
 		});
 	}
 
+	logSigningProbe(id: string, spEntityId: string, ok: boolean): void {
+		const payload = { event: 'sp_signing_probe_performed', id, spEntityId, ok };
+		this.logger.log(JSON.stringify(payload));
+		this.audit.recordSafe({
+			category: 'admin_config',
+			event: 'sp_signing_probe_performed',
+			actorType: 'admin',
+			subjectType: 'SpConnection',
+			subjectId: id,
+			metadata: { spEntityId, ok },
+		});
+	}
+
 	logAcsTested(id: string, reachable: boolean, statusCode?: number): void {
 		const payload = {
 			event: 'sp_connection_acs_tested',

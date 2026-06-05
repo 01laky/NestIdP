@@ -37,6 +37,7 @@ describe('idp-settings shared', () => {
 		const dto: IdpSettingsPublicDto = {
 			entityId: 'https://idp.example.com',
 			nameIdFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
+			wantAuthnRequestsSigned: true,
 			hasSigningCertificate: true,
 			signingCertFingerprintSha256: 'abc123',
 			signingCertNotAfter: '2030-01-01T00:00:00.000Z',
@@ -114,6 +115,7 @@ describe('idp-settings shared', () => {
 	it('SH-IDP-08: UpdateIdpSettingsRequestDto partial fields', () => {
 		const body: UpdateIdpSettingsRequestDto = { entityId: 'https://new.example.com' };
 		expect(body.nameIdFormat).toBeUndefined();
+		expect(body.wantAuthnRequestsSigned).toBeUndefined();
 	});
 
 	it('SH-IDP-09: StartIdpCertRotationRequestDto generate mode', () => {

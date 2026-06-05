@@ -1,11 +1,5 @@
-import {
-	createCipheriv,
-	createPublicKey,
-	constants,
-	publicEncrypt,
-	randomBytes,
-	type KeyObject,
-} from 'node:crypto';
+import { createCipheriv, createPublicKey, randomBytes, type KeyObject } from 'node:crypto';
+import { wrapSymmetricKeyWithTransport } from './saml-xml-encryption-shared.util';
 import {
 	getIdpContentEncryptionOption,
 	getIdpEncryptionKeyTransportOption,
@@ -95,30 +89,4 @@ export function encryptSignedAssertionForSp(
     </xenc:CipherData>
   </xenc:EncryptedData>
 </saml2:EncryptedAssertion>`;
-}
-
-function wrapSymmetricKeyWithTransport(
-	aesKey: Buffer,
-	publicKey: KeyObject,
-	xmlKeyTransportAlgorithm: string,
-): Buffer {
-	if (xmlKeyTransportAlgorithm === 'http://www.w3.org/2001/04/xmlenc#rsa-1_5') {
-		return publicEncrypt(
-			{
-				key: publicKey,
-				padding: constants.RSA_PKCS1_PADDING,
-			},
-			aesKey,
-		);
-	}
-
-	const oaepHash = xmlKeyTransportAlgorithm.includes('xmlenc11#rsa-oaep-mgf1p') ? 'sha1' : 'sha1';
-	return publicEncrypt(
-		{
-			key: publicKey,
-			padding: constants.RSA_PKCS1_OAEP_PADDING,
-			oaepHash,
-		},
-		aesKey,
-	);
 }

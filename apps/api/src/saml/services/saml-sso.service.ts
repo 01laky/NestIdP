@@ -21,6 +21,21 @@ import { SamlPostBindingService } from './saml-post-binding.service';
 import { SamlRequestParserService } from './saml-request-parser.service';
 import { SamlResponseBuilderService } from './saml-response-builder.service';
 import { validateAcsUrl } from '../utils/saml-url.util';
+import type { RawSamlRedirectQueryParams } from '../utils/saml-authn-request-redirect-signature.util';
+import {
+	buildRedirectBindingSignedContent,
+	verifyRedirectBindingSignature,
+} from '../utils/saml-authn-request-redirect-signature.util';
+import { getSamlRedirectSignatureAlgorithm } from '@nestidp/shared';
+
+export interface SamlRedirectSsoInput {
+	decoded: {
+		samlRequest: string;
+		relayState?: string;
+	};
+	raw: RawSamlRedirectQueryParams;
+	clientIp: string;
+}
 
 @Injectable()
 export class SamlSsoService {
@@ -41,21 +56,18 @@ export class SamlSsoService {
 		return this.metadataService.generateMetadata();
 	}
 
-	async handleRedirectSso(
-		samlRequest: string | undefined,
-		relayState: string | undefined,
-		clientIp: string,
-	): Promise<{ redirectUrl: string }> {
-		if (!samlRequest) {
+	async handleRedirectSso(input: SamlRedirectSsoInput): Promise<{ redirectUrl: string }> {
+		const { decoded, raw, clientIp } = input;
+		if (!decoded.samlRequest) {
 			this.audit.logRequestRejected('missing_saml_request', clientIp);
 			throw new BadRequestException('Missing SAMLRequest');
 		}
 
 		let parsed;
 		try {
-			parsed = this.parser.parseRedirectBinding(samlRequest, relayState);
+			parsed = await this.parser.parseRedirectBinding(decoded.samlRequest, decoded.relayState);
 		} catch (error) {
-			const reason = error instanceof Error ? error.message : 'parse_failed';
+			const reason = this.mapParseErrorToAuditReason(error);
 			this.audit.logRequestRejected(reason, clientIp);
 			throw error;
 		}
@@ -73,6 +85,33 @@ export class SamlSsoService {
 		if (!sp || !sp.active) {
 			this.audit.logRequestRejected('unknown_or_inactive_sp', clientIp);
 			throw new BadRequestException('Unknown or inactive Service Provider');
+		}
+
+		if (parsed.requestWasEncrypted) {
+			this.audit.logRequestDecrypted({
+				spEntityId: sp.spEntityId,
+				samlRequestId: parsed.authnRequest.id,
+				spConnectionId: sp.id,
+			});
+		}
+
+		const signatureResult = this.verifyRedirectSignature(
+			raw,
+			sp.spCertificate,
+			sp.wantAuthnRequestsSigned,
+		);
+		if (!signatureResult.ok) {
+			this.audit.logRequestRejected(signatureResult.reason!, clientIp);
+			throw new BadRequestException(signatureResult.message ?? 'Invalid SAMLRequest signature');
+		}
+
+		if (signatureResult.requestWasSigned && signatureResult.sigAlgUri) {
+			this.audit.logRequestSignatureVerified({
+				spEntityId: sp.spEntityId,
+				samlRequestId: parsed.authnRequest.id,
+				spConnectionId: sp.id,
+				sigAlgUri: signatureResult.sigAlgUri,
+			});
 		}
 
 		if (!parsed.authnRequest.destination) {
@@ -114,10 +153,118 @@ export class SamlSsoService {
 			samlRequestId: parsed.authnRequest.id,
 			spConnectionId: sp.id,
 			clientIp,
+			requestWasSigned: signatureResult.requestWasSigned,
+			requestWasEncrypted: parsed.requestWasEncrypted ?? false,
+			sigAlgUri: signatureResult.sigAlgUri,
 		});
 
 		const redirectUrl = `${LOGIN_PAGE_ROUTE}?${SAML_SESSION_QUERY_PARAM}=${session.id}`;
 		return { redirectUrl };
+	}
+
+	private verifyRedirectSignature(
+		raw: RawSamlRedirectQueryParams,
+		spCertificate: string | null,
+		wantAuthnRequestsSigned: boolean,
+	): {
+		ok: boolean;
+		reason?: string;
+		message?: string;
+		requestWasSigned: boolean;
+		sigAlgUri?: string;
+	} {
+		const hasSignature = Boolean(raw.signature);
+		const hasSigAlg = Boolean(raw.sigAlg);
+
+		if (hasSignature !== hasSigAlg) {
+			return {
+				ok: false,
+				reason: 'invalid_signature_params',
+				message: 'Invalid SAMLRequest signature parameters',
+				requestWasSigned: false,
+			};
+		}
+
+		if (!hasSignature) {
+			if (wantAuthnRequestsSigned) {
+				return {
+					ok: false,
+					reason: 'unsigned_request_required',
+					message: 'Signed AuthnRequest is required for this Service Provider',
+					requestWasSigned: false,
+				};
+			}
+			return { ok: true, requestWasSigned: false };
+		}
+
+		if (!spCertificate?.trim()) {
+			return {
+				ok: false,
+				reason: 'sp_certificate_required_for_signature',
+				message: 'SP certificate is required to verify SAMLRequest signature',
+				requestWasSigned: false,
+			};
+		}
+
+		if (!raw.samlRequest || !raw.sigAlg || !raw.signature) {
+			return {
+				ok: false,
+				reason: 'invalid_signature_params',
+				message: 'Invalid SAMLRequest signature parameters',
+				requestWasSigned: false,
+			};
+		}
+
+		const sigAlgDecoded = decodeURIComponent(raw.sigAlg);
+		if (!getSamlRedirectSignatureAlgorithm(sigAlgDecoded)) {
+			return {
+				ok: false,
+				reason: 'unsupported_signature_algorithm',
+				message: 'Unsupported SAMLRequest signature algorithm',
+				requestWasSigned: false,
+			};
+		}
+
+		const signedContent = buildRedirectBindingSignedContent({
+			samlRequestRaw: raw.samlRequest,
+			relayStateRaw: raw.relayState,
+			sigAlgRaw: raw.sigAlg,
+		});
+
+		const valid = verifyRedirectBindingSignature({
+			signedContent,
+			signatureBase64UrlEncoded: raw.signature,
+			sigAlgUri: sigAlgDecoded,
+			certificatePem: spCertificate,
+		});
+
+		if (!valid) {
+			return {
+				ok: false,
+				reason: 'invalid_saml_request_signature',
+				message: 'Invalid SAMLRequest signature',
+				requestWasSigned: false,
+			};
+		}
+
+		return { ok: true, requestWasSigned: true, sigAlgUri: sigAlgDecoded };
+	}
+
+	private mapParseErrorToAuditReason(error: unknown): string {
+		if (!(error instanceof BadRequestException)) {
+			return 'parse_failed';
+		}
+		const message = error.message;
+		if (message.includes('encryption certificate is not configured')) {
+			return 'encrypted_request_idp_key_missing';
+		}
+		if (message.includes('EC IdP encryption key')) {
+			return 'encrypted_request_ec_key_not_supported';
+		}
+		if (message.includes('decrypt')) {
+			return 'encrypted_request_decrypt_failed';
+		}
+		return message;
 	}
 
 	async completeSso(samlSessionId: string, authenticatedUserId: string): Promise<string> {

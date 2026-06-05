@@ -22,6 +22,8 @@ describe('SamlAuthAuditService', () => {
 			samlRequestId: '_req',
 			spConnectionId: 'sp-1',
 			clientIp: '127.0.0.1',
+			requestWasSigned: false,
+			requestWasEncrypted: false,
 		});
 		expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"event":"saml_request_received"'));
 	});

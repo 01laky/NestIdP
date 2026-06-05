@@ -33,7 +33,7 @@ export class SamlMetadataService {
 
 		const idp = doc.ele('md:IDPSSODescriptor', {
 			protocolSupportEnumeration: 'urn:oasis:names:tc:SAML:2.0:protocol',
-			wantAuthnRequestsSigned: 'false',
+			wantAuthnRequestsSigned: settings.wantAuthnRequestsSigned ? 'true' : 'false',
 		});
 
 		for (const certPem of certPems) {

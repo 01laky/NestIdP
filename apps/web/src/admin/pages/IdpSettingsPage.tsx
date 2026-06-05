@@ -49,6 +49,7 @@ import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messag
 import {
 	Button,
 	Callout,
+	Checkbox,
 	CodeBlock,
 	Panel,
 	Select,
@@ -125,6 +126,7 @@ export function IdpSettingsPage() {
 	const [settings, setSettings] = useState<IdpSettingsPublicDto | null>(null);
 	const [entityId, setEntityId] = useState('');
 	const [nameIdFormat, setNameIdFormat] = useState('');
+	const [wantAuthnRequestsSigned, setWantAuthnRequestsSigned] = useState(false);
 	const [metadataPreview, setMetadataPreview] = useState<string | null>(null);
 	const [showUpload, setShowUpload] = useState(false);
 	const [uploadCert, setUploadCert] = useState('');
@@ -145,6 +147,7 @@ export function IdpSettingsPage() {
 		setSettings(data);
 		setEntityId(data.entityId);
 		setNameIdFormat(data.nameIdFormat);
+		setWantAuthnRequestsSigned(data.wantAuthnRequestsSigned);
 		return data;
 	}
 
@@ -216,6 +219,16 @@ export function IdpSettingsPage() {
 			await reload();
 			setSuccess(t('successNameIdUpdated'));
 			showToast(t('toastNameIdUpdated'));
+		});
+	}
+
+	async function handleSaveWantAuthnRequestsSigned(event: FormEvent) {
+		event.preventDefault();
+		await runMutation(async () => {
+			await updateIdpSettings({ wantAuthnRequestsSigned });
+			await reload();
+			setSuccess(t('successWantAuthnRequestsSignedUpdated'));
+			showToast(t('toastWantAuthnRequestsSignedUpdated'));
 		});
 	}
 
@@ -591,6 +604,30 @@ export function IdpSettingsPage() {
 						</Select>
 						<Button type="submit" variant="primary" disabled={busy}>
 							{busy ? tCommon('saving') : t('saveNameIdFormat')}
+						</Button>
+					</fieldset>
+				</form>
+			</Panel>
+
+			<Panel title={t('samlBehavior')}>
+				<Callout variant="info">
+					{t('wantAuthnRequestsSignedCallout')}{' '}
+					<Link to={SP_CONNECTION_ROUTE_PREFIX}>{t('openSpConnections')}</Link>
+				</Callout>
+				<form
+					className="evg-stack"
+					aria-busy={busy}
+					onSubmit={(event) => void handleSaveWantAuthnRequestsSigned(event)}
+				>
+					<fieldset className="evg-stack" disabled={busy}>
+						<Checkbox
+							label={t('wantAuthnRequestsSigned')}
+							hint={t('wantAuthnRequestsSignedHint')}
+							checked={wantAuthnRequestsSigned}
+							onChange={setWantAuthnRequestsSigned}
+						/>
+						<Button type="submit" variant="primary" disabled={busy}>
+							{busy ? tCommon('saving') : t('saveWantAuthnRequestsSigned')}
 						</Button>
 					</fieldset>
 				</form>

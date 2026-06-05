@@ -12,7 +12,7 @@ import { ErrorBanner } from '../components/common/ErrorBanner';
 import { LoadingState } from '../components/common/LoadingState';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
 import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
-import { Badge, Panel, StatCard } from '../../ui';
+import { Badge, Callout, Panel, StatCard } from '../../ui';
 import {
 	certStatusLabel,
 	certStatusToBadge,
@@ -77,6 +77,7 @@ export function DashboardPage() {
 	}
 
 	const { counts } = dashboard;
+	const { spSecurity } = dashboard;
 
 	return (
 		<section>
@@ -221,6 +222,30 @@ export function DashboardPage() {
 					</Link>
 				</p>
 				<p className="evg-muted">{t('releaseNote')}</p>
+			</Panel>
+			<Panel title={t('spSecurity.title')}>
+				{spSecurity.spConnectionsMissingCertWithSecurityFlags > 0 ? (
+					<Callout variant="warning">
+						{t('spSecurity.missingCertWarning', {
+							count: spSecurity.spConnectionsMissingCertWithSecurityFlags,
+						})}{' '}
+						<Link to={SP_CONNECTION_ROUTE_PREFIX}>{t('spSecurity.openSpConnections')}</Link>
+					</Callout>
+				) : null}
+				<p className="evg-muted">
+					{t('spSecurity.requireSignedAuthnCount', {
+						count: spSecurity.spConnectionsRequireSignedAuthn,
+					})}
+				</p>
+				<p className="evg-muted">
+					{t('spSecurity.requireEncryptedAssertionsCount', {
+						count: spSecurity.spConnectionsRequireEncryptedAssertions,
+					})}
+				</p>
+				{spSecurity.idpAdvertisesSignedAuthnRequests &&
+				spSecurity.spConnectionsRequireSignedAuthn === 0 ? (
+					<p className="evg-muted">{t('spSecurity.idpAdvertisesWithoutEnforcement')}</p>
+				) : null}
 			</Panel>
 			<p className="evg-muted">
 				<Link className="evg-btn evg-btn--link" to={`${IDENTITY_ROUTE_PREFIX}/users`}>

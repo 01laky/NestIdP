@@ -2,7 +2,10 @@ import { BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { deflateSync } from 'node:zlib';
 import { buildAuthnRequestXml, encodeRedirectBinding } from '@test/support/saml/build-authn-request.util';
+import { generateTestRsaEncryptionCert } from '@api/idp-settings/utils/idp-encryption-cert.util';
+import { encryptAuthnRequestForIdp } from '@api/saml/utils/encrypt-authn-request-for-idp.util';
 import { SamlRequestParserService } from '@api/saml/services/saml-request-parser.service';
+import type { IdpEncryptionKeyService } from '@api/saml/services/idp-encryption-key.service';
 
 describe('SamlRequestParserService', () => {
 	const configService = {
@@ -13,7 +16,18 @@ describe('SamlRequestParserService', () => {
 		}),
 	} as unknown as ConfigService;
 
-	const parser = new SamlRequestParserService(configService);
+	const idpEncryptionKey = {
+		hasEcEncryptionKey: jest.fn().mockResolvedValue(false),
+		getDecryptionMaterial: jest.fn().mockResolvedValue([]),
+	} as unknown as IdpEncryptionKeyService;
+
+	const parser = new SamlRequestParserService(configService, idpEncryptionKey);
+
+	beforeEach(() => {
+		jest.clearAllMocks();
+		jest.mocked(idpEncryptionKey.hasEcEncryptionKey).mockResolvedValue(false);
+		jest.mocked(idpEncryptionKey.getDecryptionMaterial).mockResolvedValue([]);
+	});
 
 	function validEncodedRequest(options?: {
 		id?: string;
@@ -33,114 +47,114 @@ describe('SamlRequestParserService', () => {
 		return encodeURIComponent(encodeRedirectBinding(xml));
 	}
 
-	it('API-SAML-PARSE-01: valid minimal AuthnRequest round-trip', () => {
-		const result = parser.parseRedirectBinding(validEncodedRequest(), 'relay-1');
+	it('API-SAML-PARSE-01: valid minimal AuthnRequest round-trip', async () => {
+		const result = await parser.parseRedirectBinding(validEncodedRequest(), 'relay-1');
 		expect(result.authnRequest.id).toBe('_test-id-1');
 		expect(result.authnRequest.issuer).toBe('urn:test:sp');
 		expect(result.relayState).toBe('relay-1');
 	});
 
-	it('API-SAML-PARSE-02: invalid base64 → 400', () => {
-		expect(() => parser.parseRedirectBinding('%%%not-valid-base64%%%')).toThrow(
+	it('API-SAML-PARSE-02: invalid base64 → 400', async () => {
+		await expect(parser.parseRedirectBinding('%%%not-valid-base64%%%')).rejects.toThrow(
 			BadRequestException,
 		);
 	});
 
-	it('API-SAML-PARSE-03: invalid deflate payload → 400', () => {
+	it('API-SAML-PARSE-03: invalid deflate payload → 400', async () => {
 		const garbage = encodeURIComponent(Buffer.from('not-deflate').toString('base64'));
-		expect(() => parser.parseRedirectBinding(garbage)).toThrow(BadRequestException);
+		await expect(parser.parseRedirectBinding(garbage)).rejects.toThrow(BadRequestException);
 	});
 
-	it('API-SAML-PARSE-04: missing ID → 400', () => {
+	it('API-SAML-PARSE-04: missing ID → 400', async () => {
 		const xml = buildAuthnRequestXml({
 			id: '',
 			issuer: 'urn:test',
 			destination: 'http://localhost:3000/saml/sso',
 		});
-		expect(() =>
+		await expect(
 			parser.parseRedirectBinding(encodeURIComponent(encodeRedirectBinding(xml))),
-		).toThrow(BadRequestException);
+		).rejects.toThrow(BadRequestException);
 	});
 
-	it('API-SAML-PARSE-05: missing Issuer → 400', () => {
+	it('API-SAML-PARSE-05: missing Issuer → 400', async () => {
 		const xml = `<?xml version="1.0"?>
 <samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" ID="_no-issuer" Version="2.0" IssueInstant="${new Date().toISOString()}" Destination="http://localhost:3000/saml/sso"/>`;
-		expect(() => parser.parseRedirectBinding(validEncodedRequest({ xml }))).toThrow(
+		await expect(parser.parseRedirectBinding(validEncodedRequest({ xml }))).rejects.toThrow(
 			BadRequestException,
 		);
 	});
 
-	it('API-SAML-PARSE-06: IssueInstant too far in future → 400', () => {
+	it('API-SAML-PARSE-06: IssueInstant too far in future → 400', async () => {
 		const future = new Date(Date.now() + 10 * 60_000).toISOString();
-		expect(() =>
+		await expect(
 			parser.parseRedirectBinding(validEncodedRequest({ issueInstant: future })),
-		).toThrow(BadRequestException);
+		).rejects.toThrow(BadRequestException);
 	});
 
-	it('API-SAML-PARSE-07: IssueInstant too far in past → 400', () => {
+	it('API-SAML-PARSE-07: IssueInstant too far in past → 400', async () => {
 		const past = new Date(Date.now() - 10 * 60_000).toISOString();
-		expect(() => parser.parseRedirectBinding(validEncodedRequest({ issueInstant: past }))).toThrow(
+		await expect(parser.parseRedirectBinding(validEncodedRequest({ issueInstant: past }))).rejects.toThrow(
 			BadRequestException,
 		);
 	});
 
-	it('API-SAML-PARSE-08: empty SAMLRequest → 400', () => {
-		expect(() => parser.parseRedirectBinding('')).toThrow(BadRequestException);
+	it('API-SAML-PARSE-08: empty SAMLRequest → 400', async () => {
+		await expect(parser.parseRedirectBinding('')).rejects.toThrow(BadRequestException);
 	});
 
-	it('API-SAML-PARSE-09: oversized payload (> 256 KB) → 400', () => {
+	it('API-SAML-PARSE-09: oversized payload (> 256 KB) → 400', async () => {
 		const padding = 'x'.repeat(260 * 1024);
 		const xml = buildAuthnRequestXml({
 			id: '_big',
 			issuer: `urn:test:${padding}`,
 			destination: 'http://localhost:3000/saml/sso',
 		});
-		expect(() =>
+		await expect(
 			parser.parseRedirectBinding(encodeURIComponent(encodeRedirectBinding(xml))),
-		).toThrow(BadRequestException);
+		).rejects.toThrow(BadRequestException);
 	});
 
-	it('API-SAML-PARSE-10: wrong root element → 400', () => {
+	it('API-SAML-PARSE-10: wrong root element → 400', async () => {
 		const xml = `<?xml version="1.0"?><samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" ID="_x"/>`;
-		expect(() => parser.parseRedirectBinding(validEncodedRequest({ xml }))).toThrow(
+		await expect(parser.parseRedirectBinding(validEncodedRequest({ xml }))).rejects.toThrow(
 			BadRequestException,
 		);
 	});
 
-	it('API-SAML-PARSE-11: RelayState preserved in result', () => {
-		const result = parser.parseRedirectBinding(validEncodedRequest(), 'opaque-state-99');
+	it('API-SAML-PARSE-11: RelayState preserved in result', async () => {
+		const result = await parser.parseRedirectBinding(validEncodedRequest(), 'opaque-state-99');
 		expect(result.relayState).toBe('opaque-state-99');
 	});
 
-	it('API-SAML-PARSE-12: Unicode Issuer preserved', () => {
+	it('API-SAML-PARSE-12: Unicode Issuer preserved', async () => {
 		const issuer = 'urn:sp:café-naïve-日本';
-		const result = parser.parseRedirectBinding(validEncodedRequest({ issuer }));
+		const result = await parser.parseRedirectBinding(validEncodedRequest({ issuer }));
 		expect(result.authnRequest.issuer).toBe(issuer);
 	});
 
-	it('API-SAML-PARSE-13: Destination matches IdP SSO URL', () => {
-		const result = parser.parseRedirectBinding(
+	it('API-SAML-PARSE-13: Destination matches IdP SSO URL', async () => {
+		const result = await parser.parseRedirectBinding(
 			validEncodedRequest({ destination: 'http://localhost:3000/saml/sso/' }),
 		);
 		expect(result.authnRequest.destination).toBe('http://localhost:3000/saml/sso/');
 	});
 
-	it('API-SAML-PARSE-14: Destination mismatch → 400', () => {
-		expect(() =>
+	it('API-SAML-PARSE-14: Destination mismatch → 400', async () => {
+		await expect(
 			parser.parseRedirectBinding(
 				validEncodedRequest({ destination: 'http://evil.example.com/saml/sso' }),
 			),
-		).toThrow(BadRequestException);
+		).rejects.toThrow(BadRequestException);
 	});
 
-	it('API-SAML-PARSE-15: malformed XML → 400', () => {
+	it('API-SAML-PARSE-15: malformed XML → 400', async () => {
 		const xml = '<samlp:AuthnRequest><unclosed';
-		expect(() =>
+		await expect(
 			parser.parseRedirectBinding(encodeURIComponent(encodeRedirectBinding(xml))),
-		).toThrow(BadRequestException);
+		).rejects.toThrow(BadRequestException);
 	});
 
-	it('API-SAML-PARSE-16: zlib-wrapped deflate still parses', () => {
+	it('API-SAML-PARSE-16: zlib-wrapped deflate still parses', async () => {
 		const xml = buildAuthnRequestXml({
 			id: '_zlib-id',
 			issuer: 'urn:test:zlib',
@@ -148,16 +162,64 @@ describe('SamlRequestParserService', () => {
 		});
 		const zlibWrapped = deflateSync(Buffer.from(xml, 'utf8'));
 		const encoded = encodeURIComponent(zlibWrapped.toString('base64'));
-		const result = parser.parseRedirectBinding(encoded);
+		const result = await parser.parseRedirectBinding(encoded);
 		expect(result.authnRequest.id).toBe('_zlib-id');
 	});
 
-	it('API-SAML-PARSE-17: omits Destination validation when attribute absent', () => {
+	it('API-SAML-PARSE-17: omits Destination validation when attribute absent', async () => {
 		const xml = `<?xml version="1.0"?>
 <samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="_no-dest" Version="2.0" IssueInstant="${new Date().toISOString()}">
   <saml:Issuer>urn:test:no-dest</saml:Issuer>
 </samlp:AuthnRequest>`;
-		const result = parser.parseRedirectBinding(validEncodedRequest({ xml }));
+		const result = await parser.parseRedirectBinding(validEncodedRequest({ xml }));
 		expect(result.authnRequest.destination).toBeUndefined();
 	});
+
+	it('API-SAML-REQ-DEC-01: encrypted request without configured key material → 400', async () => {
+		const { certPem } = generateTestRsaEncryptionCert('urn:test:idp:missing-material');
+		const encryptedXml = encryptAuthnRequestForIdp(plainAuthnXml('_enc-missing'), certPem);
+		jest.mocked(idpEncryptionKey.getDecryptionMaterial).mockResolvedValue([]);
+
+		await expect(parser.parseRedirectBinding(toEncodedRequest(encryptedXml))).rejects.toThrow(
+			'IdP encryption certificate is not configured',
+		);
+	});
+
+	it('API-SAML-REQ-DEC-02: encrypted request with EC key family is rejected', async () => {
+		const { certPem } = generateTestRsaEncryptionCert('urn:test:idp:ec-not-supported');
+		const encryptedXml = encryptAuthnRequestForIdp(plainAuthnXml('_enc-ec'), certPem);
+		jest.mocked(idpEncryptionKey.hasEcEncryptionKey).mockResolvedValue(true);
+
+		await expect(parser.parseRedirectBinding(toEncodedRequest(encryptedXml))).rejects.toThrow(
+			'Encrypted SAMLRequest not supported with EC IdP encryption key',
+		);
+	});
+
+	it('API-SAML-REQ-DEC-03: decrypts encrypted request with provided RSA decryption material', async () => {
+		const { certPem, privateKeyPem } = generateTestRsaEncryptionCert('urn:test:idp:decrypt-ok');
+		const encryptedXml = encryptAuthnRequestForIdp(plainAuthnXml('_enc-ok'), certPem);
+		jest.mocked(idpEncryptionKey.getDecryptionMaterial).mockResolvedValue([
+			{
+				privateKeyPem,
+				keyTransportAlgorithmId: 'rsa-oaep-mgf1p',
+			},
+		]);
+
+		const result = await parser.parseRedirectBinding(toEncodedRequest(encryptedXml), 'relay-encrypted');
+		expect(result.authnRequest.id).toBe('_enc-ok');
+		expect(result.requestWasEncrypted).toBe(true);
+		expect(result.relayState).toBe('relay-encrypted');
+	});
+
+	function plainAuthnXml(id: string): string {
+		return buildAuthnRequestXml({
+			id,
+			issuer: 'urn:test:sp:encrypted',
+			destination: 'http://localhost:3000/saml/sso',
+		});
+	}
+
+	function toEncodedRequest(xml: string): string {
+		return encodeURIComponent(encodeRedirectBinding(xml));
+	}
 });

@@ -144,6 +144,7 @@ export function toIdpSettingsPublicDto(
 	return {
 		entityId: settings.entityId,
 		nameIdFormat: settings.nameIdFormat,
+		wantAuthnRequestsSigned: settings.wantAuthnRequestsSigned,
 		hasSigningCertificate: Boolean(settings.signingCertPem && settings.signingKeyEncrypted),
 		signingCertFingerprintSha256: settings.signingCertPem
 			? fingerprintSha256Hex(settings.signingCertPem)

@@ -386,6 +386,7 @@ describe('Admin forms Evergreen — extended edge cases', () => {
 				active: true,
 				hasSpCertificate: false,
 				wantAssertionsEncrypted: false,
+				wantAuthnRequestsSigned: false,
 				createdAt: '2026-01-01T00:00:00.000Z',
 				updatedAt: '2026-01-01T00:00:00.000Z',
 			});
@@ -412,6 +413,7 @@ describe('Admin forms Evergreen — extended edge cases', () => {
 				active: false,
 				hasSpCertificate: false,
 				wantAssertionsEncrypted: false,
+				wantAuthnRequestsSigned: false,
 				createdAt: '2026-01-01T00:00:00.000Z',
 				updatedAt: '2026-01-01T00:00:00.000Z',
 			});
@@ -779,13 +781,16 @@ describe('Admin forms Evergreen — extended edge cases', () => {
 				active: true,
 				hasSpCertificate: false,
 				wantAssertionsEncrypted: false,
+				wantAuthnRequestsSigned: false,
 				createdAt: '2026-01-01T00:00:00.000Z',
 				updatedAt: '2026-01-01T00:00:00.000Z',
 			});
-			vi.spyOn(adminApi, 'getIdpMetadataUrl').mockResolvedValue({
-				metadataUrl: 'http://localhost:3000/saml/metadata',
-				entityId: 'http://localhost:3000',
-				ssoUrl: 'http://localhost:3000/saml/sso',
+			vi.spyOn(adminApi, 'getSpConnectionTestSsoUrl').mockResolvedValue({
+				ssoUrl: 'http://localhost:3000/saml/sso?SAMLRequest=test',
+				spEntityId: 'urn:sp:1',
+				authnRequestId: '_test-1',
+				signed: false,
+				encrypted: false,
 			});
 			renderWithUi(
 				<MemoryRouter initialEntries={[`${SP_CONNECTION_ROUTE_PREFIX}/sp1/test-sso`]}>
@@ -798,7 +803,7 @@ describe('Admin forms Evergreen — extended edge cases', () => {
 				</MemoryRouter>,
 			);
 			await waitFor(() => {
-				const area = screen.getByLabelText(/Command/i) as HTMLTextAreaElement;
+				const area = screen.getByRole('textbox', { name: /Command/i }) as HTMLTextAreaElement;
 				expect(area.readOnly).toBe(true);
 			});
 		});
@@ -817,13 +822,16 @@ describe('Admin forms Evergreen — extended edge cases', () => {
 				active: true,
 				hasSpCertificate: false,
 				wantAssertionsEncrypted: false,
+				wantAuthnRequestsSigned: false,
 				createdAt: '2026-01-01T00:00:00.000Z',
 				updatedAt: '2026-01-01T00:00:00.000Z',
 			});
-			vi.spyOn(adminApi, 'getIdpMetadataUrl').mockResolvedValue({
-				metadataUrl: 'http://localhost:3000/saml/metadata',
-				entityId: 'http://localhost:3000',
-				ssoUrl: 'http://localhost:3000/saml/sso',
+			vi.spyOn(adminApi, 'getSpConnectionTestSsoUrl').mockResolvedValue({
+				ssoUrl: 'http://localhost:3000/saml/sso?SAMLRequest=test',
+				spEntityId: 'urn:sp:1',
+				authnRequestId: '_test-1',
+				signed: false,
+				encrypted: false,
 			});
 			renderWithUi(
 				<MemoryRouter initialEntries={[`${SP_CONNECTION_ROUTE_PREFIX}/sp1/test-sso`]}>
@@ -835,8 +843,8 @@ describe('Admin forms Evergreen — extended edge cases', () => {
 					</Routes>
 				</MemoryRouter>,
 			);
-			await waitFor(() => screen.getByLabelText(/Command/i));
-			fireEvent.focus(screen.getByLabelText(/Command/i));
+			await waitFor(() => screen.getByRole('textbox', { name: /Command/i }));
+			fireEvent.focus(screen.getByRole('textbox', { name: /Command/i }));
 			expect(selectSpy).toHaveBeenCalled();
 			selectSpy.mockRestore();
 		});

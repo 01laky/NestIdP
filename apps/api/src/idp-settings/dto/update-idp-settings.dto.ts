@@ -1,4 +1,4 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsOptional, IsString } from 'class-validator';
 
 export class UpdateIdpSettingsBodyDto {
 	@IsOptional()
@@ -8,4 +8,8 @@ export class UpdateIdpSettingsBodyDto {
 	@IsOptional()
 	@IsString()
 	nameIdFormat?: string;
+
+	@IsOptional()
+	@IsBoolean()
+	wantAuthnRequestsSigned?: boolean;
 }

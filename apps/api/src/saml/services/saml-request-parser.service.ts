@@ -5,14 +5,30 @@ import * as xpath from 'xpath';
 import type { ParseRedirectBindingResult, ParsedAuthnRequestDto } from '@nestidp/shared';
 import { decodeRedirectBinding } from '../utils/build-authn-request.util';
 import { getExpectedSsoDestination, normalizeUrlForComparison } from '../utils/saml-url.util';
+import {
+	decryptXmlEncryptedElement,
+	isEncryptedDataRoot,
+	SamlXmlDecryptionError,
+} from '../utils/saml-xml-decryption.util';
+import { IdpEncryptionKeyService } from './idp-encryption-key.service';
 
 const MAX_SAML_REQUEST_BYTES = 256 * 1024;
 
+export interface ParseRedirectBindingOptions {
+	requestWasEncrypted?: boolean;
+}
+
 @Injectable()
 export class SamlRequestParserService {
-	constructor(private readonly configService: ConfigService) {}
+	constructor(
+		private readonly configService: ConfigService,
+		private readonly idpEncryptionKey: IdpEncryptionKeyService,
+	) {}
 
-	parseRedirectBinding(encodedRequest: string, relayState?: string): ParseRedirectBindingResult {
+	async parseRedirectBinding(
+		encodedRequest: string,
+		relayState?: string,
+	): Promise<ParseRedirectBindingResult & ParseRedirectBindingOptions> {
 		if (!encodedRequest || encodedRequest.trim().length === 0) {
 			throw new BadRequestException('Missing SAMLRequest');
 		}
@@ -23,6 +39,12 @@ export class SamlRequestParserService {
 			decoded = decodeRedirectBinding(urlDecoded);
 		} catch {
 			throw new BadRequestException('Invalid SAMLRequest encoding');
+		}
+
+		let requestWasEncrypted = false;
+		if (isEncryptedDataRoot(decoded)) {
+			decoded = await this.decryptEncryptedRequest(decoded);
+			requestWasEncrypted = true;
 		}
 
 		if (Buffer.byteLength(decoded, 'utf8') > MAX_SAML_REQUEST_BYTES) {
@@ -87,7 +109,34 @@ export class SamlRequestParserService {
 			protocolBinding,
 		};
 
-		return { authnRequest, relayState };
+		return { authnRequest, relayState, requestWasEncrypted };
+	}
+
+	private async decryptEncryptedRequest(encryptedXml: string): Promise<string> {
+		if (await this.idpEncryptionKey.hasEcEncryptionKey()) {
+			throw new BadRequestException('Encrypted SAMLRequest not supported with EC IdP encryption key');
+		}
+
+		const materials = await this.idpEncryptionKey.getDecryptionMaterial();
+		if (materials.length === 0) {
+			throw new BadRequestException('IdP encryption certificate is not configured');
+		}
+
+		let lastError: unknown;
+		for (const material of materials) {
+			try {
+				return decryptXmlEncryptedElement(encryptedXml, material.privateKeyPem, {
+					keyTransportAlgorithmId: material.keyTransportAlgorithmId,
+				});
+			} catch (error) {
+				lastError = error;
+			}
+		}
+
+		if (lastError instanceof SamlXmlDecryptionError) {
+			throw new BadRequestException('Failed to decrypt SAMLRequest');
+		}
+		throw new BadRequestException('Failed to decrypt SAMLRequest');
 	}
 
 	private extractIssuer(select: xpath.XPathSelect, authn: Element): string | null {

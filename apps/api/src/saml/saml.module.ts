@@ -3,6 +3,8 @@ import { ConfigModule } from '@nestjs/config';
 import { AuditCoreModule } from '../audit/audit-core.module';
 import { IdentityModule } from '../identity/identity.module';
 import { PrismaModule } from '../prisma/prisma.module';
+import { EncryptionModule } from '../encryption/encryption.module';
+import { IdpEncryptionKeyService } from './services/idp-encryption-key.service';
 import { IdpEncryptionService } from './services/idp-encryption.service';
 import { IdpSigningService } from './services/idp-signing.service';
 import { SamlAttributeMapperService } from './services/saml-attribute-mapper.service';
@@ -25,6 +27,7 @@ import { SamlSsoService } from './services/saml-sso.service';
 		SamlPostBindingService,
 		IdpSigningService,
 		IdpEncryptionService,
+		IdpEncryptionKeyService,
 		SamlAttributeMapperService,
 		SamlSsoService,
 		SamlSessionCleanupService,

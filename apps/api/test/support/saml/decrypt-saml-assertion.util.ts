@@ -1,10 +1,5 @@
-import {
-	constants,
-	createDecipheriv,
-	createPrivateKey,
-	privateDecrypt,
-	type KeyObject,
-} from 'node:crypto';
+import { createDecipheriv } from 'node:crypto';
+import { unwrapSymmetricKeyWithTransport } from '@api/saml/utils/saml-xml-encryption-shared.util';
 import { DOMParser } from '@xmldom/xmldom';
 import * as xpath from 'xpath';
 import {
@@ -52,11 +47,14 @@ export function decryptEncryptedAssertion(
 		doc as unknown as Node,
 	);
 
-	const privateKey = createPrivateKey({ key: spPrivateKeyPem, format: 'pem' });
 	const encryptedKey = Buffer.from(encryptedKeyB64, 'base64');
 	const cipherPayload = Buffer.from(cipherB64, 'base64');
 
-	const aesKey = unwrapSymmetricKey(encryptedKey, privateKey, transport.xmlKeyTransportAlgorithm);
+	const aesKey = unwrapSymmetricKeyWithTransport(
+		encryptedKey,
+		spPrivateKeyPem,
+		transport.xmlKeyTransportAlgorithm,
+	);
 
 	const iv = cipherPayload.subarray(0, 16);
 	const ciphertext = cipherPayload.subarray(16);
@@ -78,29 +76,4 @@ function readBase64CipherValue(
 		throw new Error('Malformed EncryptedAssertion');
 	}
 	return text;
-}
-
-function unwrapSymmetricKey(
-	encryptedKey: Buffer,
-	privateKey: KeyObject,
-	xmlKeyTransportAlgorithm: string,
-): Buffer {
-	if (xmlKeyTransportAlgorithm === 'http://www.w3.org/2001/04/xmlenc#rsa-1_5') {
-		return privateDecrypt(
-			{
-				key: privateKey,
-				padding: constants.RSA_PKCS1_PADDING,
-			},
-			encryptedKey,
-		);
-	}
-
-	return privateDecrypt(
-		{
-			key: privateKey,
-			padding: constants.RSA_PKCS1_OAEP_PADDING,
-			oaepHash: 'sha1',
-		},
-		encryptedKey,
-	);
 }

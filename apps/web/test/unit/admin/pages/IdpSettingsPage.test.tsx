@@ -65,6 +65,7 @@ function baseSettings(overrides: Partial<IdpSettingsPublicDto> = {}): IdpSetting
 	return {
 		entityId: 'http://localhost:3000',
 		nameIdFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
+		wantAuthnRequestsSigned: false,
 		hasSigningCertificate: true,
 		signingCertFingerprintSha256: 'aa:bb:cc',
 		signingCertNotAfter: '2030-01-01T00:00:00.000Z',
@@ -105,6 +106,36 @@ afterEach(() => {
 });
 
 describe('IdpSettingsPage', () => {
+	it('WEB-IDP-REQ-SIG-01: wantAuthnRequestsSigned checkbox persists via PATCH settings', async () => {
+		vi.spyOn(adminApi, 'getIdpSettings')
+			.mockResolvedValueOnce(baseSettings({ wantAuthnRequestsSigned: false }))
+			.mockResolvedValue(baseSettings({ wantAuthnRequestsSigned: true }));
+		const updateSpy = vi
+			.spyOn(adminApi, 'updateIdpSettings')
+			.mockResolvedValue(baseSettings({ wantAuthnRequestsSigned: true }));
+
+		renderPage();
+		await waitFor(() =>
+			screen.getByRole('checkbox', { name: /Request signed AuthnRequests/i }),
+		);
+		fireEvent.click(screen.getByRole('checkbox', { name: /Request signed AuthnRequests/i }));
+		fireEvent.click(screen.getByRole('button', { name: 'Save SAML behavior' }));
+
+		await waitFor(() => {
+			expect(updateSpy).toHaveBeenCalledWith({ wantAuthnRequestsSigned: true });
+		});
+	});
+
+	it('WEB-IDP-REQ-SIG-02: metadata/enforcement callout links to SP connections', async () => {
+		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(baseSettings());
+
+		renderPage();
+		await waitFor(() => {
+			const link = screen.getByRole('link', { name: 'Open SP connections' });
+			expect(link.getAttribute('href')).toBe('/admin/sp-connections');
+		});
+	});
+
 	it('WEB-ADM-39: page loads settings and shows entity ID', async () => {
 		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(baseSettings());
 

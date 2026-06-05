@@ -12,14 +12,63 @@ export class SamlAuthAuditService {
 		samlRequestId: string;
 		spConnectionId: string;
 		clientIp: string;
+		requestWasSigned: boolean;
+		requestWasEncrypted: boolean;
+		sigAlgUri?: string;
 	}): void {
-		const eventPayload = { event: 'saml_request_received', ...payload };
+		const { sigAlgUri, ...rest } = payload;
+		const eventPayload = { event: 'saml_request_received', ...rest, sigAlgUri };
 		this.logger.log(JSON.stringify(eventPayload));
 		this.audit.recordSafe({
 			category: 'saml',
 			event: 'saml_request_received',
 			actorType: 'system',
 			clientIp: payload.clientIp,
+			subjectType: 'SpConnection',
+			subjectId: payload.spConnectionId,
+			metadata: {
+				spEntityId: payload.spEntityId,
+				samlRequestId: payload.samlRequestId,
+				requestWasSigned: payload.requestWasSigned,
+				requestWasEncrypted: payload.requestWasEncrypted,
+				...(sigAlgUri ? { sigAlgUri } : {}),
+			},
+		});
+	}
+
+	logRequestSignatureVerified(payload: {
+		spEntityId: string;
+		samlRequestId: string;
+		spConnectionId: string;
+		sigAlgUri: string;
+	}): void {
+		const eventPayload = { event: 'saml_request_signature_verified', ...payload };
+		this.logger.log(JSON.stringify(eventPayload));
+		this.audit.recordSafe({
+			category: 'saml',
+			event: 'saml_request_signature_verified',
+			actorType: 'system',
+			subjectType: 'SpConnection',
+			subjectId: payload.spConnectionId,
+			metadata: {
+				spEntityId: payload.spEntityId,
+				samlRequestId: payload.samlRequestId,
+				sigAlgUri: payload.sigAlgUri,
+			},
+		});
+	}
+
+	logRequestDecrypted(payload: {
+		spEntityId: string;
+		samlRequestId: string;
+		spConnectionId: string;
+	}): void {
+		const eventPayload = { event: 'saml_request_decrypted', ...payload };
+		this.logger.log(JSON.stringify(eventPayload));
+		this.audit.recordSafe({
+			category: 'saml',
+			event: 'saml_request_decrypted',
+			actorType: 'system',
 			subjectType: 'SpConnection',
 			subjectId: payload.spConnectionId,
 			metadata: {

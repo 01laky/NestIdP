@@ -11,6 +11,10 @@ import {
 import type { Request, Response } from 'express';
 import { SAML_REQUEST_QUERY_PARAM, RELAY_STATE_QUERY_PARAM } from '@nestidp/shared';
 import { SamlSsoService } from '../services/saml-sso.service';
+import {
+	extractRawQueryStringFromRequestUrl,
+	parseRawSamlRedirectQuery,
+} from '../utils/saml-authn-request-redirect-signature.util';
 
 @Controller('saml')
 export class SamlController {
@@ -31,11 +35,13 @@ export class SamlController {
 		@Res() res: Response,
 	): Promise<void> {
 		const clientIp = req.ip ?? 'unknown';
-		const { redirectUrl } = await this.samlSsoService.handleRedirectSso(
-			samlRequest,
-			relayState,
+		const rawQuery = extractRawQueryStringFromRequestUrl(req.url ?? '');
+		const raw = parseRawSamlRedirectQuery(rawQuery);
+		const { redirectUrl } = await this.samlSsoService.handleRedirectSso({
+			decoded: { samlRequest: samlRequest ?? '', relayState },
+			raw,
 			clientIp,
-		);
+		});
 		res.redirect(302, redirectUrl);
 	}
 

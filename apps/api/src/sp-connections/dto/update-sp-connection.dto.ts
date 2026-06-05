@@ -51,4 +51,8 @@ export class UpdateSpConnectionBodyDto {
 	@IsOptional()
 	@IsBoolean()
 	wantAssertionsEncrypted?: boolean;
+
+	@IsOptional()
+	@IsBoolean()
+	wantAuthnRequestsSigned?: boolean;
 }
