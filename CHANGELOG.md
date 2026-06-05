@@ -4,6 +4,16 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.7.3]
+
+### Fixed
+
+- `express` added as an explicit `dependency` in `apps/api/package.json`. The package was already used
+  directly in `main.ts` (`import express from 'express'` for `urlencoded` middleware) but was not listed
+  as a direct dependency — it only resolved transitively through `@nestjs/platform-express`. pnpm's strict
+  module isolation means transitive packages are not importable unless declared directly, causing
+  `Error: Cannot find module 'express'` on production startup inside Docker.
+
 ## [1.7.2]
 
 ### Added
