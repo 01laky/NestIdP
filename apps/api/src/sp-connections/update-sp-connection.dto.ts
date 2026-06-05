@@ -47,4 +47,8 @@ export class UpdateSpConnectionBodyDto {
 	@IsString()
 	@MaxLength(16384)
 	spCertificate?: string | null;
+
+	@IsOptional()
+	@IsBoolean()
+	wantAssertionsEncrypted?: boolean;
 }

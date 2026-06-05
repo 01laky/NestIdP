@@ -147,4 +147,34 @@ describe('AuditLogPage', () => {
 
 		expect(openSpy).toHaveBeenCalledWith('/api/admin/audit-events/export?format=csv', '_blank');
 	});
+
+	it('WEB-AUDIT-ENC-01: encryption audit events show human-readable labels', async () => {
+		vi.spyOn(adminApi, 'listAuditEvents').mockResolvedValue({
+			items: [
+				{
+					id: 'enc-1',
+					createdAt: '2026-01-01T00:00:00.000Z',
+					actorType: 'admin',
+					actorId: 'a1',
+					actorLabel: 'admin',
+					category: 'admin_config',
+					event: 'idp_encryption_cert_generated',
+					subjectType: 'IdpSettings',
+					subjectId: 'default',
+					clientIp: null,
+					metadata: null,
+				},
+			],
+			total: 1,
+			limit: 50,
+			offset: 0,
+		});
+
+		renderPage();
+
+		await waitFor(() => {
+			expect(screen.getByText('Encryption certificate generated')).toBeDefined();
+			expect(screen.queryByText('idp_encryption_cert_generated')).toBeNull();
+		});
+	});
 });

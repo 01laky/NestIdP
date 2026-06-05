@@ -22,6 +22,7 @@ describe('SpConnectionTestSsoPage Evergreen forms', () => {
 			attributeMapping: null,
 			active: true,
 			hasSpCertificate: false,
+			wantAssertionsEncrypted: false,
 			createdAt: '2026-01-01T00:00:00.000Z',
 			updatedAt: '2026-01-01T00:00:00.000Z',
 		});

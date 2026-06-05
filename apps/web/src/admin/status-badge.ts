@@ -1,4 +1,7 @@
-import type { AdminDashboardIdpCertStatus } from '@nestidp/shared';
+import type {
+	AdminDashboardEncryptionCertStatus,
+	AdminDashboardIdpCertStatus,
+} from '@nestidp/shared';
 import { resolveI18nKey } from '../i18n/api-error-messages';
 import type { BadgeVariant } from '../ui/Badge';
 
@@ -59,6 +62,42 @@ export function certStatusLabel(status: AdminDashboardIdpCertStatus | string): s
 		return String(status);
 	}
 	return resolveI18nKey(`enums.certStatus.${status}`);
+}
+
+const KNOWN_ENCRYPTION_CERT_STATUSES = new Set<AdminDashboardEncryptionCertStatus | string>([
+	'ok',
+	'missing',
+	'not_configured',
+	'expiring_soon',
+	'rotation_active',
+]);
+
+export function encryptionCertStatusToBadge(
+	status: AdminDashboardEncryptionCertStatus | string,
+): BadgeVariant {
+	switch (status) {
+		case 'ok':
+			return 'success';
+		case 'missing':
+			return 'danger';
+		case 'not_configured':
+			return 'neutral';
+		case 'expiring_soon':
+			return 'warning';
+		case 'rotation_active':
+			return 'info';
+		default:
+			return 'neutral';
+	}
+}
+
+export function encryptionCertStatusLabel(
+	status: AdminDashboardEncryptionCertStatus | string,
+): string {
+	if (!KNOWN_ENCRYPTION_CERT_STATUSES.has(status)) {
+		return String(status);
+	}
+	return resolveI18nKey(`enums.encryptionCertStatus.${status}`);
 }
 
 export function activeFlagToBadge(active: boolean): BadgeVariant {

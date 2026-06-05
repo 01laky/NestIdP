@@ -49,7 +49,7 @@ export function assertValidSigningPrivateKeyPem(value: string): string {
 	return trimmed;
 }
 
-function detectKeyFamily(keyObject: KeyObject): IdpSigningKeyFamily {
+export function detectKeyFamily(keyObject: KeyObject): IdpSigningKeyFamily {
 	const type = keyObject.asymmetricKeyType;
 	if (type === 'rsa') {
 		return 'rsa';
@@ -69,7 +69,7 @@ function detectRsaModulusBits(keyObject: KeyObject): number {
 	return length;
 }
 
-function namedCurveToLabel(namedCurve: string | undefined): IdpSigningEcCurve {
+export function namedCurveToLabel(namedCurve: string | undefined): IdpSigningEcCurve {
 	switch (namedCurve) {
 		case 'prime256v1':
 			return 'P-256';
@@ -87,7 +87,7 @@ function detectEcCurve(keyObject: KeyObject): IdpSigningEcCurve {
 	return namedCurveToLabel(details?.namedCurve);
 }
 
-function detectCertKeyFamily(certPem: string): IdpSigningKeyFamily {
+export function detectCertKeyFamily(certPem: string): IdpSigningKeyFamily {
 	const cert = new X509Certificate(certPem);
 	const keyObject = cert.publicKey;
 	const type = keyObject.asymmetricKeyType;
@@ -118,6 +118,17 @@ function probeSignVerify(
 	} catch {
 		return false;
 	}
+}
+
+export function assertMatchingKeyTypes(certPem: string, privateKeyPem: string): KeyObject {
+	const certFamily = detectCertKeyFamily(certPem);
+	const normalizedKey = assertValidSigningPrivateKeyPem(privateKeyPem);
+	const keyObject = createPrivateKey(normalizedKey);
+	const keyFamily = detectKeyFamily(keyObject);
+	if (certFamily !== keyFamily) {
+		throw new IdpCertValidationError('Certificate and private key use different key types');
+	}
+	return keyObject;
 }
 
 export function inferStoredSigningCryptoFromPem(

@@ -1,7 +1,9 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { IdpSigningCryptoValidationError } from '@nestidp/shared';
+import { IdpEncryptionCryptoValidationError } from '@nestidp/shared';
 import { IdpSettingsService } from './idp-settings.service';
+import { generateTestRsaEncryptionCert } from './idp-encryption-cert.util';
 import { getTestSigningMaterial } from '../prisma/test-fixtures';
 
 describe('IdpSettingsService', () => {
@@ -22,6 +24,10 @@ describe('IdpSettingsService', () => {
 
 	const encryptionService = {
 		encrypt: jest.fn((v: string) => `enc:${v}`),
+	};
+
+	const idpEncryptionService = {
+		generateKeyPairAndCert: jest.fn(),
 	};
 
 	const idpSigningService = {
@@ -51,6 +57,11 @@ describe('IdpSettingsService', () => {
 		logRotationStarted: jest.fn(),
 		logRotationCompleted: jest.fn(),
 		logRotationCancelled: jest.fn(),
+		logEncryptionCertGenerated: jest.fn(),
+		logEncryptionCertUploaded: jest.fn(),
+		logEncryptionRotationStarted: jest.fn(),
+		logEncryptionRotationCompleted: jest.fn(),
+		logEncryptionRotationCancelled: jest.fn(),
 	};
 
 	const service = new IdpSettingsService(
@@ -58,6 +69,7 @@ describe('IdpSettingsService', () => {
 		configService,
 		encryptionService as never,
 		idpSigningService as never,
+		idpEncryptionService as never,
 		samlMetadataService as never,
 		audit as never,
 	);
@@ -330,5 +342,100 @@ describe('IdpSettingsService', () => {
 		const status = await service.buildDashboardIdpStatus();
 		expect(status.certStatus).toBe('ok');
 		expect(status.hasSigningCertificate).toBe(true);
+	});
+
+	it('API-SVC-ENC-01: generatePrimaryEncryptionCert stores material and audits', async () => {
+		const enc = generateTestRsaEncryptionCert('https://svc-enc.example.com');
+		idpEncryptionService.generateKeyPairAndCert.mockReturnValue({
+			certPem: enc.certPem,
+			privateKeyPem: enc.privateKeyPem,
+			metadata: {
+				encryptionKeyFamily: 'rsa' as const,
+				encryptionKeyTransportAlgorithmId: 'rsa-oaep-mgf1p',
+				encryptionRsaModulusBits: 2048,
+				encryptionEcCurve: null,
+			},
+		});
+		const result = await service.generatePrimaryEncryptionCert({
+			keyTransportAlgorithmId: 'rsa-oaep-mgf1p',
+			notAfter: '2029-06-01',
+		});
+		expect(audit.logEncryptionCertGenerated).toHaveBeenCalledWith(
+			false,
+			expect.objectContaining({ keyTransportAlgorithmId: 'rsa-oaep-mgf1p' }),
+		);
+		expect(result.hasEncryptionCertificate).toBe(true);
+	});
+
+	it('API-SVC-ENC-02: generatePrimaryEncryptionCert blocked during encryption rotation', async () => {
+		prisma.idpSettings.findUnique.mockResolvedValue({
+			...baseSettings,
+			encryptionCertPem: 'cert',
+			encryptionKeyEncrypted: 'enc',
+			pendingEncryptionCertPem: 'pending-cert',
+		});
+		await expect(service.generatePrimaryEncryptionCert()).rejects.toThrow(ConflictException);
+	});
+
+	it('API-SVC-ENC-03: completeEncryptionRotation promotes pending crypto columns', async () => {
+		const enc = generateTestRsaEncryptionCert('https://pending-enc.example.com', 365, 4096);
+		prisma.idpSettings.findUnique.mockResolvedValue({
+			...baseSettings,
+			encryptionCertPem: 'old-cert',
+			encryptionKeyEncrypted: 'old-enc',
+			pendingEncryptionCertPem: enc.certPem,
+			pendingEncryptionKeyEncrypted: 'pending-enc',
+			pendingEncryptionKeyFamily: 'rsa',
+			pendingEncryptionKeyTransportAlgorithmId: 'rsa-1_5',
+			pendingEncryptionRsaModulusBits: 4096,
+			pendingEncryptionEcCurve: null,
+			encryptionRotationStartedAt: new Date(),
+		});
+		await service.completeEncryptionRotation();
+		expect(prisma.idpSettings.update).toHaveBeenCalledWith(
+			expect.objectContaining({
+				data: expect.objectContaining({
+					encryptionCertPem: enc.certPem,
+					encryptionKeyTransportAlgorithmId: 'rsa-1_5',
+					encryptionRsaModulusBits: 4096,
+					pendingEncryptionKeyTransportAlgorithmId: null,
+				}),
+			}),
+		);
+		expect(audit.logEncryptionRotationCompleted).toHaveBeenCalled();
+	});
+
+	it('API-SVC-ENC-04: cancelEncryptionRotation clears pending encryption fields', async () => {
+		prisma.idpSettings.findUnique.mockResolvedValue({
+			...baseSettings,
+			encryptionCertPem: 'cert',
+			encryptionKeyEncrypted: 'enc',
+			pendingEncryptionCertPem: 'pending',
+			pendingEncryptionKeyEncrypted: 'pending-enc',
+			pendingEncryptionKeyFamily: 'rsa',
+			pendingEncryptionKeyTransportAlgorithmId: 'rsa-oaep',
+		});
+		const result = await service.cancelEncryptionRotation();
+		expect(audit.logEncryptionRotationCancelled).toHaveBeenCalled();
+		expect(result.encryptionRotation.active).toBe(false);
+	});
+
+	it('API-SVC-ENC-05: generatePrimaryEncryptionCert maps crypto validation to 400', async () => {
+		idpEncryptionService.generateKeyPairAndCert.mockImplementation(() => {
+			throw new IdpEncryptionCryptoValidationError('bad', 'idp_encryption_transport_with_ec');
+		});
+		await expect(
+			service.generatePrimaryEncryptionCert({
+				keyFamily: 'ec',
+				keyTransportAlgorithmId: 'rsa-oaep-mgf1p',
+				notAfter: '2029-01-01',
+			}),
+		).rejects.toThrow(BadRequestException);
+	});
+
+	it('API-SVC-ENC-06: buildDashboardIdpStatus reports encryptionCertStatus not_configured', async () => {
+		const status = await service.buildDashboardIdpStatus();
+		expect(status.encryptionCertStatus).toBe('not_configured');
+		expect(status.hasEncryptionCertificate).toBe(false);
 	});
 });

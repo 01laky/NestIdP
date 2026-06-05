@@ -59,6 +59,24 @@ function idpSettingsStub(overrides: Record<string, unknown> = {}) {
 			hasPendingCertificate: false,
 			pendingCertFingerprintSha256: null,
 		},
+		hasEncryptionCertificate: false,
+		encryptionCertFingerprintSha256: null,
+		encryptionCertNotAfter: null,
+		encryptionKeyFamily: null,
+		encryptionKeyTransportAlgorithmId: null,
+		encryptionRsaModulusBits: null,
+		encryptionEcCurve: null,
+		encryptionRotation: {
+			active: false,
+			startedAt: null,
+			hasPendingCertificate: false,
+			pendingCertFingerprintSha256: null,
+			pendingEncryptionKeyFamily: null,
+			pendingEncryptionKeyTransportAlgorithmId: null,
+			pendingEncryptionRsaModulusBits: null,
+			pendingEncryptionEcCurve: null,
+			pendingEncryptionCertNotAfter: null,
+		},
 		updatedAt: '2026-01-01T00:00:00.000Z',
 		...overrides,
 	};
@@ -368,6 +386,7 @@ describe('Admin forms Evergreen — extended edge cases', () => {
 				attributeMapping: null,
 				active: true,
 				hasSpCertificate: false,
+				wantAssertionsEncrypted: false,
 				createdAt: '2026-01-01T00:00:00.000Z',
 				updatedAt: '2026-01-01T00:00:00.000Z',
 			});
@@ -393,6 +412,7 @@ describe('Admin forms Evergreen — extended edge cases', () => {
 				attributeMapping: null,
 				active: false,
 				hasSpCertificate: false,
+				wantAssertionsEncrypted: false,
 				createdAt: '2026-01-01T00:00:00.000Z',
 				updatedAt: '2026-01-01T00:00:00.000Z',
 			});
@@ -759,6 +779,7 @@ describe('Admin forms Evergreen — extended edge cases', () => {
 				attributeMapping: null,
 				active: true,
 				hasSpCertificate: false,
+				wantAssertionsEncrypted: false,
 				createdAt: '2026-01-01T00:00:00.000Z',
 				updatedAt: '2026-01-01T00:00:00.000Z',
 			});
@@ -796,6 +817,7 @@ describe('Admin forms Evergreen — extended edge cases', () => {
 				attributeMapping: null,
 				active: true,
 				hasSpCertificate: false,
+				wantAssertionsEncrypted: false,
 				createdAt: '2026-01-01T00:00:00.000Z',
 				updatedAt: '2026-01-01T00:00:00.000Z',
 			});

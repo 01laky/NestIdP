@@ -4,6 +4,34 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.5.0]
+
+### Added
+
+- IdP **encryption certificate** lifecycle parallel to signing: generate (RSA/EC, OpenSSL `keyUsage=keyEncipherment,dataEncipherment`),
+  upload, independent dual-cert rotation, `GET /encryption-cert/public-pem`, copy/download public PEM in admin UI.
+- Shared `idp-cert-common.ts` (key family, expiry, curves) and `idp-encryption-crypto.ts` (RSA key transport catalog,
+  content-encryption constants for Prompt 23, generate DTO defaults).
+- `IdpSettings` encryption PEM + encrypted key + crypto metadata (primary and pending); `encryptionRotationStartedAt`
+  separate from signing rotation (both may be active concurrently).
+- SAML metadata `md:KeyDescriptor use="encryption"` when configured (primary first, pending second during rotation);
+  up to four `KeyDescriptor` elements when signing and encryption rotations run together.
+- Admin encryption panel on `/admin/settings/idp`: key family, RSA modulus/EC curve, key transport (RSA only), expiry,
+  copy signing options, callouts (IdP vs SP cert, EC metadata-only, deprecated RSA-1_5), pending cert during rotation.
+- Dashboard encryption summary line and `encryptionCertStatus` (`not_configured` | `ok` | `expiring_soon` | `rotation_active`).
+- `SpConnection.wantAssertionsEncrypted` (DB + admin checkbox); API requires **SP certificate** PEM when enabled (not IdP
+  encryption cert); runtime encrypted assertions deferred to Prompt 23.
+- Audit log human-readable labels for encryption cert and rotation events (all locales).
+- Operator diagram [docs/img/idp-certificates.svg](docs/img/idp-certificates.svg) and PostgreSQL smoke
+  `API-IDP-PG-ENC-01`.
+- Extended tests: `API-IDP-ENC-*`, `API-SAML-META-ENC-*`, `API-SVC-ENC-*`, `API-IDP-SAML-ENC-01`, `WEB-IDP-ENC-*`,
+  `E2E-IDP-ENC-01`, `API-SP-ENC-*`.
+
+### Changed
+
+- `IdpSettingsPublicDto` and `AdminDashboardIdpStatusDto` expose encryption fingerprints, crypto fields, and
+  `encryptionRotation` block; signing imports refactored to `idp-cert-common` without behaviour change.
+
 ## [1.4.7]
 
 ### Added

@@ -17,7 +17,9 @@ import {
 	completeIdpCertRotation,
 	createApiConnection,
 	deleteApiConnection,
+	generateIdpEncryptionCert,
 	generateIdpSigningCert,
+	getIdpEncryptionCertPublicPem,
 	getApiConnection,
 	getCsrfToken,
 	getIdpMetadataPreview,
@@ -30,6 +32,10 @@ import {
 	logoutAdmin,
 	setCsrfToken,
 	startIdpCertRotation,
+	startIdpEncryptionCertRotation,
+	completeIdpEncryptionCertRotation,
+	cancelIdpEncryptionCertRotation,
+	uploadIdpEncryptionCert,
 	testApiConnection,
 	triggerIdentitySync,
 	updateApiConnection,
@@ -840,6 +846,108 @@ describe('adminApi', () => {
 				method: 'POST',
 				headers: expect.objectContaining({ [ADMIN_CSRF_HEADER_NAME]: 'csrf-idp-cancel' }),
 			}),
+		);
+	});
+
+	it('WEB-IDP-ENC-API-01: generateIdpEncryptionCert POSTs encryption generate with CSRF', async () => {
+		setCsrfToken('csrf-idp-enc-gen');
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ hasEncryptionCertificate: true }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		await generateIdpEncryptionCert({
+			keyFamily: 'rsa',
+			rsaModulusBits: 3072,
+			keyTransportAlgorithmId: 'rsa-oaep',
+			notAfter: '2029-01-01',
+		});
+		expect(fetchMock).toHaveBeenCalledWith(
+			`${IDP_SETTINGS_API_PATH}/encryption-cert/generate`,
+			expect.objectContaining({
+				method: 'POST',
+				body: JSON.stringify({
+					keyFamily: 'rsa',
+					rsaModulusBits: 3072,
+					keyTransportAlgorithmId: 'rsa-oaep',
+					notAfter: '2029-01-01',
+				}),
+				headers: expect.objectContaining({ [ADMIN_CSRF_HEADER_NAME]: 'csrf-idp-enc-gen' }),
+			}),
+		);
+	});
+
+	it('WEB-IDP-ENC-API-02: getIdpEncryptionCertPublicPem GETs public-pem path', async () => {
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ certPem: '-----BEGIN CERTIFICATE-----' }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		await getIdpEncryptionCertPublicPem();
+		expect(fetchMock).toHaveBeenCalledWith(
+			`${IDP_SETTINGS_API_PATH}/encryption-cert/public-pem`,
+			expect.any(Object),
+		);
+	});
+
+	it('WEB-IDP-ENC-API-03: startIdpEncryptionCertRotation POSTs encryption rotation start', async () => {
+		setCsrfToken('csrf-idp-enc-rot');
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ encryptionRotation: { active: true } }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		await startIdpEncryptionCertRotation({ mode: 'generate', keyFamily: 'rsa' });
+		expect(fetchMock).toHaveBeenCalledWith(
+			`${IDP_SETTINGS_API_PATH}/encryption-cert/rotation/start`,
+			expect.objectContaining({
+				method: 'POST',
+				body: JSON.stringify({ mode: 'generate', keyFamily: 'rsa' }),
+			}),
+		);
+	});
+
+	it('WEB-IDP-ENC-API-04: completeIdpEncryptionCertRotation POSTs encryption rotation complete', async () => {
+		setCsrfToken('csrf-idp-enc-complete');
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ encryptionRotation: { active: false } }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		await completeIdpEncryptionCertRotation();
+		expect(fetchMock).toHaveBeenCalledWith(
+			`${IDP_SETTINGS_API_PATH}/encryption-cert/rotation/complete`,
+			expect.objectContaining({
+				method: 'POST',
+				headers: expect.objectContaining({ [ADMIN_CSRF_HEADER_NAME]: 'csrf-idp-enc-complete' }),
+			}),
+		);
+	});
+
+	it('WEB-IDP-ENC-API-05: cancelIdpEncryptionCertRotation and uploadIdpEncryptionCert POST correct paths', async () => {
+		setCsrfToken('csrf-idp-enc-more');
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({}),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		await cancelIdpEncryptionCertRotation();
+		expect(fetchMock).toHaveBeenCalledWith(
+			`${IDP_SETTINGS_API_PATH}/encryption-cert/rotation/cancel`,
+			expect.objectContaining({ method: 'POST' }),
+		);
+		await uploadIdpEncryptionCert({
+			encryptionCertPem: '-----BEGIN CERTIFICATE-----\nX\n-----END CERTIFICATE-----',
+			encryptionPrivateKeyPem: '-----BEGIN PRIVATE KEY-----\nK\n-----END PRIVATE KEY-----',
+		});
+		expect(fetchMock).toHaveBeenCalledWith(
+			`${IDP_SETTINGS_API_PATH}/encryption-cert/upload`,
+			expect.objectContaining({ method: 'POST' }),
 		);
 	});
 

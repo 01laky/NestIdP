@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { SAML_SSO_PATH } from '@nestidp/shared';
 import { create } from 'xmlbuilder2';
 import { PrismaService } from '../prisma/prisma.service';
+import { IdpEncryptionService } from './idp-encryption.service';
 import { IdpSigningService } from './idp-signing.service';
 
 @Injectable()
@@ -11,6 +12,7 @@ export class SamlMetadataService {
 		private readonly prisma: PrismaService,
 		private readonly configService: ConfigService,
 		private readonly idpSigning: IdpSigningService,
+		private readonly idpEncryption: IdpEncryptionService,
 	) {}
 
 	async generateMetadata(): Promise<string> {
@@ -20,6 +22,7 @@ export class SamlMetadataService {
 		}
 
 		const certPems = await this.idpSigning.getMetadataSigningCertificates();
+		const encryptionCertPems = await this.idpEncryption.getMetadataEncryptionCertificates();
 		const baseUrl = (this.configService.get<string>('IDP_BASE_URL') ?? '').replace(/\/+$/, '');
 		const ssoUrl = `${baseUrl}${SAML_SSO_PATH}`;
 
@@ -37,6 +40,16 @@ export class SamlMetadataService {
 			const certBody = this.idpSigning.extractX509CertificatePem(certPem);
 			idp
 				.ele('md:KeyDescriptor', { use: 'signing' })
+				.ele('ds:KeyInfo', { 'xmlns:ds': 'http://www.w3.org/2000/09/xmldsig#' })
+				.ele('ds:X509Data')
+				.ele('ds:X509Certificate')
+				.txt(certBody);
+		}
+
+		for (const certPem of encryptionCertPems) {
+			const certBody = this.idpEncryption.extractX509CertificatePem(certPem);
+			idp
+				.ele('md:KeyDescriptor', { use: 'encryption' })
 				.ele('ds:KeyInfo', { 'xmlns:ds': 'http://www.w3.org/2000/09/xmldsig#' })
 				.ele('ds:X509Data')
 				.ele('ds:X509Certificate')

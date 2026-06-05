@@ -8,6 +8,7 @@ import { ErrorBanner } from '../components/ErrorBanner';
 import { LoadingState } from '../components/LoadingState';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
 import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
+import { auditEventLabel } from '../../i18n/audit-event-labels';
 import { auditCategoryLabel } from '../../i18n/enum-labels';
 import { Button, Select, Table, TextInput, useToast } from '../../ui';
 
@@ -135,7 +136,7 @@ export function AuditLogPage() {
 									<tr key={row.id}>
 										<td className="evg-muted">{new Date(row.createdAt).toLocaleString()}</td>
 										<td>{auditCategoryLabel(row.category, resolveI18nKey)}</td>
-										<td>{row.event}</td>
+										<td>{auditEventLabel(row.event, resolveI18nKey)}</td>
 										<td>{row.actorLabel ?? row.actorType}</td>
 										<td>
 											{row.subjectType

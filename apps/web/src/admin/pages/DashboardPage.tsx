@@ -13,7 +13,13 @@ import { LoadingState } from '../components/LoadingState';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
 import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
 import { Badge, Panel, StatCard } from '../../ui';
-import { certStatusLabel, certStatusToBadge, lastSyncStatusToBadge } from '../status-badge';
+import {
+	certStatusLabel,
+	certStatusToBadge,
+	encryptionCertStatusLabel,
+	encryptionCertStatusToBadge,
+	lastSyncStatusToBadge,
+} from '../status-badge';
 
 export function DashboardPage() {
 	const { t } = useTranslation('dashboard');
@@ -140,12 +146,45 @@ export function DashboardPage() {
 						})}
 					</p>
 				) : null}
+				{dashboard.idp.hasEncryptionCertificate &&
+				dashboard.idp.encryptionKeyFamily &&
+				(dashboard.idp.encryptionKeyTransportAlgorithmId ||
+					dashboard.idp.encryptionKeyFamily === 'ec') ? (
+					<p className="evg-muted">
+						{t('idpEncryptionSummary', {
+							family: dashboard.idp.encryptionKeyFamily.toUpperCase(),
+							detail:
+								dashboard.idp.encryptionKeyFamily === 'rsa'
+									? `${dashboard.idp.encryptionRsaModulusBits ?? 2048} bit`
+									: (dashboard.idp.encryptionEcCurve ?? 'P-256'),
+							algorithm:
+								dashboard.idp.encryptionKeyTransportAlgorithmId ??
+								t('idpSettings:encryption.crypto.ecNoKeyTransport'),
+							date: dashboard.idp.encryptionCertNotAfter ?? tCommon('emDash'),
+						})}
+					</p>
+				) : dashboard.idp.encryptionCertStatus === 'not_configured' ? (
+					<p className="evg-muted">
+						<Badge variant={encryptionCertStatusToBadge('not_configured')}>
+							{encryptionCertStatusLabel('not_configured')}
+						</Badge>
+					</p>
+				) : null}
 				{dashboard.idp.rotationActive ? (
 					<p className="evg-muted">{t('completeRotationCallout')}</p>
+				) : null}
+				{dashboard.idp.encryptionRotationActive ? (
+					<p className="evg-muted">{t('completeEncryptionRotationCallout')}</p>
 				) : null}
 				{dashboard.idp.certStatus === 'expiring_soon' && dashboard.idp.signingCertNotAfter ? (
 					<p className="evg-muted">
 						{t('certExpiresOn', { date: dashboard.idp.signingCertNotAfter })}
+					</p>
+				) : null}
+				{dashboard.idp.encryptionCertStatus === 'expiring_soon' &&
+				dashboard.idp.encryptionCertNotAfter ? (
+					<p className="evg-muted">
+						{t('encryptionCertExpiresOn', { date: dashboard.idp.encryptionCertNotAfter })}
 					</p>
 				) : null}
 				<dl className="evg-dl">

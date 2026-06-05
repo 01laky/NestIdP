@@ -39,6 +39,7 @@ Mermaid sources (`.mmd`) and pre-rendered SVGs. GitHub does not execute Mermaid 
 | `admin-confirm-dialog.mmd`     | Evergreen confirm modal (replaces `window.confirm`)            | [development.md](../development.md) § Confirm dialog                                                                |
 | `identity-list-pagination.mmd` | TanStack paginated identity lists (users/groups/roles)         | [development.md](../development.md) § Identity lists                                                                |
 | `evergreen-ui.mmd`             | Evergreen tokens, `src/ui`, admin/login, responsive shell      | [development.md](../development.md) § Evergreen UI                                                                  |
+| `idp-certificates.mmd`         | Signing vs IdP encryption vs SP cert roles (v1.5.0)            | [proposal.MD](../proposal.MD) §8.4, [tutorial.md](../tutorial.md), [development.md](../development.md)              |
 
 Regenerate after editing sources:
 

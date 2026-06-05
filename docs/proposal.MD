@@ -425,6 +425,7 @@ SAML protocol behaviour is implemented by the custom NestJS `SamlModule` (Sectio
 | SSO URL | `{baseUrl}/saml/sso` |
 | Metadata URL | `{baseUrl}/saml/metadata` |
 | Signing certificate | X.509 cert + private key (PEM); used to sign assertions |
+| Encryption certificate | Optional X.509 + private key (PEM); published as `md:KeyDescriptor use="encryption"` in metadata (no lazy generate on SSO) |
 | NameID format | Default: `urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress` |
 
 ### 8.2 SP Connection Settings (Per Application)
@@ -433,7 +434,8 @@ SAML protocol behaviour is implemented by the custom NestJS `SamlModule` (Sectio
 |---------|-------------|
 | SP Entity ID | Unique identifier of the Service Provider |
 | ACS URL | Assertion Consumer Service URL (POST binding) |
-| SP certificate | Used to encrypt assertions if required |
+| SP certificate | SP public key PEM; required when `wantAssertionsEncrypted` is enabled (runtime encryption in a follow-up prompt) |
+| wantAssertionsEncrypted | Stored per SP (v1.5.0); outbound XML Encryption not implemented yet |
 | NameID format | Override per SP if needed |
 | Attribute mapping | Map local fields → SAML attributes (see below) |
 
@@ -454,7 +456,10 @@ Attribute mapping is configurable per SP connection in the admin UI.
 - Operators generate certificates in admin with selectable **RSA or EC** key, **XML-DSig signature algorithm** (RSA/ECDSA with SHA-1/256/384/512), and **expiry date** (today through +10 years; default ~2 years).
 - Upload infers key family and algorithm from PEM; SAML assertions sign with the **primary** algorithm until rotation completes.
 - Support for two active signing certificates during rotation (old + new both published in metadata until cutover).
+- **Encryption certificate (optional):** separate from signing; RSA or EC key; RSA key transport algorithm catalog (RSA-OAEP variants) stored for future assertion encryption; self-signed generate or PEM upload; independent dual-cert rotation; metadata publishes `use="encryption"` descriptors when configured. Does **not** replace the per-SP certificate used to encrypt assertions to that SP.
 - Private keys stored encrypted at rest in the database or in a secrets manager.
+
+See [idp-certificates.svg](./img/idp-certificates.svg) for how signing, IdP encryption, and SP certificates relate.
 
 ---
 

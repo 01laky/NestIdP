@@ -23,6 +23,7 @@ import {
 	buildTestAuthnRequestRedirectPayload,
 	createTestAdminUserWithPassword,
 	createTestApiConnection,
+	createTestIdpSettingsWithEncryptionKey,
 	createTestIdpSettingsWithSigningKey,
 	createTestSpConnection,
 	createTestUserWithPassword,
@@ -471,5 +472,48 @@ describe('IdP settings SAML metadata & rotation (SQLite)', () => {
 			.expect(200);
 		const xml = decodeSamlResponseBase64(extractSamlResponseFromHtml(complete.text)!);
 		expect(verifySamlXmlSignature(xml, settings!.signingCertPem!)).toBe(true);
+	});
+
+	it('API-IDP-SAML-ENC-01: SSO still signs assertions when encryption cert is configured', async () => {
+		await createTestIdpSettingsWithEncryptionKey(prisma);
+		const { samlRequest } = buildTestAuthnRequestRedirectPayload({ issuer: spEntityId });
+		const redirect = await request(app.getHttpServer() as App)
+			.get(`/saml/sso?${SAML_REQUEST_QUERY_PARAM}=${samlRequest}`)
+			.expect(302);
+		const samlSessionId = new URL(
+			redirect.headers.location as string,
+			'http://localhost',
+		).searchParams.get('samlSessionId')!;
+		const userAgent = request.agent(app.getHttpServer() as App);
+		await userAgent
+			.post(`${AUTH_API_PATH}/login`)
+			.send({ username: 'alice', password: endUserPassword, samlSessionId })
+			.expect(200);
+		const complete = await userAgent
+			.post(`${AUTH_API_PATH}/login/complete-sso`)
+			.send({ samlSessionId })
+			.expect(200);
+		const settings = await prisma.idpSettings.findUnique({ where: { id: 'default' } });
+		const xml = decodeSamlResponseBase64(extractSamlResponseFromHtml(complete.text)!);
+		expect(verifySamlXmlSignature(xml, settings!.signingCertPem!)).toBe(true);
+		expect(settings?.encryptionCertPem).toContain('BEGIN CERTIFICATE');
+	});
+
+	it('API-SAML-META-ENC-03: metadata lists two encryption KeyDescriptors during encryption rotation', async () => {
+		const { agent, csrf } = await adminCsrfAgent();
+		await createTestIdpSettingsWithEncryptionKey(prisma);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/encryption-cert/rotation/start`)
+			.set(csrfHeader(csrf))
+			.send({ mode: 'generate', rsaModulusBits: 3072 })
+			.expect(201);
+		const meta = await request(app.getHttpServer() as App)
+			.get('/saml/metadata')
+			.expect(200);
+		expect((meta.text.match(/use="encryption"/g) ?? []).length).toBe(2);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/encryption-cert/rotation/cancel`)
+			.set(csrfHeader(csrf))
+			.expect(201);
 	});
 });

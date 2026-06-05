@@ -10,6 +10,7 @@ describe('toSpConnectionPublicDto', () => {
 		attributeMapping: { attributes: [{ samlName: 'uid', source: 'username' }] },
 		active: true,
 		spCertificate: '-----BEGIN CERTIFICATE-----\nX\n-----END CERTIFICATE-----',
+		wantAssertionsEncrypted: false,
 		createdAt: new Date('2026-01-01T00:00:00.000Z'),
 		updatedAt: new Date('2026-01-02T00:00:00.000Z'),
 	};

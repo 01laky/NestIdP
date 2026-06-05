@@ -102,4 +102,87 @@ export class IdpSettingsAuditService {
 			subjectId: 'default',
 		});
 	}
+
+	logEncryptionCertGenerated(
+		rotation: boolean,
+		crypto?: {
+			keyFamily?: string;
+			keyTransportAlgorithmId?: string;
+			rsaModulusBits?: number;
+			ecCurve?: string;
+			notAfter?: string;
+		},
+	): void {
+		const metadata = { rotation, ...crypto };
+		const payload = { event: 'idp_encryption_cert_generated', ...metadata };
+		this.logger.log(JSON.stringify(payload));
+		this.audit.recordSafe({
+			category: 'admin_config',
+			event: 'idp_encryption_cert_generated',
+			actorType: 'admin',
+			subjectType: 'IdpSettings',
+			subjectId: 'default',
+			metadata,
+		});
+	}
+
+	logEncryptionCertUploaded(rotation: boolean): void {
+		const payload = { event: 'idp_encryption_cert_uploaded', rotation };
+		this.logger.log(JSON.stringify(payload));
+		this.audit.recordSafe({
+			category: 'admin_config',
+			event: 'idp_encryption_cert_uploaded',
+			actorType: 'admin',
+			subjectType: 'IdpSettings',
+			subjectId: 'default',
+			metadata: { rotation },
+		});
+	}
+
+	logEncryptionRotationStarted(
+		mode: 'generate' | 'upload',
+		crypto?: {
+			keyFamily?: string;
+			keyTransportAlgorithmId?: string;
+			rsaModulusBits?: number;
+			ecCurve?: string;
+			notAfter?: string;
+		},
+	): void {
+		const metadata = { mode, ...crypto };
+		const payload = { event: 'idp_encryption_rotation_started', ...metadata };
+		this.logger.log(JSON.stringify(payload));
+		this.audit.recordSafe({
+			category: 'admin_config',
+			event: 'idp_encryption_rotation_started',
+			actorType: 'admin',
+			subjectType: 'IdpSettings',
+			subjectId: 'default',
+			metadata,
+		});
+	}
+
+	logEncryptionRotationCompleted(): void {
+		const payload = { event: 'idp_encryption_rotation_completed' };
+		this.logger.log(JSON.stringify(payload));
+		this.audit.recordSafe({
+			category: 'admin_config',
+			event: 'idp_encryption_rotation_completed',
+			actorType: 'admin',
+			subjectType: 'IdpSettings',
+			subjectId: 'default',
+		});
+	}
+
+	logEncryptionRotationCancelled(): void {
+		const payload = { event: 'idp_encryption_rotation_cancelled' };
+		this.logger.log(JSON.stringify(payload));
+		this.audit.recordSafe({
+			category: 'admin_config',
+			event: 'idp_encryption_rotation_cancelled',
+			actorType: 'admin',
+			subjectType: 'IdpSettings',
+			subjectId: 'default',
+		});
+	}
 }

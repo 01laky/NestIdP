@@ -11,6 +11,7 @@ export function toSpConnectionPublicDto(row: SpConnection): SpConnectionPublicDt
 		attributeMapping: (row.attributeMapping ?? null) as SpAttributeMappingConfig | null,
 		active: row.active,
 		hasSpCertificate: row.spCertificate != null && row.spCertificate.length > 0,
+		wantAssertionsEncrypted: row.wantAssertionsEncrypted,
 		createdAt: row.createdAt.toISOString(),
 		updatedAt: row.updatedAt.toISOString(),
 	};

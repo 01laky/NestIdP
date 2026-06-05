@@ -1,9 +1,15 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import type { GenerateIdpSigningCertRequestDto, IdpSettingsPublicDto } from '@nestidp/shared';
+import type {
+	GenerateIdpEncryptionCertRequestDto,
+	GenerateIdpSigningCertRequestDto,
+	IdpSettingsPublicDto,
+} from '@nestidp/shared';
 import {
+	getDefaultGenerateIdpEncryptionCertRequest,
 	getDefaultGenerateIdpSigningCertRequest,
+	IDP_ENCRYPTION_DEFAULT_KEY_TRANSPORT_ALGORITHM_ID,
 	IDP_ROTATION_STALE_WARNING_DAYS,
 	IDP_CERT_EXPIRY_WARNING_DAYS,
 	SAML_NAME_ID_FORMATS,
@@ -12,14 +18,24 @@ import {
 import {
 	AdminApiError,
 	cancelIdpCertRotation,
+	cancelIdpEncryptionCertRotation,
 	completeIdpCertRotation,
+	completeIdpEncryptionCertRotation,
+	generateIdpEncryptionCert,
 	generateIdpSigningCert,
+	getIdpEncryptionCertPublicPem,
 	getIdpMetadataPreview,
 	getIdpSettings,
 	startIdpCertRotation,
+	startIdpEncryptionCertRotation,
 	updateIdpSettings,
+	uploadIdpEncryptionCert,
 	uploadIdpSigningCert,
 } from '../adminApi';
+import {
+	buildEncryptionCertOptionsConfirmSummary,
+	IdpEncryptionCertOptionsFields,
+} from '../components/IdpEncryptionCertOptionsFields';
 import {
 	buildCertOptionsConfirmSummary,
 	IdpSigningCertOptionsFields,
@@ -79,6 +95,23 @@ function certStatusKey(settings: IdpSettingsPublicDto): string {
 	return 'certStatusOk';
 }
 
+function encryptionCertStatusKey(settings: IdpSettingsPublicDto): string {
+	if (settings.encryptionRotation.active) {
+		return 'encryption.certStatusRotation';
+	}
+	if (!settings.hasEncryptionCertificate) {
+		return 'encryption.certStatusMissing';
+	}
+	if (isExpiringSoon(settings.encryptionCertNotAfter)) {
+		return 'encryption.certStatusExpiresSoon';
+	}
+	return 'encryption.certStatusOk';
+}
+
+function isStaleEncryptionRotation(startedAt: string | null): boolean {
+	return isStaleRotation(startedAt);
+}
+
 export function IdpSettingsPage() {
 	const { t } = useTranslation('idpSettings');
 	const { t: tNav } = useTranslation('nav');
@@ -100,6 +133,12 @@ export function IdpSettingsPage() {
 	const [certOptions, setCertOptions] = useState<GenerateIdpSigningCertRequestDto>(() =>
 		getDefaultGenerateIdpSigningCertRequest(),
 	);
+	const [encCertOptions, setEncCertOptions] = useState<GenerateIdpEncryptionCertRequestDto>(() =>
+		getDefaultGenerateIdpEncryptionCertRequest(),
+	);
+	const [showEncUpload, setShowEncUpload] = useState(false);
+	const [uploadEncCert, setUploadEncCert] = useState('');
+	const [uploadEncKey, setUploadEncKey] = useState('');
 
 	async function reload(): Promise<IdpSettingsPublicDto> {
 		const data = await getIdpSettings();
@@ -305,6 +344,147 @@ export function IdpSettingsPage() {
 		});
 	}
 
+	function copySigningOptionsToEncryption() {
+		const family = certOptions.keyFamily ?? 'rsa';
+		setEncCertOptions({
+			keyFamily: family,
+			rsaModulusBits: certOptions.rsaModulusBits,
+			ecCurve: certOptions.ecCurve,
+			notAfter: certOptions.notAfter,
+			keyTransportAlgorithmId:
+				family === 'rsa' ? IDP_ENCRYPTION_DEFAULT_KEY_TRANSPORT_ALGORITHM_ID : undefined,
+		});
+		showToast(t('encryption.toastCopiedSigningOptions'));
+	}
+
+	async function handleGenerateEncryptionPrimary() {
+		const ok = await confirm({
+			title: t('encryption.confirmGeneratePrimaryTitle'),
+			description: `${t('encryption.confirmGeneratePrimary')}\n\n${buildEncryptionCertOptionsConfirmSummary(encCertOptions, t)}`,
+			tone: 'warning',
+			showAuditNote: true,
+			typeToConfirm: { challenge: 'REPLACE', label: t('typeReplaceToConfirm') },
+			confirmLabel: t('encryption.generateCertificate'),
+		});
+		if (!ok) {
+			return;
+		}
+		await runMutation(async () => {
+			await generateIdpEncryptionCert(encCertOptions);
+			await reload();
+			await refreshMetadataPreview();
+			setSuccess(t('encryption.successPrimaryGenerated'));
+			showToast(t('encryption.toastPrimaryGenerated'));
+		});
+	}
+
+	async function handleUploadEncryptionPrimary(event: FormEvent) {
+		event.preventDefault();
+		const ok = await confirm({
+			title: t('encryption.confirmUploadPrimaryTitle'),
+			description: t('encryption.confirmUploadPrimary'),
+			tone: 'warning',
+			showAuditNote: true,
+			typeToConfirm: { challenge: 'REPLACE', label: t('typeReplaceToConfirm') },
+			confirmLabel: t('encryption.uploadPrimary'),
+		});
+		if (!ok) {
+			return;
+		}
+		await runMutation(async () => {
+			await uploadIdpEncryptionCert({
+				encryptionCertPem: uploadEncCert,
+				encryptionPrivateKeyPem: uploadEncKey,
+			});
+			setShowEncUpload(false);
+			setUploadEncCert('');
+			setUploadEncKey('');
+			await reload();
+			setSuccess(t('encryption.successPrimaryUploaded'));
+			showToast(t('encryption.toastPrimaryUploaded'));
+		});
+	}
+
+	async function handleStartEncryptionRotationGenerate() {
+		const ok = await confirm({
+			title: t('encryption.confirmStartRotationTitle'),
+			description: `${t('encryption.confirmStartRotation')}\n\n${buildEncryptionCertOptionsConfirmSummary(encCertOptions, t)}`,
+			tone: 'warning',
+			showAuditNote: true,
+			confirmLabel: t('encryption.startRotationGenerate'),
+		});
+		if (!ok) {
+			return;
+		}
+		await runMutation(async () => {
+			await startIdpEncryptionCertRotation({ mode: 'generate', ...encCertOptions });
+			await reload();
+			await refreshMetadataPreview();
+			setSuccess(t('encryption.successRotationStarted'));
+			showToast(t('encryption.toastRotationStarted'));
+		});
+	}
+
+	async function handleCompleteEncryptionRotation() {
+		const ok = await confirm({
+			title: t('encryption.confirmCompleteRotationTitle'),
+			description: t('encryption.confirmCompleteRotation'),
+			tone: 'warning',
+			showAuditNote: true,
+			typeToConfirm: { challenge: 'COMPLETE', label: t('typeCompleteToConfirm') },
+			confirmLabel: t('encryption.completeRotation'),
+		});
+		if (!ok) {
+			return;
+		}
+		await runMutation(async () => {
+			await completeIdpEncryptionCertRotation();
+			await reload();
+			setSuccess(t('encryption.successRotationCompleted'));
+			showToast(t('encryption.toastRotationCompleted'));
+		});
+	}
+
+	async function handleCancelEncryptionRotation() {
+		const ok = await confirm({
+			title: t('encryption.confirmCancelRotationTitle'),
+			description: t('encryption.confirmCancelRotation'),
+			tone: 'warning',
+			confirmLabel: t('encryption.cancelRotation'),
+		});
+		if (!ok) {
+			return;
+		}
+		await runMutation(async () => {
+			await cancelIdpEncryptionCertRotation();
+			await reload();
+			setSuccess(t('encryption.successRotationCancelled'));
+			showToast(t('encryption.toastRotationCancelled'));
+		});
+	}
+
+	async function handleCopyEncryptionPublicPem() {
+		await runMutation(async () => {
+			const { certPem } = await getIdpEncryptionCertPublicPem();
+			await copyText(t('encryption.publicPem'), certPem);
+			showToast(t('encryption.toastPublicPemCopied'));
+		});
+	}
+
+	async function handleDownloadEncryptionPublicPem() {
+		await runMutation(async () => {
+			const { certPem } = await getIdpEncryptionCertPublicPem();
+			const blob = new Blob([certPem], { type: 'application/x-pem-file' });
+			const url = URL.createObjectURL(blob);
+			const anchor = document.createElement('a');
+			anchor.href = url;
+			anchor.download = 'idp-encryption-cert.pem';
+			anchor.click();
+			URL.revokeObjectURL(url);
+			showToast(t('encryption.toastPublicPemDownloaded'));
+		});
+	}
+
 	if (loading) {
 		return <LoadingState message={t('loading')} />;
 	}
@@ -362,6 +542,11 @@ export function IdpSettingsPage() {
 			{isExpiringSoon(settings.signingCertNotAfter) ? (
 				<p className="evg-callout evg-callout--warning">
 					{t('certExpiresWarning', { date: settings.signingCertNotAfter })}
+				</p>
+			) : null}
+			{isExpiringSoon(settings.encryptionCertNotAfter) ? (
+				<p className="evg-callout evg-callout--warning">
+					{t('encryption.certExpiresWarning', { date: settings.encryptionCertNotAfter })}
 				</p>
 			) : null}
 
@@ -575,6 +760,207 @@ export function IdpSettingsPage() {
 							onClick={() => void handleCancelRotation()}
 						>
 							{t('cancelRotation')}
+						</Button>
+					</div>
+				</Panel>
+			) : null}
+
+			<Panel title={t('encryption.encryptionCertificate')}>
+				<p>
+					<span className="evg-badge evg-badge--info">{t(encryptionCertStatusKey(settings))}</span>
+				</p>
+				<p className="evg-muted">{t('encryption.panelHint')}</p>
+				<ul className="evg-dl">
+					<li>
+						<span>{t('fingerprint')}</span>
+						<code>{settings.encryptionCertFingerprintSha256 ?? tCommon('emDash')}</code>
+					</li>
+					<li>
+						<span>{t('notAfter')}</span>
+						<code>{settings.encryptionCertNotAfter ?? tCommon('emDash')}</code>
+					</li>
+					{settings.encryptionKeyFamily ? (
+						<li>
+							<span>{t('encryption.crypto.keyFamily')}</span>
+							<code>
+								{settings.encryptionKeyFamily === 'rsa'
+									? `RSA ${settings.encryptionRsaModulusBits ?? 2048}`
+									: `EC ${settings.encryptionEcCurve ?? 'P-256'}`}
+							</code>
+						</li>
+					) : null}
+					{settings.encryptionKeyTransportAlgorithmId ? (
+						<li>
+							<span>{t('encryption.crypto.keyTransportAlgorithm')}</span>
+							<code>
+								{t(`encryption.crypto.algorithms.${settings.encryptionKeyTransportAlgorithmId}`, {
+									defaultValue: settings.encryptionKeyTransportAlgorithmId,
+								})}
+							</code>
+						</li>
+					) : null}
+				</ul>
+				<IdpEncryptionCertOptionsFields
+					value={encCertOptions}
+					onChange={setEncCertOptions}
+					disabled={busy || settings.encryptionRotation.active}
+				/>
+				<div className="evg-cluster evg-cluster--wrap">
+					<Button
+						type="button"
+						variant="secondary"
+						size="sm"
+						disabled={busy || settings.encryptionRotation.active}
+						onClick={copySigningOptionsToEncryption}
+					>
+						{t('encryption.copySigningOptions')}
+					</Button>
+					<Button
+						type="button"
+						variant="secondary"
+						disabled={busy || settings.encryptionRotation.active}
+						onClick={() => void handleGenerateEncryptionPrimary()}
+					>
+						{t('encryption.generateCertificate')}
+					</Button>
+					<Button
+						type="button"
+						variant="secondary"
+						disabled={busy || settings.encryptionRotation.active}
+						onClick={() => setShowEncUpload(true)}
+					>
+						{t('encryption.uploadCertificate')}
+					</Button>
+					<Button
+						type="button"
+						variant="secondary"
+						disabled={
+							busy || settings.encryptionRotation.active || !settings.hasEncryptionCertificate
+						}
+						onClick={() => void handleStartEncryptionRotationGenerate()}
+					>
+						{t('encryption.startRotationGenerate')}
+					</Button>
+					<Button
+						type="button"
+						variant="secondary"
+						disabled={busy || !settings.hasEncryptionCertificate}
+						onClick={() => void handleCopyEncryptionPublicPem()}
+					>
+						{t('encryption.copyPublicPem')}
+					</Button>
+					<Button
+						type="button"
+						variant="secondary"
+						disabled={busy || !settings.hasEncryptionCertificate}
+						onClick={() => void handleDownloadEncryptionPublicPem()}
+					>
+						{t('encryption.downloadPublicPem')}
+					</Button>
+				</div>
+			</Panel>
+
+			{showEncUpload ? (
+				<Panel title={t('encryption.uploadPrimary')}>
+					<form
+						className="evg-stack"
+						aria-busy={busy}
+						onSubmit={(event) => void handleUploadEncryptionPrimary(event)}
+					>
+						<fieldset className="evg-stack" disabled={busy}>
+							<TextArea
+								label={t('encryption.encryptionCertPem')}
+								rows={6}
+								hint={t('encryption.encryptionCertHint')}
+								value={uploadEncCert}
+								onChange={(event) => setUploadEncCert(event.target.value)}
+							/>
+							<TextArea
+								label={t('encryption.privateKeyPem')}
+								rows={6}
+								hint={t('encryption.privateKeyHint')}
+								value={uploadEncKey}
+								onChange={(event) => setUploadEncKey(event.target.value)}
+							/>
+							<div className="evg-cluster">
+								<Button type="submit" variant="primary" disabled={busy}>
+									{tCommon('upload')}
+								</Button>
+								<Button
+									type="button"
+									variant="secondary"
+									disabled={busy}
+									onClick={() => setShowEncUpload(false)}
+								>
+									{tCommon('cancel')}
+								</Button>
+							</div>
+						</fieldset>
+					</form>
+				</Panel>
+			) : null}
+
+			{settings.encryptionRotation.active ? (
+				<Panel title={t('encryption.certificateRotation')}>
+					{isStaleEncryptionRotation(settings.encryptionRotation.startedAt) ? (
+						<p className="evg-callout evg-callout--info">
+							{t('encryption.rotationStale', { date: settings.encryptionRotation.startedAt })}
+						</p>
+					) : null}
+					<h3 className="evg-panel__title">{t('encryption.pendingCertTitle')}</h3>
+					<p className="evg-muted">
+						{t('encryption.pendingFingerprint', {
+							fingerprint:
+								settings.encryptionRotation.pendingCertFingerprintSha256 ?? tCommon('emDash'),
+						})}
+					</p>
+					{settings.encryptionRotation.pendingEncryptionKeyFamily ? (
+						<p className="evg-muted">
+							{t('encryption.crypto.keyFamily')}:{' '}
+							{settings.encryptionRotation.pendingEncryptionKeyFamily}
+							{settings.encryptionRotation.pendingEncryptionKeyFamily === 'rsa'
+								? ` ${settings.encryptionRotation.pendingEncryptionRsaModulusBits ?? 2048}`
+								: ` ${settings.encryptionRotation.pendingEncryptionEcCurve ?? 'P-256'}`}
+							{' · '}
+							{t('encryption.crypto.keyTransportAlgorithm')}:{' '}
+							{settings.encryptionRotation.pendingEncryptionKeyTransportAlgorithmId ??
+								tCommon('emDash')}
+							{' · '}
+							{t('notAfter')}:{' '}
+							{settings.encryptionRotation.pendingEncryptionCertNotAfter ?? tCommon('emDash')}
+						</p>
+					) : null}
+					{settings.encryptionRotation.pendingEncryptionKeyTransportAlgorithmId &&
+					settings.encryptionKeyTransportAlgorithmId &&
+					settings.encryptionRotation.pendingEncryptionKeyTransportAlgorithmId !==
+						settings.encryptionKeyTransportAlgorithmId ? (
+						<Callout variant="warning">{t('encryption.rotationTransportMismatchWarning')}</Callout>
+					) : null}
+					<ol className="evg-checklist">
+						<li>{t('encryption.rotationStep1')}</li>
+						<li>
+							{t('encryption.rotationStep2')}{' '}
+							<Link to={SP_CONNECTION_ROUTE_PREFIX}>{t('openSpConnections')}</Link>
+						</li>
+						<li>{t('encryption.rotationStep3')}</li>
+						<li>{t('encryption.rotationStep4')}</li>
+					</ol>
+					<div className="evg-cluster">
+						<Button
+							type="button"
+							variant="primary"
+							disabled={busy}
+							onClick={() => void handleCompleteEncryptionRotation()}
+						>
+							{t('encryption.completeRotation')}
+						</Button>
+						<Button
+							type="button"
+							variant="danger"
+							disabled={busy}
+							onClick={() => void handleCancelEncryptionRotation()}
+						>
+							{t('encryption.cancelRotation')}
 						</Button>
 					</div>
 				</Panel>

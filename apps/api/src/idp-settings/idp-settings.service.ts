@@ -6,19 +6,27 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type {
+	GenerateIdpEncryptionCertRequestDto,
 	GenerateIdpSigningCertRequestDto,
 	IdpMetadataPreviewResponseDto,
 	IdpMetadataUrlResponseDto,
 	IdpSettingsPublicDto,
 	StartIdpCertRotationRequestDto,
+	StartIdpEncryptionCertRotationRequestDto,
 	UpdateIdpSettingsRequestDto,
+	UploadIdpEncryptionCertRequestDto,
 	UploadIdpSigningCertRequestDto,
 } from '@nestidp/shared';
 import type { AdminDashboardIdpStatusDto } from '@nestidp/shared';
-import { IdpSigningCryptoValidationError } from '@nestidp/shared';
+import {
+	IdpEncryptionCryptoValidationError,
+	IdpSigningCryptoValidationError,
+	type StoredEncryptionCrypto,
+} from '@nestidp/shared';
 import type { IdpSettings } from '@prisma/client';
 import { EncryptionService } from '../encryption/encryption.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { IdpEncryptionService } from '../saml/idp-encryption.service';
 import { IdpSigningService } from '../saml/idp-signing.service';
 import { SamlMetadataService } from '../saml/saml-metadata.service';
 import {
@@ -27,6 +35,11 @@ import {
 	prismaCryptoPrimaryData,
 	validateSigningCertPair,
 } from './idp-cert.util';
+import {
+	prismaEncryptionPendingData,
+	prismaEncryptionPrimaryData,
+	validateEncryptionKeyPair,
+} from './idp-encryption-cert.util';
 import {
 	assertValidIdpEntityId,
 	assertValidIdpNameIdFormat,
@@ -48,6 +61,14 @@ export interface SigningCertGeneratedAuditMeta {
 	notAfter?: string;
 }
 
+export interface EncryptionCertGeneratedAuditMeta {
+	keyFamily?: string;
+	keyTransportAlgorithmId?: string;
+	rsaModulusBits?: number;
+	ecCurve?: string;
+	notAfter?: string;
+}
+
 @Injectable()
 export class IdpSettingsService {
 	constructor(
@@ -55,9 +76,15 @@ export class IdpSettingsService {
 		private readonly configService: ConfigService,
 		private readonly encryptionService: EncryptionService,
 		private readonly idpSigningService: IdpSigningService,
+		private readonly idpEncryptionService: IdpEncryptionService,
 		private readonly samlMetadataService: SamlMetadataService,
 		private readonly audit: IdpSettingsAuditService,
 	) {}
+
+	async hasEncryptionCertificate(): Promise<boolean> {
+		const settings = await this.findSettingsOrThrow();
+		return Boolean(settings.encryptionCertPem && settings.encryptionKeyEncrypted);
+	}
 
 	async getSettings(): Promise<IdpSettingsPublicDto> {
 		const settings = await this.findSettingsOrThrow();
@@ -215,6 +242,159 @@ export class IdpSettingsService {
 		return toIdpSettingsPublicDto(updated, this.getIdpBaseUrl());
 	}
 
+	async generatePrimaryEncryptionCert(
+		body: GenerateIdpEncryptionCertRequestDto = {},
+	): Promise<IdpSettingsPublicDto> {
+		const settings = await this.findSettingsOrThrow();
+		this.assertNoActiveEncryptionRotation(settings);
+
+		const generated = this.generateEncryptionWithOptions(settings.entityId, body);
+		const updated = await this.prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: {
+				encryptionCertPem: generated.certPem,
+				encryptionKeyEncrypted: this.encryptionService.encrypt(generated.privateKeyPem),
+				...prismaEncryptionPrimaryData(generated.metadata),
+			},
+		});
+		this.audit.logEncryptionCertGenerated(
+			false,
+			this.auditMetaFromEncryptionGenerated(body, generated.metadata),
+		);
+		return toIdpSettingsPublicDto(updated, this.getIdpBaseUrl());
+	}
+
+	async uploadPrimaryEncryptionCert(
+		body: UploadIdpEncryptionCertRequestDto,
+	): Promise<IdpSettingsPublicDto> {
+		const settings = await this.findSettingsOrThrow();
+		this.assertNoActiveEncryptionRotation(settings);
+
+		const pair = this.validateEncryptionCertPair(
+			body.encryptionCertPem,
+			body.encryptionPrivateKeyPem,
+			settings.signingCertPem,
+		);
+		const updated = await this.prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: {
+				encryptionCertPem: pair.certPem,
+				encryptionKeyEncrypted: this.encryptionService.encrypt(pair.privateKeyPem),
+				...prismaEncryptionPrimaryData(pair.crypto),
+			},
+		});
+		this.audit.logEncryptionCertUploaded(false);
+		return toIdpSettingsPublicDto(updated, this.getIdpBaseUrl());
+	}
+
+	async startEncryptionRotation(
+		body: StartIdpEncryptionCertRotationRequestDto,
+	): Promise<IdpSettingsPublicDto> {
+		const settings = await this.findSettingsOrThrow();
+		if (!settings.encryptionCertPem || !settings.encryptionKeyEncrypted) {
+			throw new ConflictException('Configure or generate primary encryption certificate first');
+		}
+		if (settings.pendingEncryptionCertPem || settings.pendingEncryptionKeyEncrypted) {
+			throw new ConflictException('Encryption certificate rotation already in progress');
+		}
+
+		let pendingCertPem: string;
+		let pendingKeyPem: string;
+		let pendingCrypto;
+
+		if (body.mode === 'generate') {
+			const { mode, ...generateOptions } = body;
+			void mode;
+			const generated = this.generateEncryptionWithOptions(settings.entityId, generateOptions);
+			pendingCertPem = generated.certPem;
+			pendingKeyPem = generated.privateKeyPem;
+			pendingCrypto = generated.metadata;
+			this.audit.logEncryptionRotationStarted(
+				'generate',
+				this.auditMetaFromEncryptionGenerated(generateOptions, pendingCrypto),
+			);
+		} else {
+			const pair = this.validateEncryptionCertPair(
+				body.encryptionCertPem,
+				body.encryptionPrivateKeyPem,
+				settings.signingCertPem,
+			);
+			pendingCertPem = pair.certPem;
+			pendingKeyPem = pair.privateKeyPem;
+			pendingCrypto = pair.crypto;
+			this.audit.logEncryptionRotationStarted('upload');
+		}
+
+		const updated = await this.prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: {
+				pendingEncryptionCertPem: pendingCertPem,
+				pendingEncryptionKeyEncrypted: this.encryptionService.encrypt(pendingKeyPem),
+				encryptionRotationStartedAt: new Date(),
+				...prismaEncryptionPendingData(pendingCrypto),
+			},
+		});
+		return toIdpSettingsPublicDto(updated, this.getIdpBaseUrl());
+	}
+
+	async completeEncryptionRotation(): Promise<IdpSettingsPublicDto> {
+		const settings = await this.findSettingsOrThrow();
+		if (!settings.pendingEncryptionCertPem || !settings.pendingEncryptionKeyEncrypted) {
+			throw new ConflictException('No encryption certificate rotation in progress');
+		}
+
+		const updated = await this.prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: {
+				encryptionCertPem: settings.pendingEncryptionCertPem,
+				encryptionKeyEncrypted: settings.pendingEncryptionKeyEncrypted,
+				encryptionKeyFamily: settings.pendingEncryptionKeyFamily,
+				encryptionKeyTransportAlgorithmId: settings.pendingEncryptionKeyTransportAlgorithmId,
+				encryptionRsaModulusBits: settings.pendingEncryptionRsaModulusBits,
+				encryptionEcCurve: settings.pendingEncryptionEcCurve,
+				pendingEncryptionCertPem: null,
+				pendingEncryptionKeyEncrypted: null,
+				pendingEncryptionKeyFamily: null,
+				pendingEncryptionKeyTransportAlgorithmId: null,
+				pendingEncryptionRsaModulusBits: null,
+				pendingEncryptionEcCurve: null,
+				encryptionRotationStartedAt: null,
+			},
+		});
+		this.audit.logEncryptionRotationCompleted();
+		return toIdpSettingsPublicDto(updated, this.getIdpBaseUrl());
+	}
+
+	async cancelEncryptionRotation(): Promise<IdpSettingsPublicDto> {
+		const settings = await this.findSettingsOrThrow();
+		if (!settings.pendingEncryptionCertPem || !settings.pendingEncryptionKeyEncrypted) {
+			throw new ConflictException('No encryption certificate rotation in progress');
+		}
+
+		const updated = await this.prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: {
+				pendingEncryptionCertPem: null,
+				pendingEncryptionKeyEncrypted: null,
+				pendingEncryptionKeyFamily: null,
+				pendingEncryptionKeyTransportAlgorithmId: null,
+				pendingEncryptionRsaModulusBits: null,
+				pendingEncryptionEcCurve: null,
+				encryptionRotationStartedAt: null,
+			},
+		});
+		this.audit.logEncryptionRotationCancelled();
+		return toIdpSettingsPublicDto(updated, this.getIdpBaseUrl());
+	}
+
+	async getEncryptionCertPublicPem(): Promise<{ certPem: string }> {
+		const settings = await this.findSettingsOrThrow();
+		if (!settings.encryptionCertPem) {
+			throw new NotFoundException('IdP encryption certificate not configured');
+		}
+		return { certPem: settings.encryptionCertPem };
+	}
+
 	async cancelRotation(): Promise<IdpSettingsPublicDto> {
 		const settings = await this.findSettingsOrThrow();
 		if (!settings.pendingSigningCertPem || !settings.pendingSigningKeyEncrypted) {
@@ -264,6 +444,31 @@ export class IdpSettingsService {
 		}
 	}
 
+	private generateEncryptionWithOptions(
+		entityId: string,
+		options: GenerateIdpEncryptionCertRequestDto,
+	) {
+		try {
+			return this.idpEncryptionService.generateKeyPairAndCert(entityId, options);
+		} catch (error) {
+			this.rethrowEncryptionCryptoValidation(error);
+			throw error;
+		}
+	}
+
+	private auditMetaFromEncryptionGenerated(
+		options: GenerateIdpEncryptionCertRequestDto,
+		metadata: StoredEncryptionCrypto,
+	): EncryptionCertGeneratedAuditMeta {
+		return {
+			keyFamily: metadata.encryptionKeyFamily,
+			keyTransportAlgorithmId: metadata.encryptionKeyTransportAlgorithmId ?? undefined,
+			rsaModulusBits: metadata.encryptionRsaModulusBits ?? undefined,
+			ecCurve: metadata.encryptionEcCurve ?? undefined,
+			notAfter: options.notAfter,
+		};
+	}
+
 	private auditMetaFromGenerated(
 		options: GenerateIdpSigningCertRequestDto,
 		metadata: {
@@ -288,6 +493,12 @@ export class IdpSettingsService {
 		}
 	}
 
+	private assertNoActiveEncryptionRotation(settings: IdpSettings): void {
+		if (settings.pendingEncryptionCertPem || settings.pendingEncryptionKeyEncrypted) {
+			throw new ConflictException('Finish or cancel encryption certificate rotation first');
+		}
+	}
+
 	private validateCertPair(certPem: string, privateKeyPem: string) {
 		try {
 			return validateSigningCertPair(certPem, privateKeyPem);
@@ -300,8 +511,30 @@ export class IdpSettingsService {
 		}
 	}
 
+	private validateEncryptionCertPair(
+		certPem: string,
+		privateKeyPem: string,
+		signingCertPem: string | null,
+	) {
+		try {
+			return validateEncryptionKeyPair(certPem, privateKeyPem, signingCertPem);
+		} catch (error) {
+			if (error instanceof IdpCertValidationError) {
+				throw new BadRequestException(error.message);
+			}
+			this.rethrowEncryptionCryptoValidation(error);
+			throw error;
+		}
+	}
+
 	private rethrowCryptoValidation(error: unknown): void {
 		if (error instanceof IdpSigningCryptoValidationError) {
+			throw new BadRequestException(error.message);
+		}
+	}
+
+	private rethrowEncryptionCryptoValidation(error: unknown): void {
+		if (error instanceof IdpEncryptionCryptoValidationError) {
 			throw new BadRequestException(error.message);
 		}
 	}

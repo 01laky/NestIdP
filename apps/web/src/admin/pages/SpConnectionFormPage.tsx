@@ -44,6 +44,7 @@ export function SpConnectionFormPage() {
 	const [acsUrl, setAcsUrl] = useState('');
 	const [nameIdFormat, setNameIdFormat] = useState('');
 	const [active, setActive] = useState(true);
+	const [wantAssertionsEncrypted, setWantAssertionsEncrypted] = useState(false);
 	const [attributeMapping, setAttributeMapping] = useState<SpAttributeMappingConfig | null>(null);
 	const [spCertificate, setSpCertificate] = useState('');
 	const [acsTestMessage, setAcsTestMessage] = useState<string | null>(null);
@@ -64,6 +65,7 @@ export function SpConnectionFormPage() {
 					setAcsUrl(item.acsUrl);
 					setNameIdFormat(item.nameIdFormat);
 					setActive(item.active);
+					setWantAssertionsEncrypted(item.wantAssertionsEncrypted);
 					setAttributeMapping(item.attributeMapping);
 				}
 			} catch (err) {
@@ -100,6 +102,7 @@ export function SpConnectionFormPage() {
 			acsUrl,
 			nameIdFormat: nameIdFormat || undefined,
 			active,
+			wantAssertionsEncrypted,
 			attributeMapping,
 			spCertificate: spCertificate.trim() ? spCertificate.trim() : null,
 		};
@@ -241,6 +244,13 @@ export function SpConnectionFormPage() {
 							))}
 						</Select>
 						<Checkbox label={tCommon('active')} checked={active} onChange={setActive} />
+						<Checkbox
+							label={t('wantAssertionsEncrypted')}
+							hint={t('wantAssertionsEncryptedHint')}
+							checked={wantAssertionsEncrypted}
+							onChange={setWantAssertionsEncrypted}
+							disabled={saving || spCertificate.trim().length === 0}
+						/>
 						<AttributeMappingEditor
 							value={attributeMapping}
 							onChange={setAttributeMapping}

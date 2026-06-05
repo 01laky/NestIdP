@@ -27,9 +27,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import {
 	createTestAdminUserWithPassword,
 	createTestIdpSettings,
+	createTestIdpSettingsWithEncryptionKey,
 	createTestIdpSettingsWithSigningKey,
 	getTestSigningMaterial,
 } from '../prisma/test-fixtures';
+import { generateTestRsaEncryptionCert } from './idp-encryption-cert.util';
 import { runMigrationsOnTestDb } from '../prisma/test-db.helper';
 
 jest.setTimeout(60_000);
@@ -93,6 +95,19 @@ describe('IdP settings admin API (SQLite)', () => {
 				pendingSigningRsaModulusBits: null,
 				pendingSigningEcCurve: null,
 				rotationStartedAt: null,
+				pendingEncryptionCertPem: null,
+				pendingEncryptionKeyEncrypted: null,
+				pendingEncryptionKeyFamily: null,
+				pendingEncryptionKeyTransportAlgorithmId: null,
+				pendingEncryptionRsaModulusBits: null,
+				pendingEncryptionEcCurve: null,
+				encryptionRotationStartedAt: null,
+				encryptionCertPem: null,
+				encryptionKeyEncrypted: null,
+				encryptionKeyFamily: null,
+				encryptionKeyTransportAlgorithmId: null,
+				encryptionRsaModulusBits: null,
+				encryptionEcCurve: null,
 			},
 		});
 	});
@@ -1104,5 +1119,403 @@ describe('IdP settings admin API (SQLite)', () => {
 		expect(res.body.rotation.pendingSigningSignatureAlgorithmId).toBe('rsa-sha384');
 		expect(res.body.rotation.pendingSigningCertNotAfter).toMatch(/^2030-04-15T/);
 		expect(res.body.rotation.pendingSigningRsaModulusBits).toBe(2048);
+	});
+
+	it('API-IDP-ENC-01: POST generate encryption cert sets primary', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: { encryptionCertPem: null, encryptionKeyEncrypted: null },
+		});
+		const res = await agent
+			.post(`${IDP_SETTINGS_API_PATH}/encryption-cert/generate`)
+			.set(csrfHeader(csrf))
+			.send({ rsaModulusBits: 2048, notAfter: '2029-06-01' })
+			.expect(201);
+		expect(res.body.hasEncryptionCertificate).toBe(true);
+		expect(res.body.encryptionKeyFamily).toBe('rsa');
+		expect(res.body.encryptionRsaModulusBits).toBe(2048);
+	});
+
+	it('API-IDP-ENC-02: POST generate blocked during encryption rotation → 409', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await createTestIdpSettingsWithEncryptionKey(prisma);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/encryption-cert/rotation/start`)
+			.set(csrfHeader(csrf))
+			.send({ mode: 'generate' })
+			.expect(201);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/encryption-cert/generate`)
+			.set(csrfHeader(csrf))
+			.send({ notAfter: '2029-07-01' })
+			.expect(409);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/encryption-cert/rotation/cancel`)
+			.set(csrfHeader(csrf))
+			.expect(201);
+	});
+
+	it('API-IDP-ENC-03: POST upload valid encryption pair', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		const { certPem, privateKeyPem } = generateTestRsaEncryptionCert('http://localhost:3000');
+		const res = await agent
+			.post(`${IDP_SETTINGS_API_PATH}/encryption-cert/upload`)
+			.set(csrfHeader(csrf))
+			.send({ encryptionCertPem: certPem, encryptionPrivateKeyPem: privateKeyPem })
+			.expect(201);
+		expect(res.body.hasEncryptionCertificate).toBe(true);
+	});
+
+	it('API-IDP-ENC-04: POST upload signing-only cert → 400', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		const { certPem, privateKeyPem } = getTestSigningMaterial('http://localhost:3000');
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/encryption-cert/upload`)
+			.set(csrfHeader(csrf))
+			.send({ encryptionCertPem: certPem, encryptionPrivateKeyPem: privateKeyPem })
+			.expect(400);
+	});
+
+	it('API-IDP-ENC-05: POST upload same cert as signing primary → 400', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		const settings = await prisma.idpSettings.findUnique({ where: { id: 'default' } });
+		const signingCert = settings!.signingCertPem!;
+		const { privateKeyPem } = generateTestRsaEncryptionCert('http://other.example.com');
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/encryption-cert/upload`)
+			.set(csrfHeader(csrf))
+			.send({ encryptionCertPem: signingCert, encryptionPrivateKeyPem: privateKeyPem })
+			.expect(400);
+	});
+
+	it('API-IDP-ENC-06: GET public-pem returns primary cert only', async () => {
+		await createTestIdpSettingsWithEncryptionKey(prisma);
+		const agent = await adminAgent();
+		const res = await agent.get(`${IDP_SETTINGS_API_PATH}/encryption-cert/public-pem`).expect(200);
+		expect(res.body.certPem).toContain('BEGIN CERTIFICATE');
+		expect(res.body.certPem).not.toContain('PRIVATE KEY');
+	});
+
+	it('API-IDP-ENC-07: GET public-pem without cert → 404', async () => {
+		await prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: { encryptionCertPem: null, encryptionKeyEncrypted: null },
+		});
+		const agent = await adminAgent();
+		await agent.get(`${IDP_SETTINGS_API_PATH}/encryption-cert/public-pem`).expect(404);
+	});
+
+	it('API-IDP-ENC-08: encryption rotation complete promotes pending', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await createTestIdpSettingsWithEncryptionKey(prisma);
+		const before = await agent.get(IDP_SETTINGS_API_PATH).expect(200);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/encryption-cert/rotation/start`)
+			.set(csrfHeader(csrf))
+			.send({ mode: 'generate', rsaModulusBits: 3072 })
+			.expect(201);
+		const pendingFp = (await agent.get(IDP_SETTINGS_API_PATH).expect(200)).body.encryptionRotation
+			.pendingCertFingerprintSha256;
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/encryption-cert/rotation/complete`)
+			.set(csrfHeader(csrf))
+			.expect(201);
+		const after = await agent.get(IDP_SETTINGS_API_PATH).expect(200);
+		expect(after.body.encryptionCertFingerprintSha256).toBe(pendingFp);
+		expect(after.body.encryptionRsaModulusBits).toBe(3072);
+		expect(after.body.encryptionRotation.active).toBe(false);
+		expect(before.body.encryptionCertFingerprintSha256).not.toBe(pendingFp);
+	});
+
+	it('API-IDP-ENC-09: signing rotation does not block encryption generate', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/start`)
+			.set(csrfHeader(csrf))
+			.send({ mode: 'generate' })
+			.expect(201);
+		await prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: { encryptionCertPem: null, encryptionKeyEncrypted: null },
+		});
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/encryption-cert/generate`)
+			.set(csrfHeader(csrf))
+			.send({ notAfter: '2029-08-01' })
+			.expect(201);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/cancel`)
+			.set(csrfHeader(csrf))
+			.expect(201);
+	});
+
+	it('API-IDP-ENC-10: POST encryption generate without CSRF → 403', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		await loginCsrf(agent);
+		await agent.post(`${IDP_SETTINGS_API_PATH}/encryption-cert/generate`).expect(403);
+	});
+
+	it('API-IDP-ENC-11: generate EC P-256 sets encryptionKeyTransportAlgorithmId null', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: { encryptionCertPem: null, encryptionKeyEncrypted: null },
+		});
+		const res = await agent
+			.post(`${IDP_SETTINGS_API_PATH}/encryption-cert/generate`)
+			.set(csrfHeader(csrf))
+			.send({ keyFamily: 'ec', ecCurve: 'P-256', notAfter: '2029-09-01' })
+			.expect(201);
+		expect(res.body.encryptionKeyFamily).toBe('ec');
+		expect(res.body.encryptionEcCurve).toBe('P-256');
+		expect(res.body.encryptionKeyTransportAlgorithmId).toBeNull();
+	});
+
+	it('API-IDP-ENC-12: EC generate with keyTransportAlgorithmId → 400', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/encryption-cert/generate`)
+			.set(csrfHeader(csrf))
+			.send({
+				keyFamily: 'ec',
+				ecCurve: 'P-256',
+				keyTransportAlgorithmId: 'rsa-oaep-mgf1p',
+				notAfter: '2029-09-02',
+			})
+			.expect(400);
+	});
+
+	it('API-IDP-ENC-13: RSA generate with rsa-oaep transport persists id', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: { encryptionCertPem: null, encryptionKeyEncrypted: null },
+		});
+		const res = await agent
+			.post(`${IDP_SETTINGS_API_PATH}/encryption-cert/generate`)
+			.set(csrfHeader(csrf))
+			.send({
+				keyTransportAlgorithmId: 'rsa-oaep',
+				notAfter: '2029-10-01',
+			})
+			.expect(201);
+		expect(res.body.encryptionKeyTransportAlgorithmId).toBe('rsa-oaep');
+	});
+
+	it('API-IDP-ENC-ADM-02: POST encryption rotation complete without CSRF → 403', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		await loginCsrf(agent);
+		await agent.post(`${IDP_SETTINGS_API_PATH}/encryption-cert/rotation/complete`).expect(403);
+	});
+
+	it('API-IDP-ENC-14: POST generate with {} uses RSA-2048 rsa-oaep-mgf1p defaults', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: { encryptionCertPem: null, encryptionKeyEncrypted: null },
+		});
+		const res = await agent
+			.post(`${IDP_SETTINGS_API_PATH}/encryption-cert/generate`)
+			.set(csrfHeader(csrf))
+			.send({})
+			.expect(201);
+		expect(res.body.encryptionKeyFamily).toBe('rsa');
+		expect(res.body.encryptionRsaModulusBits).toBe(2048);
+		expect(res.body.encryptionKeyTransportAlgorithmId).toBe('rsa-oaep-mgf1p');
+	});
+
+	it('API-IDP-ENC-15: notAfter in the past → 400', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/encryption-cert/generate`)
+			.set(csrfHeader(csrf))
+			.send({ notAfter: '2020-01-01' })
+			.expect(400);
+	});
+
+	it('API-IDP-ENC-16: notAfter more than ten years ahead → 400', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		const far = new Date();
+		far.setUTCFullYear(far.getUTCFullYear() + 11);
+		const notAfter = far.toISOString().slice(0, 10);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/encryption-cert/generate`)
+			.set(csrfHeader(csrf))
+			.send({ notAfter })
+			.expect(400);
+	});
+
+	it('API-IDP-ENC-17: each RSA key transport algorithm id accepted', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		for (const keyTransportAlgorithmId of ['rsa-oaep-mgf1p', 'rsa-oaep', 'rsa-1_5']) {
+			await prisma.idpSettings.update({
+				where: { id: 'default' },
+				data: { encryptionCertPem: null, encryptionKeyEncrypted: null },
+			});
+			const res = await agent
+				.post(`${IDP_SETTINGS_API_PATH}/encryption-cert/generate`)
+				.set(csrfHeader(csrf))
+				.send({ keyTransportAlgorithmId, notAfter: '2029-11-01' })
+				.expect(201);
+			expect(res.body.encryptionKeyTransportAlgorithmId).toBe(keyTransportAlgorithmId);
+		}
+	});
+
+	it('API-IDP-ENC-18: upload RSA encryption pair infers default transport', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		const { certPem, privateKeyPem } = generateTestRsaEncryptionCert(
+			'https://upload-inf.example.com',
+		);
+		const res = await agent
+			.post(`${IDP_SETTINGS_API_PATH}/encryption-cert/upload`)
+			.set(csrfHeader(csrf))
+			.send({ encryptionCertPem: certPem, encryptionPrivateKeyPem: privateKeyPem })
+			.expect(201);
+		expect(res.body.encryptionKeyTransportAlgorithmId).toBe('rsa-oaep-mgf1p');
+		expect(res.body.encryptionKeyFamily).toBe('rsa');
+	});
+
+	it('API-IDP-ENC-19: GET settings never exposes encryption PEM or private key', async () => {
+		await createTestIdpSettingsWithEncryptionKey(prisma);
+		const agent = await adminAgent();
+		const res = await agent.get(IDP_SETTINGS_API_PATH).expect(200);
+		const body = JSON.stringify(res.body);
+		expect(body).not.toContain('BEGIN PRIVATE KEY');
+		expect(body).not.toContain('encryptionPrivateKeyPem');
+		expect(body).not.toContain('encryptionKeyEncrypted');
+		expect(res.body.encryptionCertFingerprintSha256).toMatch(/^[a-f0-9]{64}$/);
+	});
+
+	it('API-IDP-ENC-20: encryption rotation cancel clears pending crypto columns', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await createTestIdpSettingsWithEncryptionKey(prisma);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/encryption-cert/rotation/start`)
+			.set(csrfHeader(csrf))
+			.send({ mode: 'generate', rsaModulusBits: 4096, notAfter: '2029-12-15' })
+			.expect(201);
+		const pendingRow = await prisma.idpSettings.findUnique({ where: { id: 'default' } });
+		expect(pendingRow?.pendingEncryptionRsaModulusBits).toBe(4096);
+		expect(pendingRow?.pendingEncryptionKeyTransportAlgorithmId).toBe('rsa-oaep-mgf1p');
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/encryption-cert/rotation/cancel`)
+			.set(csrfHeader(csrf))
+			.expect(201);
+		const row = await prisma.idpSettings.findUnique({ where: { id: 'default' } });
+		expect(row?.pendingEncryptionCertPem).toBeNull();
+		expect(row?.pendingEncryptionKeyTransportAlgorithmId).toBeNull();
+		expect(row?.encryptionRotationStartedAt).toBeNull();
+		const dto = await agent.get(IDP_SETTINGS_API_PATH).expect(200);
+		expect(dto.body.encryptionRotation.active).toBe(false);
+	});
+
+	it('API-IDP-ENC-21: signing and encryption rotation may run simultaneously', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await createTestIdpSettingsWithEncryptionKey(prisma);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/start`)
+			.set(csrfHeader(csrf))
+			.send({ mode: 'generate' })
+			.expect(201);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/encryption-cert/rotation/start`)
+			.set(csrfHeader(csrf))
+			.send({ mode: 'generate', rsaModulusBits: 3072 })
+			.expect(201);
+		const settings = await agent.get(IDP_SETTINGS_API_PATH).expect(200);
+		expect(settings.body.rotation.active).toBe(true);
+		expect(settings.body.encryptionRotation.active).toBe(true);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/cancel`)
+			.set(csrfHeader(csrf))
+			.expect(201);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/encryption-cert/rotation/cancel`)
+			.set(csrfHeader(csrf))
+			.expect(201);
+	});
+
+	it('API-IDP-ENC-22: upload encryption cert blocked during encryption rotation → 409', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await createTestIdpSettingsWithEncryptionKey(prisma);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/encryption-cert/rotation/start`)
+			.set(csrfHeader(csrf))
+			.send({ mode: 'generate' })
+			.expect(201);
+		const { certPem, privateKeyPem } = generateTestRsaEncryptionCert('https://blocked.example.com');
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/encryption-cert/upload`)
+			.set(csrfHeader(csrf))
+			.send({ encryptionCertPem: certPem, encryptionPrivateKeyPem: privateKeyPem })
+			.expect(409);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/encryption-cert/rotation/cancel`)
+			.set(csrfHeader(csrf))
+			.expect(201);
+	});
+
+	it('API-IDP-ENC-ADM-01: POST encryption rotation start without CSRF → 403', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		await loginCsrf(agent);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/encryption-cert/rotation/start`)
+			.send({ mode: 'generate' })
+			.expect(403);
+	});
+
+	it('API-IDP-ENC-ADM-03: POST encryption upload without CSRF → 403', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		await loginCsrf(agent);
+		const { certPem, privateKeyPem } = generateTestRsaEncryptionCert(
+			'https://csrf-upload.example.com',
+		);
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/encryption-cert/upload`)
+			.send({ encryptionCertPem: certPem, encryptionPrivateKeyPem: privateKeyPem })
+			.expect(403);
+	});
+
+	it('API-AUDIT-ENC-01: encryption generate audit metadata has no PEM', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: { encryptionCertPem: null, encryptionKeyEncrypted: null },
+		});
+		await agent
+			.post(`${IDP_SETTINGS_API_PATH}/encryption-cert/generate`)
+			.set(csrfHeader(csrf))
+			.send({ rsaModulusBits: 3072, keyTransportAlgorithmId: 'rsa-oaep', notAfter: '2029-12-01' })
+			.expect(201);
+		const row = await prisma.auditEvent.findFirst({
+			where: { event: 'idp_encryption_cert_generated' },
+			orderBy: { createdAt: 'desc' },
+		});
+		expect(row).not.toBeNull();
+		const meta = JSON.stringify(row!.metadata);
+		expect(meta).toContain('rsa-oaep');
+		expect(meta).toContain('3072');
+		expect(meta).not.toContain('BEGIN CERTIFICATE');
+		expect(meta).not.toContain('BEGIN PRIVATE KEY');
 	});
 });

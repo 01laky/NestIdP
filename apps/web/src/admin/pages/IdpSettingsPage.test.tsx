@@ -6,7 +6,11 @@ import {
 	clickDialogConfirm,
 } from '../../test/confirm-dialog-helpers';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import type { IdpSettingsPublicDto, IdpSigningRotationStatusDto } from '@nestidp/shared';
+import type {
+	IdpEncryptionRotationStatusDto,
+	IdpSettingsPublicDto,
+	IdpSigningRotationStatusDto,
+} from '@nestidp/shared';
 import { IDP_SETTINGS_ROUTE_PREFIX } from '@nestidp/shared';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as adminApi from '../adminApi';
@@ -23,6 +27,20 @@ function inactiveRotation(): IdpSigningRotationStatusDto {
 		pendingSigningRsaModulusBits: null,
 		pendingSigningEcCurve: null,
 		pendingSigningCertNotAfter: null,
+	};
+}
+
+function inactiveEncryptionRotation(): IdpEncryptionRotationStatusDto {
+	return {
+		active: false,
+		startedAt: null,
+		hasPendingCertificate: false,
+		pendingCertFingerprintSha256: null,
+		pendingEncryptionKeyFamily: null,
+		pendingEncryptionKeyTransportAlgorithmId: null,
+		pendingEncryptionRsaModulusBits: null,
+		pendingEncryptionEcCurve: null,
+		pendingEncryptionCertNotAfter: null,
 	};
 }
 
@@ -58,6 +76,14 @@ function baseSettings(overrides: Partial<IdpSettingsPublicDto> = {}): IdpSetting
 		ssoUrl: 'http://localhost:3000/saml/sso',
 		idpBaseUrl: 'http://localhost:3000',
 		rotation: inactiveRotation(),
+		hasEncryptionCertificate: false,
+		encryptionCertFingerprintSha256: null,
+		encryptionCertNotAfter: null,
+		encryptionKeyFamily: null,
+		encryptionKeyTransportAlgorithmId: null,
+		encryptionRsaModulusBits: null,
+		encryptionEcCurve: null,
+		encryptionRotation: inactiveEncryptionRotation(),
 		updatedAt: '2026-01-01T00:00:00.000Z',
 		...overrides,
 	};
@@ -189,8 +215,8 @@ describe('IdpSettingsPage', () => {
 			.mockResolvedValue(baseSettings());
 
 		renderPage();
-		await waitFor(() => screen.getByLabelText(/Certificate expiry/i));
-		const expiry = screen.getByLabelText(/Certificate expiry/i) as HTMLInputElement;
+		await waitFor(() => screen.getAllByLabelText(/Certificate expiry date/i)[0]);
+		const expiry = screen.getAllByLabelText(/Certificate expiry date/i)[0] as HTMLInputElement;
 		fireEvent.change(expiry, { target: { value: '2029-03-20' } });
 		fireEvent.click(screen.getByRole('button', { name: 'Generate certificate' }));
 		await acceptDialogWithChallenge('REPLACE', 'Generate certificate');
@@ -270,8 +296,10 @@ describe('IdpSettingsPage', () => {
 		);
 
 		renderPage();
-		await waitFor(() => screen.getByLabelText(/RSA key size/i));
-		fireEvent.change(screen.getByLabelText(/RSA key size/i), { target: { value: '4096' } });
+		await waitFor(() => screen.getAllByLabelText(/RSA key size/i)[0]);
+		fireEvent.change(screen.getAllByLabelText(/RSA key size/i)[0]!, {
+			target: { value: '4096' },
+		});
 		fireEvent.click(screen.getByRole('button', { name: 'Start rotation (generate)' }));
 		clickDialogConfirm('Start rotation (generate)');
 
@@ -731,5 +759,145 @@ describe('IdpSettingsPage', () => {
 		fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: 'COMPLETE' } });
 		fireEvent.click(confirmBtn);
 		await waitFor(() => expect(completeSpy).toHaveBeenCalled());
+	});
+});
+
+describe('IdpSettingsPage encryption certificate', () => {
+	function activeEncryptionRotation(
+		overrides: Partial<IdpEncryptionRotationStatusDto> = {},
+	): IdpEncryptionRotationStatusDto {
+		return {
+			active: true,
+			startedAt: '2026-02-01T00:00:00.000Z',
+			hasPendingCertificate: true,
+			pendingCertFingerprintSha256: '11:22:33',
+			pendingEncryptionKeyFamily: 'rsa',
+			pendingEncryptionKeyTransportAlgorithmId: 'rsa-oaep',
+			pendingEncryptionRsaModulusBits: 3072,
+			pendingEncryptionEcCurve: null,
+			pendingEncryptionCertNotAfter: '2031-01-01T00:00:00.000Z',
+			...overrides,
+		};
+	}
+
+	it('WEB-IDP-ENC-08: pending encryption panel shows transport and expiry', async () => {
+		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(
+			baseSettings({
+				hasEncryptionCertificate: true,
+				encryptionKeyFamily: 'rsa',
+				encryptionKeyTransportAlgorithmId: 'rsa-oaep-mgf1p',
+				encryptionRsaModulusBits: 2048,
+				encryptionRotation: activeEncryptionRotation(),
+			}),
+		);
+
+		renderPage();
+
+		await waitFor(() => {
+			expect(screen.getByText('Pending encryption certificate')).toBeDefined();
+			expect(screen.getByText(/11:22:33/)).toBeDefined();
+			expect(screen.getByText(/rsa-oaep/)).toBeDefined();
+		});
+	});
+
+	it('WEB-IDP-ENC-12: copy signing options fills encryption generate defaults', async () => {
+		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(
+			baseSettings({
+				signingRsaModulusBits: 3072,
+				signingKeyFamily: 'rsa',
+			}),
+		);
+
+		renderPage();
+
+		await waitFor(() => screen.getByRole('button', { name: 'Copy signing options' }));
+		fireEvent.click(screen.getByRole('button', { name: 'Copy signing options' }));
+
+		await waitFor(() => {
+			expect(screen.getByText(/Copied signing key options into encryption form/i)).toBeDefined();
+		});
+	});
+
+	it('WEB-IDP-ENC-03: encryption generate confirm calls API with form options', async () => {
+		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(baseSettings());
+		const generateSpy = vi
+			.spyOn(adminApi, 'generateIdpEncryptionCert')
+			.mockResolvedValue(baseSettings({ hasEncryptionCertificate: true }));
+		const previewSpy = vi.spyOn(adminApi, 'getIdpMetadataPreview').mockResolvedValue({
+			xml: '<EntityDescriptor/>',
+			contentType: 'application/xml',
+		});
+
+		renderPage();
+		const section = await screen.findByRole('heading', { name: 'Encryption certificate' });
+		const panel = section.closest('section') ?? section.parentElement!;
+		await waitFor(() =>
+			within(panel as HTMLElement).getByRole('button', { name: 'Generate encryption certificate' }),
+		);
+		fireEvent.click(
+			within(panel as HTMLElement).getByRole('button', { name: 'Generate encryption certificate' }),
+		);
+		const dialog = await screen.findByRole('dialog');
+		fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: 'REPLACE' } });
+		fireEvent.click(
+			within(dialog).getByRole('button', { name: 'Generate encryption certificate' }),
+		);
+
+		await waitFor(() => {
+			expect(generateSpy).toHaveBeenCalledWith(
+				expect.objectContaining({
+					keyFamily: 'rsa',
+					keyTransportAlgorithmId: 'rsa-oaep-mgf1p',
+				}),
+			);
+			expect(previewSpy).toHaveBeenCalled();
+		});
+	});
+
+	it('WEB-IDP-ENC-13: copy public encryption PEM uses GET public-pem', async () => {
+		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(
+			baseSettings({
+				hasEncryptionCertificate: true,
+				encryptionCertFingerprintSha256: 'aa'.repeat(32),
+			}),
+		);
+		vi.spyOn(adminApi, 'getIdpEncryptionCertPublicPem').mockResolvedValue({
+			certPem: '-----BEGIN CERTIFICATE-----\nENC\n-----END CERTIFICATE-----',
+		});
+		const writeText = vi.fn().mockResolvedValue(undefined);
+		Object.assign(navigator, { clipboard: { writeText } });
+
+		renderPage();
+		await waitFor(() => screen.getByRole('button', { name: 'Copy public PEM' }));
+		fireEvent.click(screen.getByRole('button', { name: 'Copy public PEM' }));
+
+		await waitFor(() => {
+			expect(writeText).toHaveBeenCalledWith(
+				'-----BEGIN CERTIFICATE-----\nENC\n-----END CERTIFICATE-----',
+			);
+		});
+	});
+
+	it('WEB-IDP-ENC-14: download public encryption PEM triggers object URL', async () => {
+		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(
+			baseSettings({
+				hasEncryptionCertificate: true,
+				encryptionCertFingerprintSha256: 'bb'.repeat(32),
+			}),
+		);
+		vi.spyOn(adminApi, 'getIdpEncryptionCertPublicPem').mockResolvedValue({
+			certPem: '-----BEGIN CERTIFICATE-----\nDL\n-----END CERTIFICATE-----',
+		});
+		const createObjectURL = vi.fn(() => 'blob:enc-cert');
+		const revokeObjectURL = vi.fn();
+		vi.stubGlobal('URL', { createObjectURL, revokeObjectURL });
+
+		renderPage();
+		await waitFor(() => screen.getByRole('button', { name: 'Download public PEM' }));
+		fireEvent.click(screen.getByRole('button', { name: 'Download public PEM' }));
+
+		await waitFor(() => {
+			expect(createObjectURL).toHaveBeenCalled();
+		});
 	});
 });

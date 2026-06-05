@@ -19,6 +19,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { hashPassword } from '../admin-auth/password.util';
 import { encrypt } from '../encryption/encryption.util';
+import { generateTestRsaEncryptionCert } from '../idp-settings/idp-encryption-cert.util';
 import { buildTestAuthnRequestRedirectPayload as buildAuthnRedirectPayload } from '../saml/testing/build-authn-request.util';
 
 export const TEST_ENCRYPTED_CREDENTIALS = 'test-encrypted-token';
@@ -217,6 +218,34 @@ export async function createTestIdpSettings(
 		data: {
 			id: 'default',
 			entityId: 'https://idp.example.com',
+			...overrides,
+		},
+	});
+}
+
+export async function createTestIdpSettingsWithEncryptionKey(
+	prisma: PrismaClient,
+	overrides: IdpSettingsOverrides = {},
+): Promise<IdpSettings> {
+	const entityId = overrides.entityId ?? 'http://localhost:3000';
+	const { privateKeyPem, certPem } = generateTestRsaEncryptionCert(entityId);
+	return prisma.idpSettings.upsert({
+		where: { id: 'default' },
+		create: {
+			id: 'default',
+			entityId,
+			encryptionCertPem: certPem,
+			encryptionKeyEncrypted: encrypt(privateKeyPem, TEST_ENCRYPTION_KEY),
+			encryptionKeyFamily: 'rsa',
+			encryptionRsaModulusBits: 2048,
+			...overrides,
+		},
+		update: {
+			entityId,
+			encryptionCertPem: certPem,
+			encryptionKeyEncrypted: encrypt(privateKeyPem, TEST_ENCRYPTION_KEY),
+			encryptionKeyFamily: 'rsa',
+			encryptionRsaModulusBits: 2048,
 			...overrides,
 		},
 	});

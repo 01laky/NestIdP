@@ -20,6 +20,14 @@ const defaultIdp = {
 	signingRsaModulusBits: 2048,
 	signingEcCurve: null,
 	certStatus: 'ok' as const,
+	hasEncryptionCertificate: false,
+	encryptionRotationActive: false,
+	encryptionCertNotAfter: null,
+	encryptionKeyFamily: null,
+	encryptionKeyTransportAlgorithmId: null,
+	encryptionRsaModulusBits: null,
+	encryptionEcCurve: null,
+	encryptionCertStatus: 'not_configured' as const,
 };
 
 function dashboardStub(
@@ -101,6 +109,32 @@ describe('DashboardPage', () => {
 		});
 	});
 
+	it('WEB-DASH-ENC-01: dashboard renders idpEncryptionSummary when encryption configured', async () => {
+		vi.spyOn(adminApi, 'getAdminDashboard').mockResolvedValue(
+			dashboardStub({
+				idp: {
+					...defaultIdp,
+					hasEncryptionCertificate: true,
+					encryptionCertStatus: 'ok',
+					encryptionKeyFamily: 'rsa',
+					encryptionKeyTransportAlgorithmId: 'rsa-oaep-mgf1p',
+					encryptionRsaModulusBits: 3072,
+					encryptionCertNotAfter: '2031-06-01T00:00:00.000Z',
+				},
+			}),
+		);
+
+		render(
+			<MemoryRouter>
+				<DashboardPage />
+			</MemoryRouter>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByText(/Encryption: RSA 3072 bit · rsa-oaep-mgf1p/i)).toBeDefined();
+		});
+	});
+
 	it('WEB-DASH-CRYPTO-01: dashboard renders idpSigningSummary when cert configured', async () => {
 		vi.spyOn(adminApi, 'getAdminDashboard').mockResolvedValue(dashboardStub());
 
@@ -171,7 +205,7 @@ describe('DashboardPage', () => {
 
 		await waitFor(() => {
 			expect(screen.getByText('Rotation in progress')).toBeDefined();
-			expect(screen.getByText(/Complete or cancel certificate rotation/i)).toBeDefined();
+			expect(screen.getByText(/Complete or cancel signing certificate rotation/i)).toBeDefined();
 		});
 	});
 

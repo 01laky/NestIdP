@@ -140,16 +140,17 @@ model UserRole {
 }
 
 model SpConnection {
-	id               String   @id @default(cuid())
-	name             String
-	spEntityId       String   @unique
-	acsUrl           String
-	spCertificate    String?
-	nameIdFormat     String   @default("urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress")
-	attributeMapping Json?
-	active           Boolean  @default(true)
-	createdAt        DateTime @default(now())
-	updatedAt        DateTime @updatedAt
+	id                      String   @id @default(cuid())
+	name                    String
+	spEntityId              String   @unique
+	acsUrl                  String
+	spCertificate           String?
+	nameIdFormat            String   @default("urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress")
+	attributeMapping        Json?
+	active                  Boolean  @default(true)
+	wantAssertionsEncrypted Boolean  @default(false)
+	createdAt               DateTime @default(now())
+	updatedAt               DateTime @updatedAt
 
 	samlSessions SamlSession[]
 }
@@ -229,6 +230,19 @@ model IdpSettings {
 	pendingSigningRsaModulusBits      Int?
 	pendingSigningEcCurve             String?
 	rotationStartedAt                 DateTime?
+	encryptionCertPem                      String?
+	encryptionKeyEncrypted                 String?
+	encryptionKeyFamily                    String?
+	encryptionKeyTransportAlgorithmId      String?
+	encryptionRsaModulusBits               Int?
+	encryptionEcCurve                      String?
+	pendingEncryptionCertPem               String?
+	pendingEncryptionKeyEncrypted          String?
+	pendingEncryptionKeyFamily             String?
+	pendingEncryptionKeyTransportAlgorithmId String?
+	pendingEncryptionRsaModulusBits        Int?
+	pendingEncryptionEcCurve               String?
+	encryptionRotationStartedAt            DateTime?
 	nameIdFormat                      String    @default("urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress")
 	createdAt                         DateTime  @default(now())
 	updatedAt                         DateTime  @updatedAt

@@ -81,6 +81,7 @@ describe('admin confirm page flows', () => {
 			nameIdFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
 			attributeMapping: null,
 			hasSpCertificate: false,
+			wantAssertionsEncrypted: false,
 			createdAt: '',
 			updatedAt: '',
 		});
@@ -94,6 +95,7 @@ describe('admin confirm page flows', () => {
 				nameIdFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
 				attributeMapping: null,
 				hasSpCertificate: false,
+				wantAssertionsEncrypted: false,
 				createdAt: '',
 				updatedAt: '',
 			},
@@ -278,6 +280,7 @@ describe('admin confirm page flows', () => {
 			nameIdFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
 			attributeMapping: null,
 			hasSpCertificate: false,
+			wantAssertionsEncrypted: false,
 			createdAt: '',
 			updatedAt: '',
 		});
@@ -423,6 +426,7 @@ describe('admin confirm page flows', () => {
 			nameIdFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
 			attributeMapping: null,
 			hasSpCertificate: false,
+			wantAssertionsEncrypted: false,
 			createdAt: '',
 			updatedAt: '',
 		});

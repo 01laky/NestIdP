@@ -1,4 +1,6 @@
 /** Admin REST — global IdP settings (v0.9.0). */
+import type { IdpCertEcCurve, IdpCertKeyFamily } from './idp-cert-common.js';
+import type { GenerateIdpEncryptionCertRequestDto } from './idp-encryption-crypto.js';
 import type { GenerateIdpSigningCertRequestDto } from './idp-signing-crypto.js';
 
 export const IDP_SETTINGS_API_PATH = '/api/admin/idp/settings';
@@ -17,15 +19,29 @@ export const IDP_ROTATION_STALE_WARNING_DAYS = 7;
 
 export type AdminDashboardIdpCertStatus = 'missing' | 'ok' | 'expiring_soon' | 'rotation_active';
 
+export type AdminDashboardEncryptionCertStatus = 'not_configured' | AdminDashboardIdpCertStatus;
+
+export interface IdpEncryptionRotationStatusDto {
+	active: boolean;
+	startedAt: string | null;
+	hasPendingCertificate: boolean;
+	pendingCertFingerprintSha256: string | null;
+	pendingEncryptionKeyFamily: IdpCertKeyFamily | null;
+	pendingEncryptionKeyTransportAlgorithmId: string | null;
+	pendingEncryptionRsaModulusBits: number | null;
+	pendingEncryptionEcCurve: IdpCertEcCurve | null;
+	pendingEncryptionCertNotAfter: string | null;
+}
+
 export interface IdpSigningRotationStatusDto {
 	active: boolean;
 	startedAt: string | null;
 	hasPendingCertificate: boolean;
 	pendingCertFingerprintSha256: string | null;
-	pendingSigningKeyFamily: 'rsa' | 'ec' | null;
+	pendingSigningKeyFamily: IdpCertKeyFamily | null;
 	pendingSigningSignatureAlgorithmId: string | null;
 	pendingSigningRsaModulusBits: number | null;
-	pendingSigningEcCurve: string | null;
+	pendingSigningEcCurve: IdpCertEcCurve | null;
 	pendingSigningCertNotAfter: string | null;
 }
 
@@ -35,14 +51,22 @@ export interface IdpSettingsPublicDto {
 	hasSigningCertificate: boolean;
 	signingCertFingerprintSha256: string | null;
 	signingCertNotAfter: string | null;
-	signingKeyFamily: 'rsa' | 'ec' | null;
+	signingKeyFamily: IdpCertKeyFamily | null;
 	signingSignatureAlgorithmId: string | null;
 	signingRsaModulusBits: number | null;
-	signingEcCurve: string | null;
+	signingEcCurve: IdpCertEcCurve | null;
 	metadataUrl: string;
 	ssoUrl: string;
 	idpBaseUrl: string;
 	rotation: IdpSigningRotationStatusDto;
+	hasEncryptionCertificate: boolean;
+	encryptionCertFingerprintSha256: string | null;
+	encryptionCertNotAfter: string | null;
+	encryptionKeyFamily: IdpCertKeyFamily | null;
+	encryptionKeyTransportAlgorithmId: string | null;
+	encryptionRsaModulusBits: number | null;
+	encryptionEcCurve: IdpCertEcCurve | null;
+	encryptionRotation: IdpEncryptionRotationStatusDto;
 	updatedAt: string;
 }
 
@@ -56,11 +80,20 @@ export interface UploadIdpSigningCertRequestDto {
 	signingPrivateKeyPem: string;
 }
 
-export type { GenerateIdpSigningCertRequestDto };
+export interface UploadIdpEncryptionCertRequestDto {
+	encryptionCertPem: string;
+	encryptionPrivateKeyPem: string;
+}
+
+export type { GenerateIdpSigningCertRequestDto, GenerateIdpEncryptionCertRequestDto };
 
 export type StartIdpCertRotationRequestDto =
 	| ({ mode: 'generate' } & GenerateIdpSigningCertRequestDto)
 	| { mode: 'upload'; signingCertPem: string; signingPrivateKeyPem: string };
+
+export type StartIdpEncryptionCertRotationRequestDto =
+	| ({ mode: 'generate' } & GenerateIdpEncryptionCertRequestDto)
+	| { mode: 'upload'; encryptionCertPem: string; encryptionPrivateKeyPem: string };
 
 export interface IdpMetadataPreviewResponseDto {
 	xml: string;

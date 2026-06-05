@@ -43,6 +43,7 @@ describe('SpConnectionFormPage', () => {
 				attributeMapping: null,
 				active: true,
 				hasSpCertificate: false,
+				wantAssertionsEncrypted: false,
 				createdAt: '2026-01-01T00:00:00.000Z',
 				updatedAt: '2026-01-01T00:00:00.000Z',
 			},
@@ -86,5 +87,31 @@ describe('SpConnectionFormPage', () => {
 		await waitFor(() => {
 			expect(screen.getByRole('alert').textContent).toContain('Name already exists');
 		});
+	});
+
+	it('WEB-SP-ENC-01: wantAssertionsEncrypted checkbox disabled without SP certificate PEM', async () => {
+		const { container } = renderNew();
+		await waitFor(() => container.querySelector('#encrypt-saml-assertions'));
+		const checkbox = container.querySelector('#encrypt-saml-assertions') as HTMLInputElement;
+		expect(checkbox.disabled).toBe(true);
+	});
+
+	it('WEB-SP-ENC-02: wantAssertionsEncrypted enabled when SP certificate PEM entered', async () => {
+		const { container } = renderNew();
+		const pem = await waitFor(() =>
+			container.querySelector('[id="sp-certificate-pem-(optional)"]'),
+		);
+		fireEvent.change(pem!, {
+			target: { value: '-----BEGIN CERTIFICATE-----\nX\n-----END CERTIFICATE-----' },
+		});
+		const checkbox = await waitFor(() => {
+			const el = container.querySelector('#encrypt-saml-assertions') as HTMLInputElement;
+			if (el.disabled) {
+				throw new Error('still disabled');
+			}
+			return el;
+		});
+		fireEvent.click(checkbox);
+		expect(checkbox.checked).toBe(true);
 	});
 });

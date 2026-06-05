@@ -4,13 +4,17 @@ import {
 	type IdpMetadataPreviewResponseDto,
 	type IdpSettingsPublicDto,
 	type StartIdpCertRotationRequestDto,
+	type StartIdpEncryptionCertRotationRequestDto,
 } from '@nestidp/shared';
 import { AdminAuthGuard } from '../admin-auth/admin-auth.guard';
 import { AdminCsrfGuard } from '../admin-auth/admin-csrf.guard';
 import { IdpSettingsService } from './idp-settings.service';
+import { GenerateIdpEncryptionCertBodyDto } from './generate-idp-encryption-cert.dto';
 import { GenerateIdpSigningCertBodyDto } from './generate-idp-signing-cert.dto';
 import { StartIdpCertRotationBodyDto } from './start-idp-cert-rotation.dto';
+import { StartIdpEncryptionCertRotationBodyDto } from './start-idp-encryption-cert-rotation.dto';
 import { UpdateIdpSettingsBodyDto } from './update-idp-settings.dto';
+import { UploadIdpEncryptionCertBodyDto } from './upload-idp-encryption-cert.dto';
 import { UploadIdpSigningCertBodyDto } from './upload-idp-signing-cert.dto';
 
 @Controller(IDP_SETTINGS_API_PATH)
@@ -69,6 +73,52 @@ export class IdpSettingsController {
 	@UseGuards(AdminCsrfGuard)
 	cancelRotation(): Promise<IdpSettingsPublicDto> {
 		return this.idpSettingsService.cancelRotation();
+	}
+
+	@Post('encryption-cert/generate')
+	@UseGuards(AdminCsrfGuard)
+	generatePrimaryEncryptionCert(
+		@Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+		body: GenerateIdpEncryptionCertBodyDto,
+	): Promise<IdpSettingsPublicDto> {
+		return this.idpSettingsService.generatePrimaryEncryptionCert(body);
+	}
+
+	@Post('encryption-cert/upload')
+	@UseGuards(AdminCsrfGuard)
+	uploadPrimaryEncryptionCert(
+		@Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+		body: UploadIdpEncryptionCertBodyDto,
+	): Promise<IdpSettingsPublicDto> {
+		return this.idpSettingsService.uploadPrimaryEncryptionCert(body);
+	}
+
+	@Post('encryption-cert/rotation/start')
+	@UseGuards(AdminCsrfGuard)
+	startEncryptionRotation(
+		@Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+		body: StartIdpEncryptionCertRotationBodyDto,
+	): Promise<IdpSettingsPublicDto> {
+		return this.idpSettingsService.startEncryptionRotation(
+			body as StartIdpEncryptionCertRotationRequestDto,
+		);
+	}
+
+	@Post('encryption-cert/rotation/complete')
+	@UseGuards(AdminCsrfGuard)
+	completeEncryptionRotation(): Promise<IdpSettingsPublicDto> {
+		return this.idpSettingsService.completeEncryptionRotation();
+	}
+
+	@Post('encryption-cert/rotation/cancel')
+	@UseGuards(AdminCsrfGuard)
+	cancelEncryptionRotation(): Promise<IdpSettingsPublicDto> {
+		return this.idpSettingsService.cancelEncryptionRotation();
+	}
+
+	@Get('encryption-cert/public-pem')
+	getEncryptionCertPublicPem(): Promise<{ certPem: string }> {
+		return this.idpSettingsService.getEncryptionCertPublicPem();
 	}
 
 	@Get('metadata-preview')

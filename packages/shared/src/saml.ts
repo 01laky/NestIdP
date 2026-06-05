@@ -48,6 +48,7 @@ export interface SpConnectionPublicDto {
 	attributeMapping: SpAttributeMappingConfig | null;
 	active: boolean;
 	hasSpCertificate: boolean;
+	wantAssertionsEncrypted: boolean;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -74,6 +75,7 @@ export interface CreateSpConnectionRequestDto {
 	attributeMapping?: SpAttributeMappingConfig | null;
 	active?: boolean;
 	spCertificate?: string | null;
+	wantAssertionsEncrypted?: boolean;
 }
 
 export interface UpdateSpConnectionRequestDto {
@@ -84,6 +86,7 @@ export interface UpdateSpConnectionRequestDto {
 	attributeMapping?: SpAttributeMappingConfig | null;
 	active?: boolean;
 	spCertificate?: string | null;
+	wantAssertionsEncrypted?: boolean;
 }
 
 export interface DeleteSpConnectionResponseDto {

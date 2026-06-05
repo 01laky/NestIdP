@@ -1,0 +1,13 @@
+flowchart LR
+	subgraph idp [NestIdP IdP Settings]
+		SK[Signing cert + key]
+		EK[Encryption cert + key]
+	end
+	subgraph sp [SP Connection]
+		SPB[SP certificate PEM]
+		WA[wantAssertionsEncrypted stub]
+	end
+	SK -->|XML-DSig| Assert[Signed SAML Assertion]
+	EK -->|metadata KeyDescriptor use=encryption| Meta[GET /saml/metadata]
+	SPB -->|Prompt 23: encrypt session key to SP| Assert
+	WA -.->|v1.5.0 stored only| Assert

@@ -18,12 +18,12 @@ import type {
 import { SAML_NAME_ID_FORMATS } from '@nestidp/shared';
 import { assertValidAcsUrl, AcsUrlValidationError } from '../common/acs-url.util';
 import { PrismaService } from '../prisma/prisma.service';
-import { IdpSettingsService } from '../idp-settings/idp-settings.service';
 import {
 	assertValidSpAttributeMapping,
 	SpAttributeMappingValidationError,
 } from './sp-attribute-mapping.validator';
 import { assertValidSpCertificatePem, SpCertificateValidationError } from './sp-certificate.util';
+import { IdpSettingsService } from '../idp-settings/idp-settings.service';
 import { SpConnectionsAuditService } from './sp-connections-audit.service';
 import { toSpConnectionPublicDto } from './sp-connections.mapper';
 
@@ -55,6 +55,8 @@ export class SpConnectionsService {
 		const nameIdFormat = this.resolveNameIdFormat(body.nameIdFormat);
 		const attributeMapping = this.validateMapping(body.attributeMapping);
 		const spCertificate = this.validateCertificate(body.spCertificate);
+		const wantAssertionsEncrypted = body.wantAssertionsEncrypted ?? false;
+		this.assertWantAssertionsEncryptedRequiresSpCert(wantAssertionsEncrypted, spCertificate);
 
 		const row = await this.prisma.spConnection.create({
 			data: {
@@ -65,6 +67,7 @@ export class SpConnectionsService {
 				attributeMapping: attributeMapping ?? Prisma.JsonNull,
 				active: body.active ?? true,
 				spCertificate,
+				wantAssertionsEncrypted,
 			},
 		});
 
@@ -80,7 +83,8 @@ export class SpConnectionsService {
 			body.nameIdFormat === undefined &&
 			body.attributeMapping === undefined &&
 			body.active === undefined &&
-			body.spCertificate === undefined
+			body.spCertificate === undefined &&
+			body.wantAssertionsEncrypted === undefined
 		) {
 			throw new BadRequestException('At least one field must be provided');
 		}
@@ -124,6 +128,14 @@ export class SpConnectionsService {
 		}
 		if (body.spCertificate !== undefined) {
 			data.spCertificate = this.validateCertificate(body.spCertificate);
+		}
+		if (body.wantAssertionsEncrypted !== undefined) {
+			const certForCheck =
+				body.spCertificate !== undefined
+					? this.validateCertificate(body.spCertificate)
+					: existing.spCertificate;
+			this.assertWantAssertionsEncryptedRequiresSpCert(body.wantAssertionsEncrypted, certForCheck);
+			data.wantAssertionsEncrypted = body.wantAssertionsEncrypted;
 		}
 
 		const row = await this.prisma.spConnection.update({
@@ -209,6 +221,20 @@ export class SpConnectionsService {
 		});
 		if (rows.some((row) => row.name.trim().toLowerCase() === normalized)) {
 			throw new ConflictException('A Service Provider connection with this name already exists');
+		}
+	}
+
+	private assertWantAssertionsEncryptedRequiresSpCert(
+		wantEncrypted: boolean,
+		spCertificate: string | null,
+	): void {
+		if (!wantEncrypted) {
+			return;
+		}
+		if (!spCertificate?.trim()) {
+			throw new BadRequestException(
+				'SP certificate PEM is required when encrypt assertions is enabled',
+			);
 		}
 	}
 

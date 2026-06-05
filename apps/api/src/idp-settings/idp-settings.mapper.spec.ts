@@ -4,10 +4,12 @@ import {
 	buildIdpUrls,
 	buildMetadataUrlResponse,
 	deriveCertStatus,
+	deriveEncryptionCertStatus,
 	resolveIdpBaseUrl,
 	toDashboardIdpStatus,
 	toIdpSettingsPublicDto,
 } from './idp-settings.mapper';
+import { generateTestRsaEncryptionCert } from './idp-encryption-cert.util';
 import { getTestSigningMaterial, getTestSigningMaterialWithDays } from '../prisma/test-fixtures';
 
 describe('idp-settings.mapper', () => {
@@ -32,6 +34,15 @@ describe('idp-settings.mapper', () => {
 			pendingSigningRsaModulusBits: null,
 			pendingSigningEcCurve: null,
 			rotationStartedAt: null,
+			encryptionCertPem: null,
+			encryptionKeyEncrypted: null,
+			encryptionKeyFamily: null,
+			encryptionRsaModulusBits: null,
+			pendingEncryptionCertPem: null,
+			pendingEncryptionKeyEncrypted: null,
+			pendingEncryptionKeyFamily: null,
+			pendingEncryptionRsaModulusBits: null,
+			encryptionRotationStartedAt: null,
 			createdAt: new Date('2026-01-01T00:00:00.000Z'),
 			updatedAt: new Date('2026-01-02T00:00:00.000Z'),
 			...overrides,
@@ -171,6 +182,58 @@ describe('idp-settings.mapper', () => {
 		);
 		expect(dto.signingSignatureAlgorithmId).toBe('rsa-sha512');
 		expect(dto.signingRsaModulusBits).toBe(3072);
+	});
+
+	it('API-IDP-MAP-18: public DTO maps encryptionRotation and primary encryption crypto', () => {
+		const enc = generateTestRsaEncryptionCert('https://enc-map.example.com');
+		const dto = toIdpSettingsPublicDto(
+			settingsRow({
+				encryptionCertPem: enc.certPem,
+				encryptionKeyEncrypted: 'enc-blob',
+				encryptionKeyFamily: 'rsa',
+				encryptionKeyTransportAlgorithmId: 'rsa-oaep',
+				encryptionRsaModulusBits: 3072,
+				encryptionEcCurve: null,
+				pendingEncryptionCertPem: enc.certPem,
+				pendingEncryptionKeyEncrypted: 'pending-enc',
+				pendingEncryptionKeyFamily: 'rsa',
+				pendingEncryptionKeyTransportAlgorithmId: 'rsa-1_5',
+				pendingEncryptionRsaModulusBits: 4096,
+				encryptionRotationStartedAt: new Date('2026-05-01T00:00:00.000Z'),
+			}),
+			'http://localhost:3000',
+		);
+		expect(dto.hasEncryptionCertificate).toBe(true);
+		expect(dto.encryptionKeyTransportAlgorithmId).toBe('rsa-oaep');
+		expect(dto.encryptionRsaModulusBits).toBe(3072);
+		expect(dto.encryptionRotation.active).toBe(true);
+		expect(dto.encryptionRotation.pendingEncryptionKeyTransportAlgorithmId).toBe('rsa-1_5');
+		expect(dto.encryptionRotation.pendingEncryptionRsaModulusBits).toBe(4096);
+		expect(JSON.stringify(dto)).not.toContain('BEGIN PRIVATE KEY');
+		expect(dto).not.toHaveProperty('encryptionKeyEncrypted');
+	});
+
+	it('API-IDP-MAP-19: deriveEncryptionCertStatus not_configured / ok / rotation_active', () => {
+		expect(deriveEncryptionCertStatus(settingsRow())).toBe('not_configured');
+		const enc = generateTestRsaEncryptionCert('https://enc-status.example.com', 365);
+		expect(
+			deriveEncryptionCertStatus(
+				settingsRow({
+					encryptionCertPem: enc.certPem,
+					encryptionKeyEncrypted: 'enc',
+				}),
+			),
+		).toBe('ok');
+		expect(
+			deriveEncryptionCertStatus(
+				settingsRow({
+					encryptionCertPem: enc.certPem,
+					encryptionKeyEncrypted: 'enc',
+					pendingEncryptionCertPem: enc.certPem,
+					pendingEncryptionKeyEncrypted: 'pending',
+				}),
+			),
+		).toBe('rotation_active');
 	});
 
 	it('API-IDP-MAP-15: rotation_active takes precedence over expiring_soon', () => {

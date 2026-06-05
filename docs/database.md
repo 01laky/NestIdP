@@ -69,15 +69,23 @@ Migration: `20260604120000_identity_manual_crud` (SQLite + PostgreSQL histories 
 
 Singleton row `id = default`. Bootstrap creates **`entityId`** only (from `IDP_BASE_URL`); signing certs are operator-managed or lazy-generated on first SSO/metadata (dev fallback).
 
-| Column                                                 | Purpose                                                  |
-| ------------------------------------------------------ | -------------------------------------------------------- |
-| `signingCertPem` / `signingKeyEncrypted`               | Primary signing material (assertions + metadata)         |
-| `pendingSigningCertPem` / `pendingSigningKeyEncrypted` | Next cert during rotation (metadata only until complete) |
-| `rotationStartedAt`                                    | UI / audit timestamp when rotation started               |
+| Column                                                                                                      | Purpose                                                                   |
+| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `signingCertPem` / `signingKeyEncrypted`                                                                    | Primary signing material (assertions + metadata)                          |
+| `pendingSigningCertPem` / `pendingSigningKeyEncrypted`                                                      | Next cert during rotation (metadata only until complete)                  |
+| `rotationStartedAt`                                                                                         | UI / audit timestamp when signing rotation started                        |
+| `signingKeyFamily`, `signingSignatureAlgorithmId`, …                                                        | Crypto metadata for primary/pending signing certs (v1.4.7)                |
+| `encryptionCertPem` / `encryptionKeyEncrypted`                                                              | Optional IdP encryption material (metadata `use="encryption"`)            |
+| `pendingEncryptionCertPem` / `pendingEncryptionKeyEncrypted`                                                | Next encryption cert during encryption rotation                           |
+| `encryptionRotationStartedAt`                                                                               | Timestamp when **encryption** rotation started (independent from signing) |
+| `encryptionKeyFamily`, `encryptionKeyTransportAlgorithmId`, `encryptionRsaModulusBits`, `encryptionEcCurve` | Primary encryption crypto metadata (v1.5.0)                               |
+| `pendingEncryption*` columns                                                                                | Pending encryption crypto during rotation                                 |
 
-**Invariants:** pending cert and key must both be set or both null; `complete` promotes pending → primary; `cancel` clears pending + `rotationStartedAt`. Private keys encrypted with `EncryptionService` (`v1:` prefix).
+**Invariants:** for each rotation kind (signing vs encryption), pending cert and key must both be set or both null; `complete` promotes pending → primary including crypto columns; `cancel` clears pending fields. Signing and encryption rotations may be active **at the same time**. Encryption cert is **never** lazy-generated on SSO. Private keys encrypted with `EncryptionService` (`v1:` prefix).
 
-Deploy: `pnpm db:migrate:deploy` applies migration `20260602120000_idp_settings_rotation` on both SQLite and PostgreSQL.
+**SpConnection (v1.5.0):** `wantAssertionsEncrypted` defaults `false`; API rejects enabling without `spCertificate` PEM (runtime encrypted assertions deferred).
+
+Deploy: `pnpm db:migrate:deploy` applies migrations through `20260605130000_idp_encryption_crypto` on both SQLite and PostgreSQL.
 
 ### Audit events (v1.0.0)
 

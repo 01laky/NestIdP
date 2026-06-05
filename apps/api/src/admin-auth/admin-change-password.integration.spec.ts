@@ -44,6 +44,19 @@ function flushPromises(): Promise<void> {
 	return new Promise((resolve) => setImmediate(resolve));
 }
 
+async function waitForAuditEvent(prisma: PrismaService, event: string) {
+	for (let attempt = 0; attempt < 30; attempt += 1) {
+		const row = await prisma.auditEvent.findFirst({
+			where: { event },
+		});
+		if (row) {
+			return row;
+		}
+		await new Promise((resolve) => setTimeout(resolve, 25));
+	}
+	return null;
+}
+
 describe('admin change-password integration (SQLite)', () => {
 	let app: INestApplication;
 	let prisma: PrismaService;
@@ -210,11 +223,7 @@ describe('admin change-password integration (SQLite)', () => {
 			.send({ currentPassword: adminPassword, newPassword: 'AnotherNewPass99' })
 			.expect(200);
 
-		await flushPromises();
-
-		const row = await prisma.auditEvent.findFirst({
-			where: { event: 'admin_password_changed' },
-		});
+		const row = await waitForAuditEvent(prisma, 'admin_password_changed');
 		expect(row).not.toBeNull();
 		expect(row!.category).toBe('admin_auth');
 	});

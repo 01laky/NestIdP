@@ -13,6 +13,7 @@ import {
 	SAML_REQUEST_QUERY_PARAM,
 	SP_CONNECTIONS_API_PATH,
 } from '@nestidp/shared';
+import { generateTestRsaEncryptionCert } from '../idp-settings/idp-encryption-cert.util';
 import { AdminAuthModule } from '../admin-auth/admin-auth.module';
 import { EncryptionModule } from '../encryption/encryption.module';
 import { SamlModule } from '../saml/saml.module';
@@ -685,5 +686,64 @@ describe('SP connections admin API (SQLite)', () => {
 		const res = await agent.get(SP_CONNECTIONS_API_PATH).expect(200);
 		const item = res.body.items.find((row: { id: string }) => row.id === sp.id);
 		expect(item?.active).toBe(false);
+	});
+
+	it('API-SP-ENC-01: new SP defaults wantAssertionsEncrypted false', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		const res = await agent
+			.post(SP_CONNECTIONS_API_PATH)
+			.set(csrfHeader(csrf))
+			.send({
+				name: 'Plain Assertions',
+				spEntityId: 'urn:sp:plain-assertions',
+				acsUrl: 'https://sp.example.com/acs/plain',
+			})
+			.expect(201);
+		expect(res.body.item.wantAssertionsEncrypted).toBe(false);
+	});
+
+	it('API-SP-ENC-02: wantAssertionsEncrypted true without SP certificate → 400', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent
+			.post(SP_CONNECTIONS_API_PATH)
+			.set(csrfHeader(csrf))
+			.send({
+				name: 'Encrypted Required',
+				spEntityId: 'urn:sp:enc-required',
+				acsUrl: 'https://sp.example.com/acs/enc',
+				wantAssertionsEncrypted: true,
+			})
+			.expect(400);
+	});
+
+	it('API-SP-ENC-03: wantAssertionsEncrypted true with SP certificate PEM → 201', async () => {
+		const { certPem } = generateTestRsaEncryptionCert('https://idp.example.com');
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		const res = await agent
+			.post(SP_CONNECTIONS_API_PATH)
+			.set(csrfHeader(csrf))
+			.send({
+				name: 'Encrypted OK',
+				spEntityId: 'urn:sp:enc-ok',
+				acsUrl: 'https://sp.example.com/acs/enc-ok',
+				spCertificate: certPem,
+				wantAssertionsEncrypted: true,
+			})
+			.expect(201);
+		expect(res.body.item.wantAssertionsEncrypted).toBe(true);
+	});
+
+	it('API-SP-ENC-04: PATCH enable encrypted assertions without SP cert → 400', async () => {
+		const sp = await createTestSpConnection(prisma, { name: 'Enc Patch Target' });
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent
+			.patch(`${SP_CONNECTIONS_API_PATH}/${sp.id}`)
+			.set(csrfHeader(csrf))
+			.send({ wantAssertionsEncrypted: true })
+			.expect(400);
 	});
 });

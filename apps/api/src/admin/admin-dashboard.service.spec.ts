@@ -49,6 +49,14 @@ describe('AdminDashboardService', () => {
 			signingRsaModulusBits: 2048,
 			signingEcCurve: null,
 			certStatus: 'ok',
+			hasEncryptionCertificate: false,
+			encryptionRotationActive: false,
+			encryptionCertNotAfter: null,
+			encryptionKeyFamily: null,
+			encryptionKeyTransportAlgorithmId: null,
+			encryptionRsaModulusBits: null,
+			encryptionEcCurve: null,
+			encryptionCertStatus: 'not_configured',
 		});
 	});
 
@@ -115,6 +123,14 @@ describe('AdminDashboardService', () => {
 			signingRsaModulusBits: 2048,
 			signingEcCurve: null,
 			certStatus: 'ok',
+			hasEncryptionCertificate: false,
+			encryptionRotationActive: false,
+			encryptionCertNotAfter: null,
+			encryptionKeyFamily: null,
+			encryptionKeyTransportAlgorithmId: null,
+			encryptionRsaModulusBits: null,
+			encryptionEcCurve: null,
+			encryptionCertStatus: 'not_configured',
 		});
 	});
 
@@ -134,6 +150,14 @@ describe('AdminDashboardService', () => {
 			signingRsaModulusBits: null,
 			signingEcCurve: null,
 			certStatus: 'missing',
+			hasEncryptionCertificate: false,
+			encryptionRotationActive: false,
+			encryptionCertNotAfter: null,
+			encryptionKeyFamily: null,
+			encryptionKeyTransportAlgorithmId: null,
+			encryptionRsaModulusBits: null,
+			encryptionEcCurve: null,
+			encryptionCertStatus: 'not_configured',
 		});
 	});
 });

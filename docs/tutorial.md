@@ -54,6 +54,14 @@ Paste PEM certificate and private key if you bring your own key material.
 
 Download or copy metadata from the preview (or open `/saml/metadata`) and register it in your SP admin UI.
 
+### Encryption certificate (optional, v1.5.0)
+
+A **second** panel configures an IdP encryption certificate, independent from signing. Use it when partners expect `KeyDescriptor use="encryption"` in metadata. Defaults: RSA-2048, RSA-OAEP-MGF1P key transport, ~two-year expiry. EC keys are supported for metadata; key transport is RSA-only in the UI.
+
+This is **not** the certificate used to encrypt SAML assertions **to** a service provider — that is each SP connection’s **SP certificate** PEM. The admin UI explains the distinction; see [idp-certificates.svg](./img/idp-certificates.svg).
+
+Copy signing options or download/copy the public encryption PEM from the panel. Encrypted assertions at runtime are not enabled yet; `wantAssertionsEncrypted` on SP connections is stored for a future release.
+
 ## 4. API connection (identity source)
 
 v1 supports one external API connection for sync (plus a hidden local directory for manual users). Point it at your REST identity API.

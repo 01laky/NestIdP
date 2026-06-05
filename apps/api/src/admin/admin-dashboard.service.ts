@@ -50,6 +50,14 @@ export class AdminDashboardService {
 					signingRsaModulusBits: null,
 					signingEcCurve: null,
 					certStatus: 'missing' as const,
+					hasEncryptionCertificate: false,
+					encryptionRotationActive: false,
+					encryptionCertNotAfter: null,
+					encryptionKeyFamily: null,
+					encryptionKeyTransportAlgorithmId: null,
+					encryptionRsaModulusBits: null,
+					encryptionEcCurve: null,
+					encryptionCertStatus: 'not_configured' as const,
 				};
 
 		return {

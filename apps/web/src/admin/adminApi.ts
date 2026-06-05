@@ -20,6 +20,7 @@ import type {
 	DeleteApiConnectionResponseDto,
 	DeleteSpConnectionResponseDto,
 	IdpMetadataPreviewResponseDto,
+	GenerateIdpEncryptionCertRequestDto,
 	GenerateIdpSigningCertRequestDto,
 	IdpSettingsPublicDto,
 	CreateManualIdentityGroupDto,
@@ -38,6 +39,7 @@ import type {
 	SpConnectionResponseDto,
 	SpConnectionTestAcsResponseDto,
 	StartIdpCertRotationRequestDto,
+	StartIdpEncryptionCertRotationRequestDto,
 	SyncLogListResponseDto,
 	SyncLogResponseDto,
 	SyncStatusResponseDto,
@@ -46,6 +48,7 @@ import type {
 	UpdateApiConnectionRequestDto,
 	UpdateIdpSettingsRequestDto,
 	UpdateSpConnectionRequestDto,
+	UploadIdpEncryptionCertRequestDto,
 	UploadIdpSigningCertRequestDto,
 } from '@nestidp/shared';
 import type { IdpMetadataUrlResponseDto, SpConnectionListResponseDto } from '@nestidp/shared';
@@ -458,6 +461,58 @@ export function cancelIdpCertRotation(): Promise<IdpSettingsPublicDto> {
 	return adminFetch<IdpSettingsPublicDto>(`${IDP_SETTINGS_API_PATH}/signing-cert/rotation/cancel`, {
 		method: 'POST',
 	});
+}
+
+export function generateIdpEncryptionCert(
+	body: GenerateIdpEncryptionCertRequestDto = {},
+): Promise<IdpSettingsPublicDto> {
+	return adminFetch<IdpSettingsPublicDto>(`${IDP_SETTINGS_API_PATH}/encryption-cert/generate`, {
+		method: 'POST',
+		body: JSON.stringify(body),
+	});
+}
+
+export function uploadIdpEncryptionCert(
+	body: UploadIdpEncryptionCertRequestDto,
+): Promise<IdpSettingsPublicDto> {
+	return adminFetch<IdpSettingsPublicDto>(`${IDP_SETTINGS_API_PATH}/encryption-cert/upload`, {
+		method: 'POST',
+		body: JSON.stringify(body),
+	});
+}
+
+export function startIdpEncryptionCertRotation(
+	body: StartIdpEncryptionCertRotationRequestDto,
+): Promise<IdpSettingsPublicDto> {
+	return adminFetch<IdpSettingsPublicDto>(
+		`${IDP_SETTINGS_API_PATH}/encryption-cert/rotation/start`,
+		{
+			method: 'POST',
+			body: JSON.stringify(body),
+		},
+	);
+}
+
+export function completeIdpEncryptionCertRotation(): Promise<IdpSettingsPublicDto> {
+	return adminFetch<IdpSettingsPublicDto>(
+		`${IDP_SETTINGS_API_PATH}/encryption-cert/rotation/complete`,
+		{
+			method: 'POST',
+		},
+	);
+}
+
+export function cancelIdpEncryptionCertRotation(): Promise<IdpSettingsPublicDto> {
+	return adminFetch<IdpSettingsPublicDto>(
+		`${IDP_SETTINGS_API_PATH}/encryption-cert/rotation/cancel`,
+		{
+			method: 'POST',
+		},
+	);
+}
+
+export function getIdpEncryptionCertPublicPem(): Promise<{ certPem: string }> {
+	return adminFetch<{ certPem: string }>(`${IDP_SETTINGS_API_PATH}/encryption-cert/public-pem`);
 }
 
 export function getIdpMetadataPreview(): Promise<IdpMetadataPreviewResponseDto> {

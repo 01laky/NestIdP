@@ -1,5 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
+import { IdpEncryptionService } from './idp-encryption.service';
 import { IdpSigningService } from './idp-signing.service';
 import { SamlAuthAuditService } from './saml-auth-audit.service';
 import { SamlMetadataService } from './saml-metadata.service';
@@ -32,10 +33,16 @@ describe('SamlMetadataService', () => {
 		audit,
 	);
 
+	const idpEncryption = {
+		getMetadataEncryptionCertificates: jest.fn().mockResolvedValue([]),
+		extractX509CertificatePem: (pem: string) => pem.replace(/\s/g, ''),
+	} as unknown as IdpEncryptionService;
+
 	const service = new SamlMetadataService(
 		prisma as unknown as PrismaService,
 		configService,
 		idpSigning,
+		idpEncryption,
 	);
 
 	beforeEach(() => {
@@ -112,5 +119,83 @@ describe('SamlMetadataService', () => {
 		});
 		const xml = await service.generateMetadata();
 		expect(xml).not.toContain('AttributeConsumingService');
+	});
+
+	it('API-SAML-META-ENC-01: no encryption KeyDescriptor when no encryption cert', async () => {
+		const xml = await service.generateMetadata();
+		expect(xml).not.toContain('use="encryption"');
+	});
+
+	it('API-SAML-META-ENC-02: includes encryption KeyDescriptor when configured', async () => {
+		const { generateTestRsaEncryptionCert } =
+			await import('../idp-settings/idp-encryption-cert.util');
+		const { certPem } = generateTestRsaEncryptionCert('http://localhost:3000');
+		jest.mocked(idpEncryption.getMetadataEncryptionCertificates).mockResolvedValue([certPem]);
+		const xml = await service.generateMetadata();
+		expect(xml).toContain('use="encryption"');
+		expect(xml).toContain('X509Certificate');
+	});
+
+	it('API-SAML-META-ENC-03: signing and encryption descriptors both present', async () => {
+		const { generateTestRsaEncryptionCert } =
+			await import('../idp-settings/idp-encryption-cert.util');
+		const { certPem } = generateTestRsaEncryptionCert('http://localhost:3000');
+		jest.mocked(idpEncryption.getMetadataEncryptionCertificates).mockResolvedValue([certPem]);
+		const xml = await service.generateMetadata();
+		expect(xml).toContain('use="signing"');
+		expect(xml).toContain('use="encryption"');
+	});
+
+	it('API-SAML-META-ENC-04: signing rotation alone does not add encryption descriptors', async () => {
+		const { privateKeyPem, certPem } = getTestSigningMaterial('http://localhost:3000');
+		const pending = getTestSigningMaterial('https://pending-sign.example.com');
+		prisma.idpSettings.findUnique.mockResolvedValue({
+			id: 'default',
+			entityId: 'http://localhost:3000',
+			nameIdFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
+			signingCertPem: certPem,
+			signingKeyEncrypted: encrypt(privateKeyPem, TEST_ENCRYPTION_KEY),
+			pendingSigningCertPem: pending.certPem,
+			pendingSigningKeyEncrypted: encrypt(pending.privateKeyPem, TEST_ENCRYPTION_KEY),
+			encryptionCertPem: null,
+			pendingEncryptionCertPem: null,
+		});
+		jest.mocked(idpEncryption.getMetadataEncryptionCertificates).mockResolvedValue([]);
+		const xml = await service.generateMetadata();
+		expect((xml.match(/use="signing"/g) ?? []).length).toBe(2);
+		expect(xml).not.toContain('use="encryption"');
+	});
+
+	it('API-SAML-META-ENC-05: dual signing + encryption rotation → four KeyDescriptors', async () => {
+		const primarySign = getTestSigningMaterial('http://localhost:3000');
+		const pendingSign = getTestSigningMaterial('https://pending-sign.example.com');
+		const { generateTestRsaEncryptionCert } =
+			await import('../idp-settings/idp-encryption-cert.util');
+		const primaryEnc = generateTestRsaEncryptionCert('http://localhost:3000');
+		const pendingEnc = generateTestRsaEncryptionCert('https://pending-enc.example.com');
+		prisma.idpSettings.findUnique.mockResolvedValue({
+			id: 'default',
+			entityId: 'http://localhost:3000',
+			nameIdFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
+			signingCertPem: primarySign.certPem,
+			signingKeyEncrypted: encrypt(primarySign.privateKeyPem, TEST_ENCRYPTION_KEY),
+			pendingSigningCertPem: pendingSign.certPem,
+			pendingSigningKeyEncrypted: encrypt(pendingSign.privateKeyPem, TEST_ENCRYPTION_KEY),
+			encryptionCertPem: primaryEnc.certPem,
+			pendingEncryptionCertPem: pendingEnc.certPem,
+		});
+		jest
+			.spyOn(idpSigning, 'getMetadataSigningCertificates')
+			.mockResolvedValue([primarySign.certPem, pendingSign.certPem]);
+		jest
+			.spyOn(idpEncryption, 'getMetadataEncryptionCertificates')
+			.mockResolvedValue([primaryEnc.certPem, pendingEnc.certPem]);
+		const xml = await service.generateMetadata();
+		const signingIdx = xml.indexOf('use="signing"');
+		const encryptionIdx = xml.indexOf('use="encryption"');
+		expect(signingIdx).toBeGreaterThanOrEqual(0);
+		expect(encryptionIdx).toBeGreaterThan(signingIdx);
+		expect((xml.match(/use="signing"/g) ?? []).length).toBe(2);
+		expect((xml.match(/use="encryption"/g) ?? []).length).toBe(2);
 	});
 });

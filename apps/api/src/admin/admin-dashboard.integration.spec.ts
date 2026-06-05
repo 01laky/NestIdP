@@ -16,6 +16,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import {
 	createTestAdminUserWithPassword,
 	createTestApiConnection,
+	createTestIdpSettingsWithEncryptionKey,
 	createTestIdpSettingsWithSigningKey,
 	createTestSpConnection,
 	createTestUser,
@@ -250,5 +251,19 @@ describe('Admin dashboard API (SQLite)', () => {
 		const res = await agent.get('/api/admin').expect(200);
 		expect(res.body.idp.certStatus).toBe('expiring_soon');
 		await createTestIdpSettingsWithSigningKey(prisma, { entityId: 'http://localhost:3000' });
+	});
+
+	it('API-ADM-DASH-ENC-01: dashboard idp encryption summary fields when encryption configured', async () => {
+		await createTestIdpSettingsWithEncryptionKey(prisma, {
+			encryptionKeyTransportAlgorithmId: 'rsa-oaep',
+			encryptionRsaModulusBits: 3072,
+		});
+		const agent = await adminAgent();
+		const res = await agent.get('/api/admin').expect(200);
+		expect(res.body.idp.hasEncryptionCertificate).toBe(true);
+		expect(res.body.idp.encryptionCertStatus).toBe('ok');
+		expect(res.body.idp.encryptionKeyFamily).toBe('rsa');
+		expect(res.body.idp.encryptionKeyTransportAlgorithmId).toBe('rsa-oaep');
+		expect(res.body.idp.encryptionRsaModulusBits).toBe(3072);
 	});
 });

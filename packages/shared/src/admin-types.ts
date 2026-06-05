@@ -1,6 +1,9 @@
 import type { ApiConnectionDto } from './connections.js';
 import type { LastSyncStatus } from './schema-enums.js';
-import type { AdminDashboardIdpCertStatus } from './idp-settings.js';
+import type {
+	AdminDashboardEncryptionCertStatus,
+	AdminDashboardIdpCertStatus,
+} from './idp-settings.js';
 import { AUDIT_ROUTE_PREFIX } from './audit-events.js';
 import { ADMIN_USERS_ROUTE_PREFIX } from './admin-users.js';
 
@@ -22,6 +25,14 @@ export interface AdminDashboardIdpStatusDto {
 	signingRsaModulusBits: number | null;
 	signingEcCurve: string | null;
 	certStatus: AdminDashboardIdpCertStatus;
+	hasEncryptionCertificate: boolean;
+	encryptionRotationActive: boolean;
+	encryptionCertNotAfter: string | null;
+	encryptionKeyFamily: 'rsa' | 'ec' | null;
+	encryptionKeyTransportAlgorithmId: string | null;
+	encryptionRsaModulusBits: number | null;
+	encryptionEcCurve: string | null;
+	encryptionCertStatus: AdminDashboardEncryptionCertStatus;
 }
 
 export interface AdminDashboardResponseDto {

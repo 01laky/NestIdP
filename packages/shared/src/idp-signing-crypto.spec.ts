@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { daysFromTodayUntilNotAfter, defaultNotAfterCalendarDate } from './idp-cert-common.js';
 import {
 	assertCompatibleKeyAndSignature,
-	daysFromTodayUntilNotAfter,
-	defaultNotAfterCalendarDate,
 	defaultSignatureAlgorithmIdForKeyFamily,
 	getDefaultGenerateIdpSigningCertRequest,
 	getIdpSigningSignatureOption,
