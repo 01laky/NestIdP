@@ -204,13 +204,18 @@ describe('ConfirmProvider / useConfirm — extended edge', () => {
 			useConfirm();
 			return null;
 		}
-		expect(() =>
-			render(
-				<I18nextProvider i18n={getI18n()}>
-					<Bad />
-				</I18nextProvider>,
-			),
-		).toThrow(/ConfirmProvider/);
+		const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			expect(() =>
+				render(
+					<I18nextProvider i18n={getI18n()}>
+						<Bad />
+					</I18nextProvider>,
+				),
+			).toThrow(/ConfirmProvider/);
+		} finally {
+			spy.mockRestore();
+		}
 	});
 
 	it('WEB-EVG-CONF-35: second confirm() while open resolves false immediately', async () => {
