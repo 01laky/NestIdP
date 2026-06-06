@@ -26,7 +26,11 @@ export const TEST_ENCRYPTED_CREDENTIALS = 'test-encrypted-token';
 export const TEST_ENCRYPTION_KEY = 'test-encryption-key-32chars!!';
 export const TEST_PASSWORD_HASH = '$2b$12$test.hash.for.integration.tests.only';
 
-type ApiConnectionOverrides = Partial<Omit<ApiConnection, 'id' | 'createdAt' | 'updatedAt'>> & {
+type ApiConnectionOverrides = Partial<
+	Omit<ApiConnection, 'id' | 'createdAt' | 'updatedAt' | 'apiContractConfig'> & {
+		apiContractConfig?: Prisma.InputJsonValue;
+	}
+> & {
 	bearerToken?: string;
 };
 type UserOverrides = Partial<Omit<User, 'id' | 'createdAt' | 'updatedAt'>>;

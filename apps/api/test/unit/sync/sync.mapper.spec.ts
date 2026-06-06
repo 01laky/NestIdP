@@ -26,6 +26,7 @@ describe('sync.mapper', () => {
 		authType: 'BEARER',
 		authCredentialsEncrypted: 'enc',
 		isLocalDirectory: false,
+		apiContractConfig: null,
 		lastSyncAt: new Date('2026-01-01T00:00:01.500Z'),
 		lastSyncStatus: 'SUCCESS',
 		createdAt: new Date('2025-12-01T00:00:00.000Z'),

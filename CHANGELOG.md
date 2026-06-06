@@ -43,6 +43,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - The sync orchestration was restructured into map→upsert→(bounded-parallel membership fetch)→apply
   phases to support embedded memberships and concurrency while keeping counters deterministic.
 
+### Fixed
+
+- Test support typings updated for the new `ApiConnection.apiContractConfig` column so the suite
+  type-checks against a freshly generated Prisma client (CI): the `createTestApiConnection` override
+  type now exposes `apiContractConfig` as `Prisma.InputJsonValue` (Prisma create inputs reject the
+  nullable `JsonValue`), and the `sync.mapper` fixture includes the now-required `apiContractConfig`
+  field. No runtime behaviour change.
+
 ## [1.8.0]
 
 ### Added
