@@ -1,4 +1,7 @@
-import { assertValidSpCertificatePem, SpCertificateValidationError } from '@api/sp-connections/utils/sp-certificate.util';
+import {
+	assertValidSpCertificatePem,
+	SpCertificateValidationError,
+} from '@api/sp-connections/utils/sp-certificate.util';
 
 const VALID_PEM = '-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----';
 

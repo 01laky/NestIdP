@@ -6,6 +6,7 @@ import { IdentityModule } from '../identity/identity.module';
 import { IdpSettingsModule } from '../idp-settings/idp-settings.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { SpConnectionsModule } from '../sp-connections/sp-connections.module';
+import { SamlSessionsAdminModule } from '../saml-sessions/saml-sessions-admin.module';
 import { SyncModule } from '../sync/sync.module';
 import { AdminController } from './controllers/admin.controller';
 import { AdminDashboardService } from './services/admin-dashboard.service';
@@ -23,6 +24,7 @@ import { AuditModule } from '../audit/audit.module';
 		ApiConnectionsModule,
 		SyncModule,
 		SpConnectionsModule,
+		SamlSessionsAdminModule,
 		IdpSettingsModule,
 		AdminUsersModule,
 	],

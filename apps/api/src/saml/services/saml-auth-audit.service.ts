@@ -81,7 +81,12 @@ export class SamlAuthAuditService {
 	}
 
 	logRequestRejected(reason: string, clientIp: string, bindingType?: 'redirect' | 'post'): void {
-		const eventPayload = { event: 'saml_request_rejected', reason, clientIp, ...(bindingType ? { bindingType } : {}) };
+		const eventPayload = {
+			event: 'saml_request_rejected',
+			reason,
+			clientIp,
+			...(bindingType ? { bindingType } : {}),
+		};
 		this.logger.warn(JSON.stringify(eventPayload));
 		this.audit.recordSafe({
 			category: 'saml',
@@ -116,6 +121,77 @@ export class SamlAuthAuditService {
 			subjectType: 'SamlSession',
 			subjectId: samlSessionId,
 			metadata: { reason },
+		});
+	}
+
+	logLogoutRequestReceived(payload: {
+		spEntityId: string;
+		logoutRequestId: string;
+		spConnectionId: string;
+		clientIp: string;
+		bindingType: 'redirect' | 'post';
+		requestWasSigned: boolean;
+	}): void {
+		const eventPayload = { event: 'saml_logout_request_received', ...payload };
+		this.logger.log(JSON.stringify(eventPayload));
+		this.audit.recordSafe({
+			category: 'saml',
+			event: 'saml_logout_request_received',
+			actorType: 'system',
+			clientIp: payload.clientIp,
+			subjectType: 'SpConnection',
+			subjectId: payload.spConnectionId,
+			metadata: {
+				spEntityId: payload.spEntityId,
+				logoutRequestId: payload.logoutRequestId,
+				bindingType: payload.bindingType,
+				requestWasSigned: payload.requestWasSigned,
+			},
+		});
+	}
+
+	logLogoutRequestRejected(
+		reason: string,
+		clientIp: string,
+		bindingType?: 'redirect' | 'post',
+	): void {
+		const eventPayload = {
+			event: 'saml_logout_request_rejected',
+			reason,
+			clientIp,
+			...(bindingType ? { bindingType } : {}),
+		};
+		this.logger.warn(JSON.stringify(eventPayload));
+		this.audit.recordSafe({
+			category: 'saml',
+			event: 'saml_logout_request_rejected',
+			actorType: 'system',
+			clientIp,
+			metadata: { reason, ...(bindingType ? { bindingType } : {}) },
+		});
+	}
+
+	logLogoutCompleted(payload: {
+		spEntityId: string;
+		spConnectionId: string;
+		bindingType: 'redirect' | 'post';
+		responseDelivered: boolean;
+		sessionTerminated: boolean;
+	}): void {
+		const eventPayload = { event: 'saml_logout_completed', ...payload };
+		this.logger.log(JSON.stringify(eventPayload));
+		this.audit.recordSafe({
+			category: 'saml',
+			event: 'saml_logout_completed',
+			actorType: 'system',
+			subjectType: 'SpConnection',
+			subjectId: payload.spConnectionId,
+			metadata: {
+				spEntityId: payload.spEntityId,
+				bindingType: payload.bindingType,
+				responseDelivered: payload.responseDelivered,
+				sessionTerminated: payload.sessionTerminated,
+			},
 		});
 	}
 

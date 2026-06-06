@@ -4,7 +4,10 @@ import * as xpath from 'xpath';
 import { applyNestIdpXmlCryptoExtensions } from '@api/saml/xml-crypto-extended-algorithms';
 
 /** Validates a signed assertion fragment (Assertion + enveloped Signature sibling). */
-export function verifySignedAssertionFragment(assertionWithSignatureXml: string, certPem: string): boolean {
+export function verifySignedAssertionFragment(
+	assertionWithSignatureXml: string,
+	certPem: string,
+): boolean {
 	const stripped = assertionWithSignatureXml.replace(/^<\?xml[^?]*\?>\s*/i, '').trim();
 	return verifySamlXmlSignature(`<wrapper>${stripped}</wrapper>`, certPem);
 }

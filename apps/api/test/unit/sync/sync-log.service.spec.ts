@@ -1,5 +1,9 @@
 import type { SyncLogErrorEntryDto } from '@nestidp/shared';
-import { appendSyncError, capSyncErrors, SyncLogService } from '@api/sync/services/sync-log.service';
+import {
+	appendSyncError,
+	capSyncErrors,
+	SyncLogService,
+} from '@api/sync/services/sync-log.service';
 
 function makeError(index: number): SyncLogErrorEntryDto {
 	return {

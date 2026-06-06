@@ -28,7 +28,9 @@ function patchSessionCookiesForHttp(app: INestApplication): void {
 	const sessionService = app.get(AdminSessionService);
 	const sign = (
 		sessionService as unknown as {
-			sign: (payload: import('@api/admin-auth/services/admin-session.service').AdminSessionPayload) => string;
+			sign: (
+				payload: import('@api/admin-auth/services/admin-session.service').AdminSessionPayload,
+			) => string;
 		}
 	).sign.bind(sessionService);
 	jest.spyOn(sessionService, 'setCookie').mockImplementation((res, payload) => {

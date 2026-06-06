@@ -9,6 +9,7 @@ export * from './api-error.js';
 export * from './sync.js';
 export * from './end-user-auth.js';
 export * from './saml.js';
+export * from './saml-slo.js';
 export * from './identity-admin.js';
 export * from './idp-settings.js';
 export * from './idp-cert-common.js';

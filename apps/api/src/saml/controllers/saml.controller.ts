@@ -3,16 +3,26 @@ import {
 	Body,
 	Controller,
 	Get,
-	HttpCode,
+	HttpException,
+	HttpStatus,
 	Post,
 	Query,
 	Req,
 	Res,
 	UnsupportedMediaTypeException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
-import { SAML_REQUEST_QUERY_PARAM, RELAY_STATE_QUERY_PARAM } from '@nestidp/shared';
+import {
+	END_USER_SESSION_COOKIE_NAME,
+	LOGGED_OUT_ROUTE,
+	RELAY_STATE_QUERY_PARAM,
+	SAML_REQUEST_QUERY_PARAM,
+} from '@nestidp/shared';
+import { NodeEnv } from '../../config/env.validation';
 import { SamlSsoService } from '../services/saml-sso.service';
+import { SamlLogoutService, type SamlLogoutResult } from '../services/saml-logout.service';
+import { SamlSloRateLimiterService } from '../services/saml-slo-rate-limiter.service';
 import {
 	extractRawQueryStringFromRequestUrl,
 	parseRawSamlRedirectQuery,
@@ -20,7 +30,12 @@ import {
 
 @Controller('saml')
 export class SamlController {
-	constructor(private readonly samlSsoService: SamlSsoService) {}
+	constructor(
+		private readonly samlSsoService: SamlSsoService,
+		private readonly samlLogoutService: SamlLogoutService,
+		private readonly sloRateLimiter: SamlSloRateLimiterService,
+		private readonly configService: ConfigService,
+	) {}
 
 	@Get('metadata')
 	async getMetadata(@Res() res: Response): Promise<void> {
@@ -73,18 +88,79 @@ export class SamlController {
 	}
 
 	@Get('slo')
-	@HttpCode(501)
-	getSlo() {
-		return {
-			status: 'not_implemented',
-			endpoint: '/saml/slo',
-			message: 'Single Logout will be implemented in a later release.',
-		};
+	async getSlo(
+		@Query(SAML_REQUEST_QUERY_PARAM) samlRequest: string | undefined,
+		@Query(RELAY_STATE_QUERY_PARAM) relayState: string | undefined,
+		@Req() req: Request,
+		@Res() res: Response,
+	): Promise<void> {
+		const clientIp = req.ip ?? 'unknown';
+		this.enforceRateLimit(clientIp);
+		const rawQuery = extractRawQueryStringFromRequestUrl(req.url ?? '');
+		const raw = parseRawSamlRedirectQuery(rawQuery);
+		const result = await this.samlLogoutService.handleRedirectSlo({
+			samlRequest: samlRequest ?? '',
+			relayState,
+			raw,
+			clientIp,
+		});
+		this.deliver(res, result);
 	}
 
 	@Post('slo')
-	@HttpCode(501)
-	postSlo() {
-		return this.getSlo();
+	async postSlo(
+		@Body(SAML_REQUEST_QUERY_PARAM) samlRequest: string | undefined,
+		@Body(RELAY_STATE_QUERY_PARAM) relayState: string | undefined,
+		@Req() req: Request,
+		@Res() res: Response,
+	): Promise<void> {
+		const contentType = req.headers['content-type'] ?? '';
+		if (!contentType.startsWith('application/x-www-form-urlencoded')) {
+			throw new UnsupportedMediaTypeException(
+				'POST /saml/slo requires Content-Type: application/x-www-form-urlencoded',
+			);
+		}
+		const clientIp = req.ip ?? 'unknown';
+		this.enforceRateLimit(clientIp);
+		const result = await this.samlLogoutService.handlePostSlo({
+			samlRequest: samlRequest ?? '',
+			relayState,
+			clientIp,
+		});
+		this.deliver(res, result);
+	}
+
+	private enforceRateLimit(clientIp: string): void {
+		if (this.sloRateLimiter.hitAndCheck(clientIp)) {
+			throw new HttpException('Too many logout requests', HttpStatus.TOO_MANY_REQUESTS);
+		}
+	}
+
+	private deliver(res: Response, result: SamlLogoutResult): void {
+		if (result.clearEndUserCookie) {
+			this.clearEndUserCookie(res);
+		}
+		switch (result.delivery.type) {
+			case 'redirect':
+				res.redirect(302, result.delivery.url);
+				return;
+			case 'post':
+				res.setHeader('Content-Type', 'text/html; charset=utf-8');
+				res.status(200).send(result.delivery.html);
+				return;
+			case 'logged-out':
+				res.redirect(302, LOGGED_OUT_ROUTE);
+				return;
+		}
+	}
+
+	private clearEndUserCookie(res: Response): void {
+		const secure = this.configService.get<string>('NODE_ENV') === NodeEnv.Production;
+		res.clearCookie(END_USER_SESSION_COOKIE_NAME, {
+			httpOnly: true,
+			secure,
+			sameSite: 'lax',
+			path: '/',
+		});
 	}
 }

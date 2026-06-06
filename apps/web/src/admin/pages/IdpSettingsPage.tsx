@@ -640,11 +640,15 @@ export function IdpSettingsPage() {
 				<dl className="evg-dl">
 					<div className="evg-dl__row">
 						<dt>{t('fingerprint')}</dt>
-						<dd><code>{settings.signingCertFingerprintSha256 ?? tCommon('emDash')}</code></dd>
+						<dd>
+							<code>{settings.signingCertFingerprintSha256 ?? tCommon('emDash')}</code>
+						</dd>
 					</div>
 					<div className="evg-dl__row">
 						<dt>{t('notAfter')}</dt>
-						<dd><code>{settings.signingCertNotAfter ?? tCommon('emDash')}</code></dd>
+						<dd>
+							<code>{settings.signingCertNotAfter ?? tCommon('emDash')}</code>
+						</dd>
 					</div>
 					{settings.signingKeyFamily ? (
 						<div className="evg-dl__row">
@@ -815,11 +819,15 @@ export function IdpSettingsPage() {
 				<dl className="evg-dl">
 					<div className="evg-dl__row">
 						<dt>{t('fingerprint')}</dt>
-						<dd><code>{settings.encryptionCertFingerprintSha256 ?? tCommon('emDash')}</code></dd>
+						<dd>
+							<code>{settings.encryptionCertFingerprintSha256 ?? tCommon('emDash')}</code>
+						</dd>
 					</div>
 					<div className="evg-dl__row">
 						<dt>{t('notAfter')}</dt>
-						<dd><code>{settings.encryptionCertNotAfter ?? tCommon('emDash')}</code></dd>
+						<dd>
+							<code>{settings.encryptionCertNotAfter ?? tCommon('emDash')}</code>
+						</dd>
 					</div>
 					{settings.encryptionKeyFamily ? (
 						<div className="evg-dl__row">

@@ -24,6 +24,8 @@ describe('SpConnectionTestSsoPage Evergreen forms', () => {
 			hasSpCertificate: false,
 			wantAssertionsEncrypted: false,
 			wantAuthnRequestsSigned: false,
+			wantLogoutRequestsSigned: false,
+			sloUrl: null,
 			createdAt: '2026-01-01T00:00:00.000Z',
 			updatedAt: '2026-01-01T00:00:00.000Z',
 		});
@@ -47,7 +49,9 @@ describe('SpConnectionTestSsoPage Evergreen forms', () => {
 		);
 
 		await waitFor(() =>
-			expect(screen.getByDisplayValue('http://localhost:3000/saml/sso?SAMLRequest=abc')).toBeDefined(),
+			expect(
+				screen.getByDisplayValue('http://localhost:3000/saml/sso?SAMLRequest=abc'),
+			).toBeDefined(),
 		);
 		expect(container.querySelector('textarea.evg-textarea')).not.toBeNull();
 	});
@@ -64,6 +68,8 @@ describe('SpConnectionTestSsoPage Evergreen forms', () => {
 			hasSpCertificate: false,
 			wantAssertionsEncrypted: false,
 			wantAuthnRequestsSigned: false,
+			wantLogoutRequestsSigned: false,
+			sloUrl: null,
 			createdAt: '2026-01-01T00:00:00.000Z',
 			updatedAt: '2026-01-01T00:00:00.000Z',
 		});
@@ -96,7 +102,9 @@ describe('SpConnectionTestSsoPage Evergreen forms', () => {
 		);
 
 		await waitFor(() =>
-			expect(screen.getByDisplayValue('http://localhost:3000/saml/sso?SAMLRequest=plain')).toBeDefined(),
+			expect(
+				screen.getByDisplayValue('http://localhost:3000/saml/sso?SAMLRequest=plain'),
+			).toBeDefined(),
 		);
 		fireEvent.click(screen.getByRole('checkbox', { name: 'Include signature' }));
 

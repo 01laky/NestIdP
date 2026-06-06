@@ -3,6 +3,7 @@ import { END_USER_SESSION_COOKIE_NAME } from '@nestidp/shared';
 import { EndUserAuthGuard } from '@api/auth/guards/end-user-auth.guard';
 import { EndUserAuthService } from '@api/auth/services/end-user-auth.service';
 import { EndUserSessionService } from '@api/auth/services/end-user-session.service';
+import { SamlSsoSessionService } from '@api/saml-sessions/services/saml-sso-session.service';
 import type { EndUserAuthenticatedRequest } from '@api/auth/end-user-auth.types';
 
 describe('EndUserAuthGuard', () => {
@@ -13,10 +14,15 @@ describe('EndUserAuthGuard', () => {
 	const endUserAuthService = {
 		getMe: jest.fn(),
 	};
+	const ssoSessions = {
+		isActive: jest.fn().mockResolvedValue(true),
+		touch: jest.fn().mockResolvedValue(undefined),
+	};
 
 	const guard = new EndUserAuthGuard(
 		endUserSessionService as unknown as EndUserSessionService,
 		endUserAuthService as unknown as EndUserAuthService,
+		ssoSessions as unknown as SamlSsoSessionService,
 	);
 
 	const response = { clearCookie: jest.fn() };
@@ -34,10 +40,12 @@ describe('EndUserAuthGuard', () => {
 
 	beforeEach(() => {
 		jest.clearAllMocks();
+		ssoSessions.isActive.mockResolvedValue(true);
+		ssoSessions.touch.mockResolvedValue(undefined);
 	});
 
 	it('API-AUTH-GUARD-01: valid cookie → allows access', async () => {
-		endUserSessionService.verify.mockReturnValue({ userId: 'u1', username: 'alice' });
+		endUserSessionService.verify.mockReturnValue({ userId: 'u1', username: 'alice', sid: 'sso1' });
 		endUserAuthService.getMe.mockResolvedValue({
 			id: 'u1',
 			username: 'alice',
@@ -81,6 +89,24 @@ describe('EndUserAuthGuard', () => {
 			UnauthorizedException,
 		);
 		expect(endUserSessionService.clearCookie).toHaveBeenCalled();
+	});
+
+	it('API-SESS-REVOKE-01: valid cookie but terminated SSO session → 401 and clears cookie', async () => {
+		endUserSessionService.verify.mockReturnValue({ userId: 'u1', username: 'alice', sid: 'sso1' });
+		ssoSessions.isActive.mockResolvedValue(false);
+		await expect(guard.canActivate(contextWithCookie('token'))).rejects.toThrow(
+			UnauthorizedException,
+		);
+		expect(endUserSessionService.clearCookie).toHaveBeenCalled();
+		expect(endUserAuthService.getMe).not.toHaveBeenCalled();
+	});
+
+	it('backward compat: cookie without sid is treated as inactive', async () => {
+		endUserSessionService.verify.mockReturnValue({ userId: 'u1', username: 'alice' });
+		ssoSessions.isActive.mockResolvedValue(false);
+		await expect(guard.canActivate(contextWithCookie('legacy'))).rejects.toThrow(
+			UnauthorizedException,
+		);
 	});
 
 	it('API-AUTH-GUARD-05: empty string cookie treated as missing', async () => {

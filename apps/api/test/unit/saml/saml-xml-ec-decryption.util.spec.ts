@@ -3,23 +3,22 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { encryptAuthnRequestForIdp } from '@api/saml/utils/encrypt-authn-request-for-idp.util';
-import {
-	decryptXmlEcdhEs,
-	isEcdhEsAgreement,
-} from '@api/saml/utils/saml-xml-decryption.util';
+import { decryptXmlEcdhEs, isEcdhEsAgreement } from '@api/saml/utils/saml-xml-decryption.util';
 import {
 	deriveEcdhEsKeyWithConcatKdf,
 	extractEcPublicKeyFromXenc11,
 } from '@api/saml/utils/saml-xml-encryption-shared.util';
 import { buildAuthnRequestXml } from '@test/support/saml/build-authn-request.util';
 
-function generateTestEcCert(
-	curve: 'P-256' | 'P-384' | 'P-521',
-): { certPem: string; privateKeyPem: string } {
+function generateTestEcCert(curve: 'P-256' | 'P-384' | 'P-521'): {
+	certPem: string;
+	privateKeyPem: string;
+} {
 	const tmp = mkdtempSync(join(tmpdir(), 'nestidp-ec-test-'));
 	const keyPath = join(tmp, 'key.pem');
 	const certPath = join(tmp, 'cert.pem');
-	const curveName = curve === 'P-256' ? 'prime256v1' : curve === 'P-384' ? 'secp384r1' : 'secp521r1';
+	const curveName =
+		curve === 'P-256' ? 'prime256v1' : curve === 'P-384' ? 'secp384r1' : 'secp521r1';
 	try {
 		execSync(
 			`openssl ecparam -name ${curveName} -genkey -noout -out "${keyPath}" 2>/dev/null && ` +
@@ -191,18 +190,34 @@ describe('saml-xml-ec-decryption.util', () => {
 			const algorithmId256 = Buffer.from('\x00\x00\x00\x07AES-256', 'binary');
 			const algorithmId128 = Buffer.from('\x00\x00\x00\x07AES-128', 'binary');
 
-			const key256 = deriveEcdhEsKeyWithConcatKdf({ sharedSecret, algorithmId: algorithmId256, keyLengthBits: 256 });
-			const key128 = deriveEcdhEsKeyWithConcatKdf({ sharedSecret, algorithmId: algorithmId128, keyLengthBits: 128 });
+			const key256 = deriveEcdhEsKeyWithConcatKdf({
+				sharedSecret,
+				algorithmId: algorithmId256,
+				keyLengthBits: 256,
+			});
+			const key128 = deriveEcdhEsKeyWithConcatKdf({
+				sharedSecret,
+				algorithmId: algorithmId128,
+				keyLengthBits: 128,
+			});
 
 			expect(key256).toHaveLength(32);
 			expect(key128).toHaveLength(16);
 
 			// Must be deterministic
-			const key256b = deriveEcdhEsKeyWithConcatKdf({ sharedSecret, algorithmId: algorithmId256, keyLengthBits: 256 });
+			const key256b = deriveEcdhEsKeyWithConcatKdf({
+				sharedSecret,
+				algorithmId: algorithmId256,
+				keyLengthBits: 256,
+			});
 			expect(key256.equals(key256b)).toBe(true);
 
 			// Same algorithmId but different keyLengthBits → different keys (keyDataLen is part of hash input)
-			const key256AsKey128 = deriveEcdhEsKeyWithConcatKdf({ sharedSecret, algorithmId: algorithmId256, keyLengthBits: 128 });
+			const key256AsKey128 = deriveEcdhEsKeyWithConcatKdf({
+				sharedSecret,
+				algorithmId: algorithmId256,
+				keyLengthBits: 128,
+			});
 			expect(key256AsKey128).toHaveLength(16);
 			// keyDataLen (128 vs 256) is part of OtherInfo, so derived keys must differ
 			expect(key256.subarray(0, 16).equals(key256AsKey128)).toBe(false);
@@ -219,7 +234,10 @@ describe('saml-xml-ec-decryption.util', () => {
 	describe('extractEcPublicKeyFromXenc11', () => {
 		it('rejects non-uncompressed point', () => {
 			expect(() =>
-				extractEcPublicKeyFromXenc11('1.2.840.10045.3.1.7', Buffer.alloc(65, 0x02).toString('base64')),
+				extractEcPublicKeyFromXenc11(
+					'1.2.840.10045.3.1.7',
+					Buffer.alloc(65, 0x02).toString('base64'),
+				),
 			).toThrow();
 		});
 

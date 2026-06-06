@@ -5,7 +5,11 @@ import type { Request } from 'express';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { SamlPostBindingService } from '@api/saml/services/saml-post-binding.service';
-import { applyHttpSecurity, applyProductionHelmet, applyTrustProxy } from '@api/common/utils/http-security';
+import {
+	applyHttpSecurity,
+	applyProductionHelmet,
+	applyTrustProxy,
+} from '@api/common/utils/http-security';
 
 @Controller('probe')
 class ProbeController {

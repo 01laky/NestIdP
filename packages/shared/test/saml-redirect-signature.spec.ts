@@ -17,9 +17,7 @@ describe('saml redirect signature shared', () => {
 		const byUri = getSamlRedirectSignatureAlgorithm(
 			'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256',
 		);
-		expect(byId?.xmlSignatureAlgorithm).toBe(
-			'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256',
-		);
+		expect(byId?.xmlSignatureAlgorithm).toBe('http://www.w3.org/2001/04/xmldsig-more#rsa-sha256');
 		expect(byUri?.id).toBe('rsa-sha256');
 		expect(SAML_REDIRECT_SIGNATURE_ALGORITHMS.length).toBeGreaterThan(0);
 	});

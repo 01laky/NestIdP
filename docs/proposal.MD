@@ -160,7 +160,7 @@ nest-idp/
 | `/api/auth/*` | NestJS Auth API | End-user login, session management. |
 | `/saml/metadata` | NestJS SAML Module | IdP metadata XML (public). |
 | `/saml/sso` | NestJS SAML Module | SSO endpoint; receives SAMLRequest. |
-| `/saml/slo` | NestJS SAML Module | Single Logout (future phase). |
+| `/saml/slo` | NestJS SAML Module | Single Logout (SP-initiated; admin session termination). |
 | `/login` | React Login Page | End-user authentication UI. |
 | `/admin/*` | React Admin SPA | Operator configuration UI. |
 | `/*` | React fallback | SPA routing for admin. |
@@ -207,9 +207,13 @@ Included in v1:
 - Attribute mapping per SP connection
 - `InResponseTo` validation against server-side SAML session
 
+Implemented (v1.8.0):
+
+- Single Logout (SLO) — SP-initiated (HTTP-Redirect + HTTP-POST) with signature verification, plus admin-initiated session termination (local invalidate). Revocable server-side SSO sessions.
+
 Deferred (Phase 2+):
 
-- Single Logout (SLO)
+- Back-channel (SOAP) SLO and multi-SP front-channel logout propagation
 - IdP-initiated SSO
 - SAMLRequest signature verification (optional hardening)
 
@@ -695,7 +699,8 @@ _Phase 1 complete in **v1.0.0** (Prompt 10 — Docker, persistent audit, admin a
 - [ ] Sync error reporting in admin UI
 - [ ] OAuth 2.0 Client Credentials for API connections
 - [ ] IdP-initiated SSO
-- [ ] Single Logout (SLO)
+- [x] Single Logout (SLO) — SP-initiated + admin session termination (v1.8.0)
+- [ ] Back-channel (SOAP) SLO + multi-SP logout propagation
 
 ### Phase 3 — Extensibility
 

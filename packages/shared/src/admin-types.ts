@@ -41,6 +41,7 @@ export interface AdminDashboardSpSecuritySummaryDto {
 	spConnectionsMissingCertWithSecurityFlags: number;
 	idpAdvertisesSignedAuthnRequests: boolean;
 	idpEncryptionKeyIsEc: boolean;
+	activeSamlSessions: number;
 }
 
 export interface AdminDashboardResponseDto {

@@ -116,7 +116,9 @@ describe('SAML request security integration (SQLite)', () => {
 			wantAuthnRequestsSigned: false,
 		});
 		const query = buildUnsignedSsoQuery(sp.spEntityId, `_unsigned-${Date.now()}`);
-		await request(app.getHttpServer() as App).get(`/saml/sso?${query}`).expect(302);
+		await request(app.getHttpServer() as App)
+			.get(`/saml/sso?${query}`)
+			.expect(302);
 	});
 
 	it('API-SAML-REQ-INT-02: unsigned AuthnRequest rejected when SP requires signatures', async () => {
@@ -127,7 +129,9 @@ describe('SAML request security integration (SQLite)', () => {
 			wantAuthnRequestsSigned: true,
 		});
 		const query = buildUnsignedSsoQuery(sp.spEntityId, `_unsigned-reject-${Date.now()}`);
-		const res = await request(app.getHttpServer() as App).get(`/saml/sso?${query}`).expect(400);
+		const res = await request(app.getHttpServer() as App)
+			.get(`/saml/sso?${query}`)
+			.expect(400);
 		expect(String(res.body.message)).toContain('Signed AuthnRequest is required');
 	});
 
@@ -141,7 +145,9 @@ describe('SAML request security integration (SQLite)', () => {
 			requestId: `_signed-ok-${Date.now()}`,
 			spPrivateKeyPem,
 		});
-		await request(app.getHttpServer() as App).get(`/saml/sso?${query}`).expect(302);
+		await request(app.getHttpServer() as App)
+			.get(`/saml/sso?${query}`)
+			.expect(302);
 	});
 
 	it('API-SAML-REQ-INT-04: tampered signature is rejected', async () => {
@@ -155,7 +161,9 @@ describe('SAML request security integration (SQLite)', () => {
 			spPrivateKeyPem,
 		});
 		const tampered = query.replace(/Signature=[^&]+/, 'Signature=dGFtcGVyZWQ%3D');
-		const res = await request(app.getHttpServer() as App).get(`/saml/sso?${tampered}`).expect(400);
+		const res = await request(app.getHttpServer() as App)
+			.get(`/saml/sso?${tampered}`)
+			.expect(400);
 		expect(String(res.body.message)).toContain('Invalid SAMLRequest signature');
 	});
 
@@ -165,7 +173,9 @@ describe('SAML request security integration (SQLite)', () => {
 		});
 		const base = buildUnsignedSsoQuery(sp.spEntityId, `_invalid-params-${Date.now()}`);
 		const query = `${base}&Signature=dGVzdA%3D%3D`;
-		const res = await request(app.getHttpServer() as App).get(`/saml/sso?${query}`).expect(400);
+		const res = await request(app.getHttpServer() as App)
+			.get(`/saml/sso?${query}`)
+			.expect(400);
 		expect(String(res.body.message)).toContain('Invalid SAMLRequest signature parameters');
 	});
 
@@ -182,7 +192,9 @@ describe('SAML request security integration (SQLite)', () => {
 			/SigAlg=[^&]+/,
 			`SigAlg=${encodeURIComponent(encodeURIComponent('urn:unsupported:signature'))}`,
 		);
-		const res = await request(app.getHttpServer() as App).get(`/saml/sso?${query}`).expect(400);
+		const res = await request(app.getHttpServer() as App)
+			.get(`/saml/sso?${query}`)
+			.expect(400);
 		expect(String(res.body.message)).toContain('Unsupported SAMLRequest signature algorithm');
 	});
 
@@ -198,7 +210,9 @@ describe('SAML request security integration (SQLite)', () => {
 			requestId: `_no-cert-${Date.now()}`,
 			spPrivateKeyPem: signing.privateKeyPem,
 		});
-		const res = await request(app.getHttpServer() as App).get(`/saml/sso?${query}`).expect(400);
+		const res = await request(app.getHttpServer() as App)
+			.get(`/saml/sso?${query}`)
+			.expect(400);
 		expect(String(res.body.message)).toContain('SP certificate is required');
 	});
 
@@ -214,7 +228,9 @@ describe('SAML request security integration (SQLite)', () => {
 			requestId: `_encrypted-ok-${Date.now()}`,
 			idpEncryptionCertPem: settings.encryptionCertPem!,
 		});
-		await request(app.getHttpServer() as App).get(`/saml/sso?${encryptedQuery}`).expect(302);
+		await request(app.getHttpServer() as App)
+			.get(`/saml/sso?${encryptedQuery}`)
+			.expect(302);
 	});
 
 	it('API-SAML-REQ-INT-09: encrypted AuthnRequest fails when IdP key is not configured', async () => {
@@ -243,7 +259,9 @@ describe('SAML request security integration (SQLite)', () => {
 			requestId: `_audit-signed-${Date.now()}`,
 			spPrivateKeyPem,
 		});
-		await request(app.getHttpServer() as App).get(`/saml/sso?${query}`).expect(302);
+		await request(app.getHttpServer() as App)
+			.get(`/saml/sso?${query}`)
+			.expect(302);
 
 		const row = await waitForAuditEvent('saml_request_signature_verified');
 		expect(row).not.toBeNull();
@@ -265,7 +283,9 @@ describe('SAML request security integration (SQLite)', () => {
 			requestId: `_audit-decrypted-${Date.now()}`,
 			idpEncryptionCertPem: settings.encryptionCertPem!,
 		});
-		await request(app.getHttpServer() as App).get(`/saml/sso?${query}`).expect(302);
+		await request(app.getHttpServer() as App)
+			.get(`/saml/sso?${query}`)
+			.expect(302);
 
 		const row = await waitForAuditEvent('saml_request_decrypted');
 		expect(row).not.toBeNull();
@@ -283,7 +303,9 @@ describe('SAML request security integration (SQLite)', () => {
 			spPrivateKeyPem,
 		});
 		const tampered = query.replace(/Signature=[^&]+/, 'Signature=ZmFrZQ%3D%3D');
-		await request(app.getHttpServer() as App).get(`/saml/sso?${tampered}`).expect(400);
+		await request(app.getHttpServer() as App)
+			.get(`/saml/sso?${tampered}`)
+			.expect(400);
 
 		const row = await waitForAuditEvent('saml_request_rejected');
 		expect(row).not.toBeNull();

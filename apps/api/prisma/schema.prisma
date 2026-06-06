@@ -80,6 +80,7 @@ model User {
 	groups        UserGroup[]
 	roles         UserRole[]
 	samlSessions  SamlSession[]
+	samlSsoSessions SamlSsoSession[]
 
 	@@unique([apiConnectionId, externalId])
 	@@index([apiConnectionId])
@@ -144,16 +145,19 @@ model SpConnection {
 	name                    String
 	spEntityId              String   @unique
 	acsUrl                  String
+	sloUrl                  String?
 	spCertificate           String?
 	nameIdFormat            String   @default("urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress")
 	attributeMapping        Json?
 	active                  Boolean  @default(true)
 	wantAssertionsEncrypted Boolean  @default(false)
 	wantAuthnRequestsSigned Boolean  @default(false)
+	wantLogoutRequestsSigned Boolean @default(false)
 	createdAt               DateTime @default(now())
 	updatedAt               DateTime @updatedAt
 
-	samlSessions SamlSession[]
+	samlSessions      SamlSession[]
+	samlParticipations SamlSpParticipation[]
 }
 
 model AdminUser {
@@ -195,6 +199,53 @@ model SamlSession {
 
 	@@index([expiresAt])
 	@@index([spConnectionId])
+}
+
+model SamlSsoSession {
+	id                  String    @id @default(cuid())
+	userId              String?
+	username            String
+	createdAt           DateTime  @default(now())
+	lastSeenAt          DateTime  @default(now())
+	expiresAt           DateTime
+	loginIp             String?
+	userAgent           String?
+	lastSeenIp          String?
+	status              String    @default("active")
+	terminatedAt        DateTime?
+	terminatedReason    String?
+	terminatedByAdminId String?
+
+	user           User?                 @relation(fields: [userId], references: [id], onDelete: SetNull)
+	participations SamlSpParticipation[]
+
+	@@index([status, expiresAt])
+	@@index([userId])
+}
+
+model SamlSpParticipation {
+	id             String   @id @default(cuid())
+	ssoSessionId   String
+	spConnectionId String
+	sessionIndex   String
+	nameId         String
+	nameIdFormat   String
+	createdAt      DateTime @default(now())
+
+	ssoSession   SamlSsoSession @relation(fields: [ssoSessionId], references: [id], onDelete: Cascade)
+	spConnection SpConnection   @relation(fields: [spConnectionId], references: [id], onDelete: Cascade)
+
+	@@index([spConnectionId, sessionIndex])
+	@@index([ssoSessionId])
+}
+
+model SamlLogoutRequestLog {
+	id             String   @id @default(cuid())
+	requestId      String   @unique
+	spConnectionId String
+	createdAt      DateTime @default(now())
+
+	@@index([createdAt])
 }
 
 model AuditEvent {

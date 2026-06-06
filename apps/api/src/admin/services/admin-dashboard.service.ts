@@ -38,7 +38,9 @@ export class AdminDashboardService {
 
 		const entityId = settings?.entityId ?? base;
 		const urls = buildIdpUrls(base);
-		const spSecurity = await this.buildSpSecuritySummary(settings?.wantAuthnRequestsSigned ?? false);
+		const spSecurity = await this.buildSpSecuritySummary(
+			settings?.wantAuthnRequestsSigned ?? false,
+		);
 
 		const idp = settings
 			? await this.idpSettingsService.buildDashboardIdpStatus()
@@ -84,17 +86,24 @@ export class AdminDashboardService {
 	}
 
 	private async buildSpSecuritySummary(idpAdvertisesSignedAuthnRequests: boolean) {
-		const [requireSigned, requireEncrypted, flaggedRows, idpSettings] = await Promise.all([
-			this.prisma.spConnection.count({ where: { wantAuthnRequestsSigned: true } }),
-			this.prisma.spConnection.count({ where: { wantAssertionsEncrypted: true } }),
-			this.prisma.spConnection.findMany({
-				where: {
-					OR: [{ wantAuthnRequestsSigned: true }, { wantAssertionsEncrypted: true }],
-				},
-				select: { spCertificate: true },
-			}),
-			this.prisma.idpSettings.findUnique({ where: { id: 'default' }, select: { encryptionKeyFamily: true } }),
-		]);
+		const [requireSigned, requireEncrypted, flaggedRows, idpSettings, activeSamlSessions] =
+			await Promise.all([
+				this.prisma.spConnection.count({ where: { wantAuthnRequestsSigned: true } }),
+				this.prisma.spConnection.count({ where: { wantAssertionsEncrypted: true } }),
+				this.prisma.spConnection.findMany({
+					where: {
+						OR: [{ wantAuthnRequestsSigned: true }, { wantAssertionsEncrypted: true }],
+					},
+					select: { spCertificate: true },
+				}),
+				this.prisma.idpSettings.findUnique({
+					where: { id: 'default' },
+					select: { encryptionKeyFamily: true },
+				}),
+				this.prisma.samlSsoSession.count({
+					where: { status: 'active', expiresAt: { gt: new Date() } },
+				}),
+			]);
 
 		const missingCertCount = flaggedRows.filter((row) => !row.spCertificate?.trim()).length;
 
@@ -104,6 +113,7 @@ export class AdminDashboardService {
 			spConnectionsMissingCertWithSecurityFlags: missingCertCount,
 			idpAdvertisesSignedAuthnRequests,
 			idpEncryptionKeyIsEc: idpSettings?.encryptionKeyFamily === 'ec',
+			activeSamlSessions,
 		};
 	}
 }

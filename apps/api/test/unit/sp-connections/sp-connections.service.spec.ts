@@ -267,4 +267,101 @@ describe('SpConnectionsService', () => {
 			}),
 		);
 	});
+
+	const certPem = '-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----';
+
+	it('SLO: create stores a valid sloUrl', async () => {
+		prisma.spConnection.create.mockResolvedValue(sampleRow);
+		await service.create({
+			name: 'App',
+			spEntityId: 'urn:sp:app',
+			acsUrl: 'https://sp.example.com/acs',
+			sloUrl: 'https://sp.example.com/slo',
+		});
+		expect(prisma.spConnection.create).toHaveBeenCalledWith(
+			expect.objectContaining({
+				data: expect.objectContaining({ sloUrl: 'https://sp.example.com/slo' }),
+			}),
+		);
+	});
+
+	it('SLO: empty sloUrl is stored as null', async () => {
+		prisma.spConnection.create.mockResolvedValue(sampleRow);
+		await service.create({
+			name: 'App',
+			spEntityId: 'urn:sp:app',
+			acsUrl: 'https://sp.example.com/acs',
+			sloUrl: '   ',
+		});
+		expect(prisma.spConnection.create.mock.calls[0][0].data.sloUrl).toBeNull();
+	});
+
+	it('SLO: invalid sloUrl → BadRequestException', async () => {
+		await expect(
+			service.create({
+				name: 'App',
+				spEntityId: 'urn:sp:app',
+				acsUrl: 'https://sp.example.com/acs',
+				sloUrl: 'not-a-url',
+			}),
+		).rejects.toThrow(BadRequestException);
+	});
+
+	it('SLO: wantLogoutRequestsSigned without SP cert → BadRequestException', async () => {
+		await expect(
+			service.create({
+				name: 'App',
+				spEntityId: 'urn:sp:app',
+				acsUrl: 'https://sp.example.com/acs',
+				wantLogoutRequestsSigned: true,
+			}),
+		).rejects.toThrow(BadRequestException);
+	});
+
+	it('SLO: wantLogoutRequestsSigned with SP cert → stored', async () => {
+		prisma.spConnection.create.mockResolvedValue(sampleRow);
+		await service.create({
+			name: 'App',
+			spEntityId: 'urn:sp:app',
+			acsUrl: 'https://sp.example.com/acs',
+			spCertificate: certPem,
+			wantLogoutRequestsSigned: true,
+		});
+		expect(prisma.spConnection.create).toHaveBeenCalledWith(
+			expect.objectContaining({
+				data: expect.objectContaining({ wantLogoutRequestsSigned: true }),
+			}),
+		);
+	});
+
+	it('SLO: update wantLogoutRequestsSigned without cert → BadRequestException', async () => {
+		prisma.spConnection.findUnique.mockResolvedValue({ ...sampleRow, spCertificate: null });
+		await expect(service.update(sampleRow.id, { wantLogoutRequestsSigned: true })).rejects.toThrow(
+			BadRequestException,
+		);
+	});
+
+	it('SLO: removing cert while wantLogoutRequestsSigned=true → BadRequestException', async () => {
+		prisma.spConnection.findUnique.mockResolvedValue({
+			...sampleRow,
+			spCertificate: certPem,
+			wantLogoutRequestsSigned: true,
+		});
+		await expect(service.update(sampleRow.id, { spCertificate: null })).rejects.toThrow(
+			BadRequestException,
+		);
+	});
+
+	it('SLO: update clears sloUrl with empty string', async () => {
+		prisma.spConnection.findUnique.mockResolvedValue(sampleRow);
+		prisma.spConnection.update.mockResolvedValue(sampleRow);
+		await service.update(sampleRow.id, { sloUrl: '' });
+		expect(prisma.spConnection.update.mock.calls[0][0].data.sloUrl).toBeNull();
+	});
+
+	it('SLO: parseSloFromMetadata extracts Redirect Location', () => {
+		const xml =
+			'<md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata"><md:SPSSODescriptor><md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://sp/slo"/></md:SPSSODescriptor></md:EntityDescriptor>';
+		expect(service.parseSloFromMetadata(xml).redirect).toBe('https://sp/slo');
+	});
 });

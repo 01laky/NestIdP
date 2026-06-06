@@ -6,6 +6,8 @@ export const I18N_NAMESPACES = [
 	'dashboard',
 	'apiConnections',
 	'spConnections',
+	'samlSessions',
+	'loggedOut',
 	'idpSettings',
 	'identity',
 	'audit',

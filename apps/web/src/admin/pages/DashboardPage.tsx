@@ -88,6 +88,7 @@ export function DashboardPage() {
 				<StatCard label={t('statRoles')} value={counts.roles} />
 				<StatCard label={t('statApiConnections')} value={counts.apiConnections} />
 				<StatCard label={t('statSpConnections')} value={counts.spConnections} />
+				<StatCard label={t('activeSamlSessionsLabel')} value={spSecurity.activeSamlSessions} />
 			</div>
 			{dashboard.apiConnection ? (
 				<Panel title={t('identitySource')}>

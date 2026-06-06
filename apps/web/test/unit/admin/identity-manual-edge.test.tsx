@@ -42,7 +42,6 @@ function mockMembershipLists() {
 	vi.spyOn(adminApi, 'listIdentityRoles').mockResolvedValue({ items: [], total: 0 });
 }
 
-
 afterEach(() => {
 	cleanup();
 	vi.restoreAllMocks();

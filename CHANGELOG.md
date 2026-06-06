@@ -4,6 +4,55 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.8.0]
+
+### Added
+
+- **SAML Single Logout — SP-initiated (Prompt 26):** `GET/POST /saml/slo` now accept a `<samlp:LogoutRequest>`
+  over the HTTP-Redirect and HTTP-POST bindings (previously a 501 stub). The IdP validates Destination,
+  IssueInstant clock skew, and the optional `NotOnOrAfter`; verifies the signature (detached query signature
+  for Redirect, enveloped XML-DSig for POST); terminates the matching IdP SSO session (**single-SP scope —
+  no propagation to other SPs**); and returns a signed `<samlp:LogoutResponse>` to the SP's `sloUrl` over the
+  same binding. When `sloUrl` is absent the browser is redirected to a localized `/logged-out` page. The IdP
+  metadata now advertises `<md:SingleLogoutService>` (HTTP-POST + HTTP-Redirect) at `/saml/slo`.
+- **Revocable server-side SSO sessions:** new `SamlSsoSession` + `SamlSpParticipation` models. A session row is
+  created at end-user login (its id becomes the cookie `sid`), and a participation row (carrying the emitted
+  `SessionIndex` + NameID) is created on each assertion. `EndUserAuthGuard` now rejects a cookie whose backing
+  session is terminated/expired/missing — making logout actually force re-authentication on the next SSO
+  despite the stateless cookie. Cookies issued before v1.8.0 (no `sid`) require one re-login after upgrade.
+- **Admin Active Sessions page** (`/admin/sessions`, `GET/POST /api/admin/saml-sessions`): list active/terminated
+  SSO sessions with status / Service-Provider / search filters and pagination; terminate one session or all
+  sessions for a user (`/terminate-by-user`); shows login IP, user-agent, and last-active. Dashboard gains an
+  active-SSO-sessions stat.
+- **Per-SP `wantLogoutRequestsSigned` flag** and **`sloUrl`** field on SP connections (DTOs, mapper, form),
+  plus an **Autofill from SP metadata** affordance (`POST /api/admin/sp-connections/parse-slo-from-metadata`)
+  that extracts `SingleLogoutService` Locations from a pasted SP `EntityDescriptor`.
+- **LogoutRequest replay protection** (`SamlLogoutRequestLog`, unique request id, recorded only after the
+  signature is valid; purged with the clock-skew window), and **per-IP rate limiting** on the public `/saml/slo`
+  endpoint (`SamlSloRateLimiterService`).
+- **Automatic session termination on user lifecycle:** deactivating or deleting an identity user terminates all
+  of that user's active SSO sessions.
+- New audit events: `saml_logout_request_received`, `saml_logout_request_rejected`, `saml_logout_completed`,
+  `saml_session_terminated`, `saml_sso_session_started`. New `samlSessions` + `loggedOut` i18n namespaces and
+  `spConnections.sloUrl` / `wantLogoutRequestsSigned` strings in all 10 locales.
+- New shared contracts: `SAML_SLO_PATH`, `SAML_SESSIONS_API_PATH`, `SAML_SESSIONS_ROUTE_PREFIX`,
+  `LOGGED_OUT_ROUTE`, SLO status-code constants, `EndUserSessionPayload.sid`, and session/SLO DTOs.
+- New `docs/img/slo-flow.mmd` sequence diagram (SP-initiated SLO + admin termination).
+
+### Changed
+
+- `SamlResponseBuilderService.buildLoginResponse` now also returns `sessionIndex`, `nameId`, and `nameIdFormat`.
+- `SamlSsoService.completeSso` accepts the SSO-session id, records a participation, and rejects a terminated
+  session. `verifyEnvelopedXmlDsig` was extracted into a reusable util. `SamlSessionCleanupService` also purges
+  expired SSO sessions and old replay-log rows.
+- `SamlSsoSessionService` lives in a dedicated `SamlSessionRegistryModule` imported by the SAML, Auth, and
+  Identity-admin modules.
+
+### Security
+
+- SP application sessions are **not** torn down by local invalidation (no back-channel SLO) — documented as an
+  explicit limitation in the admin UI. Display-only login IP / user-agent are never used for authorization.
+
 ## [1.7.3]
 
 ### Fixed

@@ -13,7 +13,11 @@ import {
 	SAML_METADATA_PATH,
 	SAML_SSO_PATH,
 } from '@nestidp/shared';
-import { fingerprintSha256Hex, isCertExpiringSoon, parseCertNotAfterIso } from '../utils/idp-cert.util';
+import {
+	fingerprintSha256Hex,
+	isCertExpiringSoon,
+	parseCertNotAfterIso,
+} from '../utils/idp-cert.util';
 
 export function resolveIdpBaseUrl(idpBaseUrl: string): string {
 	return idpBaseUrl.replace(/\/+$/, '');

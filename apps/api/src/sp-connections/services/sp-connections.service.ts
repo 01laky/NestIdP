@@ -10,19 +10,24 @@ import type {
 	CreateSpConnectionRequestDto,
 	DeleteSpConnectionResponseDto,
 	IdpMetadataUrlResponseDto,
+	ParseSloFromMetadataResponseDto,
 	SpConnectionListResponseDto,
 	SpConnectionPublicDto,
 	SpConnectionResponseDto,
 	UpdateSpConnectionRequestDto,
 } from '@nestidp/shared';
 import { SAML_NAME_ID_FORMATS } from '@nestidp/shared';
+import { extractSloUrlFromSpMetadata } from '../../saml/utils/sp-metadata-slo.util';
 import { assertValidAcsUrl, AcsUrlValidationError } from '../../common/utils/acs-url.util';
 import { PrismaService } from '../../prisma/services/prisma.service';
 import {
 	assertValidSpAttributeMapping,
 	SpAttributeMappingValidationError,
 } from '../validators/sp-attribute-mapping.validator';
-import { assertValidSpCertificatePem, SpCertificateValidationError } from '../utils/sp-certificate.util';
+import {
+	assertValidSpCertificatePem,
+	SpCertificateValidationError,
+} from '../utils/sp-certificate.util';
 import { IdpSettingsService } from '../../idp-settings/services/idp-settings.service';
 import { SpConnectionsAuditService } from './sp-connections-audit.service';
 import { toSpConnectionPublicDto } from '../mappers/sp-connections.mapper';
@@ -52,25 +57,30 @@ export class SpConnectionsService {
 		await this.assertEntityIdAvailable(spEntityId);
 
 		const acsUrl = this.validateAcsUrl(body.acsUrl);
+		const sloUrl = this.validateSloUrl(body.sloUrl);
 		const nameIdFormat = this.resolveNameIdFormat(body.nameIdFormat);
 		const attributeMapping = this.validateMapping(body.attributeMapping);
 		const spCertificate = this.validateCertificate(body.spCertificate);
 		const wantAssertionsEncrypted = body.wantAssertionsEncrypted ?? false;
 		const wantAuthnRequestsSigned = body.wantAuthnRequestsSigned ?? false;
+		const wantLogoutRequestsSigned = body.wantLogoutRequestsSigned ?? false;
 		this.assertWantAssertionsEncryptedRequiresSpCert(wantAssertionsEncrypted, spCertificate);
 		this.assertWantAuthnRequestsSignedRequiresSpCert(wantAuthnRequestsSigned, spCertificate);
+		this.assertWantLogoutRequestsSignedRequiresSpCert(wantLogoutRequestsSigned, spCertificate);
 
 		const row = await this.prisma.spConnection.create({
 			data: {
 				name: body.name.trim(),
 				spEntityId,
 				acsUrl,
+				sloUrl,
 				nameIdFormat,
 				attributeMapping: attributeMapping ?? Prisma.JsonNull,
 				active: body.active ?? true,
 				spCertificate,
 				wantAssertionsEncrypted,
 				wantAuthnRequestsSigned,
+				wantLogoutRequestsSigned,
 			},
 		});
 
@@ -83,12 +93,14 @@ export class SpConnectionsService {
 			body.name === undefined &&
 			body.spEntityId === undefined &&
 			body.acsUrl === undefined &&
+			body.sloUrl === undefined &&
 			body.nameIdFormat === undefined &&
 			body.attributeMapping === undefined &&
 			body.active === undefined &&
 			body.spCertificate === undefined &&
 			body.wantAssertionsEncrypted === undefined &&
-			body.wantAuthnRequestsSigned === undefined
+			body.wantAuthnRequestsSigned === undefined &&
+			body.wantLogoutRequestsSigned === undefined
 		) {
 			throw new BadRequestException('At least one field must be provided');
 		}
@@ -120,6 +132,9 @@ export class SpConnectionsService {
 		if (body.acsUrl !== undefined) {
 			data.acsUrl = this.validateAcsUrl(body.acsUrl);
 		}
+		if (body.sloUrl !== undefined) {
+			data.sloUrl = this.validateSloUrl(body.sloUrl);
+		}
 		if (body.nameIdFormat !== undefined) {
 			data.nameIdFormat = this.resolveNameIdFormat(body.nameIdFormat);
 		}
@@ -147,11 +162,20 @@ export class SpConnectionsService {
 				body.spCertificate !== undefined
 					? this.validateCertificate(body.spCertificate)
 					: existing.spCertificate;
-			this.assertWantAuthnRequestsSignedRequiresSpCert(
-				body.wantAuthnRequestsSigned,
+			this.assertWantAuthnRequestsSignedRequiresSpCert(body.wantAuthnRequestsSigned, certForCheck);
+			data.wantAuthnRequestsSigned = body.wantAuthnRequestsSigned;
+		}
+
+		if (body.wantLogoutRequestsSigned !== undefined) {
+			const certForCheck =
+				body.spCertificate !== undefined
+					? this.validateCertificate(body.spCertificate)
+					: existing.spCertificate;
+			this.assertWantLogoutRequestsSignedRequiresSpCert(
+				body.wantLogoutRequestsSigned,
 				certForCheck,
 			);
-			data.wantAuthnRequestsSigned = body.wantAuthnRequestsSigned;
+			data.wantLogoutRequestsSigned = body.wantLogoutRequestsSigned;
 		}
 
 		if (body.spCertificate !== undefined) {
@@ -164,9 +188,13 @@ export class SpConnectionsService {
 				body.wantAuthnRequestsSigned !== undefined
 					? body.wantAuthnRequestsSigned
 					: existing.wantAuthnRequestsSigned;
-			if (!nextCert?.trim() && (nextWantEncrypted || nextWantSigned)) {
+			const nextWantLogoutSigned =
+				body.wantLogoutRequestsSigned !== undefined
+					? body.wantLogoutRequestsSigned
+					: existing.wantLogoutRequestsSigned;
+			if (!nextCert?.trim() && (nextWantEncrypted || nextWantSigned || nextWantLogoutSigned)) {
 				throw new BadRequestException(
-					'Disable encrypt assertions and require signed AuthnRequest before removing SP certificate',
+					'Disable encrypt assertions, require signed AuthnRequest, and require signed LogoutRequest before removing SP certificate',
 				);
 			}
 		}
@@ -191,6 +219,10 @@ export class SpConnectionsService {
 		return this.idpSettingsService.getMetadataUrlResponse();
 	}
 
+	parseSloFromMetadata(metadataXml: string): ParseSloFromMetadataResponseDto {
+		return extractSloUrlFromSpMetadata(metadataXml);
+	}
+
 	private async findOrThrow(id: string) {
 		const row = await this.prisma.spConnection.findUnique({ where: { id } });
 		if (!row) {
@@ -205,6 +237,20 @@ export class SpConnectionsService {
 		} catch (error) {
 			if (error instanceof AcsUrlValidationError) {
 				throw new BadRequestException(error.message);
+			}
+			throw error;
+		}
+	}
+
+	private validateSloUrl(raw: string | null | undefined): string | null {
+		if (raw == null || raw.trim().length === 0) {
+			return null;
+		}
+		try {
+			return assertValidAcsUrl(raw, this.configService.get<string>('NODE_ENV') ?? 'development');
+		} catch (error) {
+			if (error instanceof AcsUrlValidationError) {
+				throw new BadRequestException(`Invalid sloUrl: ${error.message}`);
 			}
 			throw error;
 		}
@@ -281,6 +327,20 @@ export class SpConnectionsService {
 		if (!spCertificate?.trim()) {
 			throw new BadRequestException(
 				'SP certificate PEM is required when require signed AuthnRequest is enabled',
+			);
+		}
+	}
+
+	private assertWantLogoutRequestsSignedRequiresSpCert(
+		wantSigned: boolean,
+		spCertificate: string | null,
+	): void {
+		if (!wantSigned) {
+			return;
+		}
+		if (!spCertificate?.trim()) {
+			throw new BadRequestException(
+				'SP certificate PEM is required when require signed LogoutRequest is enabled',
 			);
 		}
 	}

@@ -1,0 +1,28 @@
+sequenceDiagram
+	autonumber
+	actor User as End user
+	actor Admin as Operator
+	participant SP as Service Provider
+	participant SLO as /saml/slo
+	participant Sessions as SSO session registry
+	participant AdminUI as Admin · Active sessions
+	participant DB as Local DB
+
+	rect rgb(235, 244, 255)
+	Note over User,DB: SP-initiated SLO (single-SP, local invalidate)
+	User->>SP: Click logout
+	SP->>SLO: HTTP-Redirect or HTTP-POST + signed LogoutRequest
+	SLO->>SLO: Rate-limit · parse · validate Destination/IssueInstant/NotOnOrAfter
+	SLO->>SLO: Verify signature (per wantLogoutRequestsSigned)
+	SLO->>Sessions: Replay check · match participation (NameID + SessionIndex)
+	Sessions->>DB: Terminate matching SSO session
+	SLO->>SP: Signed LogoutResponse to sp.sloUrl (clears IdP cookie)
+	end
+
+	rect rgb(255, 244, 235)
+	Note over Admin,DB: Admin-initiated termination (local invalidate)
+	Admin->>AdminUI: View active sessions · Terminate
+	AdminUI->>Sessions: POST /api/admin/saml-sessions/:id/terminate
+	Sessions->>DB: status = terminated
+	Note over Sessions,DB: Revocation: terminated sid blocks the<br/>stateless end-user cookie → re-auth on next SSO
+	end

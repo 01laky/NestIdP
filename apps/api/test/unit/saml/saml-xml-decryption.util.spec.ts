@@ -53,8 +53,7 @@ describe('saml-xml-decryption.util', () => {
 
 	it('API-SAML-REQ-DEC-UTIL-05: encrypted-root detector is strict to xenc namespace', () => {
 		const encryptedRoot = '<xenc:EncryptedData xmlns:xenc="http://www.w3.org/2001/04/xmlenc#"/>';
-		const plainRoot =
-			'<samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"/>';
+		const plainRoot = '<samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"/>';
 		expect(isEncryptedDataRoot(encryptedRoot)).toBe(true);
 		expect(isEncryptedDataRoot(plainRoot)).toBe(false);
 	});

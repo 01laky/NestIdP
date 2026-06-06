@@ -22,6 +22,9 @@ export interface BuildLoginResponseInput {
 export interface BuildLoginResponseResult {
 	samlResponseXml: string;
 	assertionXml: string;
+	sessionIndex: string;
+	nameId: string;
+	nameIdFormat: string;
 }
 
 @Injectable()
@@ -130,6 +133,9 @@ export class SamlResponseBuilderService {
 		return {
 			samlResponseXml: responseXml,
 			assertionXml: outwardAssertionXml,
+			sessionIndex,
+			nameId: mapped.nameId,
+			nameIdFormat: mapped.nameIdFormat,
 		};
 	}
 

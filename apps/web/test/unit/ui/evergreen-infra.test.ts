@@ -94,7 +94,11 @@ describe('Evergreen infrastructure', () => {
 	});
 
 	it('WEB-EVG-177: extended responsive shell vitest suites exist', () => {
-		expect(existsSync(join(webRoot, 'test/unit/ui/responsive-shell-edge-extended.test.ts'))).toBe(true);
-		expect(existsSync(join(webRoot, 'test/unit/ui/responsive-shell-edge-extended.test.tsx'))).toBe(true);
+		expect(existsSync(join(webRoot, 'test/unit/ui/responsive-shell-edge-extended.test.ts'))).toBe(
+			true,
+		);
+		expect(existsSync(join(webRoot, 'test/unit/ui/responsive-shell-edge-extended.test.tsx'))).toBe(
+			true,
+		);
 	});
 });

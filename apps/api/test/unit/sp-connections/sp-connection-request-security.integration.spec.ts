@@ -190,9 +190,7 @@ describe('SP request security integration (SQLite)', () => {
 			spEntityId: `urn:test:sp:test-sso-encrypted-missing:${Date.now()}`,
 		});
 		const { agent } = await adminCsrfAgent();
-		await agent
-			.get(`${SP_CONNECTIONS_API_PATH}/${sp.id}/test-sso-url?encrypted=true`)
-			.expect(400);
+		await agent.get(`${SP_CONNECTIONS_API_PATH}/${sp.id}/test-sso-url?encrypted=true`).expect(400);
 	});
 
 	it('API-SP-TEST-SSO-04: encrypted test SSO URL carries encrypted SAMLRequest', async () => {

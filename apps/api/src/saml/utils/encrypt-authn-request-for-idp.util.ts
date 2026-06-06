@@ -1,11 +1,21 @@
-import { createCipheriv, createPrivateKey, createPublicKey, diffieHellman, generateKeyPairSync, randomBytes } from 'node:crypto';
+import {
+	createCipheriv,
+	createPrivateKey,
+	createPublicKey,
+	diffieHellman,
+	generateKeyPairSync,
+	randomBytes,
+} from 'node:crypto';
 import {
 	getIdpContentEncryptionOption,
 	getIdpEncryptionKeyTransportOption,
 	IDP_DEFAULT_CONTENT_ENCRYPTION_ALGORITHM_ID,
 	IDP_ENCRYPTION_DEFAULT_KEY_TRANSPORT_ALGORITHM_ID,
 } from '@nestidp/shared';
-import { deriveEcdhEsKeyWithConcatKdf, wrapSymmetricKeyWithTransport } from './saml-xml-encryption-shared.util';
+import {
+	deriveEcdhEsKeyWithConcatKdf,
+	wrapSymmetricKeyWithTransport,
+} from './saml-xml-encryption-shared.util';
 
 const XMLENC_NS = 'http://www.w3.org/2001/04/xmlenc#';
 const XMLENC11_NS = 'http://www.w3.org/2009/xmlenc11#';
@@ -20,21 +30,21 @@ export interface EncryptAuthnRequestForIdpOptions {
 /** Map from Node.js curve name to OID URI used in xenc11:NamedCurve */
 const CURVE_NAME_TO_OID_URI: Record<string, string> = {
 	'P-256': 'urn:oid:1.2.840.10045.3.1.7',
-	'prime256v1': 'urn:oid:1.2.840.10045.3.1.7',
+	prime256v1: 'urn:oid:1.2.840.10045.3.1.7',
 	'P-384': 'urn:oid:1.3.132.0.34',
-	'secp384r1': 'urn:oid:1.3.132.0.34',
+	secp384r1: 'urn:oid:1.3.132.0.34',
 	'P-521': 'urn:oid:1.3.132.0.35',
-	'secp521r1': 'urn:oid:1.3.132.0.35',
+	secp521r1: 'urn:oid:1.3.132.0.35',
 };
 
 /** SPKI header byte lengths for each curve (used to extract the raw point). */
 const CURVE_SPKI_HEADER_LENGTH: Record<string, number> = {
 	'P-256': 26,
-	'prime256v1': 26,
+	prime256v1: 26,
 	'P-384': 23,
-	'secp384r1': 23,
+	secp384r1: 23,
 	'P-521': 25,
-	'secp521r1': 25,
+	secp521r1: 25,
 };
 
 function detectEcCurveFromCertPem(certPem: string): string | null {
@@ -70,7 +80,12 @@ export function encryptAuthnRequestForIdp(
 	// Detect key type
 	const ecCurve = detectEcCurveFromCertPem(idpEncryptionCertPem);
 	if (ecCurve) {
-		return encryptAuthnRequestForIdpEc(plainAuthnRequestXml, idpEncryptionCertPem, ecCurve, options);
+		return encryptAuthnRequestForIdpEc(
+			plainAuthnRequestXml,
+			idpEncryptionCertPem,
+			ecCurve,
+			options,
+		);
 	}
 	return encryptAuthnRequestForIdpRsa(plainAuthnRequestXml, idpEncryptionCertPem, options);
 }
@@ -82,7 +97,8 @@ function encryptAuthnRequestForIdpRsa(
 ): string {
 	const transportId =
 		options.keyTransportAlgorithmId ?? IDP_ENCRYPTION_DEFAULT_KEY_TRANSPORT_ALGORITHM_ID;
-	const contentId = options.contentEncryptionAlgorithmId ?? IDP_DEFAULT_CONTENT_ENCRYPTION_ALGORITHM_ID;
+	const contentId =
+		options.contentEncryptionAlgorithmId ?? IDP_DEFAULT_CONTENT_ENCRYPTION_ALGORITHM_ID;
 	const transport = getIdpEncryptionKeyTransportOption(transportId)!;
 	const content = getIdpContentEncryptionOption(contentId)!;
 
@@ -97,7 +113,11 @@ function encryptAuthnRequestForIdpRsa(
 	const cipherPayload = Buffer.concat([iv, ciphertext]);
 
 	const publicKey = createPublicKey({ key: idpEncryptionCertPem, format: 'pem' });
-	const encryptedKey = wrapSymmetricKeyWithTransport(aesKey, publicKey, transport.xmlKeyTransportAlgorithm);
+	const encryptedKey = wrapSymmetricKeyWithTransport(
+		aesKey,
+		publicKey,
+		transport.xmlKeyTransportAlgorithm,
+	);
 
 	const encryptedDataId = `_${randomBytes(16).toString('hex')}`;
 	const encryptedKeyId = `_${randomBytes(16).toString('hex')}`;
@@ -124,7 +144,8 @@ function encryptAuthnRequestForIdpEc(
 	ecCurve: string,
 	options: EncryptAuthnRequestForIdpOptions,
 ): string {
-	const contentId = options.contentEncryptionAlgorithmId ?? IDP_DEFAULT_CONTENT_ENCRYPTION_ALGORITHM_ID;
+	const contentId =
+		options.contentEncryptionAlgorithmId ?? IDP_DEFAULT_CONTENT_ENCRYPTION_ALGORITHM_ID;
 	const content = getIdpContentEncryptionOption(contentId)!;
 
 	const namedCurveOidUri = CURVE_NAME_TO_OID_URI[ecCurve];

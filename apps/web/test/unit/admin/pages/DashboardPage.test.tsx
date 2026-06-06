@@ -51,6 +51,7 @@ function dashboardStub(
 			spConnectionsMissingCertWithSecurityFlags: 0,
 			idpAdvertisesSignedAuthnRequests: false,
 			idpEncryptionKeyIsEc: false,
+			activeSamlSessions: 0,
 		},
 		apiConnection: null,
 		lastSyncStatus: null,
@@ -164,7 +165,8 @@ describe('DashboardPage', () => {
 					spConnectionsRequireEncryptedAssertions: 2,
 					spConnectionsMissingCertWithSecurityFlags: 1,
 					idpAdvertisesSignedAuthnRequests: false,
-			idpEncryptionKeyIsEc: false,
+					idpEncryptionKeyIsEc: false,
+					activeSamlSessions: 0,
 				},
 			}),
 		);
@@ -280,7 +282,7 @@ describe('DashboardPage', () => {
 			expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeDefined();
 			expect(screen.getByRole('heading', { name: 'IdP configuration' })).toBeDefined();
 			expect(screen.getByText('http://localhost:3000/saml/metadata')).toBeDefined();
-			expect(document.querySelectorAll('.evg-stat__value').length).toBe(5);
+			expect(document.querySelectorAll('.evg-stat__value').length).toBe(6);
 		});
 	});
 });

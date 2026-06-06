@@ -53,13 +53,23 @@ export class SamlRequestParserService {
 		}
 
 		const parsed = this.parseAuthnRequestXml(decoded, relayState, 'redirect');
-		return { authnRequest: parsed.authnRequest, relayState: parsed.relayState, requestWasEncrypted };
+		return {
+			authnRequest: parsed.authnRequest,
+			relayState: parsed.relayState,
+			requestWasEncrypted,
+		};
 	}
 
 	async parsePostBinding(
 		encodedRequest: string,
 		relayState?: string,
-	): Promise<ParseRedirectBindingResult & { requestWasEncrypted: boolean; requestWasSigned: boolean; rawAuthnRequestXml: string }> {
+	): Promise<
+		ParseRedirectBindingResult & {
+			requestWasEncrypted: boolean;
+			requestWasSigned: boolean;
+			rawAuthnRequestXml: string;
+		}
+	> {
 		if (!encodedRequest?.trim()) {
 			throw new BadRequestException('Missing SAMLRequest');
 		}
@@ -72,8 +82,16 @@ export class SamlRequestParserService {
 		}
 
 		// Reject deflate-encoded payloads (binary garbage — first byte < 0x20 and not whitespace)
-		if (decoded.length > 0 && decoded.charCodeAt(0) < 0x20 && decoded.charCodeAt(0) !== 0x09 && decoded.charCodeAt(0) !== 0x0a && decoded.charCodeAt(0) !== 0x0d) {
-			throw new BadRequestException('Invalid SAMLRequest encoding — deflate-encoded data is not accepted for POST binding');
+		if (
+			decoded.length > 0 &&
+			decoded.charCodeAt(0) < 0x20 &&
+			decoded.charCodeAt(0) !== 0x09 &&
+			decoded.charCodeAt(0) !== 0x0a &&
+			decoded.charCodeAt(0) !== 0x0d
+		) {
+			throw new BadRequestException(
+				'Invalid SAMLRequest encoding — deflate-encoded data is not accepted for POST binding',
+			);
 		}
 
 		if (Buffer.byteLength(decoded, 'utf8') > MAX_SAML_REQUEST_BYTES) {
@@ -95,7 +113,10 @@ export class SamlRequestParserService {
 			ds: 'http://www.w3.org/2000/09/xmldsig#',
 		});
 		const doc = new DOMParser().parseFromString(decoded, 'text/xml');
-		const sigNodes = selectPost('//samlp:AuthnRequest/ds:Signature', doc as unknown as Node) as Node[];
+		const sigNodes = selectPost(
+			'//samlp:AuthnRequest/ds:Signature',
+			doc as unknown as Node,
+		) as Node[];
 		const requestWasSigned = sigNodes.length > 0;
 
 		return {

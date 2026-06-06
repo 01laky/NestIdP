@@ -4,6 +4,7 @@ import { AuditCoreModule } from '../audit/audit-core.module';
 import { IdentityModule } from '../identity/identity.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { SamlModule } from '../saml/saml.module';
+import { SamlSessionRegistryModule } from '../saml-sessions/saml-session-registry.module';
 import { AuthController } from './controllers/auth.controller';
 import { EndUserAuthAuditService } from './services/end-user-auth-audit.service';
 import { EndUserAuthGuard } from './guards/end-user-auth.guard';
@@ -13,7 +14,7 @@ import { EndUserSessionService } from './services/end-user-session.service';
 import { SamlSessionBindService } from './services/saml-session-bind.service';
 
 @Module({
-	imports: [PrismaModule, AuditCoreModule, IdentityModule, SamlModule],
+	imports: [PrismaModule, AuditCoreModule, IdentityModule, SamlModule, SamlSessionRegistryModule],
 	controllers: [AuthController],
 	providers: [
 		EndUserAuthService,

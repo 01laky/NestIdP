@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SAML_SSO_PATH } from '@nestidp/shared';
+import { SAML_SLO_PATH, SAML_SSO_PATH } from '@nestidp/shared';
 import { create } from 'xmlbuilder2';
 import { PrismaService } from '../../prisma/services/prisma.service';
 import { IdpEncryptionService } from './idp-encryption.service';
@@ -25,6 +25,7 @@ export class SamlMetadataService {
 		const encryptionCertPems = await this.idpEncryption.getMetadataEncryptionCertificates();
 		const baseUrl = (this.configService.get<string>('IDP_BASE_URL') ?? '').replace(/\/+$/, '');
 		const ssoUrl = `${baseUrl}${SAML_SSO_PATH}`;
+		const sloUrl = `${baseUrl}${SAML_SLO_PATH}`;
 
 		const doc = create({ version: '1.0', encoding: 'UTF-8' }).ele('md:EntityDescriptor', {
 			'xmlns:md': 'urn:oasis:names:tc:SAML:2.0:metadata',
@@ -55,6 +56,15 @@ export class SamlMetadataService {
 				.ele('ds:X509Certificate')
 				.txt(certBody);
 		}
+
+		idp.ele('md:SingleLogoutService', {
+			Binding: 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST',
+			Location: sloUrl,
+		});
+		idp.ele('md:SingleLogoutService', {
+			Binding: 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect',
+			Location: sloUrl,
+		});
 
 		idp.ele('md:NameIDFormat').txt(settings.nameIdFormat);
 		idp.ele('md:NameIDFormat').txt('urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified');

@@ -115,9 +115,7 @@ describe('IdpSettingsPage', () => {
 			.mockResolvedValue(baseSettings({ wantAuthnRequestsSigned: true }));
 
 		renderPage();
-		await waitFor(() =>
-			screen.getByRole('checkbox', { name: /Request signed AuthnRequests/i }),
-		);
+		await waitFor(() => screen.getByRole('checkbox', { name: /Request signed AuthnRequests/i }));
 		fireEvent.click(screen.getByRole('checkbox', { name: /Request signed AuthnRequests/i }));
 		fireEvent.click(screen.getByRole('button', { name: 'Save SAML behavior' }));
 

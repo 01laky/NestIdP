@@ -22,6 +22,7 @@ import { IdpSettingsPage } from './pages/IdpSettingsPage';
 import { AdminUsersPage } from './pages/AdminUsersPage';
 import { AuditLogPage } from './pages/AuditLogPage';
 import { SpConnectionsListPage } from './pages/SpConnectionsListPage';
+import { SamlSessionsPage } from './pages/SamlSessionsPage';
 import { SyncLogDetailPage } from './pages/SyncLogDetailPage';
 import { AppShell, ConfirmProvider, EmptyState, LoadingState, ToastProvider } from '../ui';
 
@@ -99,6 +100,7 @@ export function AdminLayout() {
 						<Route path="sp-connections/new" element={<SpConnectionFormPage />} />
 						<Route path="sp-connections/:id" element={<SpConnectionFormPage />} />
 						<Route path="sp-connections/:id/test-sso" element={<SpConnectionTestSsoPage />} />
+						<Route path="sessions" element={<SamlSessionsPage />} />
 						<Route path="identity/users" element={<IdentityUsersPage />} />
 						<Route path="identity/users/new" element={<IdentityUserFormPage />} />
 						<Route path="identity/users/:id/edit" element={<IdentityUserFormPage />} />

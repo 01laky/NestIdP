@@ -35,6 +35,8 @@ describe('SpConnectionFormPage Evergreen forms', () => {
 			hasSpCertificate: false,
 			wantAssertionsEncrypted: false,
 			wantAuthnRequestsSigned: false,
+			wantLogoutRequestsSigned: false,
+			sloUrl: null,
 			createdAt: '2026-01-01T00:00:00.000Z',
 			updatedAt: '2026-01-01T00:00:00.000Z',
 		});

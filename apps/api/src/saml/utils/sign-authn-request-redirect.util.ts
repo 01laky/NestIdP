@@ -23,7 +23,8 @@ export function buildSignedAuthnRequestRedirectQuery(
 	options: BuildSignedAuthnRequestRedirectQueryOptions,
 ): SignedAuthnRequestRedirectQuery {
 	const sigAlgUri =
-		options.sigAlgUri ?? SAML_REDIRECT_SIGNATURE_ALGORITHMS.find((a) => a.id === 'rsa-sha256')!.xmlSignatureAlgorithm;
+		options.sigAlgUri ??
+		SAML_REDIRECT_SIGNATURE_ALGORITHMS.find((a) => a.id === 'rsa-sha256')!.xmlSignatureAlgorithm;
 	const algorithm = getSamlRedirectSignatureAlgorithm(sigAlgUri);
 	if (!algorithm) {
 		throw new Error(`Unsupported SigAlg: ${sigAlgUri}`);
@@ -36,7 +37,10 @@ export function buildSignedAuthnRequestRedirectQuery(
 		sigAlgRaw,
 	});
 
-	const signer = createSign(algorithm.nodeVerifyAlgorithm);
+	// Node's createSign needs the digest (e.g. 'sha256'); 'ecdsa-with-SHA256' is rejected.
+	const digestMatch = algorithm.nodeVerifyAlgorithm.match(/sha-?(\d+)/i);
+	const digest = digestMatch ? `sha${digestMatch[1]}` : 'sha256';
+	const signer = createSign(digest);
 	const privateKey = createPrivateKey({ key: options.spPrivateKeyPem, format: 'pem' });
 	const signature = signer.update(signedContent, 'utf8').sign(privateKey, 'base64');
 

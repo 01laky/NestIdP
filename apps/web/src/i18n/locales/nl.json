@@ -94,7 +94,9 @@
 		"baseUrl": "Base URL",
 		"lastSync": "Last sync",
 		"optional": "optional",
-		"required": "required"
+		"required": "required",
+		"previous": "Vorige",
+		"next": "Volgende"
 	},
 	"nav": {
 		"brand": "NestIdP",
@@ -108,7 +110,8 @@
 		"idpSettings": "IdP-instellingen",
 		"adminAccounts": "Adminaccounts",
 		"auditLog": "Auditlogboek",
-		"samlLogin": "SAML-login"
+		"samlLogin": "SAML-login",
+		"samlSessions": "Actieve sessies"
 	},
 	"adminAuth": {
 		"title": "Admin Login",
@@ -177,7 +180,8 @@
 			"requireEncryptedAssertionsCount": "Require encrypted assertions: {{count}}",
 			"idpAdvertisesWithoutEnforcement": "IdP metadata advertises signed AuthnRequests, but no SP connection currently enforces signature verification.",
 			"ecKeyAdvisory": "IdP encryption uses an EC key (ECDH-ES). Service Providers must support XML Encryption 1.1 (xenc11:AgreementMethod). Older SPs may not be compatible — consider using an RSA key for broader compatibility."
-		}
+		},
+		"activeSamlSessionsLabel": "Actieve SSO-sessies"
 	},
 	"apiConnections": {
 		"listTitle": "API-verbindingen",
@@ -269,7 +273,16 @@
 		"testSsoWarningCallout": "Test URLs are for operator validation only. Keep private key material out of browser history, logs, and screenshots.",
 		"testSsoEphemeralKeyWarning": "Signed URL used an ephemeral server key. Verification only succeeds if the generated key matches the uploaded SP certificate.",
 		"testSsoEcKeyAgreementWarning": "The IdP encryption key is an EC key. This encrypted test URL uses ECDH-ES (XML Encryption 1.1). The target SP must support xenc11:AgreementMethod — not all SP implementations do.",
-		"probeSigningOpenEditLink": "Open SP edit page to validate signing key/certificate pair"
+		"probeSigningOpenEditLink": "Open SP edit page to validate signing key/certificate pair",
+		"sloUrl": "Single Logout-URL",
+		"sloUrlHint": "Het SP-eindpunt waar de IdP de LogoutResponse naartoe stuurt. Optioneel.",
+		"wantLogoutRequestsSigned": "Ondertekende LogoutRequest vereisen",
+		"wantLogoutRequestsSignedHint": "Indien ingeschakeld, moeten inkomende LogoutRequests een geldige handtekening hebben. Vereist een SP-certificaat.",
+		"autofillSloFromMetadata": "Automatisch invullen uit SP-metadata",
+		"autofillSloMetadataPlaceholder": "Plak SP-EntityDescriptor-XML…",
+		"autofillSloApply": "SLO-URL extraheren",
+		"autofillSloFound": "SLO-URL ingevuld uit metadata",
+		"autofillSloNotFound": "Geen SingleLogoutService gevonden in metadata"
 	},
 	"idpSettings": {
 		"encryptionEcKeyAgreementInfo": "EC encryption key — ECDH-ES key agreement (XML Encryption 1.1). Service Providers must support xenc11:AgreementMethod. RSA keys are more widely compatible.",
@@ -667,7 +680,48 @@
 			"idp_want_authn_requests_signed_updated": "IdP wantAuthnRequestsSigned updated",
 			"saml_request_signature_verified": "SAML request signature verified",
 			"saml_request_decrypted": "SAML request decrypted",
-			"sp_signing_probe_performed": "SP signing probe performed"
+			"sp_signing_probe_performed": "SP signing probe performed",
+			"saml_logout_request_received": "SAML-LogoutRequest ontvangen",
+			"saml_logout_request_rejected": "SAML-LogoutRequest geweigerd",
+			"saml_logout_completed": "SAML-uitloggen voltooid",
+			"saml_session_terminated": "SSO-sessie beëindigd",
+			"saml_sso_session_started": "SSO-sessie gestart"
 		}
+	},
+	"samlSessions": {
+		"title": "Actieve sessies",
+		"subtitle": "Actieve SSO-sessies van eindgebruikers bekijken en beëindigen.",
+		"filters": "Filters",
+		"statusFilter": "Status",
+		"statusActive": "Actief",
+		"statusTerminated": "Beëindigd",
+		"spFilter": "Service Provider",
+		"search": "Zoeken",
+		"searchPlaceholder": "Gebruikersnaam of NameID",
+		"limitationNote": "Het beëindigen van een sessie dwingt herauthenticatie af bij de volgende SSO en blokkeert stille SSO. Het beëindigt niet de sessie die al binnen de Service Provider-applicatie bestaat (daarvoor is back-channel SLO nodig).",
+		"colUser": "Gebruiker",
+		"colServiceProviders": "Service Providers",
+		"colLoginIp": "Login-IP",
+		"colUserAgent": "User-agent",
+		"colLastActive": "Laatst actief",
+		"terminate": "Beëindigen",
+		"terminateAllForUser": "Alles beëindigen voor gebruiker",
+		"confirmTerminateTitle": "Sessie beëindigen?",
+		"confirmTerminateDescription": "Dit beëindigt de SSO-sessie van {{username}} en dwingt herauthenticatie af bij de volgende SSO.",
+		"confirmTerminateUserTitle": "Alle sessies beëindigen?",
+		"confirmTerminateUserDescription": "Dit beëindigt elke actieve SSO-sessie van {{username}}.",
+		"toastTerminated": "Sessie beëindigd",
+		"toastTerminatedUser": "{{count}} sessie(s) beëindigd",
+		"terminateFailed": "Beëindigen van sessie mislukt",
+		"loadFailed": "Sessies laden mislukt",
+		"emptyTitle": "Geen sessies",
+		"emptyDescription": "Geen SSO-sessies komen overeen met de huidige filters.",
+		"showing": "{{shown}} van {{total}} weergegeven",
+		"pageOf": "Pagina {{page}} van {{totalPages}}"
+	},
+	"loggedOut": {
+		"title": "U bent afgemeld",
+		"description": "Uw single sign-on-sessie is beëindigd.",
+		"backToLogin": "Terug naar inloggen"
 	}
 }

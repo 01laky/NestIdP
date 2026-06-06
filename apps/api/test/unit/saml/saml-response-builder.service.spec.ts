@@ -289,7 +289,11 @@ describe('SamlResponseBuilderService (SQLite)', () => {
 		});
 		await expect(
 			builder.buildLoginResponse({
-				authnRequest: { id: '_enc-err', issuer: sp.spEntityId, issueInstant: new Date().toISOString() },
+				authnRequest: {
+					id: '_enc-err',
+					issuer: sp.spEntityId,
+					issueInstant: new Date().toISOString(),
+				},
 				user,
 				spConnection: sp,
 				idpEntityId: 'http://localhost:3000',

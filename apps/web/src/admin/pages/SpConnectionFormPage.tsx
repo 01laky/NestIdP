@@ -8,6 +8,7 @@ import {
 	createSpConnection,
 	deleteSpConnection,
 	getSpConnection,
+	parseSpSloFromMetadata,
 	probeSpConnectionSigning,
 	testSpConnectionAcs,
 	updateSpConnection,
@@ -44,10 +45,14 @@ export function SpConnectionFormPage() {
 	const [name, setName] = useState('');
 	const [spEntityId, setSpEntityId] = useState('');
 	const [acsUrl, setAcsUrl] = useState('');
+	const [sloUrl, setSloUrl] = useState('');
 	const [nameIdFormat, setNameIdFormat] = useState('');
 	const [active, setActive] = useState(true);
 	const [wantAssertionsEncrypted, setWantAssertionsEncrypted] = useState(false);
 	const [wantAuthnRequestsSigned, setWantAuthnRequestsSigned] = useState(false);
+	const [wantLogoutRequestsSigned, setWantLogoutRequestsSigned] = useState(false);
+	const [sloMetadataXml, setSloMetadataXml] = useState('');
+	const [sloMetadataMessage, setSloMetadataMessage] = useState<string | null>(null);
 	const [attributeMapping, setAttributeMapping] = useState<SpAttributeMappingConfig | null>(null);
 	const [spCertificate, setSpCertificate] = useState('');
 	const [hasStoredSpCertificate, setHasStoredSpCertificate] = useState(false);
@@ -73,10 +78,12 @@ export function SpConnectionFormPage() {
 					setName(item.name);
 					setSpEntityId(item.spEntityId);
 					setAcsUrl(item.acsUrl);
+					setSloUrl(item.sloUrl ?? '');
 					setNameIdFormat(item.nameIdFormat);
 					setActive(item.active);
 					setWantAssertionsEncrypted(item.wantAssertionsEncrypted);
 					setWantAuthnRequestsSigned(item.wantAuthnRequestsSigned);
+					setWantLogoutRequestsSigned(item.wantLogoutRequestsSigned);
 					setAttributeMapping(item.attributeMapping);
 					setHasStoredSpCertificate(item.hasSpCertificate);
 					setSpCertificateTouched(false);
@@ -113,21 +120,34 @@ export function SpConnectionFormPage() {
 		setWantAuthnRequestsSigned(false);
 	}, [hasSpCertificate, wantAuthnRequestsSigned]);
 
+	useEffect(() => {
+		if (hasSpCertificate || !wantLogoutRequestsSigned) {
+			return;
+		}
+		setWantLogoutRequestsSigned(false);
+	}, [hasSpCertificate, wantLogoutRequestsSigned]);
+
 	async function handleSubmit(event: FormEvent) {
 		event.preventDefault();
 		setSaving(true);
 		setError(null);
 		const trimmedSpCertificate = spCertificate.trim();
 		const spCertificateValue =
-			isNew || spCertificateTouched ? (trimmedSpCertificate ? trimmedSpCertificate : null) : undefined;
+			isNew || spCertificateTouched
+				? trimmedSpCertificate
+					? trimmedSpCertificate
+					: null
+				: undefined;
 		const body = {
 			name,
 			spEntityId,
 			acsUrl,
+			sloUrl: sloUrl.trim() ? sloUrl.trim() : null,
 			nameIdFormat: nameIdFormat || undefined,
 			active,
 			wantAssertionsEncrypted,
 			wantAuthnRequestsSigned,
+			wantLogoutRequestsSigned,
 			attributeMapping,
 			...(spCertificateValue !== undefined ? { spCertificate: spCertificateValue } : {}),
 		};
@@ -153,6 +173,22 @@ export function SpConnectionFormPage() {
 			);
 		} finally {
 			setSaving(false);
+		}
+	}
+
+	async function handleAutofillSlo() {
+		setSloMetadataMessage(null);
+		try {
+			const result = await parseSpSloFromMetadata(sloMetadataXml);
+			const found = result.redirect ?? result.post;
+			if (found) {
+				setSloUrl(found);
+				setSloMetadataMessage(t('autofillSloFound'));
+			} else {
+				setSloMetadataMessage(t('autofillSloNotFound'));
+			}
+		} catch {
+			setSloMetadataMessage(t('autofillSloNotFound'));
 		}
 	}
 
@@ -292,6 +328,32 @@ export function SpConnectionFormPage() {
 							required
 							requiredMark
 						/>
+						<TextInput
+							label={t('sloUrl')}
+							name="sloUrl"
+							value={sloUrl}
+							hint={t('sloUrlHint')}
+							onChange={(e) => setSloUrl(e.target.value)}
+						/>
+						<details className="evg-filters-panel evg-filters-panel--collapsible">
+							<summary>{t('autofillSloFromMetadata')}</summary>
+							<TextArea
+								label={t('autofillSloFromMetadata')}
+								value={sloMetadataXml}
+								placeholder={t('autofillSloMetadataPlaceholder')}
+								onChange={(e) => setSloMetadataXml(e.target.value)}
+								rows={4}
+							/>
+							<Button
+								type="button"
+								variant="link"
+								onClick={() => void handleAutofillSlo()}
+								disabled={saving || sloMetadataXml.trim().length === 0}
+							>
+								{t('autofillSloApply')}
+							</Button>
+							{sloMetadataMessage ? <p className="evg-muted">{sloMetadataMessage}</p> : null}
+						</details>
 						<Select
 							label={t('nameIdFormat')}
 							value={nameIdFormat}
@@ -325,6 +387,13 @@ export function SpConnectionFormPage() {
 								<Callout variant="warning">{t('wantAuthnRequestsSignedMetadataHint')}</Callout>
 							</>
 						) : null}
+						<Checkbox
+							label={t('wantLogoutRequestsSigned')}
+							hint={t('wantLogoutRequestsSignedHint')}
+							checked={wantLogoutRequestsSigned}
+							onChange={setWantLogoutRequestsSigned}
+							disabled={saving || !hasSpCertificate}
+						/>
 						<AttributeMappingEditor
 							value={attributeMapping}
 							onChange={setAttributeMapping}
@@ -363,9 +432,7 @@ export function SpConnectionFormPage() {
 											disabled={saving || probeSigningBusy || probeSpPrivateKeyPem.trim() === ''}
 											onClick={() => void handleProbeSigning()}
 										>
-											{probeSigningBusy
-												? t('probeSigningButtonBusy')
-												: t('probeSigningButton')}
+											{probeSigningBusy ? t('probeSigningButtonBusy') : t('probeSigningButton')}
 										</Button>
 									</div>
 									{probeSigningMessage ? (

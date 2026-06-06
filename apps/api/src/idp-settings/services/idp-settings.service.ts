@@ -100,8 +100,9 @@ export class IdpSettingsService {
 			throw new BadRequestException('At least one field is required');
 		}
 
-		const data: Partial<Pick<IdpSettings, 'entityId' | 'nameIdFormat' | 'wantAuthnRequestsSigned'>> =
-			{};
+		const data: Partial<
+			Pick<IdpSettings, 'entityId' | 'nameIdFormat' | 'wantAuthnRequestsSigned'>
+		> = {};
 		const updatedFields: string[] = [];
 
 		if (body.entityId !== undefined) {

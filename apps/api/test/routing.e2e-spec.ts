@@ -63,6 +63,13 @@ describe('Routing (e2e)', () => {
 			delete: jest.fn(),
 			deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
 		},
+		samlSsoSession: {
+			deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+			count: jest.fn().mockResolvedValue(0),
+		},
+		samlLogoutRequestLog: {
+			deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+		},
 		idpSettings: {
 			findUnique: jest.fn(),
 			update: jest.fn(),

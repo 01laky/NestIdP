@@ -6,7 +6,6 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AppShell } from '@/ui/AppShell';
 
-
 function renderShell() {
 	return render(
 		<MemoryRouter>

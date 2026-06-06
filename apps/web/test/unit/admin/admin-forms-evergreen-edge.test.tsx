@@ -27,7 +27,6 @@ import { SpConnectionFormPage } from '@/admin/pages/SpConnectionFormPage';
 import { SpConnectionTestSsoPage } from '@/admin/pages/SpConnectionTestSsoPage';
 import { SyncLogDetailPage } from '@/admin/pages/SyncLogDetailPage';
 
-
 function apiConnectionStub() {
 	return {
 		id: 'c1',
@@ -387,6 +386,8 @@ describe('Admin forms Evergreen — extended edge cases', () => {
 				hasSpCertificate: false,
 				wantAssertionsEncrypted: false,
 				wantAuthnRequestsSigned: false,
+				wantLogoutRequestsSigned: false,
+				sloUrl: null,
 				createdAt: '2026-01-01T00:00:00.000Z',
 				updatedAt: '2026-01-01T00:00:00.000Z',
 			});
@@ -414,6 +415,8 @@ describe('Admin forms Evergreen — extended edge cases', () => {
 				hasSpCertificate: false,
 				wantAssertionsEncrypted: false,
 				wantAuthnRequestsSigned: false,
+				wantLogoutRequestsSigned: false,
+				sloUrl: null,
 				createdAt: '2026-01-01T00:00:00.000Z',
 				updatedAt: '2026-01-01T00:00:00.000Z',
 			});
@@ -782,6 +785,8 @@ describe('Admin forms Evergreen — extended edge cases', () => {
 				hasSpCertificate: false,
 				wantAssertionsEncrypted: false,
 				wantAuthnRequestsSigned: false,
+				wantLogoutRequestsSigned: false,
+				sloUrl: null,
 				createdAt: '2026-01-01T00:00:00.000Z',
 				updatedAt: '2026-01-01T00:00:00.000Z',
 			});
@@ -823,6 +828,8 @@ describe('Admin forms Evergreen — extended edge cases', () => {
 				hasSpCertificate: false,
 				wantAssertionsEncrypted: false,
 				wantAuthnRequestsSigned: false,
+				wantLogoutRequestsSigned: false,
+				sloUrl: null,
 				createdAt: '2026-01-01T00:00:00.000Z',
 				updatedAt: '2026-01-01T00:00:00.000Z',
 			});
@@ -981,7 +988,10 @@ describe('Admin forms static conventions — edge cases', () => {
 	});
 
 	it('WEB-EVG-166: admin components import Select/TextArea from ui barrel', () => {
-		const text = readFileSync(join(webSrc, 'admin/components/mapping/AttributeMappingEditor.tsx'), 'utf8');
+		const text = readFileSync(
+			join(webSrc, 'admin/components/mapping/AttributeMappingEditor.tsx'),
+			'utf8',
+		);
 		expect(text).toContain("from '../../../ui'");
 		expect(text).toContain('Fieldset');
 	});

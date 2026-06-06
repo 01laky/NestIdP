@@ -52,11 +52,16 @@ export function decryptXmlEncryptedElement(
 	const contentUri =
 		options.contentEncryptionAlgorithmId !== undefined
 			? getIdpContentEncryptionOption(options.contentEncryptionAlgorithmId)?.xmlEncryptionMethod
-			: readAlgorithmUri(select, '//xenc:EncryptedData/xenc:EncryptionMethod/@Algorithm', doc as unknown as Node);
+			: readAlgorithmUri(
+					select,
+					'//xenc:EncryptedData/xenc:EncryptionMethod/@Algorithm',
+					doc as unknown as Node,
+				);
 
 	const transportUri =
 		options.keyTransportAlgorithmId !== undefined
-			? getIdpEncryptionKeyTransportOption(options.keyTransportAlgorithmId)?.xmlKeyTransportAlgorithm
+			? getIdpEncryptionKeyTransportOption(options.keyTransportAlgorithmId)
+					?.xmlKeyTransportAlgorithm
 			: readAlgorithmUri(
 					select,
 					'//xenc:EncryptedData/ds:KeyInfo/xenc:EncryptedKey/xenc:EncryptionMethod/@Algorithm',
@@ -73,7 +78,10 @@ export function decryptXmlEncryptedElement(
 		) as Node[],
 	);
 	const cipherB64 = readBase64CipherValueFromNodes(
-		select('//xenc:EncryptedData/xenc:CipherData/xenc:CipherValue', doc as unknown as Node) as Node[],
+		select(
+			'//xenc:EncryptedData/xenc:CipherData/xenc:CipherValue',
+			doc as unknown as Node,
+		) as Node[],
 	);
 
 	const encryptedKey = Buffer.from(encryptedKeyB64, 'base64');
@@ -81,9 +89,16 @@ export function decryptXmlEncryptedElement(
 
 	let aesKey: Buffer;
 	try {
-		aesKey = unwrapSymmetricKeyWithTransport(encryptedKey, privateKeyPem, transport.xmlKeyTransportAlgorithm);
+		aesKey = unwrapSymmetricKeyWithTransport(
+			encryptedKey,
+			privateKeyPem,
+			transport.xmlKeyTransportAlgorithm,
+		);
 	} catch {
-		throw new SamlXmlDecryptionError('Failed to unwrap encrypted symmetric key', 'decrypt_key_unwrap_failed');
+		throw new SamlXmlDecryptionError(
+			'Failed to unwrap encrypted symmetric key',
+			'decrypt_key_unwrap_failed',
+		);
 	}
 
 	const iv = cipherPayload.subarray(0, 16);
@@ -106,16 +121,24 @@ function readAlgorithmUri(
 	const nodes = select(expr, doc) as Attr[];
 	const uri = nodes[0]?.value?.trim();
 	if (!uri) {
-		throw new SamlXmlDecryptionError('Missing EncryptionMethod Algorithm URI', 'missing_algorithm_uri');
+		throw new SamlXmlDecryptionError(
+			'Missing EncryptionMethod Algorithm URI',
+			'missing_algorithm_uri',
+		);
 	}
 	return uri;
 }
 
 function resolveContentOption(uri: string | undefined) {
 	if (!uri) {
-		throw new SamlXmlDecryptionError('Missing content encryption algorithm', 'encrypted_request_unsupported_algorithm');
+		throw new SamlXmlDecryptionError(
+			'Missing content encryption algorithm',
+			'encrypted_request_unsupported_algorithm',
+		);
 	}
-	const option = IDP_CONTENT_ENCRYPTION_ALGORITHMS.find((entry) => entry.xmlEncryptionMethod === uri);
+	const option = IDP_CONTENT_ENCRYPTION_ALGORITHMS.find(
+		(entry) => entry.xmlEncryptionMethod === uri,
+	);
 	if (!option) {
 		throw new SamlXmlDecryptionError(
 			`Unsupported content encryption: ${uri}`,
@@ -127,7 +150,10 @@ function resolveContentOption(uri: string | undefined) {
 
 function resolveTransportOption(uri: string | undefined) {
 	if (!uri) {
-		throw new SamlXmlDecryptionError('Missing key transport algorithm', 'encrypted_request_unsupported_algorithm');
+		throw new SamlXmlDecryptionError(
+			'Missing key transport algorithm',
+			'encrypted_request_unsupported_algorithm',
+		);
 	}
 	const option = IDP_ENCRYPTION_KEY_TRANSPORT_ALGORITHMS.find(
 		(entry) => entry.xmlKeyTransportAlgorithm === uri,
@@ -144,8 +170,8 @@ function resolveTransportOption(uri: string | undefined) {
 /** Map from NamedCurve OID to expected uncompressed point size (for validation). */
 const CURVE_OID_TO_POINT_BYTE_SIZE: Record<string, number> = {
 	'1.2.840.10045.3.1.7': 65, // P-256
-	'1.3.132.0.34': 97,         // P-384
-	'1.3.132.0.35': 133,        // P-521
+	'1.3.132.0.34': 97, // P-384
+	'1.3.132.0.35': 133, // P-521
 };
 
 /** Map from NamedCurve OID to Node.js curve name. */
@@ -266,10 +292,7 @@ export function decryptXmlEcdhEs(
 
 	const expectedCurveName = CURVE_OID_TO_NAME[oid];
 	if (!expectedCurveName) {
-		throw new SamlXmlDecryptionError(
-			`Unsupported EC curve OID: ${oid}`,
-			'ec_curve_mismatch',
-		);
+		throw new SamlXmlDecryptionError(`Unsupported EC curve OID: ${oid}`, 'ec_curve_mismatch');
 	}
 	if (expectedCurveName !== ecCurve) {
 		throw new SamlXmlDecryptionError(
@@ -350,7 +373,10 @@ export function decryptXmlEcdhEs(
 
 	// 7. Decrypt content
 	const cipherB64 = readBase64CipherValueFromNodes(
-		select('//xenc:EncryptedData/xenc:CipherData/xenc:CipherValue', doc as unknown as Node) as Node[],
+		select(
+			'//xenc:EncryptedData/xenc:CipherData/xenc:CipherValue',
+			doc as unknown as Node,
+		) as Node[],
 	);
 	const cipherPayload = Buffer.from(cipherB64, 'base64');
 	const iv = cipherPayload.subarray(0, 16);
@@ -373,7 +399,10 @@ export function isEncryptedDataRoot(xml: string): boolean {
 		if (!root) {
 			return false;
 		}
-		return root.localName === 'EncryptedData' && root.namespaceURI === 'http://www.w3.org/2001/04/xmlenc#';
+		return (
+			root.localName === 'EncryptedData' &&
+			root.namespaceURI === 'http://www.w3.org/2001/04/xmlenc#'
+		);
 	} catch {
 		return false;
 	}

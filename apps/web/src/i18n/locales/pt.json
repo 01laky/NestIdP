@@ -94,7 +94,9 @@
 		"baseUrl": "Base URL",
 		"lastSync": "Last sync",
 		"optional": "optional",
-		"required": "required"
+		"required": "required",
+		"previous": "Anterior",
+		"next": "Próximo"
 	},
 	"nav": {
 		"brand": "NestIdP",
@@ -108,7 +110,8 @@
 		"idpSettings": "Definições IdP",
 		"adminAccounts": "Contas de administrador",
 		"auditLog": "Registo de auditoria",
-		"samlLogin": "Início de sessão SAML"
+		"samlLogin": "Início de sessão SAML",
+		"samlSessions": "Sessões ativas"
 	},
 	"adminAuth": {
 		"title": "Admin Login",
@@ -177,7 +180,8 @@
 			"requireEncryptedAssertionsCount": "Require encrypted assertions: {{count}}",
 			"idpAdvertisesWithoutEnforcement": "IdP metadata advertises signed AuthnRequests, but no SP connection currently enforces signature verification.",
 			"ecKeyAdvisory": "IdP encryption uses an EC key (ECDH-ES). Service Providers must support XML Encryption 1.1 (xenc11:AgreementMethod). Older SPs may not be compatible — consider using an RSA key for broader compatibility."
-		}
+		},
+		"activeSamlSessionsLabel": "Sessões SSO ativas"
 	},
 	"apiConnections": {
 		"listTitle": "Ligações API",
@@ -269,7 +273,16 @@
 		"testSsoWarningCallout": "Test URLs are for operator validation only. Keep private key material out of browser history, logs, and screenshots.",
 		"testSsoEphemeralKeyWarning": "Signed URL used an ephemeral server key. Verification only succeeds if the generated key matches the uploaded SP certificate.",
 		"testSsoEcKeyAgreementWarning": "The IdP encryption key is an EC key. This encrypted test URL uses ECDH-ES (XML Encryption 1.1). The target SP must support xenc11:AgreementMethod — not all SP implementations do.",
-		"probeSigningOpenEditLink": "Open SP edit page to validate signing key/certificate pair"
+		"probeSigningOpenEditLink": "Open SP edit page to validate signing key/certificate pair",
+		"sloUrl": "URL de Single Logout",
+		"sloUrlHint": "O endpoint do SP para onde o IdP envia a LogoutResponse. Opcional.",
+		"wantLogoutRequestsSigned": "Exigir LogoutRequest assinada",
+		"wantLogoutRequestsSignedHint": "Quando ativado, as LogoutRequests recebidas devem ter uma assinatura válida. Requer um certificado do SP.",
+		"autofillSloFromMetadata": "Preencher a partir dos metadados do SP",
+		"autofillSloMetadataPlaceholder": "Cole o XML EntityDescriptor do SP…",
+		"autofillSloApply": "Extrair URL de SLO",
+		"autofillSloFound": "URL de SLO preenchido a partir dos metadados",
+		"autofillSloNotFound": "Nenhum SingleLogoutService encontrado nos metadados"
 	},
 	"idpSettings": {
 		"encryptionEcKeyAgreementInfo": "EC encryption key — ECDH-ES key agreement (XML Encryption 1.1). Service Providers must support xenc11:AgreementMethod. RSA keys are more widely compatible.",
@@ -667,7 +680,48 @@
 			"idp_want_authn_requests_signed_updated": "IdP wantAuthnRequestsSigned updated",
 			"saml_request_signature_verified": "SAML request signature verified",
 			"saml_request_decrypted": "SAML request decrypted",
-			"sp_signing_probe_performed": "SP signing probe performed"
+			"sp_signing_probe_performed": "SP signing probe performed",
+			"saml_logout_request_received": "LogoutRequest SAML recebida",
+			"saml_logout_request_rejected": "LogoutRequest SAML rejeitada",
+			"saml_logout_completed": "Logout SAML concluído",
+			"saml_session_terminated": "Sessão SSO terminada",
+			"saml_sso_session_started": "Sessão SSO iniciada"
 		}
+	},
+	"samlSessions": {
+		"title": "Sessões ativas",
+		"subtitle": "Ver e terminar sessões SSO ativas de utilizadores.",
+		"filters": "Filtros",
+		"statusFilter": "Estado",
+		"statusActive": "Ativa",
+		"statusTerminated": "Terminada",
+		"spFilter": "Provedor de serviço",
+		"search": "Pesquisar",
+		"searchPlaceholder": "Utilizador ou NameID",
+		"limitationNote": "Terminar uma sessão força a reautenticação no próximo SSO e bloqueia o SSO silencioso. Não termina a sessão já estabelecida na aplicação do provedor de serviço (isso requer SLO por back-channel).",
+		"colUser": "Utilizador",
+		"colServiceProviders": "Provedores de serviço",
+		"colLoginIp": "IP de login",
+		"colUserAgent": "Agente de utilizador",
+		"colLastActive": "Última atividade",
+		"terminate": "Terminar",
+		"terminateAllForUser": "Terminar todas do utilizador",
+		"confirmTerminateTitle": "Terminar sessão?",
+		"confirmTerminateDescription": "Isto terminará a sessão SSO de {{username}} e forçará a reautenticação no próximo SSO.",
+		"confirmTerminateUserTitle": "Terminar todas as sessões?",
+		"confirmTerminateUserDescription": "Isto terminará todas as sessões SSO ativas de {{username}}.",
+		"toastTerminated": "Sessão terminada",
+		"toastTerminatedUser": "{{count}} sessão(ões) terminada(s)",
+		"terminateFailed": "Falha ao terminar a sessão",
+		"loadFailed": "Falha ao carregar as sessões",
+		"emptyTitle": "Sem sessões",
+		"emptyDescription": "Nenhuma sessão SSO corresponde aos filtros atuais.",
+		"showing": "A mostrar {{shown}} de {{total}}",
+		"pageOf": "Página {{page}} de {{totalPages}}"
+	},
+	"loggedOut": {
+		"title": "Sessão terminada",
+		"description": "A sua sessão de início de sessão único terminou.",
+		"backToLogin": "Voltar ao início de sessão"
 	}
 }

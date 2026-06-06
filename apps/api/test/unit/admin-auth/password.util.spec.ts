@@ -1,4 +1,8 @@
-import { hashPassword, verifyPassword, verifyPasswordTimingSafe } from '@api/admin-auth/utils/password.util';
+import {
+	hashPassword,
+	verifyPassword,
+	verifyPasswordTimingSafe,
+} from '@api/admin-auth/utils/password.util';
 
 describe('password.util', () => {
 	it('API-PWD-01: hash produces bcrypt $2 prefix', async () => {

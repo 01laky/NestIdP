@@ -58,7 +58,9 @@ export function buildPlainAuthnRequestPostBody(options: {
 	const destination = options.destination ?? 'http://localhost:3000/saml/sso';
 	const xml = buildAuthnRequestXml({ id, issuer, destination, issueInstant: options.issueInstant });
 	return {
-		samlRequestBase64: Buffer.from(xml.replace(/^<\?xml[^?]*\?>\s*/i, '').trim(), 'utf8').toString('base64'),
+		samlRequestBase64: Buffer.from(xml.replace(/^<\?xml[^?]*\?>\s*/i, '').trim(), 'utf8').toString(
+			'base64',
+		),
 		relayState: options.relayState,
 	};
 }

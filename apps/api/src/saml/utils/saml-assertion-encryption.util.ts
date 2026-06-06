@@ -65,7 +65,11 @@ export function encryptSignedAssertionForSp(
 		throw new SamlAssertionEncryptionError('Invalid SP certificate PEM for assertion encryption');
 	}
 
-	const encryptedKey = wrapSymmetricKeyWithTransport(aesKey, publicKey, transport.xmlKeyTransportAlgorithm);
+	const encryptedKey = wrapSymmetricKeyWithTransport(
+		aesKey,
+		publicKey,
+		transport.xmlKeyTransportAlgorithm,
+	);
 
 	const encryptedDataId = `_${randomBytes(16).toString('hex')}`;
 	const encryptedKeyId = `_${randomBytes(16).toString('hex')}`;

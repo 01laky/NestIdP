@@ -1,5 +1,8 @@
 import { PrismaClient } from '@prisma/client';
-import { clearApiConnectionScopedTestData, runMigrationsOnTestDb } from '@test/support/prisma/test-db.helper';
+import {
+	clearApiConnectionScopedTestData,
+	runMigrationsOnTestDb,
+} from '@test/support/prisma/test-db.helper';
 import { createTestApiConnection } from '@test/support/prisma/test-fixtures';
 
 const postgresTestUrl = process.env.POSTGRES_TEST_URL;

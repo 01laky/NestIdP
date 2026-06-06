@@ -235,7 +235,9 @@ describe('IdP settings admin API (SQLite)', () => {
 			.expect(200);
 		expect(updated.body.wantAuthnRequestsSigned).toBe(true);
 
-		const metadata = await request(app.getHttpServer() as App).get('/saml/metadata').expect(200);
+		const metadata = await request(app.getHttpServer() as App)
+			.get('/saml/metadata')
+			.expect(200);
 		expect(metadata.text).toContain('wantAuthnRequestsSigned="true"');
 	});
 

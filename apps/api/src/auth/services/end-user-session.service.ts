@@ -70,12 +70,13 @@ export class EndUserSessionService {
 		return payload;
 	}
 
-	createPayload(userId: string, username: string): EndUserSessionPayload {
+	createPayload(userId: string, username: string, sid?: string): EndUserSessionPayload {
 		const now = Math.floor(Date.now() / 1000);
 		const ttl = this.getSessionTtlSeconds();
 		return {
 			userId,
 			username,
+			...(sid ? { sid } : {}),
 			iat: now,
 			exp: now + ttl,
 		};

@@ -29,6 +29,12 @@ export class UpdateSpConnectionBodyDto {
 	acsUrl?: string;
 
 	@IsOptional()
+	@ValidateIf((_, value) => value !== null)
+	@IsString()
+	@MaxLength(2048)
+	sloUrl?: string | null;
+
+	@IsOptional()
 	@IsString()
 	@MaxLength(512)
 	nameIdFormat?: string;
@@ -55,4 +61,8 @@ export class UpdateSpConnectionBodyDto {
 	@IsOptional()
 	@IsBoolean()
 	wantAuthnRequestsSigned?: boolean;
+
+	@IsOptional()
+	@IsBoolean()
+	wantLogoutRequestsSigned?: boolean;
 }

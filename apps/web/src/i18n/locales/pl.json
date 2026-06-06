@@ -94,7 +94,9 @@
 		"baseUrl": "Base URL",
 		"lastSync": "Last sync",
 		"optional": "optional",
-		"required": "required"
+		"required": "required",
+		"previous": "Poprzednia",
+		"next": "Następna"
 	},
 	"nav": {
 		"brand": "NestIdP",
@@ -108,7 +110,8 @@
 		"idpSettings": "Ustawienia IdP",
 		"adminAccounts": "Konta administratora",
 		"auditLog": "Dziennik audytu",
-		"samlLogin": "Logowanie SAML"
+		"samlLogin": "Logowanie SAML",
+		"samlSessions": "Aktywne sesje"
 	},
 	"adminAuth": {
 		"title": "Admin Login",
@@ -177,7 +180,8 @@
 			"requireEncryptedAssertionsCount": "Require encrypted assertions: {{count}}",
 			"idpAdvertisesWithoutEnforcement": "IdP metadata advertises signed AuthnRequests, but no SP connection currently enforces signature verification.",
 			"ecKeyAdvisory": "IdP encryption uses an EC key (ECDH-ES). Service Providers must support XML Encryption 1.1 (xenc11:AgreementMethod). Older SPs may not be compatible — consider using an RSA key for broader compatibility."
-		}
+		},
+		"activeSamlSessionsLabel": "Aktywne sesje SSO"
 	},
 	"apiConnections": {
 		"listTitle": "Połączenia API",
@@ -269,7 +273,16 @@
 		"testSsoWarningCallout": "Test URLs are for operator validation only. Keep private key material out of browser history, logs, and screenshots.",
 		"testSsoEphemeralKeyWarning": "Signed URL used an ephemeral server key. Verification only succeeds if the generated key matches the uploaded SP certificate.",
 		"testSsoEcKeyAgreementWarning": "The IdP encryption key is an EC key. This encrypted test URL uses ECDH-ES (XML Encryption 1.1). The target SP must support xenc11:AgreementMethod — not all SP implementations do.",
-		"probeSigningOpenEditLink": "Open SP edit page to validate signing key/certificate pair"
+		"probeSigningOpenEditLink": "Open SP edit page to validate signing key/certificate pair",
+		"sloUrl": "Adres URL Single Logout",
+		"sloUrlHint": "Punkt końcowy SP, do którego IdP wysyła LogoutResponse. Opcjonalne.",
+		"wantLogoutRequestsSigned": "Wymagaj podpisanego LogoutRequest",
+		"wantLogoutRequestsSignedHint": "Po włączeniu przychodzące LogoutRequests muszą mieć prawidłowy podpis. Wymaga certyfikatu SP.",
+		"autofillSloFromMetadata": "Wypełnij z metadanych SP",
+		"autofillSloMetadataPlaceholder": "Wklej XML EntityDescriptor SP…",
+		"autofillSloApply": "Wyodrębnij URL SLO",
+		"autofillSloFound": "URL SLO wypełniony z metadanych",
+		"autofillSloNotFound": "Nie znaleziono SingleLogoutService w metadanych"
 	},
 	"idpSettings": {
 		"encryptionEcKeyAgreementInfo": "EC encryption key — ECDH-ES key agreement (XML Encryption 1.1). Service Providers must support xenc11:AgreementMethod. RSA keys are more widely compatible.",
@@ -667,7 +680,48 @@
 			"idp_want_authn_requests_signed_updated": "IdP wantAuthnRequestsSigned updated",
 			"saml_request_signature_verified": "SAML request signature verified",
 			"saml_request_decrypted": "SAML request decrypted",
-			"sp_signing_probe_performed": "SP signing probe performed"
+			"sp_signing_probe_performed": "SP signing probe performed",
+			"saml_logout_request_received": "Otrzymano SAML LogoutRequest",
+			"saml_logout_request_rejected": "Odrzucono SAML LogoutRequest",
+			"saml_logout_completed": "Wylogowanie SAML zakończone",
+			"saml_session_terminated": "Sesja SSO zakończona",
+			"saml_sso_session_started": "Sesja SSO rozpoczęta"
 		}
+	},
+	"samlSessions": {
+		"title": "Aktywne sesje",
+		"subtitle": "Przeglądaj i kończ aktywne sesje SSO użytkowników.",
+		"filters": "Filtry",
+		"statusFilter": "Status",
+		"statusActive": "Aktywna",
+		"statusTerminated": "Zakończona",
+		"spFilter": "Dostawca usług",
+		"search": "Szukaj",
+		"searchPlaceholder": "Nazwa użytkownika lub NameID",
+		"limitationNote": "Zakończenie sesji wymusza ponowne uwierzytelnienie przy następnym SSO i blokuje ciche SSO. Nie kończy sesji już ustanowionej w aplikacji dostawcy usług (do tego potrzebne jest SLO back-channel).",
+		"colUser": "Użytkownik",
+		"colServiceProviders": "Dostawcy usług",
+		"colLoginIp": "IP logowania",
+		"colUserAgent": "User agent",
+		"colLastActive": "Ostatnia aktywność",
+		"terminate": "Zakończ",
+		"terminateAllForUser": "Zakończ wszystkie użytkownika",
+		"confirmTerminateTitle": "Zakończyć sesję?",
+		"confirmTerminateDescription": "Spowoduje to zakończenie sesji SSO użytkownika {{username}} i wymusi ponowne uwierzytelnienie przy następnym SSO.",
+		"confirmTerminateUserTitle": "Zakończyć wszystkie sesje?",
+		"confirmTerminateUserDescription": "Spowoduje to zakończenie wszystkich aktywnych sesji SSO użytkownika {{username}}.",
+		"toastTerminated": "Sesja zakończona",
+		"toastTerminatedUser": "Zakończono {{count}} sesji",
+		"terminateFailed": "Nie udało się zakończyć sesji",
+		"loadFailed": "Nie udało się załadować sesji",
+		"emptyTitle": "Brak sesji",
+		"emptyDescription": "Żadna sesja SSO nie pasuje do bieżących filtrów.",
+		"showing": "Pokazano {{shown}} z {{total}}",
+		"pageOf": "Strona {{page}} z {{totalPages}}"
+	},
+	"loggedOut": {
+		"title": "Zostałeś wylogowany",
+		"description": "Twoja sesja jednokrotnego logowania zakończyła się.",
+		"backToLogin": "Powrót do logowania"
 	}
 }

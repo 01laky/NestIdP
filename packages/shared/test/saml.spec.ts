@@ -59,9 +59,9 @@ describe('saml shared', () => {
 	});
 
 	it('SH-SAML-06: redirect signature algorithm registry includes rsa-sha256', () => {
-		expect(
-			SAML_REDIRECT_SIGNATURE_ALGORITHMS.some((option) => option.id === 'rsa-sha256'),
-		).toBe(true);
+		expect(SAML_REDIRECT_SIGNATURE_ALGORITHMS.some((option) => option.id === 'rsa-sha256')).toBe(
+			true,
+		);
 	});
 
 	it('SH-SAML-07: signing probe DTOs and test SSO URL DTO are assignable', () => {

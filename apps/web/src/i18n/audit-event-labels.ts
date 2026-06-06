@@ -16,6 +16,11 @@ const KNOWN_AUDIT_EVENTS = new Set([
 	'saml_request_signature_verified',
 	'saml_request_decrypted',
 	'sp_signing_probe_performed',
+	'saml_logout_request_received',
+	'saml_logout_request_rejected',
+	'saml_logout_completed',
+	'saml_session_terminated',
+	'saml_sso_session_started',
 ]);
 
 export function auditEventLabel(event: string, t: TFunction): string {

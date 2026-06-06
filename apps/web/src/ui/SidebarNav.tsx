@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import {
 	API_CONNECTION_ROUTE_PREFIX,
 	SP_CONNECTION_ROUTE_PREFIX,
+	SAML_SESSIONS_ROUTE_PREFIX,
 	IDENTITY_ROUTE_PREFIX,
 	IDP_SETTINGS_ROUTE_PREFIX,
 	ADMIN_USERS_ROUTE_PREFIX,
@@ -60,6 +61,13 @@ export function SidebarNav({
 					onClick={onNavigate}
 				>
 					{t('spConnections')}
+				</NavLink>
+				<NavLink
+					to={SAML_SESSIONS_ROUTE_PREFIX}
+					className={({ isActive }) => `evg-nav__link${isActive ? ' evg-nav__link--active' : ''}`}
+					onClick={onNavigate}
+				>
+					{t('samlSessions')}
 				</NavLink>
 				<NavLink
 					to={`${IDENTITY_ROUTE_PREFIX}/users`}

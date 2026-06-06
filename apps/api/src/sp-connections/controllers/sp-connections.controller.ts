@@ -15,6 +15,7 @@ import {
 import {
 	SP_CONNECTIONS_API_PATH,
 	type DeleteSpConnectionResponseDto,
+	type ParseSloFromMetadataResponseDto,
 	type ProbeSpSigningRequestDto,
 	type ProbeSpSigningResponseDto,
 	type SpConnectionListResponseDto,
@@ -30,6 +31,7 @@ import { SpConnectionProbeSigningService } from '../services/sp-connection-probe
 import { SpConnectionTestAcsService } from '../services/sp-connection-test-acs.service';
 import { SpConnectionTestSsoUrlService } from '../services/sp-connection-test-sso-url.service';
 import { ProbeSpSigningBodyDto } from '../dto/probe-sp-signing.dto';
+import { ParseSloMetadataBodyDto } from '../dto/parse-slo-metadata.dto';
 import { CreateSpConnectionBodyDto } from '../dto/create-sp-connection.dto';
 import { SpConnectionsService } from '../services/sp-connections.service';
 import { UpdateSpConnectionBodyDto } from '../dto/update-sp-connection.dto';
@@ -99,6 +101,16 @@ export class SpConnectionsController {
 			encrypted: encrypted === 'true',
 			relayState,
 		});
+	}
+
+	@Post('parse-slo-from-metadata')
+	@HttpCode(HttpStatus.OK)
+	@UseGuards(AdminCsrfGuard)
+	parseSloFromMetadata(
+		@Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+		body: ParseSloMetadataBodyDto,
+	): ParseSloFromMetadataResponseDto {
+		return this.spConnectionsService.parseSloFromMetadata(body.metadataXml);
 	}
 
 	@Post(':id/probe-sp-signing')

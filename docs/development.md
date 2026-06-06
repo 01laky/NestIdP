@@ -641,11 +641,11 @@ If the machine still feels slow after aborting tests in the IDE, run **`pnpm tes
 
 ### Repository layout (tests vs source)
 
-| Package | Source | Tests | Test-only helpers |
-| ------- | ------ | ----- | ----------------- |
-| `apps/api` | `src/<module>/` with `controllers/`, `services/`, `dto/`, `utils/`, … | `test/unit/**` (mirrors modules), `test/support/**` (fixtures, SAML helpers), `test/routing.e2e-spec.ts` | `@api/*` → `src/*`, `@test/*` → `test/*` |
-| `apps/web` | `src/` (pages, `admin/components/<area>/`, UI) | `test/unit/**` (mirrors `src`), `test/setup/`, `test/helpers/` | `@/*` → `src/*`, `@test/*` → `test/*` |
-| `packages/shared` | `src/*.ts` | `test/*.spec.ts` | `@shared/*` → `src/*` |
+| Package           | Source                                                                | Tests                                                                                                    | Test-only helpers                        |
+| ----------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| `apps/api`        | `src/<module>/` with `controllers/`, `services/`, `dto/`, `utils/`, … | `test/unit/**` (mirrors modules), `test/support/**` (fixtures, SAML helpers), `test/routing.e2e-spec.ts` | `@api/*` → `src/*`, `@test/*` → `test/*` |
+| `apps/web`        | `src/` (pages, `admin/components/<area>/`, UI)                        | `test/unit/**` (mirrors `src`), `test/setup/`, `test/helpers/`                                           | `@/*` → `src/*`, `@test/*` → `test/*`    |
+| `packages/shared` | `src/*.ts`                                                            | `test/*.spec.ts`                                                                                         | `@shared/*` → `src/*`                    |
 
 API integration specs that need temp DBs live under `apps/api/test/unit/**` (not beside handlers). Web static guards use `@test/helpers/paths` (`webSrc`, `webRoot`, `repoRoot`).
 

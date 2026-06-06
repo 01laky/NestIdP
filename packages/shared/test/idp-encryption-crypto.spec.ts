@@ -109,7 +109,9 @@ describe('idp-encryption-crypto', () => {
 		});
 
 		it('SH-EC-ENC-02: IDP_ENCRYPTION_DEFAULT_EC_KEY_AGREEMENT_ALGORITHM_ID resolves via getIdpEcKeyAgreementOption', () => {
-			const option = getIdpEcKeyAgreementOption(IDP_ENCRYPTION_DEFAULT_EC_KEY_AGREEMENT_ALGORITHM_ID);
+			const option = getIdpEcKeyAgreementOption(
+				IDP_ENCRYPTION_DEFAULT_EC_KEY_AGREEMENT_ALGORITHM_ID,
+			);
 			expect(option).toBeDefined();
 			expect(option?.id).toBe('ecdh-es');
 		});

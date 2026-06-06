@@ -1,4 +1,7 @@
-import { assertValidBaseUrl, BaseUrlValidationError } from '@api/api-connections/utils/base-url.util';
+import {
+	assertValidBaseUrl,
+	BaseUrlValidationError,
+} from '@api/api-connections/utils/base-url.util';
 
 describe('base-url.util', () => {
 	it('API-URL-01: strips trailing slash', () => {

@@ -104,6 +104,35 @@ export class IdpSigningService {
 		return this.extractSignedAssertionFragment(signedWrapper) ?? stripped;
 	}
 
+	/**
+	 * Sign a `<samlp:LogoutResponse>` (or other SAML protocol message) at the root
+	 * with an enveloped XML-DSig. The `<ds:Signature>` is inserted directly after the
+	 * `<saml2:Issuer>` element, per the SAML schema sequence (Issuer, Signature, Status).
+	 */
+	signLogoutResponse(messageXml: string, material: SigningMaterial, messageId: string): string {
+		const option = resolveSignatureAlgorithmIdForSigning(material.signatureAlgorithmId);
+		const sig = new SignedXml({
+			privateKey: material.privateKeyPem,
+			publicCert: material.certPem,
+			signatureAlgorithm: option.xmlSignatureAlgorithm,
+			canonicalizationAlgorithm: 'http://www.w3.org/2001/10/xml-exc-c14n#',
+		});
+		applyNestIdpXmlCryptoExtensions(sig);
+		const stripped = messageXml.replace(/^<\?xml[^?]*\?>\s*/i, '').trim();
+		sig.addReference({
+			xpath: `//*[@ID='${messageId}']`,
+			transforms: [
+				'http://www.w3.org/2000/09/xmldsig#enveloped-signature',
+				'http://www.w3.org/2001/10/xml-exc-c14n#',
+			],
+			digestAlgorithm: option.xmlDigestAlgorithm,
+		});
+		sig.computeSignature(stripped, {
+			location: { reference: "//*[local-name(.)='Issuer']", action: 'after' },
+		});
+		return sig.getSignedXml() ?? stripped;
+	}
+
 	async hasSigningMaterial(): Promise<boolean> {
 		const settings = await this.prisma.idpSettings.findUnique({ where: { id: 'default' } });
 		return Boolean(settings?.signingCertPem && settings?.signingKeyEncrypted);

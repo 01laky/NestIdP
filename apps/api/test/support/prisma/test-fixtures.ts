@@ -140,8 +140,7 @@ export async function createTestSpConnectionWithSigningKey(
 	spCertificatePem: string;
 }> {
 	const entityId =
-		overrides.spEntityId ??
-		`urn:sp:signed:${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+		overrides.spEntityId ?? `urn:sp:signed:${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 	const { privateKeyPem, certPem } = generateTestRsaCert(entityId);
 	const spConnection = await createTestSpConnection(prisma, {
 		...overrides,
@@ -373,8 +372,7 @@ export async function createTestSpConnectionWithEcSigningKey(
 	spCertificatePem: string;
 }> {
 	const entityId =
-		overrides.spEntityId ??
-		`urn:sp:ec:${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+		overrides.spEntityId ?? `urn:sp:ec:${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 	const { privateKeyPem, certPem } = generateTestEcCert(entityId, 'P-256');
 	const spConnection = await createTestSpConnection(prisma, {
 		...overrides,

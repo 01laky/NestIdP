@@ -1,7 +1,10 @@
 import { BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { deflateSync } from 'node:zlib';
-import { buildAuthnRequestXml, encodeRedirectBinding } from '@test/support/saml/build-authn-request.util';
+import {
+	buildAuthnRequestXml,
+	encodeRedirectBinding,
+} from '@test/support/saml/build-authn-request.util';
 import { generateTestRsaEncryptionCert } from '@api/idp-settings/utils/idp-encryption-cert.util';
 import { encryptAuthnRequestForIdp } from '@api/saml/utils/encrypt-authn-request-for-idp.util';
 import { SamlRequestParserService } from '@api/saml/services/saml-request-parser.service';
@@ -93,9 +96,9 @@ describe('SamlRequestParserService', () => {
 
 	it('API-SAML-PARSE-07: IssueInstant too far in past → 400', async () => {
 		const past = new Date(Date.now() - 10 * 60_000).toISOString();
-		await expect(parser.parseRedirectBinding(validEncodedRequest({ issueInstant: past }))).rejects.toThrow(
-			BadRequestException,
-		);
+		await expect(
+			parser.parseRedirectBinding(validEncodedRequest({ issueInstant: past })),
+		).rejects.toThrow(BadRequestException);
 	});
 
 	it('API-SAML-PARSE-08: empty SAMLRequest → 400', async () => {
@@ -190,9 +193,9 @@ describe('SamlRequestParserService', () => {
 		const { certPem } = generateTestRsaEncryptionCert('urn:test:idp:ec-not-supported');
 		const encryptedXml = encryptAuthnRequestForIdp(plainAuthnXml('_enc-ec'), certPem);
 		jest.mocked(idpEncryptionKey.getRsaDecryptionMaterial).mockResolvedValue([]);
-		jest.mocked(idpEncryptionKey.getEcDecryptionMaterial).mockResolvedValue([
-			{ privateKeyPem: 'ec-key', ecCurve: 'P-256' },
-		]);
+		jest
+			.mocked(idpEncryptionKey.getEcDecryptionMaterial)
+			.mockResolvedValue([{ privateKeyPem: 'ec-key', ecCurve: 'P-256' }]);
 
 		await expect(parser.parseRedirectBinding(toEncodedRequest(encryptedXml))).rejects.toThrow(
 			'RSA key transport payload received but IdP has EC encryption key',
@@ -209,7 +212,10 @@ describe('SamlRequestParserService', () => {
 			},
 		]);
 
-		const result = await parser.parseRedirectBinding(toEncodedRequest(encryptedXml), 'relay-encrypted');
+		const result = await parser.parseRedirectBinding(
+			toEncodedRequest(encryptedXml),
+			'relay-encrypted',
+		);
 		expect(result.authnRequest.id).toBe('_enc-ok');
 		expect(result.requestWasEncrypted).toBe(true);
 		expect(result.relayState).toBe('relay-encrypted');

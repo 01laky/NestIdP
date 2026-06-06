@@ -3,7 +3,6 @@ import { evergreenDir } from '@test/helpers/paths';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-
 describe('Evergreen styles', () => {
 	it('WEB-EVG-11: prefers-reduced-motion present in tokens stack', () => {
 		const reset = readFileSync(join(evergreenDir, 'reset.css'), 'utf8');

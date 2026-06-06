@@ -136,9 +136,7 @@ export function extractEcPublicKeyFromXenc11(curveOid: string, publicKeyBase64: 
 	return createPublicKey({ key: spki, format: 'der', type: 'spki' });
 }
 
-export function readBase64CipherValueFromNodes(
-	nodes: Node[],
-): string {
+export function readBase64CipherValueFromNodes(nodes: Node[]): string {
 	const el = nodes[0] as { textContent?: string | null } | undefined;
 	const text = el?.textContent?.replace(/\s+/g, '') ?? '';
 	if (!text) {

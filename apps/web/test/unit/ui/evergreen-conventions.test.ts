@@ -3,7 +3,6 @@ import { webSrc } from '@test/helpers/paths';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-
 function walkTsx(dir: string, out: string[] = []): string[] {
 	for (const name of readdirSync(dir)) {
 		const path = join(dir, name);

@@ -1,6 +1,7 @@
 /** Public SAML HTTP paths (Nest controllers use these segments). */
 export const SAML_METADATA_PATH = '/saml/metadata';
 export const SAML_SSO_PATH = '/saml/sso';
+export const SAML_SLO_PATH = '/saml/slo';
 
 /** SAML binding URIs. */
 export const POST_BINDING_URI = 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST';
@@ -111,12 +112,14 @@ export interface SpConnectionPublicDto {
 	name: string;
 	spEntityId: string;
 	acsUrl: string;
+	sloUrl: string | null;
 	nameIdFormat: string;
 	attributeMapping: SpAttributeMappingConfig | null;
 	active: boolean;
 	hasSpCertificate: boolean;
 	wantAssertionsEncrypted: boolean;
 	wantAuthnRequestsSigned: boolean;
+	wantLogoutRequestsSigned: boolean;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -139,24 +142,37 @@ export interface CreateSpConnectionRequestDto {
 	name: string;
 	spEntityId: string;
 	acsUrl: string;
+	sloUrl?: string | null;
 	nameIdFormat?: string;
 	attributeMapping?: SpAttributeMappingConfig | null;
 	active?: boolean;
 	spCertificate?: string | null;
 	wantAssertionsEncrypted?: boolean;
 	wantAuthnRequestsSigned?: boolean;
+	wantLogoutRequestsSigned?: boolean;
 }
 
 export interface UpdateSpConnectionRequestDto {
 	name?: string;
 	spEntityId?: string;
 	acsUrl?: string;
+	sloUrl?: string | null;
 	nameIdFormat?: string;
 	attributeMapping?: SpAttributeMappingConfig | null;
 	active?: boolean;
 	spCertificate?: string | null;
 	wantAssertionsEncrypted?: boolean;
 	wantAuthnRequestsSigned?: boolean;
+	wantLogoutRequestsSigned?: boolean;
+}
+
+export interface ParseSloFromMetadataRequestDto {
+	metadataXml: string;
+}
+
+export interface ParseSloFromMetadataResponseDto {
+	redirect: string | null;
+	post: string | null;
 }
 
 export interface DeleteSpConnectionResponseDto {

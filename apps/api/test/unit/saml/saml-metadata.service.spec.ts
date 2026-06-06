@@ -93,6 +93,34 @@ describe('SamlMetadataService', () => {
 		expect(xml).toContain('wantAuthnRequestsSigned="false"');
 	});
 
+	it('API-SLO-META-01: advertises POST + Redirect SingleLogoutService at /saml/slo', async () => {
+		const xml = await service.generateMetadata();
+		expect(xml).toContain(
+			'<md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"',
+		);
+		expect(xml).toContain(
+			'<md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"',
+		);
+		expect(xml).toMatch(/SingleLogoutService[^>]*Location="[^"]*\/saml\/slo"/);
+	});
+
+	it('API-SLO-META-02: SLO POST binding element precedes the Redirect binding element', async () => {
+		const xml = await service.generateMetadata();
+		const postIdx = xml.indexOf(
+			'<md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"',
+		);
+		const redirectIdx = xml.indexOf(
+			'<md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"',
+		);
+		expect(postIdx).toBeGreaterThanOrEqual(0);
+		expect(postIdx).toBeLessThan(redirectIdx);
+	});
+
+	it('API-SLO-META-03: SingleLogoutService appears before NameIDFormat', async () => {
+		const xml = await service.generateMetadata();
+		expect(xml.indexOf('SingleLogoutService')).toBeLessThan(xml.indexOf('NameIDFormat'));
+	});
+
 	it('API-SAML-META-REQ-01: metadata advertises wantAuthnRequestsSigned=true when enabled', async () => {
 		const signing = getTestSigningMaterial('http://localhost:3000');
 		prisma.idpSettings.findUnique.mockResolvedValue({

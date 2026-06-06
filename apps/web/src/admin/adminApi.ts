@@ -54,7 +54,15 @@ import type {
 	UploadIdpEncryptionCertRequestDto,
 	UploadIdpSigningCertRequestDto,
 } from '@nestidp/shared';
-import type { IdpMetadataUrlResponseDto, SpConnectionListResponseDto } from '@nestidp/shared';
+import type {
+	IdpMetadataUrlResponseDto,
+	ParseSloFromMetadataResponseDto,
+	SamlSsoSessionListQueryDto,
+	SamlSsoSessionListResponseDto,
+	SpConnectionListResponseDto,
+	TerminateSamlSessionResponseDto,
+	TerminateSamlSessionsByUserResponseDto,
+} from '@nestidp/shared';
 import {
 	ADMIN_CSRF_HEADER_NAME,
 	API_CONNECTIONS_API_PATH,
@@ -66,6 +74,7 @@ import {
 	IDP_SETTINGS_API_PATH,
 	ADMIN_USERS_API_PATH,
 	AUDIT_EVENTS_API_PATH,
+	SAML_SESSIONS_API_PATH,
 	SP_CONNECTIONS_API_PATH,
 	SYNC_API_PATH,
 } from '@nestidp/shared';
@@ -302,10 +311,50 @@ export function probeSpConnectionSigning(
 	id: string,
 	body: ProbeSpSigningRequestDto,
 ): Promise<ProbeSpSigningResponseDto> {
-	return adminFetch<ProbeSpSigningResponseDto>(`${SP_CONNECTIONS_API_PATH}/${id}/probe-sp-signing`, {
+	return adminFetch<ProbeSpSigningResponseDto>(
+		`${SP_CONNECTIONS_API_PATH}/${id}/probe-sp-signing`,
+		{
+			method: 'POST',
+			body: JSON.stringify(body),
+		},
+	);
+}
+
+export function parseSpSloFromMetadata(
+	metadataXml: string,
+): Promise<ParseSloFromMetadataResponseDto> {
+	return adminFetch<ParseSloFromMetadataResponseDto>(
+		`${SP_CONNECTIONS_API_PATH}/parse-slo-from-metadata`,
+		{ method: 'POST', body: JSON.stringify({ metadataXml }) },
+	);
+}
+
+export function listSamlSessions(
+	query: SamlSsoSessionListQueryDto = {},
+): Promise<SamlSsoSessionListResponseDto> {
+	const params = new URLSearchParams();
+	if (query.status) params.set('status', query.status);
+	if (query.spConnectionId) params.set('spConnectionId', query.spConnectionId);
+	if (query.q) params.set('q', query.q);
+	if (query.page) params.set('page', String(query.page));
+	if (query.pageSize) params.set('pageSize', String(query.pageSize));
+	const suffix = params.size > 0 ? `?${params.toString()}` : '';
+	return adminFetch<SamlSsoSessionListResponseDto>(`${SAML_SESSIONS_API_PATH}${suffix}`);
+}
+
+export function terminateSamlSession(id: string): Promise<TerminateSamlSessionResponseDto> {
+	return adminFetch<TerminateSamlSessionResponseDto>(`${SAML_SESSIONS_API_PATH}/${id}/terminate`, {
 		method: 'POST',
-		body: JSON.stringify(body),
 	});
+}
+
+export function terminateSamlSessionsByUser(
+	userId: string,
+): Promise<TerminateSamlSessionsByUserResponseDto> {
+	return adminFetch<TerminateSamlSessionsByUserResponseDto>(
+		`${SAML_SESSIONS_API_PATH}/terminate-by-user`,
+		{ method: 'POST', body: JSON.stringify({ userId }) },
+	);
 }
 
 function identityQuery(params: Record<string, string | number | undefined>): string {

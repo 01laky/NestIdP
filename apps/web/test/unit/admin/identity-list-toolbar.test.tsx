@@ -18,7 +18,6 @@ import { IdentityUserDetailPage } from '@/admin/pages/IdentityUserDetailPage';
 import { IdentityUserFormPage } from '@/admin/pages/IdentityUserFormPage';
 import { IdentityUsersPage } from '@/admin/pages/IdentityUsersPage';
 
-
 afterEach(() => {
 	cleanup();
 	vi.restoreAllMocks();

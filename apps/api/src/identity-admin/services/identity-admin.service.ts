@@ -35,6 +35,7 @@ import {
 	toOriginLiteral,
 } from '../../identity/utils/local-directory.util';
 import { PrismaService } from '../../prisma/services/prisma.service';
+import { SamlSsoSessionService } from '../../saml-sessions/services/saml-sso-session.service';
 import { IdentityAdminAuditService } from './identity-admin-audit.service';
 
 const DEFAULT_LIMIT = 50;
@@ -50,6 +51,7 @@ export class IdentityAdminService {
 		@Inject(CREDENTIALS_ENCRYPTION)
 		private readonly encryption: CredentialsEncryptionPort,
 		private readonly audit: IdentityAdminAuditService,
+		private readonly ssoSessions: SamlSsoSessionService,
 	) {}
 
 	async listUsers(
@@ -223,11 +225,16 @@ export class IdentityAdminService {
 		});
 
 		this.audit.logUserUpdated(id, body.username ?? existing.username);
+		// SLO (v1.8.0): deactivating a user kills their live SSO sessions immediately.
+		if (body.active === false && existing.active) {
+			await this.ssoSessions.terminateAllForUser(id, 'user_deactivated');
+		}
 		return this.getUserById(id, 0);
 	}
 
 	async deleteUser(id: string): Promise<void> {
 		const existing = await this.findManualUserOrThrow(id);
+		await this.ssoSessions.terminateAllForUser(id, 'user_deactivated');
 		await this.prisma.user.delete({ where: { id } });
 		this.audit.logUserDeleted(id, existing.username);
 	}

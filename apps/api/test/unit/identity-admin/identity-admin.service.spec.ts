@@ -6,11 +6,18 @@ import { IdentityRepository } from '@api/identity/identity.repository';
 
 describe('IdentityAdminService', () => {
 	const prisma = {
-		user: { findMany: jest.fn(), count: jest.fn(), findUnique: jest.fn() },
+		user: {
+			findMany: jest.fn(),
+			count: jest.fn(),
+			findUnique: jest.fn(),
+			update: jest.fn(),
+			delete: jest.fn(),
+		},
 		group: { findMany: jest.fn(), count: jest.fn() },
 		role: { findMany: jest.fn(), count: jest.fn() },
 		apiConnection: { findFirst: jest.fn() },
 		auditEvent: { findMany: jest.fn() },
+		$transaction: jest.fn(),
 	};
 
 	const identityRepository = {} as IdentityRepository;
@@ -27,10 +34,72 @@ describe('IdentityAdminService', () => {
 		logRoleDeleted: jest.fn(),
 	} as unknown as IdentityAdminAuditService;
 
-	const service = new IdentityAdminService(prisma as never, identityRepository, encryption, audit);
+	const ssoSessions = {
+		terminateAllForUser: jest.fn().mockResolvedValue(0),
+	};
+	const service = new IdentityAdminService(
+		prisma as never,
+		identityRepository,
+		encryption,
+		audit,
+		ssoSessions as never,
+	);
 
 	beforeEach(() => {
 		jest.clearAllMocks();
+	});
+
+	it('H4: deleteUser terminates the user’s SSO sessions before delete', async () => {
+		prisma.user.findUnique.mockResolvedValue({
+			id: 'u1',
+			origin: IdentityOrigin.MANUAL,
+			username: 'alice',
+			active: true,
+		});
+		prisma.user.delete.mockResolvedValue({});
+		await service.deleteUser('u1');
+		expect(ssoSessions.terminateAllForUser).toHaveBeenCalledWith('u1', 'user_deactivated');
+		expect(prisma.user.delete).toHaveBeenCalledWith({ where: { id: 'u1' } });
+	});
+
+	it('H4: updateUser deactivation (active true→false) terminates SSO sessions', async () => {
+		prisma.user.findUnique.mockResolvedValue({
+			id: 'u1',
+			origin: IdentityOrigin.MANUAL,
+			username: 'alice',
+			active: true,
+		});
+		prisma.$transaction.mockImplementation(async (cb: (tx: unknown) => unknown) =>
+			cb({
+				user: { update: jest.fn() },
+				userGroup: { deleteMany: jest.fn(), createMany: jest.fn() },
+				userRole: { deleteMany: jest.fn(), createMany: jest.fn() },
+			}),
+		);
+		const spy = jest.spyOn(service, 'getUserById').mockResolvedValue({} as never);
+		await service.updateUser('u1', { active: false });
+		expect(ssoSessions.terminateAllForUser).toHaveBeenCalledWith('u1', 'user_deactivated');
+		spy.mockRestore();
+	});
+
+	it('H4: updateUser without deactivation does NOT terminate sessions', async () => {
+		prisma.user.findUnique.mockResolvedValue({
+			id: 'u1',
+			origin: IdentityOrigin.MANUAL,
+			username: 'alice',
+			active: true,
+		});
+		prisma.$transaction.mockImplementation(async (cb: (tx: unknown) => unknown) =>
+			cb({
+				user: { update: jest.fn() },
+				userGroup: { deleteMany: jest.fn(), createMany: jest.fn() },
+				userRole: { deleteMany: jest.fn(), createMany: jest.fn() },
+			}),
+		);
+		const spy = jest.spyOn(service, 'getUserById').mockResolvedValue({} as never);
+		await service.updateUser('u1', { displayName: 'New Name' });
+		expect(ssoSessions.terminateAllForUser).not.toHaveBeenCalled();
+		spy.mockRestore();
 	});
 
 	it('API-IDN-SVC-01: listUsers default limit 50', async () => {

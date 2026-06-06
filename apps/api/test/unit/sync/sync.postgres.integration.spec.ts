@@ -1,7 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { PrismaClient } from '@prisma/client';
 import { DEFAULT_PASSWORD_HASH_ALGORITHM, SYNC_API_PATH } from '@nestidp/shared';
-import { clearApiConnectionScopedTestData, runMigrationsOnTestDb } from '@test/support/prisma/test-db.helper';
+import {
+	clearApiConnectionScopedTestData,
+	runMigrationsOnTestDb,
+} from '@test/support/prisma/test-db.helper';
 import { createTestApiConnection, TEST_PASSWORD_HASH } from '@test/support/prisma/test-fixtures';
 import { SyncService } from '@api/sync/services/sync.service';
 import { SyncLogService } from '@api/sync/services/sync-log.service';

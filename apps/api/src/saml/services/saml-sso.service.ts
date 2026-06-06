@@ -6,9 +6,6 @@ import {
 	Logger,
 	ServiceUnavailableException,
 } from '@nestjs/common';
-import { DOMParser } from '@xmldom/xmldom';
-import * as xpath from 'xpath';
-import { SignedXml } from 'xml-crypto';
 import { ConfigService } from '@nestjs/config';
 import {
 	LOGIN_PAGE_ROUTE,
@@ -24,6 +21,8 @@ import { SamlPostBindingService } from './saml-post-binding.service';
 import { SamlRequestParserService } from './saml-request-parser.service';
 import { SamlResponseBuilderService } from './saml-response-builder.service';
 import { validateAcsUrl } from '../utils/saml-url.util';
+import { verifyEnvelopedXmlDsig } from '../utils/saml-enveloped-signature.util';
+import { SamlSsoSessionService } from '../../saml-sessions/services/saml-sso-session.service';
 import type { RawSamlRedirectQueryParams } from '../utils/saml-authn-request-redirect-signature.util';
 import {
 	buildRedirectBindingSignedContent,
@@ -59,6 +58,7 @@ export class SamlSsoService {
 		private readonly metadataService: SamlMetadataService,
 		private readonly identityRepository: IdentityRepository,
 		private readonly audit: SamlAuthAuditService,
+		private readonly ssoSessions: SamlSsoSessionService,
 	) {}
 
 	async getMetadataXml(): Promise<string> {
@@ -277,21 +277,7 @@ export class SamlSsoService {
 	}
 
 	private verifyEnvelopedXmlDsig(authnRequestXml: string, spCertPem: string): boolean {
-		try {
-			const doc = new DOMParser().parseFromString(authnRequestXml, 'text/xml');
-			const sigNodes = xpath.select(
-				"//*[local-name(.)='Signature']",
-				doc as unknown as Node,
-			) as Node[];
-			if (!sigNodes.length) {
-				return false;
-			}
-			const signed = new SignedXml({ publicCert: spCertPem });
-			signed.loadSignature(sigNodes[0] as Element);
-			return signed.checkSignature(authnRequestXml);
-		} catch {
-			return false;
-		}
+		return verifyEnvelopedXmlDsig(authnRequestXml, spCertPem);
 	}
 
 	private verifyRedirectSignature(
@@ -399,7 +385,16 @@ export class SamlSsoService {
 		return message;
 	}
 
-	async completeSso(samlSessionId: string, authenticatedUserId: string): Promise<string> {
+	async completeSso(
+		samlSessionId: string,
+		authenticatedUserId: string,
+		ssoSessionId?: string,
+	): Promise<string> {
+		if (ssoSessionId && !(await this.ssoSessions.isActive(ssoSessionId))) {
+			this.audit.logResponseFailed(samlSessionId, 'sso_session_terminated');
+			throw new BadRequestException('SSO session has been terminated');
+		}
+
 		const session = await this.prisma.samlSession.findUnique({
 			where: { id: samlSessionId },
 			include: { spConnection: true },
@@ -448,12 +443,13 @@ export class SamlSsoService {
 			issueInstant: session.createdAt.toISOString(),
 		};
 
-		const { samlResponseXml } = await this.responseBuilder.buildLoginResponse({
-			authnRequest,
-			user: toEndUserPublicDto(profile),
-			spConnection: session.spConnection,
-			idpEntityId: settings.entityId,
-		});
+		const { samlResponseXml, sessionIndex, nameId, nameIdFormat } =
+			await this.responseBuilder.buildLoginResponse({
+				authnRequest,
+				user: toEndUserPublicDto(profile),
+				spConnection: session.spConnection,
+				idpEntityId: settings.entityId,
+			});
 
 		const base64Response = Buffer.from(samlResponseXml, 'utf8').toString('base64');
 		const html = this.postBinding.renderAutoPostForm(
@@ -461,6 +457,16 @@ export class SamlSsoService {
 			base64Response,
 			session.relayState ?? undefined,
 		);
+
+		if (ssoSessionId) {
+			await this.ssoSessions.createParticipation({
+				ssoSessionId,
+				spConnectionId: session.spConnectionId,
+				sessionIndex,
+				nameId,
+				nameIdFormat,
+			});
+		}
 
 		await this.prisma.samlSession.delete({ where: { id: samlSessionId } });
 

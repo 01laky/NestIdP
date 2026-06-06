@@ -3,7 +3,10 @@ import type { Response } from 'express';
 import { AUDIT_EVENTS_API_PATH } from '@nestidp/shared';
 import { AdminAuthGuard } from '../../admin-auth/guards/admin-auth.guard';
 import { AuditQueryService } from '../services/audit-query.service';
-import { ExportAuditEventsQueryDto, ListAuditEventsQueryDto } from '../dto/list-audit-events.query.dto';
+import {
+	ExportAuditEventsQueryDto,
+	ListAuditEventsQueryDto,
+} from '../dto/list-audit-events.query.dto';
 
 @Controller(AUDIT_EVENTS_API_PATH)
 @UseGuards(AdminAuthGuard)

@@ -94,7 +94,9 @@
 		"baseUrl": "Základní URL",
 		"lastSync": "Poslední synchronizace",
 		"optional": "voliteľné",
-		"required": "povinné"
+		"required": "povinné",
+		"previous": "Predchádzajúca",
+		"next": "Ďalšia"
 	},
 	"nav": {
 		"brand": "NestIdP",
@@ -108,7 +110,8 @@
 		"idpSettings": "Nastavenia IdP",
 		"adminAccounts": "Admin účty",
 		"auditLog": "Audit log",
-		"samlLogin": "SAML přihlášení"
+		"samlLogin": "SAML přihlášení",
+		"samlSessions": "Aktívne relácie"
 	},
 	"adminAuth": {
 		"title": "Admin přihlášení",
@@ -177,7 +180,8 @@
 			"requireEncryptedAssertionsCount": "Require encrypted assertions: {{count}}",
 			"idpAdvertisesWithoutEnforcement": "IdP metadata advertises signed AuthnRequests, but no SP connection currently enforces signature verification.",
 			"ecKeyAdvisory": "IdP encryption uses an EC key (ECDH-ES). Service Providers must support XML Encryption 1.1 (xenc11:AgreementMethod). Older SPs may not be compatible — consider using an RSA key for broader compatibility."
-		}
+		},
+		"activeSamlSessionsLabel": "Aktívne relácie SSO"
 	},
 	"apiConnections": {
 		"listTitle": "API pripojenia",
@@ -269,7 +273,16 @@
 		"testSsoWarningCallout": "Test URLs are for operator validation only. Keep private key material out of browser history, logs, and screenshots.",
 		"testSsoEphemeralKeyWarning": "Signed URL used an ephemeral server key. Verification only succeeds if the generated key matches the uploaded SP certificate.",
 		"testSsoEcKeyAgreementWarning": "The IdP encryption key is an EC key. This encrypted test URL uses ECDH-ES (XML Encryption 1.1). The target SP must support xenc11:AgreementMethod — not all SP implementations do.",
-		"probeSigningOpenEditLink": "Open SP edit page to validate signing key/certificate pair"
+		"probeSigningOpenEditLink": "Open SP edit page to validate signing key/certificate pair",
+		"sloUrl": "URL Single Logout",
+		"sloUrlHint": "Koncový bod SP, kam IdP posiela LogoutResponse. Voliteľné.",
+		"wantLogoutRequestsSigned": "Vyžadovať podpísaný LogoutRequest",
+		"wantLogoutRequestsSignedHint": "Pri zapnutí musia prichádzajúce LogoutRequests niesť platný podpis. Vyžaduje certifikát SP.",
+		"autofillSloFromMetadata": "Vyplniť z metadát SP",
+		"autofillSloMetadataPlaceholder": "Vložte XML EntityDescriptor SP…",
+		"autofillSloApply": "Získať URL SLO",
+		"autofillSloFound": "URL SLO vyplnené z metadát",
+		"autofillSloNotFound": "V metadátach sa nenašiel žiadny SingleLogoutService"
 	},
 	"idpSettings": {
 		"encryptionEcKeyAgreementInfo": "EC encryption key — ECDH-ES key agreement (XML Encryption 1.1). Service Providers must support xenc11:AgreementMethod. RSA keys are more widely compatible.",
@@ -667,7 +680,48 @@
 			"idp_want_authn_requests_signed_updated": "IdP wantAuthnRequestsSigned updated",
 			"saml_request_signature_verified": "SAML request signature verified",
 			"saml_request_decrypted": "SAML request decrypted",
-			"sp_signing_probe_performed": "SP signing probe performed"
+			"sp_signing_probe_performed": "SP signing probe performed",
+			"saml_logout_request_received": "Prijatý SAML LogoutRequest",
+			"saml_logout_request_rejected": "Zamietnutý SAML LogoutRequest",
+			"saml_logout_completed": "Odhlásenie SAML dokončené",
+			"saml_session_terminated": "SSO relácia ukončená",
+			"saml_sso_session_started": "SSO relácia začatá"
 		}
+	},
+	"samlSessions": {
+		"title": "Aktívne relácie",
+		"subtitle": "Zobraziť a ukončiť aktívne SSO relácie koncových používateľov.",
+		"filters": "Filtre",
+		"statusFilter": "Stav",
+		"statusActive": "Aktívna",
+		"statusTerminated": "Ukončená",
+		"spFilter": "Poskytovateľ služby",
+		"search": "Hľadať",
+		"searchPlaceholder": "Používateľ alebo NameID",
+		"limitationNote": "Ukončenie relácie vynúti opätovné prihlásenie pri ďalšom SSO a zablokuje tiché SSO. Neukončí reláciu už vytvorenú v aplikácii poskytovateľa služby (to vyžaduje back-channel SLO).",
+		"colUser": "Používateľ",
+		"colServiceProviders": "Poskytovatelia služby",
+		"colLoginIp": "IP prihlásenia",
+		"colUserAgent": "User agent",
+		"colLastActive": "Naposledy aktívna",
+		"terminate": "Ukončiť",
+		"terminateAllForUser": "Ukončiť všetky pre používateľa",
+		"confirmTerminateTitle": "Ukončiť reláciu?",
+		"confirmTerminateDescription": "Týmto sa ukončí SSO relácia používateľa {{username}} a vynúti sa opätovné prihlásenie pri ďalšom SSO.",
+		"confirmTerminateUserTitle": "Ukončiť všetky relácie?",
+		"confirmTerminateUserDescription": "Týmto sa ukončia všetky aktívne SSO relácie používateľa {{username}}.",
+		"toastTerminated": "Relácia ukončená",
+		"toastTerminatedUser": "Ukončených {{count}} relácií",
+		"terminateFailed": "Reláciu sa nepodarilo ukončiť",
+		"loadFailed": "Relácie sa nepodarilo načítať",
+		"emptyTitle": "Žiadne relácie",
+		"emptyDescription": "Žiadne SSO relácie nezodpovedajú aktuálnym filtrom.",
+		"showing": "Zobrazené {{shown}} z {{total}}",
+		"pageOf": "Stránka {{page}} z {{totalPages}}"
+	},
+	"loggedOut": {
+		"title": "Boli ste odhlásení",
+		"description": "Vaša relácia jednotného prihlásenia sa skončila.",
+		"backToLogin": "Späť na prihlásenie"
 	}
 }

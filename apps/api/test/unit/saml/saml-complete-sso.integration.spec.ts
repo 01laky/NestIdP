@@ -337,7 +337,9 @@ describe('SAML complete-sso integration (SQLite)', () => {
 		const xml = decodeSamlResponseBase64(extractSamlResponseFromHtml(res.text)!);
 		expect(xml).toContain('saml2:EncryptedAssertion');
 		expect(xml).not.toMatch(/<saml2:Assertion[^>]/);
-		const encryptedMatch = xml.match(/<saml2:EncryptedAssertion[\s\S]*<\/saml2:EncryptedAssertion>/);
+		const encryptedMatch = xml.match(
+			/<saml2:EncryptedAssertion[\s\S]*<\/saml2:EncryptedAssertion>/,
+		);
 		expect(encryptedMatch).toBeTruthy();
 		const decrypted = decryptEncryptedAssertion(encryptedMatch![0], spKeys.privateKeyPem);
 		const settings = await prisma.idpSettings.findUnique({ where: { id: 'default' } });

@@ -59,6 +59,7 @@ function dashboardStub(): AdminDashboardResponseDto {
 			spConnectionsMissingCertWithSecurityFlags: 0,
 			idpAdvertisesSignedAuthnRequests: false,
 			idpEncryptionKeyIsEc: false,
+			activeSamlSessions: 0,
 		},
 		apiConnection: null,
 		lastSyncStatus: null,

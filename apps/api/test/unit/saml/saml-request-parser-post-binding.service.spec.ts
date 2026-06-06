@@ -107,7 +107,9 @@ describe('SamlRequestParserService — POST binding (parsePostBinding)', () => {
 			issuer: 'urn:test',
 			destination: 'http://localhost:3000/saml/sso',
 		});
-		const b64 = Buffer.from(xml.replace(/^<\?xml[^?]*\?>\s*/i, '').trim(), 'utf8').toString('base64');
+		const b64 = Buffer.from(xml.replace(/^<\?xml[^?]*\?>\s*/i, '').trim(), 'utf8').toString(
+			'base64',
+		);
 		await expect(parser.parsePostBinding(b64)).rejects.toThrow(BadRequestException);
 	});
 
@@ -125,7 +127,9 @@ describe('SamlRequestParserService — POST binding (parsePostBinding)', () => {
 			destination: 'http://localhost:3000/saml/sso',
 			issueInstant: old,
 		});
-		const b64 = Buffer.from(xml.replace(/^<\?xml[^?]*\?>\s*/i, '').trim(), 'utf8').toString('base64');
+		const b64 = Buffer.from(xml.replace(/^<\?xml[^?]*\?>\s*/i, '').trim(), 'utf8').toString(
+			'base64',
+		);
 		await expect(parser.parsePostBinding(b64)).rejects.toThrow(BadRequestException);
 	});
 
@@ -137,7 +141,9 @@ describe('SamlRequestParserService — POST binding (parsePostBinding)', () => {
 			destination: 'http://localhost:3000/saml/sso',
 			issueInstant: future,
 		});
-		const b64 = Buffer.from(xml.replace(/^<\?xml[^?]*\?>\s*/i, '').trim(), 'utf8').toString('base64');
+		const b64 = Buffer.from(xml.replace(/^<\?xml[^?]*\?>\s*/i, '').trim(), 'utf8').toString(
+			'base64',
+		);
 		await expect(parser.parsePostBinding(b64)).rejects.toThrow(BadRequestException);
 	});
 
@@ -159,7 +165,9 @@ describe('SamlRequestParserService — POST binding (parsePostBinding)', () => {
 			issuer: 'urn:test:sp',
 			destination: 'https://evil.example.com/saml/sso',
 		});
-		const b64 = Buffer.from(xml.replace(/^<\?xml[^?]*\?>\s*/i, '').trim(), 'utf8').toString('base64');
+		const b64 = Buffer.from(xml.replace(/^<\?xml[^?]*\?>\s*/i, '').trim(), 'utf8').toString(
+			'base64',
+		);
 		await expect(parser.parsePostBinding(b64)).rejects.toThrow(BadRequestException);
 	});
 
@@ -192,9 +200,9 @@ describe('SamlRequestParserService — POST binding (parsePostBinding)', () => {
 	describe('POST binding with RSA-encrypted payload', () => {
 		it('API-SAML-POST-PARSE-14: encrypted RSA payload decrypted when RSA key configured', async () => {
 			const { privateKeyPem, certPem } = generateRsaKeyAndCert();
-			jest.mocked(idpEncryptionKey.getRsaDecryptionMaterial).mockResolvedValue([
-				{ privateKeyPem, keyTransportAlgorithmId: 'rsa-oaep' },
-			]);
+			jest
+				.mocked(idpEncryptionKey.getRsaDecryptionMaterial)
+				.mockResolvedValue([{ privateKeyPem, keyTransportAlgorithmId: 'rsa-oaep' }]);
 			const xml = buildAuthnRequestXml({
 				id: '_post-enc-rsa',
 				issuer: 'urn:enc:sp',
@@ -211,9 +219,9 @@ describe('SamlRequestParserService — POST binding (parsePostBinding)', () => {
 		it('API-SAML-POST-PARSE-15: RSA-encrypted request but EC key configured → 400', async () => {
 			const { certPem } = generateRsaKeyAndCert();
 			jest.mocked(idpEncryptionKey.getRsaDecryptionMaterial).mockResolvedValue([]);
-			jest.mocked(idpEncryptionKey.getEcDecryptionMaterial).mockResolvedValue([
-				{ privateKeyPem: 'fake', ecCurve: 'P-256' },
-			]);
+			jest
+				.mocked(idpEncryptionKey.getEcDecryptionMaterial)
+				.mockResolvedValue([{ privateKeyPem: 'fake', ecCurve: 'P-256' }]);
 			const xml = buildAuthnRequestXml({
 				id: '_post-enc-mismatch',
 				issuer: 'urn:enc:mismatch:sp',
@@ -224,7 +232,9 @@ describe('SamlRequestParserService — POST binding (parsePostBinding)', () => {
 			const b64 = Buffer.from(encrypted, 'utf8').toString('base64');
 			await expect(parser.parsePostBinding(b64)).rejects.toThrow(
 				expect.objectContaining({
-					message: expect.stringContaining('RSA key transport payload received but IdP has EC encryption key'),
+					message: expect.stringContaining(
+						'RSA key transport payload received but IdP has EC encryption key',
+					),
 				}),
 			);
 		});
@@ -233,9 +243,9 @@ describe('SamlRequestParserService — POST binding (parsePostBinding)', () => {
 	describe('POST binding with EC-encrypted payload', () => {
 		it('API-SAML-POST-PARSE-16: EC-encrypted payload decrypted when EC key configured', async () => {
 			const { certPem, privateKeyPem } = generateTestEcCert('urn:test:ec:sp', 'P-256');
-			jest.mocked(idpEncryptionKey.getEcDecryptionMaterial).mockResolvedValue([
-				{ privateKeyPem, ecCurve: 'P-256' },
-			]);
+			jest
+				.mocked(idpEncryptionKey.getEcDecryptionMaterial)
+				.mockResolvedValue([{ privateKeyPem, ecCurve: 'P-256' }]);
 			const xml = buildAuthnRequestXml({
 				id: '_post-enc-ec',
 				issuer: 'urn:ec:enc:sp',
@@ -252,9 +262,9 @@ describe('SamlRequestParserService — POST binding (parsePostBinding)', () => {
 		it('API-SAML-POST-PARSE-17: EC-encrypted request but RSA key configured → 400', async () => {
 			const { certPem } = generateTestEcCert('urn:test:ec:sp', 'P-256');
 			jest.mocked(idpEncryptionKey.getEcDecryptionMaterial).mockResolvedValue([]);
-			jest.mocked(idpEncryptionKey.getRsaDecryptionMaterial).mockResolvedValue([
-				{ privateKeyPem: 'fake', keyTransportAlgorithmId: 'rsa-oaep' },
-			]);
+			jest
+				.mocked(idpEncryptionKey.getRsaDecryptionMaterial)
+				.mockResolvedValue([{ privateKeyPem: 'fake', keyTransportAlgorithmId: 'rsa-oaep' }]);
 			const xml = buildAuthnRequestXml({
 				id: '_post-ec-mismatch',
 				issuer: 'urn:ec:mismatch:sp',
@@ -265,7 +275,9 @@ describe('SamlRequestParserService — POST binding (parsePostBinding)', () => {
 			const b64 = Buffer.from(encrypted, 'utf8').toString('base64');
 			await expect(parser.parsePostBinding(b64)).rejects.toThrow(
 				expect.objectContaining({
-					message: expect.stringContaining('EC key agreement payload received but IdP has RSA encryption key'),
+					message: expect.stringContaining(
+						'EC key agreement payload received but IdP has RSA encryption key',
+					),
 				}),
 			);
 		});

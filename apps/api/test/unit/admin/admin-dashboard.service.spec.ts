@@ -12,6 +12,7 @@ describe('AdminDashboardService', () => {
 		idpSettings: { findUnique: jest.fn() },
 		apiConnection: { findFirst: jest.fn() },
 		spConnection: { count: jest.fn(), findMany: jest.fn() },
+		samlSsoSession: { count: jest.fn().mockResolvedValue(0) },
 	};
 
 	const idpSettingsService = {
@@ -38,10 +39,14 @@ describe('AdminDashboardService', () => {
 			apiConnections: 1,
 			spConnections: 0,
 		});
-		prisma.idpSettings.findUnique.mockResolvedValue({ entityId: 'http://localhost:3000', wantAuthnRequestsSigned: false });
+		prisma.idpSettings.findUnique.mockResolvedValue({
+			entityId: 'http://localhost:3000',
+			wantAuthnRequestsSigned: false,
+		});
 		prisma.apiConnection.findFirst.mockResolvedValue(null);
 		prisma.spConnection.count.mockResolvedValue(0);
 		prisma.spConnection.findMany.mockResolvedValue([]);
+		prisma.samlSsoSession.count.mockResolvedValue(0);
 		idpSettingsService.buildDashboardIdpStatus.mockResolvedValue({
 			idpSettingsRoute: IDP_SETTINGS_ROUTE_PREFIX,
 			hasSigningCertificate: true,

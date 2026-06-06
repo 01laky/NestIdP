@@ -1,6 +1,9 @@
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { DEFAULT_PASSWORD_HASH_ALGORITHM } from '@nestidp/shared';
-import { EndUserAuthService, INVALID_CREDENTIALS_MESSAGE } from '@api/auth/services/end-user-auth.service';
+import {
+	EndUserAuthService,
+	INVALID_CREDENTIALS_MESSAGE,
+} from '@api/auth/services/end-user-auth.service';
 
 jest.mock('@api/admin-auth/utils/password.util', () => ({
 	verifyPasswordTimingSafe: jest.fn(),

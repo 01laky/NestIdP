@@ -83,6 +83,8 @@ describe('admin confirm page flows', () => {
 			hasSpCertificate: false,
 			wantAssertionsEncrypted: false,
 			wantAuthnRequestsSigned: false,
+			wantLogoutRequestsSigned: false,
+			sloUrl: null,
 			createdAt: '',
 			updatedAt: '',
 		});
@@ -98,6 +100,8 @@ describe('admin confirm page flows', () => {
 				hasSpCertificate: false,
 				wantAssertionsEncrypted: false,
 				wantAuthnRequestsSigned: false,
+				wantLogoutRequestsSigned: false,
+				sloUrl: null,
 				createdAt: '',
 				updatedAt: '',
 			},
@@ -284,6 +288,8 @@ describe('admin confirm page flows', () => {
 			hasSpCertificate: false,
 			wantAssertionsEncrypted: false,
 			wantAuthnRequestsSigned: false,
+			wantLogoutRequestsSigned: false,
+			sloUrl: null,
 			createdAt: '',
 			updatedAt: '',
 		});
@@ -431,6 +437,8 @@ describe('admin confirm page flows', () => {
 			hasSpCertificate: false,
 			wantAssertionsEncrypted: false,
 			wantAuthnRequestsSigned: false,
+			wantLogoutRequestsSigned: false,
+			sloUrl: null,
 			createdAt: '',
 			updatedAt: '',
 		});

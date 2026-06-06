@@ -25,6 +25,7 @@ import { END_USER_SESSION_COOKIE_NAME } from '@nestidp/shared';
 import { EndUserAuthGuard } from '../guards/end-user-auth.guard';
 import type { EndUserAuthenticatedRequest } from '../end-user-auth.types';
 import { SamlSsoService } from '../../saml/services/saml-sso.service';
+import { SamlSsoSessionService } from '../../saml-sessions/services/saml-sso-session.service';
 import { EndUserAuthAuditService } from '../services/end-user-auth-audit.service';
 import { EndUserAuthService } from '../services/end-user-auth.service';
 import { EndUserSessionService } from '../services/end-user-session.service';
@@ -41,6 +42,7 @@ export class AuthController {
 		private readonly endUserSessionService: EndUserSessionService,
 		private readonly rateLimiter: EndUserLoginRateLimiterService,
 		private readonly samlSsoService: SamlSsoService,
+		private readonly ssoSessions: SamlSsoSessionService,
 		private readonly endUserAuthAudit: EndUserAuthAuditService,
 	) {}
 
@@ -67,9 +69,17 @@ export class AuthController {
 				samlSessionId: body.samlSessionId,
 				clientIp,
 			});
+			const ssoSession = await this.ssoSessions.create({
+				userId: result.user.id,
+				username: result.user.username,
+				expiresAt: new Date(Date.now() + this.endUserSessionService.getSessionTtlSeconds() * 1000),
+				loginIp: clientIp,
+				userAgent: req.headers['user-agent'],
+			});
 			const payload = this.endUserSessionService.createPayload(
 				result.user.id,
 				result.user.username,
+				ssoSession.id,
 			);
 			this.endUserSessionService.setCookie(res, payload);
 			this.rateLimiter.reset(clientIp, username);
@@ -86,14 +96,14 @@ export class AuthController {
 
 	@Post('logout')
 	@HttpCode(HttpStatus.OK)
-	logout(
+	async logout(
 		@Req() req: EndUserAuthenticatedRequest,
 		@Res({ passthrough: true }) res: Response,
-	): EndUserLogoutResponseDto {
+	): Promise<EndUserLogoutResponseDto> {
 		const token = req.cookies?.[END_USER_SESSION_COOKIE_NAME] as string | undefined;
 		const payload = this.endUserSessionService.verify(token);
-		if (payload) {
-			// audit optional on logout — service layer could add; keep minimal in controller
+		if (payload?.sid) {
+			await this.ssoSessions.terminate(payload.sid, 'user_logout');
 		}
 		this.endUserSessionService.clearCookie(res);
 		return { ok: true };
@@ -142,7 +152,11 @@ export class AuthController {
 
 		const clientIp = req.ip ?? 'unknown';
 		try {
-			const html = await this.samlSsoService.completeSso(body.samlSessionId, req.endUser.id);
+			const html = await this.samlSsoService.completeSso(
+				body.samlSessionId,
+				req.endUser.id,
+				req.endUserSession?.sid,
+			);
 			this.endUserAuthAudit.logSsoCompleteSuccess(body.samlSessionId, req.endUser.id, clientIp);
 			res.setHeader('Content-Type', 'text/html; charset=utf-8');
 			res.status(200).send(html);
