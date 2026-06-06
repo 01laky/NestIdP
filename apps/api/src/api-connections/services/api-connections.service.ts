@@ -8,21 +8,28 @@ import {
 	NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Prisma } from '@prisma/client';
+import { ApiConnection, Prisma } from '@prisma/client';
 import type {
 	ApiConnectionListResponseDto,
 	ApiConnectionResponseDto,
+	AuthType,
 	CreateApiConnectionRequestDto,
 	DeleteApiConnectionResponseDto,
 	UpdateApiConnectionRequestDto,
 } from '@nestidp/shared';
-import { ApiContractValidationError, assertValidApiContractConfig } from '@nestidp/shared';
+import {
+	ApiContractValidationError,
+	assertValidApiContractConfig,
+	assertValidOAuthConfig,
+	OAuthConfigValidationError,
+} from '@nestidp/shared';
 import { NodeEnv } from '../../config/env.validation';
 import {
 	CREDENTIALS_ENCRYPTION,
 	type CredentialsEncryptionPort,
 } from '../../encryption/credentials-encryption.port';
 import { PrismaService } from '../../prisma/services/prisma.service';
+import { OAuthTokenService } from '../../sync/services/oauth-token.service';
 import { assertValidBaseUrl, BaseUrlValidationError } from '../utils/base-url.util';
 import { ApiConnectionsAuditService } from './api-connections-audit.service';
 import { toApiConnectionDto } from '../mappers/api-connections.mapper';
@@ -37,6 +44,7 @@ export class ApiConnectionsService {
 		private readonly encryption: CredentialsEncryptionPort,
 		private readonly configService: ConfigService,
 		private readonly audit: ApiConnectionsAuditService,
+		private readonly oauthTokenService: OAuthTokenService,
 	) {}
 
 	async list(): Promise<ApiConnectionListResponseDto> {
@@ -44,12 +52,12 @@ export class ApiConnectionsService {
 			where: { isLocalDirectory: false },
 			orderBy: { createdAt: 'asc' },
 		});
-		return { connections: rows.map(toApiConnectionDto) };
+		return { connections: rows.map((row) => this.toDto(row)) };
 	}
 
 	async getById(id: string): Promise<ApiConnectionResponseDto> {
 		const row = await this.findOrThrow(id);
-		return { connection: toApiConnectionDto(row) };
+		return { connection: this.toDto(row) };
 	}
 
 	async create(body: CreateApiConnectionRequestDto): Promise<ApiConnectionResponseDto> {
@@ -63,22 +71,30 @@ export class ApiConnectionsService {
 		await this.assertNameAvailable(body.name);
 
 		const baseUrl = this.validateBaseUrl(body.baseUrl);
-		const authCredentialsEncrypted = this.encryption.encrypt(body.bearerToken);
 		const apiContractConfig = this.validateContract(body.apiContractConfig);
+		const authType: AuthType = body.authType ?? 'BEARER';
 
-		const row = await this.prisma.apiConnection.create({
-			data: {
-				name: body.name.trim(),
-				baseUrl,
-				authType: 'BEARER',
-				authCredentialsEncrypted,
-				apiContractConfig: apiContractConfig
-					? (apiContractConfig as unknown as Prisma.InputJsonValue)
-					: Prisma.JsonNull,
-			},
-		});
+		const data: Prisma.ApiConnectionCreateInput = {
+			name: body.name.trim(),
+			baseUrl,
+			authType,
+			authCredentialsEncrypted: '',
+			apiContractConfig: apiContractConfig
+				? (apiContractConfig as unknown as Prisma.InputJsonValue)
+				: Prisma.JsonNull,
+		};
 
-		return { connection: toApiConnectionDto(row) };
+		if (authType === 'OAUTH2_CLIENT_CREDENTIALS') {
+			this.applyOAuthData(data, body, { secretRequired: true });
+		} else {
+			if (!body.bearerToken || body.bearerToken.length === 0) {
+				throw new BadRequestException('bearerToken is required for BEARER auth');
+			}
+			data.authCredentialsEncrypted = this.encryption.encrypt(body.bearerToken);
+		}
+
+		const row = await this.prisma.apiConnection.create({ data });
+		return { connection: this.toDto(row) };
 	}
 
 	async update(id: string, body: UpdateApiConnectionRequestDto): Promise<ApiConnectionResponseDto> {
@@ -86,7 +102,15 @@ export class ApiConnectionsService {
 			!body.name &&
 			!body.baseUrl &&
 			body.bearerToken === undefined &&
-			body.apiContractConfig === undefined
+			body.apiContractConfig === undefined &&
+			body.authType === undefined &&
+			body.oauthTokenUrl === undefined &&
+			body.oauthClientId === undefined &&
+			body.oauthClientSecret === undefined &&
+			body.oauthScope === undefined &&
+			body.oauthAudience === undefined &&
+			body.oauthClientAuthMethod === undefined &&
+			body.oauthTokenRequestParams === undefined
 		) {
 			throw new BadRequestException('At least one field must be provided');
 		}
@@ -105,23 +129,48 @@ export class ApiConnectionsService {
 		if (body.name !== undefined) {
 			data.name = body.name.trim();
 		}
-
 		if (body.baseUrl !== undefined) {
 			data.baseUrl = this.validateBaseUrl(body.baseUrl);
 		}
-
-		if (body.bearerToken !== undefined) {
-			if (body.bearerToken.length === 0) {
-				throw new BadRequestException('bearerToken must not be empty');
-			}
-			data.authCredentialsEncrypted = this.encryption.encrypt(body.bearerToken);
-		}
-
 		if (body.apiContractConfig !== undefined) {
 			const validated = this.validateContract(body.apiContractConfig);
 			data.apiContractConfig = validated
 				? (validated as unknown as Prisma.InputJsonValue)
 				: Prisma.JsonNull;
+		}
+
+		const targetAuthType: AuthType = body.authType ?? existing.authType;
+		const authTypeChanged = targetAuthType !== existing.authType;
+
+		if (targetAuthType === 'OAUTH2_CLIENT_CREDENTIALS') {
+			data.authType = 'OAUTH2_CLIENT_CREDENTIALS';
+			if (body.bearerToken !== undefined) {
+				throw new BadRequestException('bearerToken is not used with OAuth 2.0 Client Credentials');
+			}
+			const hasStoredSecret = (existing.oauthClientSecretEncrypted ?? '').length > 0;
+			this.applyOAuthData(data, body, { secretRequired: authTypeChanged || !hasStoredSecret });
+			if (authTypeChanged) {
+				data.authCredentialsEncrypted = '';
+			}
+		} else {
+			data.authType = 'BEARER';
+			if (body.bearerToken !== undefined) {
+				if (body.bearerToken.length === 0) {
+					throw new BadRequestException('bearerToken must not be empty');
+				}
+				data.authCredentialsEncrypted = this.encryption.encrypt(body.bearerToken);
+			} else if (authTypeChanged) {
+				throw new BadRequestException('bearerToken is required when switching to BEARER auth');
+			}
+			if (authTypeChanged) {
+				data.oauthTokenUrl = null;
+				data.oauthClientId = null;
+				data.oauthClientSecretEncrypted = null;
+				data.oauthScope = null;
+				data.oauthAudience = null;
+				data.oauthClientAuthMethod = null;
+				data.oauthTokenRequestParams = Prisma.JsonNull;
+			}
 		}
 
 		const row = await this.prisma.apiConnection.update({
@@ -130,6 +179,9 @@ export class ApiConnectionsService {
 		});
 
 		this.audit.logUpdated(row.id, row.name);
+		if (authTypeChanged) {
+			this.audit.logAuthTypeChanged(row.id, row.name, row.authType);
+		}
 		if (body.apiContractConfig !== undefined) {
 			const sections =
 				body.apiContractConfig === null
@@ -137,7 +189,7 @@ export class ApiConnectionsService {
 					: Object.keys(body.apiContractConfig as Record<string, unknown>);
 			this.audit.logContractUpdated(row.id, row.name, sections);
 		}
-		return { connection: toApiConnectionDto(row) };
+		return { connection: this.toDto(row) };
 	}
 
 	async delete(id: string): Promise<DeleteApiConnectionResponseDto> {
@@ -152,6 +204,55 @@ export class ApiConnectionsService {
 		}
 		this.audit.logDeleted(existing.id, existing.name);
 		return { ok: true, id };
+	}
+
+	private toDto(row: ApiConnection) {
+		const oauthLastTokenAt =
+			row.authType === 'OAUTH2_CLIENT_CREDENTIALS'
+				? this.oauthTokenService.getLastTokenAt(row.id)
+				: null;
+		return toApiConnectionDto(row, { oauthLastTokenAt });
+	}
+
+	private applyOAuthData(
+		data: Prisma.ApiConnectionCreateInput | Prisma.ApiConnectionUpdateInput,
+		body: CreateApiConnectionRequestDto | UpdateApiConnectionRequestDto,
+		opts: { secretRequired: boolean },
+	): void {
+		let validated;
+		try {
+			validated = assertValidOAuthConfig({
+				oauthTokenUrl: body.oauthTokenUrl,
+				oauthClientId: body.oauthClientId,
+				oauthScope: body.oauthScope,
+				oauthAudience: body.oauthAudience,
+				oauthClientAuthMethod: body.oauthClientAuthMethod ?? undefined,
+				oauthTokenRequestParams: body.oauthTokenRequestParams,
+			});
+		} catch (error) {
+			if (error instanceof OAuthConfigValidationError) {
+				throw new BadRequestException(error.message);
+			}
+			throw error;
+		}
+
+		data.oauthTokenUrl = validated.oauthTokenUrl;
+		data.oauthClientId = validated.oauthClientId;
+		data.oauthScope = validated.oauthScope;
+		data.oauthAudience = validated.oauthAudience;
+		data.oauthClientAuthMethod = validated.oauthClientAuthMethod;
+		data.oauthTokenRequestParams = validated.oauthTokenRequestParams
+			? (validated.oauthTokenRequestParams as unknown as Prisma.InputJsonValue)
+			: Prisma.JsonNull;
+
+		if (body.oauthClientSecret !== undefined && body.oauthClientSecret !== null) {
+			if (body.oauthClientSecret.length === 0) {
+				throw new BadRequestException('oauthClientSecret must not be empty');
+			}
+			data.oauthClientSecretEncrypted = this.encryption.encrypt(body.oauthClientSecret);
+		} else if (opts.secretRequired) {
+			throw new BadRequestException('oauthClientSecret is required');
+		}
 	}
 
 	private async findOrThrow(id: string) {

@@ -299,7 +299,7 @@ Admin authentication is separate from end-user SAML authentication. Admin creden
 |--------|----------|-----|-----|
 | Endpoint paths | **Fixed** — `/users`, `/users/:id/groups`, `/users/:id/roles` | **Configurable per API connection (v1.9.0)** | Same as v2 |
 | Response field mapping | **Fixed** — field names below | **Configurable incl. nested dot-paths (v1.9.0)** | Same as v2 |
-| Auth to external API | Bearer token only | OAuth 2.0 Client Credentials (optional) | Same as v2 |
+| Auth to external API | Bearer token only | **Bearer token or OAuth 2.0 Client Credentials (v1.10.0)** | Same as v2 |
 | Outbound proxy | **None** — direct HTTP to `baseUrl` | Optional HTTP/HTTPS proxy per connection | Same as v2 |
 | **Number of sync sources** | **One** API connection | **One** API connection | **Multiple** API connections merged into local identity store |
 | What admin configures | `baseUrl` + token | + endpoints, field mapping, proxy | + multi-source sync groups and merge rules |
@@ -310,12 +310,16 @@ Admin authentication is separate from end-user SAML authentication. Admin creden
 
 Adapters for other protocols (SCIM, LDAP) remain deferred beyond v2 unless explicitly added to the roadmap.
 
-### 7.1 Authentication to External API (v1)
+### 7.1 Authentication to External API
 
 Configured per API connection:
 
-- **Bearer token** (static API key) — only option in v1
-- **OAuth 2.0 Client Credentials** — v2
+- **Bearer token** (static API key) — the default.
+- **OAuth 2.0 Client Credentials** (implemented — v1.10.0) — the IdP exchanges `client_id` +
+  `client_secret` at the API's token endpoint (`client_secret_post` or `client_secret_basic`, optional
+  `scope`/`audience`/extra params) for a short-lived access token, caches it until shortly before
+  expiry, and refreshes once on a `401`. The client secret is stored encrypted and never returned to
+  the SPA or logged.
 
 ### 7.2 Fixed Endpoints (v1)
 
@@ -707,7 +711,7 @@ _Phase 1 complete in **v1.0.0** (Prompt 10 — Docker, persistent audit, admin a
 - [ ] Certificate rotation (dual-cert in metadata)
 - [ ] Rate limiting and brute-force protection
 - [ ] Sync error reporting in admin UI
-- [ ] OAuth 2.0 Client Credentials for API connections
+- [x] **OAuth 2.0 Client Credentials for API connections** — token-endpoint exchange, caching, 401 refresh, per-connection config (v1.10.0)
 - [ ] IdP-initiated SSO
 - [x] Single Logout (SLO) — SP-initiated + admin session termination (v1.8.0)
 - [ ] Back-channel (SOAP) SLO + multi-SP logout propagation

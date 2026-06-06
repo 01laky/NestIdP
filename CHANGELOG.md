@@ -4,6 +4,52 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.10.0]
+
+### Added
+
+- **OAuth 2.0 Client Credentials for API connections (Prompt 29):** an API connection can now
+  authenticate to the external identity API via the OAuth 2.0 Client Credentials grant
+  (`AuthType.OAUTH2_CLIENT_CREDENTIALS`) instead of a static Bearer token. `BEARER` remains the
+  default and existing connections are unchanged.
+  - **Token exchange** at a configurable token endpoint: `client_secret_post` (body) or
+    `client_secret_basic` (HTTP Basic), optional `scope` / `audience`, and optional fixed extra
+    token-request params (`oauthTokenRequestParams`, validated like the Prompt 27 query params with
+    reserved OAuth names rejected).
+  - **In-memory token cache** keyed by the resolved config (URL/clientId/scope/audience/auth method/
+    params/secret hash) with a refresh skew; **single-flight** so concurrent membership fetches make
+    one token request; `expires_in` is clamped to sane min/max bounds; only a `Bearer` `token_type`
+    is accepted.
+  - **Sync** resolves the access token, and on a `401` during the users fetch refreshes once and
+    retries before failing the run with a clear `oauth` error.
+  - **Test connection** probes the token endpoint first (with a distinct TLS-error message) and a new
+    **`POST /api/admin/api-connections/:id/test-token`** action returns masked diagnostics
+    (`tokenType` / `expiresIn` / `grantedScope`) — never the token.
+  - **Admin form** adds an authentication-type selector with conditional OAuth fields (token URL,
+    client id, client secret [write-only, "leave blank to keep"], scope, audience, client auth method,
+    extra params) and a **Test token** button. New `apiConnections.auth*` / `oauth*` strings in all
+    10 locales.
+  - New audit events `api_connection_auth_type_changed`, `api_connection_oauth_token_obtained`, and
+    `api_connection_oauth_token_failed` (no secrets in metadata). Read-only `oauthLastTokenAt` is
+    surfaced on the connection DTO.
+  - Schema: `ApiConnection` gains nullable `oauthTokenUrl` / `oauthClientId` /
+    `oauthClientSecretEncrypted` / `oauthScope` / `oauthAudience` / `oauthClientAuthMethod` /
+    `oauthTokenRequestParams`, and `AuthType` gains `OAUTH2_CLIENT_CREDENTIALS` (migration in both
+    dialect dirs).
+
+### Changed
+
+- Secret redaction (`redactSecrets`) now also scrubs `client_secret`, `access_token`, and
+  `Authorization: Basic/Bearer` values from any error/log path.
+- The create/update DTO `bearerToken` is now optional and only required for `BEARER` connections; the
+  service validates credentials per auth type.
+
+### Security
+
+- The OAuth client secret is stored encrypted, never returned to the SPA (only `hasOauthClientSecret`),
+  and never logged. The token endpoint URL is validated (absolute http(s), no embedded credentials).
+  Rotating the secret transparently invalidates the cached token (the secret is part of the cache key).
+
 ## [1.9.0]
 
 ### Added

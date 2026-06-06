@@ -69,6 +69,11 @@ jest.setTimeout(60_000);
 		const identitySyncClient = new IdentitySyncClientService(config);
 
 		const audit = { recordSafe: jest.fn() };
+		const oauthTokenService = {
+			getAccessToken: jest.fn(),
+			getLastTokenAt: jest.fn().mockReturnValue(null),
+			fetchDiagnostics: jest.fn(),
+		};
 		const syncService = new SyncService(
 			prisma as unknown as PrismaService,
 			identityRepository,
@@ -76,6 +81,7 @@ jest.setTimeout(60_000);
 			identitySyncClient,
 			encryption,
 			audit as never,
+			oauthTokenService as never,
 		);
 
 		jest.spyOn(identitySyncClient, 'fetchUsersRaw').mockResolvedValue([

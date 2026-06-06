@@ -9,6 +9,7 @@ datasource db {
 
 enum AuthType {
 	BEARER
+	OAUTH2_CLIENT_CREDENTIALS
 }
 
 enum LastSyncStatus {
@@ -52,6 +53,13 @@ model ApiConnection {
 	authCredentialsEncrypted String
 	isLocalDirectory         Boolean        @default(false)
 	apiContractConfig        Json?
+	oauthTokenUrl              String?
+	oauthClientId              String?
+	oauthClientSecretEncrypted String?
+	oauthScope                 String?
+	oauthAudience              String?
+	oauthClientAuthMethod      String?
+	oauthTokenRequestParams    Json?
 	lastSyncAt               DateTime?
 	lastSyncStatus           LastSyncStatus @default(NEVER)
 	createdAt                DateTime       @default(now())

@@ -1,6 +1,7 @@
 export * from './health.js';
 export * from './connections.js';
 export * from './api-contract.js';
+export * from './oauth.js';
 export * from './database.js';
 export * from './schema-enums.js';
 export * from './password-hash-algorithms.js';

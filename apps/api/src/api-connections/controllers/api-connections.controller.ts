@@ -16,6 +16,7 @@ import {
 	type ApiConnectionListResponseDto,
 	type ApiConnectionResponseDto,
 	type ApiConnectionTestResponseDto,
+	type ApiConnectionTestTokenResponseDto,
 	type DeleteApiConnectionResponseDto,
 } from '@nestidp/shared';
 import { AdminAuthGuard } from '../../admin-auth/guards/admin-auth.guard';
@@ -75,5 +76,12 @@ export class ApiConnectionsController {
 	@UseGuards(AdminCsrfGuard)
 	test(@Param('id', ParseCuidPipe) id: string): Promise<ApiConnectionTestResponseDto> {
 		return this.apiConnectionTestService.testConnection(id);
+	}
+
+	@Post(':id/test-token')
+	@HttpCode(HttpStatus.OK)
+	@UseGuards(AdminCsrfGuard)
+	testToken(@Param('id', ParseCuidPipe) id: string): Promise<ApiConnectionTestTokenResponseDto> {
+		return this.apiConnectionTestService.testToken(id);
 	}
 }

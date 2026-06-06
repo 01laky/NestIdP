@@ -39,6 +39,7 @@ import {
 import type { ExternalGroupDto, ExternalRoleDto } from '../external-api.types';
 import { IdentitySyncClientService } from './identity-sync-client.service';
 import { IdentitySyncHttpError } from '../identity-sync.errors';
+import { OAuthTokenError, OAuthTokenService } from './oauth-token.service';
 import { AuditPersistenceService } from '../../audit/services/audit-persistence.service';
 import { SyncLogService } from './sync-log.service';
 import {
@@ -75,6 +76,7 @@ export class SyncService {
 		@Inject(CREDENTIALS_ENCRYPTION)
 		private readonly encryption: CredentialsEncryptionPort,
 		private readonly audit: AuditPersistenceService,
+		private readonly oauthTokenService: OAuthTokenService,
 	) {}
 
 	async triggerSync(
@@ -121,7 +123,7 @@ export class SyncService {
 		};
 
 		try {
-			const bearerToken = this.decryptCredentials(connection.authCredentialsEncrypted, errors);
+			let bearerToken = await this.resolveBearer(connection, errors);
 			if (bearerToken == null) {
 				return this.finishFailedTrigger(
 					connectionId,
@@ -136,11 +138,32 @@ export class SyncService {
 
 			let usersBody: unknown[];
 			try {
-				const raw = await this.identitySyncClient.fetchUsersRaw(
-					connection.baseUrl,
-					bearerToken,
-					contract,
-				);
+				let raw: unknown;
+				try {
+					raw = await this.identitySyncClient.fetchUsersRaw(
+						connection.baseUrl,
+						bearerToken,
+						contract,
+					);
+				} catch (error) {
+					// OAuth: a 401 may mean a stale cached token — refresh once and retry.
+					if (
+						connection.authType === 'OAUTH2_CLIENT_CREDENTIALS' &&
+						error instanceof IdentitySyncHttpError &&
+						error.options.statusCode === 401
+					) {
+						bearerToken = await this.oauthTokenService.getAccessToken(connection, {
+							forceRefresh: true,
+						});
+						raw = await this.identitySyncClient.fetchUsersRaw(
+							connection.baseUrl,
+							bearerToken,
+							contract,
+						);
+					} else {
+						throw error;
+					}
+				}
 				usersBody = assertUsersArrayWithinLimit(raw, this.identitySyncClient.getMaxUsersPerRun());
 				if (detectDuplicateUserIds(usersBody, contract.userFieldMap.id)) {
 					errors.push({
@@ -502,6 +525,27 @@ export class SyncService {
 			throw new NotFoundException('Sync log not found');
 		}
 		return { syncLog: toSyncLogDto(log) };
+	}
+
+	/** Resolve the effective Bearer value per auth type (static token or OAuth access token). */
+	private async resolveBearer(
+		connection: ApiConnection,
+		errors: SyncLogErrorEntryDto[],
+	): Promise<string | null> {
+		if (connection.authType === 'OAUTH2_CLIENT_CREDENTIALS') {
+			try {
+				return await this.oauthTokenService.getAccessToken(connection);
+			} catch (error) {
+				errors.push({
+					phase: 'oauth',
+					message:
+						error instanceof OAuthTokenError ? error.message : 'OAuth token acquisition failed',
+					httpStatus: error instanceof OAuthTokenError ? error.options.statusCode : undefined,
+				});
+				return null;
+			}
+		}
+		return this.decryptCredentials(connection.authCredentialsEncrypted, errors);
 	}
 
 	private decryptCredentials(

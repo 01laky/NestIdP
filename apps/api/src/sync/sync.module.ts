@@ -8,9 +8,17 @@ import { IdentitySyncClientService } from './services/identity-sync-client.servi
 import { SyncController } from './controllers/sync.controller';
 import { SyncLogService } from './services/sync-log.service';
 import { SyncService } from './services/sync.service';
+import { OAuthCoreModule } from './oauth-core.module';
 
 @Module({
-	imports: [PrismaModule, AuditCoreModule, EncryptionModule, IdentityModule, AdminAuthModule],
+	imports: [
+		PrismaModule,
+		AuditCoreModule,
+		EncryptionModule,
+		IdentityModule,
+		AdminAuthModule,
+		OAuthCoreModule,
+	],
 	controllers: [SyncController],
 	providers: [SyncService, SyncLogService, IdentitySyncClientService],
 	exports: [SyncService],

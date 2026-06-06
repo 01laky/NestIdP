@@ -2,7 +2,9 @@ import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type {
 	ApiConnectionPreviewUserDto,
 	ApiConnectionTestResponseDto,
+	ApiConnectionTestTokenResponseDto,
 	ApiContractConfig,
+	OAuthTokenDiagnosticsDto,
 	ResolvedApiContract,
 } from '@nestidp/shared';
 import { getByPath, resolveApiContract } from '@nestidp/shared';
@@ -12,6 +14,7 @@ import {
 } from '../../encryption/credentials-encryption.port';
 import { redactBearerToken } from '../../encryption/utils/redact-secret.util';
 import { PrismaService } from '../../prisma/services/prisma.service';
+import { OAuthTokenService } from '../../sync/services/oauth-token.service';
 import { ApiConnectionsAuditService } from './api-connections-audit.service';
 import { normalizeBaseUrl } from '../utils/base-url.util';
 import {
@@ -31,7 +34,25 @@ export class ApiConnectionTestService {
 		@Inject(CREDENTIALS_ENCRYPTION)
 		private readonly encryption: CredentialsEncryptionPort,
 		private readonly audit: ApiConnectionsAuditService,
+		private readonly oauthTokenService: OAuthTokenService,
 	) {}
+
+	/** Token-exchange-only diagnostics (POST /:id/test-token). Never returns the token. */
+	async testToken(id: string): Promise<ApiConnectionTestTokenResponseDto> {
+		const row = await this.prisma.apiConnection.findUnique({ where: { id } });
+		if (!row) {
+			throw new NotFoundException('API connection not found');
+		}
+		if (row.authType !== 'OAUTH2_CLIENT_CREDENTIALS') {
+			return {
+				ok: false,
+				reachable: false,
+				error: 'Connection is not configured for OAuth 2.0 Client Credentials',
+			};
+		}
+		const { diag } = await this.oauthTokenService.fetchDiagnostics(row);
+		return diag;
+	}
 
 	async testConnection(id: string): Promise<ApiConnectionTestResponseDto> {
 		const row = await this.prisma.apiConnection.findUnique({ where: { id } });
@@ -40,17 +61,33 @@ export class ApiConnectionTestService {
 		}
 
 		let token: string;
-		try {
-			token = this.encryption.decrypt(row.authCredentialsEncrypted);
-		} catch (error) {
-			this.logger.warn(
-				`Failed to decrypt credentials for connection ${id}: ${redactBearerToken(String(error))}`,
-			);
-			return {
-				ok: false,
-				reachable: false,
-				message: 'Stored credentials could not be decrypted',
-			};
+		let tokenEndpoint: OAuthTokenDiagnosticsDto | undefined;
+		if (row.authType === 'OAUTH2_CLIENT_CREDENTIALS') {
+			const result = await this.oauthTokenService.fetchDiagnostics(row);
+			tokenEndpoint = result.diag;
+			if (!result.diag.ok || !result.token) {
+				return {
+					ok: false,
+					reachable: result.diag.reachable,
+					statusCode: result.diag.statusCode,
+					message: result.diag.error ?? 'OAuth token endpoint failed',
+					tokenEndpoint: result.diag,
+				};
+			}
+			token = result.token;
+		} else {
+			try {
+				token = this.encryption.decrypt(row.authCredentialsEncrypted);
+			} catch (error) {
+				this.logger.warn(
+					`Failed to decrypt credentials for connection ${id}: ${redactBearerToken(String(error))}`,
+				);
+				return {
+					ok: false,
+					reachable: false,
+					message: 'Stored credentials could not be decrypted',
+				};
+			}
 		}
 
 		const contract = resolveApiContract(
@@ -73,6 +110,7 @@ export class ApiConnectionTestService {
 			message: ok
 				? 'Identity API responded successfully'
 				: `Identity API returned HTTP ${response.status}`,
+			...(tokenEndpoint ? { tokenEndpoint } : {}),
 		};
 		this.audit.logTested(id, true, response.status);
 

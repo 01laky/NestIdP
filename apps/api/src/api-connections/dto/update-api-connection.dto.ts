@@ -1,6 +1,15 @@
 import { Transform } from 'class-transformer';
-import { IsNotEmpty, IsObject, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
-import type { ApiContractConfig } from '@nestidp/shared';
+import {
+	IsIn,
+	IsNotEmpty,
+	IsObject,
+	IsOptional,
+	IsString,
+	MaxLength,
+	ValidateIf,
+} from 'class-validator';
+import type { ApiContractConfig, AuthType, OAuthClientAuthMethod } from '@nestidp/shared';
+import { AUTH_TYPES, OAUTH_CLIENT_AUTH_METHODS } from '@nestidp/shared';
 
 export class UpdateApiConnectionBodyDto {
 	@IsOptional()
@@ -18,6 +27,10 @@ export class UpdateApiConnectionBodyDto {
 	baseUrl?: string;
 
 	@IsOptional()
+	@IsIn([...AUTH_TYPES])
+	authType?: AuthType;
+
+	@IsOptional()
 	@ValidateIf((_o, value) => value !== undefined)
 	@IsString()
 	@IsNotEmpty()
@@ -28,4 +41,39 @@ export class UpdateApiConnectionBodyDto {
 	@ValidateIf((_, value) => value !== null)
 	@IsObject()
 	apiContractConfig?: ApiContractConfig | null;
+
+	// --- OAuth 2.0 Client Credentials ---
+	@IsOptional()
+	@IsString()
+	@MaxLength(1024)
+	oauthTokenUrl?: string;
+
+	@IsOptional()
+	@IsString()
+	@MaxLength(1024)
+	oauthClientId?: string;
+
+	@IsOptional()
+	@IsString()
+	@MaxLength(4096)
+	oauthClientSecret?: string;
+
+	@IsOptional()
+	@IsString()
+	@MaxLength(1024)
+	oauthScope?: string;
+
+	@IsOptional()
+	@IsString()
+	@MaxLength(1024)
+	oauthAudience?: string;
+
+	@IsOptional()
+	@IsIn(OAUTH_CLIENT_AUTH_METHODS.map((m) => m.id))
+	oauthClientAuthMethod?: OAuthClientAuthMethod;
+
+	@IsOptional()
+	@ValidateIf((_, value) => value !== null)
+	@IsObject()
+	oauthTokenRequestParams?: Record<string, string> | null;
 }

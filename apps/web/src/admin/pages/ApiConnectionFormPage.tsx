@@ -5,6 +5,9 @@ import {
 	API_CONNECTION_ROUTE_PREFIX,
 	API_CONTRACT_PRESETS,
 	type ApiContractConfig,
+	type AuthType,
+	OAUTH_CLIENT_AUTH_METHODS,
+	type OAuthClientAuthMethod,
 } from '@nestidp/shared';
 import {
 	AdminApiError,
@@ -12,6 +15,7 @@ import {
 	deleteApiConnection,
 	getApiConnection,
 	testApiConnection,
+	testApiConnectionToken,
 	updateApiConnection,
 } from '../adminApi';
 import { AdminPageHeader } from '../components/layout/AdminPageHeader';
@@ -43,7 +47,17 @@ export function ApiConnectionFormPage() {
 	const [error, setError] = useState<string | null>(null);
 	const [name, setName] = useState('');
 	const [baseUrl, setBaseUrl] = useState('');
+	const [authType, setAuthType] = useState<AuthType>('BEARER');
 	const [bearerToken, setBearerToken] = useState('');
+	// OAuth fields
+	const [oauthTokenUrl, setOauthTokenUrl] = useState('');
+	const [oauthClientId, setOauthClientId] = useState('');
+	const [oauthClientSecret, setOauthClientSecret] = useState('');
+	const [oauthScope, setOauthScope] = useState('');
+	const [oauthAudience, setOauthAudience] = useState('');
+	const [oauthClientAuthMethod, setOauthClientAuthMethod] =
+		useState<OAuthClientAuthMethod>('client_secret_post');
+	const [oauthTokenParamsJson, setOauthTokenParamsJson] = useState('');
 	const [testMessage, setTestMessage] = useState<string | null>(null);
 	const [contractJson, setContractJson] = useState('');
 	const [contractTouched, setContractTouched] = useState(false);
@@ -58,6 +72,14 @@ export function ApiConnectionFormPage() {
 		return JSON.parse(trimmed) as ApiContractConfig;
 	}
 
+	function parseTokenParams(): Record<string, string> | null {
+		const trimmed = oauthTokenParamsJson.trim();
+		if (trimmed.length === 0) {
+			return null;
+		}
+		return JSON.parse(trimmed) as Record<string, string>;
+	}
+
 	useEffect(() => {
 		if (isNew || !id) {
 			return;
@@ -67,13 +89,19 @@ export function ApiConnectionFormPage() {
 			try {
 				const data = await getApiConnection(id);
 				if (!cancelled) {
-					setName(data.connection.name);
-					setBaseUrl(data.connection.baseUrl);
-					setContractJson(
-						data.connection.apiContractConfig
-							? JSON.stringify(data.connection.apiContractConfig, null, 2)
-							: '',
+					const c = data.connection;
+					setName(c.name);
+					setBaseUrl(c.baseUrl);
+					setAuthType(c.authType);
+					setOauthTokenUrl(c.oauthTokenUrl ?? '');
+					setOauthClientId(c.oauthClientId ?? '');
+					setOauthScope(c.oauthScope ?? '');
+					setOauthAudience(c.oauthAudience ?? '');
+					setOauthClientAuthMethod(c.oauthClientAuthMethod ?? 'client_secret_post');
+					setOauthTokenParamsJson(
+						c.oauthTokenRequestParams ? JSON.stringify(c.oauthTokenRequestParams, null, 2) : '',
 					);
+					setContractJson(c.apiContractConfig ? JSON.stringify(c.apiContractConfig, null, 2) : '');
 				}
 			} catch (err) {
 				if (!cancelled) {
@@ -111,12 +139,36 @@ export function ApiConnectionFormPage() {
 			setSaving(false);
 			return;
 		}
+		let oauthTokenRequestParams: Record<string, string> | null;
+		try {
+			oauthTokenRequestParams = parseTokenParams();
+		} catch {
+			setError(t('oauthTokenParamsInvalid'));
+			setSaving(false);
+			return;
+		}
+
+		const oauthFields =
+			authType === 'OAUTH2_CLIENT_CREDENTIALS'
+				? {
+						oauthTokenUrl,
+						oauthClientId,
+						oauthScope: oauthScope || null,
+						oauthAudience: oauthAudience || null,
+						oauthClientAuthMethod,
+						oauthTokenRequestParams,
+						...(oauthClientSecret ? { oauthClientSecret } : {}),
+					}
+				: {};
+
 		try {
 			if (isNew) {
 				const created = await createApiConnection({
 					name,
 					baseUrl,
-					bearerToken,
+					authType,
+					...(authType === 'BEARER' ? { bearerToken } : {}),
+					...oauthFields,
 					...(apiContractConfig ? { apiContractConfig } : {}),
 				});
 				showToast(t('toastSaved'));
@@ -125,7 +177,9 @@ export function ApiConnectionFormPage() {
 				await updateApiConnection(id, {
 					name,
 					baseUrl,
-					...(bearerToken ? { bearerToken } : {}),
+					authType,
+					...(authType === 'BEARER' && bearerToken ? { bearerToken } : {}),
+					...oauthFields,
 					...(contractTouched ? { apiContractConfig } : {}),
 				});
 				showToast(t('toastSaved'));
@@ -175,6 +229,37 @@ export function ApiConnectionFormPage() {
 		}
 	}
 
+	async function handleTestToken() {
+		if (!id) {
+			return;
+		}
+		setTestMessage(null);
+		try {
+			const result = await testApiConnectionToken(id);
+			if (result.ok) {
+				setTestMessage(
+					t('tokenOk', {
+						tokenType: result.tokenType ?? 'Bearer',
+						expiresIn: result.expiresIn ?? '?',
+					}),
+				);
+			} else {
+				setTestMessage(t('tokenError', { error: result.error ?? 'failed' }));
+			}
+		} catch (err) {
+			setTestMessage(
+				err instanceof AdminApiError
+					? formatAdminApiError(
+							err.statusCode,
+							err.message,
+							resolveI18nKey,
+							'apiConnections.testFailed',
+						)
+					: t('testFailed'),
+			);
+		}
+	}
+
 	async function handleDelete() {
 		if (!id) {
 			return;
@@ -208,6 +293,8 @@ export function ApiConnectionFormPage() {
 	if (loading) {
 		return <LoadingState />;
 	}
+
+	const isOauth = authType === 'OAUTH2_CLIENT_CREDENTIALS';
 
 	return (
 		<section>
@@ -243,15 +330,91 @@ export function ApiConnectionFormPage() {
 							required
 							requiredMark={isNew}
 						/>
-						<TextInput
-							label={isNew ? t('bearerToken') : t('bearerTokenKeep')}
-							name="bearerToken"
-							type="password"
-							value={bearerToken}
-							onChange={(e) => setBearerToken(e.target.value)}
-							required={isNew}
-							requiredMark={isNew}
-						/>
+						<Select
+							label={t('authType')}
+							name="authType"
+							value={authType}
+							onChange={(e) => setAuthType(e.target.value as AuthType)}
+						>
+							<option value="BEARER">{t('authTypeBearer')}</option>
+							<option value="OAUTH2_CLIENT_CREDENTIALS">{t('authTypeOauth')}</option>
+						</Select>
+
+						{!isOauth ? (
+							<TextInput
+								label={isNew ? t('bearerToken') : t('bearerTokenKeep')}
+								name="bearerToken"
+								type="password"
+								value={bearerToken}
+								onChange={(e) => setBearerToken(e.target.value)}
+								required={isNew}
+								requiredMark={isNew}
+							/>
+						) : (
+							<div className="evg-stack">
+								<Callout variant="info">{t('oauthSection')}</Callout>
+								<TextInput
+									label={t('oauthTokenUrl')}
+									name="oauthTokenUrl"
+									value={oauthTokenUrl}
+									onChange={(e) => setOauthTokenUrl(e.target.value)}
+									required={isNew}
+								/>
+								<TextInput
+									label={t('oauthClientId')}
+									name="oauthClientId"
+									value={oauthClientId}
+									onChange={(e) => setOauthClientId(e.target.value)}
+									required={isNew}
+								/>
+								<TextInput
+									label={isNew ? t('oauthClientSecret') : t('oauthClientSecretKeep')}
+									name="oauthClientSecret"
+									type="password"
+									value={oauthClientSecret}
+									onChange={(e) => setOauthClientSecret(e.target.value)}
+									required={isNew}
+								/>
+								<Select
+									label={t('oauthClientAuthMethod')}
+									name="oauthClientAuthMethod"
+									value={oauthClientAuthMethod}
+									onChange={(e) =>
+										setOauthClientAuthMethod(e.target.value as OAuthClientAuthMethod)
+									}
+								>
+									{OAUTH_CLIENT_AUTH_METHODS.map((m) => (
+										<option key={m.id} value={m.id}>
+											{m.id === 'client_secret_post'
+												? t('oauthAuthMethodPost')
+												: t('oauthAuthMethodBasic')}
+										</option>
+									))}
+								</Select>
+								<TextInput
+									label={t('oauthScope')}
+									name="oauthScope"
+									value={oauthScope}
+									onChange={(e) => setOauthScope(e.target.value)}
+								/>
+								<TextInput
+									label={t('oauthAudience')}
+									name="oauthAudience"
+									value={oauthAudience}
+									onChange={(e) => setOauthAudience(e.target.value)}
+								/>
+								<TextArea
+									label={t('oauthTokenParams')}
+									name="oauthTokenRequestParams"
+									rows={4}
+									value={oauthTokenParamsJson}
+									placeholder='{ "resource": "https://api.example.com" }'
+									hint={t('oauthTokenParamsHint')}
+									onChange={(e) => setOauthTokenParamsJson(e.target.value)}
+								/>
+							</div>
+						)}
+
 						<details className="evg-filters-panel evg-filters-panel--collapsible">
 							<summary>{t('contractAdvanced')}</summary>
 							<div className="evg-stack">
@@ -320,6 +483,16 @@ export function ApiConnectionFormPage() {
 					>
 						{t('testConnectivity')}
 					</Button>
+					{isOauth ? (
+						<Button
+							type="button"
+							variant="secondary"
+							disabled={saving}
+							onClick={() => void handleTestToken()}
+						>
+							{t('testToken')}
+						</Button>
+					) : null}
 					<Button
 						type="button"
 						variant="danger"

@@ -18,12 +18,13 @@ describe('CreateApiConnectionBodyDto validation', () => {
 		expect(errors).toHaveLength(0);
 	});
 
-	it('API-DTO-02: missing bearerToken fails validation', async () => {
+	it('API-DTO-02: bearerToken is optional at the DTO level (auth-type validated in the service)', async () => {
+		// bearerToken became optional in v1.10.0 (required only for BEARER, enforced in the service).
 		const errors = await validateCreate({
 			name: 'Corp',
 			baseUrl: 'https://identity.example.com',
 		});
-		expect(errors.length).toBeGreaterThan(0);
+		expect(errors.length).toBe(0);
 	});
 
 	it('API-DTO-03: trims name and baseUrl via Transform', async () => {

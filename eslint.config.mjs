@@ -11,6 +11,8 @@ export default tseslint.config(
 			'**/dist/**',
 			'**/coverage/**',
 			'**/node_modules/**',
+			'mock-app/**',
+			'sp-app/**',
 			'scripts/restructure-codebase.mjs',
 			'scripts/fix-api-imports.mjs',
 			'scripts/fix-web-test-imports.mjs',

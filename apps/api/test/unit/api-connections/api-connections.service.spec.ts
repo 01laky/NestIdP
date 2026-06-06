@@ -30,12 +30,20 @@ describe('ApiConnectionsService', () => {
 		logUpdated: jest.fn(),
 		logDeleted: jest.fn(),
 		logContractUpdated: jest.fn(),
+		logAuthTypeChanged: jest.fn(),
 	};
+	const oauthTokenService = {
+		getAccessToken: jest.fn(),
+		getLastTokenAt: jest.fn().mockReturnValue(null),
+		fetchDiagnostics: jest.fn(),
+	};
+
 	const service = new ApiConnectionsService(
 		prisma as never,
 		encryption,
 		configService,
 		audit as never,
+		oauthTokenService as never,
 	);
 
 	const sampleRow = {
@@ -356,5 +364,213 @@ describe('ApiConnectionsService', () => {
 		expect(result.connection.apiContractConfig).toEqual({
 			endpoints: { usersPath: '/v1/accounts' },
 		});
+	});
+
+	// --- OAuth 2.0 Client Credentials ---
+	const oauthRow = {
+		...sampleRow,
+		authType: 'OAUTH2_CLIENT_CREDENTIALS' as const,
+		authCredentialsEncrypted: '',
+		oauthTokenUrl: 'https://idp.example.com/oauth/token',
+		oauthClientId: 'client-1',
+		oauthClientSecretEncrypted: 'enc:old-secret',
+		oauthScope: null,
+		oauthAudience: null,
+		oauthClientAuthMethod: 'client_secret_post',
+		oauthTokenRequestParams: null,
+	};
+
+	it('OAUTH-CRUD-01: create OAuth encrypts the secret; secret never returned', async () => {
+		prisma.apiConnection.create.mockImplementation(
+			async ({ data }: { data: Record<string, unknown> }) => ({
+				...oauthRow,
+				...data,
+			}),
+		);
+		const result = await service.create({
+			name: 'OAuth API',
+			baseUrl: 'https://identity.example.com',
+			authType: 'OAUTH2_CLIENT_CREDENTIALS',
+			oauthTokenUrl: 'https://idp.example.com/oauth/token',
+			oauthClientId: 'client-1',
+			oauthClientSecret: 'the-secret',
+		});
+		expect(encryption.encrypt).toHaveBeenCalledWith('the-secret');
+		const data = prisma.apiConnection.create.mock.calls[0][0].data;
+		expect(data.authType).toBe('OAUTH2_CLIENT_CREDENTIALS');
+		expect(data.authCredentialsEncrypted).toBe('');
+		expect(data.oauthClientSecretEncrypted).toBe('enc:the-secret');
+		expect(result.connection.hasOauthClientSecret).toBe(true);
+		expect(JSON.stringify(result.connection)).not.toContain('the-secret');
+	});
+
+	it('OAUTH-CRUD-02: create OAuth without secret → 400', async () => {
+		await expect(
+			service.create({
+				name: 'OAuth API',
+				baseUrl: 'https://identity.example.com',
+				authType: 'OAUTH2_CLIENT_CREDENTIALS',
+				oauthTokenUrl: 'https://idp.example.com/oauth/token',
+				oauthClientId: 'client-1',
+			}),
+		).rejects.toThrow(BadRequestException);
+	});
+
+	it('OAUTH-CRUD-03: create OAuth with bad token URL → 400', async () => {
+		await expect(
+			service.create({
+				name: 'OAuth API',
+				baseUrl: 'https://identity.example.com',
+				authType: 'OAUTH2_CLIENT_CREDENTIALS',
+				oauthTokenUrl: 'not-a-url',
+				oauthClientId: 'client-1',
+				oauthClientSecret: 's',
+			}),
+		).rejects.toThrow(BadRequestException);
+	});
+
+	it('OAUTH-CRUD-04: update without secret keeps the existing one', async () => {
+		prisma.apiConnection.findUnique.mockResolvedValue(oauthRow);
+		prisma.apiConnection.update.mockResolvedValue(oauthRow);
+		await service.update(oauthRow.id, {
+			oauthTokenUrl: 'https://idp.example.com/oauth/token',
+			oauthClientId: 'client-2',
+		});
+		const data = prisma.apiConnection.update.mock.calls[0][0].data;
+		expect(data).not.toHaveProperty('oauthClientSecretEncrypted');
+		expect(data.oauthClientId).toBe('client-2');
+	});
+
+	it('OAUTH-CRUD-05: update with a new secret re-encrypts it', async () => {
+		prisma.apiConnection.findUnique.mockResolvedValue(oauthRow);
+		prisma.apiConnection.update.mockResolvedValue(oauthRow);
+		await service.update(oauthRow.id, {
+			oauthTokenUrl: 'https://idp.example.com/oauth/token',
+			oauthClientId: 'client-1',
+			oauthClientSecret: 'rotated',
+		});
+		const data = prisma.apiConnection.update.mock.calls[0][0].data;
+		expect(data.oauthClientSecretEncrypted).toBe('enc:rotated');
+	});
+
+	it('OAUTH-CRUD-06: switching BEARER → OAUTH requires the OAuth fields', async () => {
+		prisma.apiConnection.findUnique.mockResolvedValue(sampleRow);
+		await expect(
+			service.update(sampleRow.id, { authType: 'OAUTH2_CLIENT_CREDENTIALS' }),
+		).rejects.toThrow(BadRequestException);
+	});
+
+	it('OAUTH-CRUD-07: switching BEARER → OAUTH audits the auth-type change', async () => {
+		prisma.apiConnection.findUnique.mockResolvedValue(sampleRow);
+		prisma.apiConnection.update.mockResolvedValue(oauthRow);
+		await service.update(sampleRow.id, {
+			authType: 'OAUTH2_CLIENT_CREDENTIALS',
+			oauthTokenUrl: 'https://idp.example.com/oauth/token',
+			oauthClientId: 'client-1',
+			oauthClientSecret: 'secret',
+		});
+		expect(audit.logAuthTypeChanged).toHaveBeenCalledWith(
+			oauthRow.id,
+			oauthRow.name,
+			'OAUTH2_CLIENT_CREDENTIALS',
+		);
+		const data = prisma.apiConnection.update.mock.calls[0][0].data;
+		expect(data.authCredentialsEncrypted).toBe('');
+	});
+
+	it('OAUTH-CRUD-08: switching OAUTH → BEARER requires bearerToken and clears OAuth fields', async () => {
+		prisma.apiConnection.findUnique.mockResolvedValue(oauthRow);
+		await expect(service.update(oauthRow.id, { authType: 'BEARER' })).rejects.toThrow(
+			BadRequestException,
+		);
+
+		prisma.apiConnection.update.mockResolvedValue(sampleRow);
+		await service.update(oauthRow.id, { authType: 'BEARER', bearerToken: 'new-token' });
+		const data = prisma.apiConnection.update.mock.calls[0][0].data;
+		expect(data.authCredentialsEncrypted).toBe('enc:new-token');
+		expect(data.oauthTokenUrl).toBeNull();
+		expect(data.oauthClientSecretEncrypted).toBeNull();
+	});
+
+	it('OAUTH-CRUD-09: getById round-trips non-secret OAuth fields + hasOauthClientSecret', async () => {
+		prisma.apiConnection.findUnique.mockResolvedValue(oauthRow);
+		const result = await service.getById(oauthRow.id);
+		expect(result.connection.oauthTokenUrl).toBe('https://idp.example.com/oauth/token');
+		expect(result.connection.oauthClientId).toBe('client-1');
+		expect(result.connection.hasOauthClientSecret).toBe(true);
+		expect(result.connection).not.toHaveProperty('oauthClientSecretEncrypted');
+	});
+
+	it('OAUTH-CRUD-10: BEARER create ignores stray OAuth fields (not persisted)', async () => {
+		prisma.apiConnection.create.mockImplementation(
+			async ({ data }: { data: Record<string, unknown> }) => ({
+				...sampleRow,
+				...data,
+			}),
+		);
+		await service.create({
+			name: 'Bearer API',
+			baseUrl: 'https://identity.example.com',
+			authType: 'BEARER',
+			bearerToken: 'tok',
+			oauthTokenUrl: 'https://idp.example.com/oauth/token',
+			oauthClientId: 'should-ignore',
+			oauthClientSecret: 'should-ignore',
+		});
+		const data = prisma.apiConnection.create.mock.calls[0][0].data;
+		expect(data.authType).toBe('BEARER');
+		expect(data.authCredentialsEncrypted).toBe('enc:tok');
+		expect(data.oauthTokenUrl).toBeUndefined();
+		expect(data.oauthClientSecretEncrypted).toBeUndefined();
+	});
+
+	it('OAUTH-CRUD-11: invalid client auth method → 400', async () => {
+		await expect(
+			service.create({
+				name: 'OAuth API',
+				baseUrl: 'https://identity.example.com',
+				authType: 'OAUTH2_CLIENT_CREDENTIALS',
+				oauthTokenUrl: 'https://idp.example.com/oauth/token',
+				oauthClientId: 'client-1',
+				oauthClientSecret: 's',
+				oauthClientAuthMethod: 'private_key_jwt' as never,
+			}),
+		).rejects.toThrow(BadRequestException);
+	});
+
+	it('OAUTH-CRUD-12: reserved extra token param → 400', async () => {
+		await expect(
+			service.create({
+				name: 'OAuth API',
+				baseUrl: 'https://identity.example.com',
+				authType: 'OAUTH2_CLIENT_CREDENTIALS',
+				oauthTokenUrl: 'https://idp.example.com/oauth/token',
+				oauthClientId: 'client-1',
+				oauthClientSecret: 's',
+				oauthTokenRequestParams: { grant_type: 'evil' },
+			}),
+		).rejects.toThrow(BadRequestException);
+	});
+
+	it('OAUTH-CRUD-13: OAUTH → OAUTH scope change keeps secret + does NOT audit auth-type change', async () => {
+		prisma.apiConnection.findUnique.mockResolvedValue(oauthRow);
+		prisma.apiConnection.update.mockResolvedValue(oauthRow);
+		await service.update(oauthRow.id, {
+			oauthTokenUrl: 'https://idp.example.com/oauth/token',
+			oauthClientId: 'client-1',
+			oauthScope: 'read write',
+		});
+		const data = prisma.apiConnection.update.mock.calls[0][0].data;
+		expect(data.oauthScope).toBe('read write');
+		expect(data).not.toHaveProperty('oauthClientSecretEncrypted');
+		expect(audit.logAuthTypeChanged).not.toHaveBeenCalled();
+	});
+
+	it('OAUTH-CRUD-14: list enriches OAuth rows with oauthLastTokenAt from the token service', async () => {
+		oauthTokenService.getLastTokenAt.mockReturnValue('2026-06-09T10:00:00.000Z');
+		prisma.apiConnection.findMany.mockResolvedValue([oauthRow]);
+		const result = await service.list();
+		expect(result.connections[0].oauthLastTokenAt).toBe('2026-06-09T10:00:00.000Z');
+		expect(oauthTokenService.getLastTokenAt).toHaveBeenCalledWith(oauthRow.id);
 	});
 });

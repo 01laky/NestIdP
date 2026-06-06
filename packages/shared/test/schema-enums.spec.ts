@@ -46,7 +46,7 @@ describe('schema-enums', () => {
 		expect(isSyncLogStatus('running')).toBe(false);
 	});
 
-	it('SH-ENUM-07: AUTH_TYPES has exactly one v1 value', () => {
-		expect(AUTH_TYPES).toEqual(['BEARER']);
+	it('SH-ENUM-07: AUTH_TYPES has BEARER and OAuth 2.0 Client Credentials', () => {
+		expect(AUTH_TYPES).toEqual(['BEARER', 'OAUTH2_CLIENT_CREDENTIALS']);
 	});
 });

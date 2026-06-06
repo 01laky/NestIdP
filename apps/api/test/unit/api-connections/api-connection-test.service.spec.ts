@@ -15,7 +15,17 @@ describe('ApiConnectionTestService', () => {
 	};
 
 	const audit = { logTested: jest.fn() };
-	const service = new ApiConnectionTestService(prisma as never, encryption, audit as never);
+	const oauthTokenService = {
+		getAccessToken: jest.fn(),
+		getLastTokenAt: jest.fn().mockReturnValue(null),
+		fetchDiagnostics: jest.fn(),
+	};
+	const service = new ApiConnectionTestService(
+		prisma as never,
+		encryption,
+		audit as never,
+		oauthTokenService as never,
+	);
 
 	const connection = {
 		id: 'c1234567890123456789012345',
@@ -257,5 +267,112 @@ describe('ApiConnectionTestService', () => {
 			new URL('/v1/accounts', 'https://identity.example.com').toString(),
 			expect.any(Object),
 		);
+	});
+
+	const oauthConnection = { ...connection, authType: 'OAUTH2_CLIENT_CREDENTIALS' as const };
+
+	it('OAUTH-TST-01: token endpoint failure → ok:false, /users never called', async () => {
+		prisma.apiConnection.findUnique.mockResolvedValue(oauthConnection);
+		oauthTokenService.fetchDiagnostics.mockResolvedValue({
+			diag: {
+				ok: false,
+				reachable: true,
+				statusCode: 401,
+				error: 'token endpoint: HTTP 401 (invalid_client)',
+			},
+		});
+		const fetchMock = jest.spyOn(global, 'fetch');
+
+		const result = await service.testConnection(oauthConnection.id);
+
+		expect(result.ok).toBe(false);
+		expect(result.message).toMatch(/token endpoint/);
+		expect(result.tokenEndpoint).toMatchObject({ ok: false, statusCode: 401 });
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	it('OAUTH-TST-02: token ok → uses token for users probe + reports tokenEndpoint', async () => {
+		prisma.apiConnection.findUnique.mockResolvedValue(oauthConnection);
+		oauthTokenService.fetchDiagnostics.mockResolvedValue({
+			token: 'access-1',
+			diag: { ok: true, reachable: true, statusCode: 200, tokenType: 'Bearer', expiresIn: 3600 },
+		});
+		const fetchMock = jest
+			.spyOn(global, 'fetch')
+			.mockResolvedValue({ status: 200, json: async () => [] } as Response);
+
+		const result = await service.testConnection(oauthConnection.id);
+
+		expect(result.ok).toBe(true);
+		expect(result.tokenEndpoint).toMatchObject({ ok: true, tokenType: 'Bearer' });
+		const [, init] = fetchMock.mock.calls[0];
+		expect((init as { headers: Record<string, string> }).headers.Authorization).toBe(
+			'Bearer access-1',
+		);
+	});
+
+	it('OAUTH-TST-03: testToken on a BEARER connection → not configured', async () => {
+		prisma.apiConnection.findUnique.mockResolvedValue(connection);
+		const result = await service.testToken(connection.id);
+		expect(result.ok).toBe(false);
+		expect(result.error).toMatch(/not configured/i);
+	});
+
+	it('OAUTH-TST-04: testToken returns masked diagnostics, never the token', async () => {
+		prisma.apiConnection.findUnique.mockResolvedValue(oauthConnection);
+		oauthTokenService.fetchDiagnostics.mockResolvedValue({
+			token: 'should-not-leak',
+			diag: {
+				ok: true,
+				reachable: true,
+				statusCode: 200,
+				tokenType: 'Bearer',
+				expiresIn: 1800,
+				grantedScope: 'read',
+			},
+		});
+		const result = await service.testToken(oauthConnection.id);
+		expect(result).toMatchObject({
+			ok: true,
+			tokenType: 'Bearer',
+			expiresIn: 1800,
+			grantedScope: 'read',
+		});
+		expect(JSON.stringify(result)).not.toContain('should-not-leak');
+	});
+
+	it('OAUTH-TST-05: token ok but users endpoint 500 → ok false, tokenEndpoint still reported', async () => {
+		prisma.apiConnection.findUnique.mockResolvedValue(oauthConnection);
+		oauthTokenService.fetchDiagnostics.mockResolvedValue({
+			token: 'access-1',
+			diag: { ok: true, reachable: true, statusCode: 200, tokenType: 'Bearer', expiresIn: 3600 },
+		});
+		jest.spyOn(global, 'fetch').mockResolvedValue({ status: 500 } as Response);
+
+		const result = await service.testConnection(oauthConnection.id);
+
+		expect(result.ok).toBe(false);
+		expect(result.statusCode).toBe(500);
+		expect(result.tokenEndpoint).toMatchObject({ ok: true });
+	});
+
+	it('OAUTH-TST-06: token endpoint TLS/network failure → reachable false, distinct message', async () => {
+		prisma.apiConnection.findUnique.mockResolvedValue(oauthConnection);
+		oauthTokenService.fetchDiagnostics.mockResolvedValue({
+			diag: {
+				ok: false,
+				reachable: false,
+				tlsError: true,
+				error: 'token endpoint TLS error: CERT_HAS_EXPIRED',
+			},
+		});
+		const fetchMock = jest.spyOn(global, 'fetch');
+
+		const result = await service.testConnection(oauthConnection.id);
+
+		expect(result).toMatchObject({ ok: false, reachable: false });
+		expect(result.message).toMatch(/TLS error/);
+		expect(result.tokenEndpoint?.tlsError).toBe(true);
+		expect(fetchMock).not.toHaveBeenCalled();
 	});
 });

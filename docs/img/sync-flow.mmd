@@ -2,7 +2,7 @@ flowchart TD
 	START(["Operator triggers sync"])
 	CONFIG["ApiConnection\nbaseUrl + token + apiContractConfig"]
 	RESOLVE["Resolve contract\n(v1 defaults when null)"]
-	AUTH["Bearer auth + extra headers"]
+	AUTH["Resolve credential + extra headers\nBearer token OR OAuth2 access token (cached)"]
 	USERS["GET usersPath (+ pagination/envelope)\n→ map fields → upsert users"]
 	MEMBER{"membershipSource?"}
 	EMBEDDED["Read groups/roles\nfrom the user payload"]

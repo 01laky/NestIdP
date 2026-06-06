@@ -46,6 +46,19 @@ export class ApiConnectionsAuditService {
 		});
 	}
 
+	logAuthTypeChanged(id: string, name: string, authType: string): void {
+		const payload = { event: 'api_connection_auth_type_changed', id, name, authType };
+		this.logger.log(JSON.stringify(payload));
+		this.audit.recordSafe({
+			category: 'admin_config',
+			event: 'api_connection_auth_type_changed',
+			actorType: 'admin',
+			subjectType: 'ApiConnection',
+			subjectId: id,
+			metadata: { name, authType },
+		});
+	}
+
 	logDeleted(id: string, name: string): void {
 		const payload = { event: 'api_connection_deleted', id, name };
 		this.logger.log(JSON.stringify(payload));

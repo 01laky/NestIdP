@@ -14,6 +14,7 @@ import type {
 	ApiConnectionListResponseDto,
 	ApiConnectionResponseDto,
 	ApiConnectionTestResponseDto,
+	ApiConnectionTestTokenResponseDto,
 	ApiErrorResponseDto,
 	CreateApiConnectionRequestDto,
 	CreateSpConnectionRequestDto,
@@ -210,6 +211,15 @@ export function testApiConnection(id: string): Promise<ApiConnectionTestResponse
 	return adminFetch<ApiConnectionTestResponseDto>(`${API_CONNECTIONS_API_PATH}/${id}/test`, {
 		method: 'POST',
 	});
+}
+
+export function testApiConnectionToken(id: string): Promise<ApiConnectionTestTokenResponseDto> {
+	return adminFetch<ApiConnectionTestTokenResponseDto>(
+		`${API_CONNECTIONS_API_PATH}/${id}/test-token`,
+		{
+			method: 'POST',
+		},
+	);
 }
 
 export function triggerIdentitySync(

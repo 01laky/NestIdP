@@ -25,6 +25,7 @@ export interface SyncLogDto {
 export interface SyncLogErrorEntryDto {
 	phase:
 		| 'decrypt_credentials'
+		| 'oauth'
 		| 'fetch_users'
 		| 'parse_users'
 		| 'upsert_user'

@@ -77,6 +77,12 @@ describe('SyncService', () => {
 		recordSafe: jest.fn(),
 	};
 
+	const oauthTokenService = {
+		getAccessToken: jest.fn(),
+		getLastTokenAt: jest.fn().mockReturnValue(null),
+		fetchDiagnostics: jest.fn(),
+	};
+
 	const service = new SyncService(
 		prisma as never,
 		identityRepository as unknown as IdentityRepository,
@@ -84,6 +90,7 @@ describe('SyncService', () => {
 		identitySyncClient as unknown as IdentitySyncClientService,
 		encryption,
 		audit as never,
+		oauthTokenService as never,
 	);
 
 	const baseConnection = {
@@ -861,5 +868,139 @@ describe('SyncService', () => {
 		expect(result.syncLog.usersSynced).toBe(3);
 		expect(identitySyncClient.fetchGroupsRawForUser).toHaveBeenCalledTimes(3);
 		expect(identitySyncClient.getMembershipFetchConcurrency).toHaveBeenCalled();
+	});
+
+	const oauthConnection = {
+		...{
+			id: CONNECTION_ID,
+			name: 'OAuth API',
+			baseUrl: 'https://identity.example.com',
+			authType: 'OAUTH2_CLIENT_CREDENTIALS' as const,
+			authCredentialsEncrypted: '',
+			oauthTokenUrl: 'https://idp.example.com/oauth/token',
+			oauthClientId: 'client-1',
+			oauthClientSecretEncrypted: 'enc:secret',
+			lastSyncAt: null,
+			lastSyncStatus: 'NEVER' as const,
+			createdAt: new Date('2026-01-01T00:00:00.000Z'),
+			updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+		},
+	};
+
+	it('OAUTH-SYNC-01: OAuth connection resolves a token then syncs', async () => {
+		setupHappyPathMocks();
+		prisma.apiConnection.findUnique.mockResolvedValue(oauthConnection);
+		oauthTokenService.getAccessToken.mockResolvedValue('access-token-1');
+
+		const result = await service.triggerSync(CONNECTION_ID);
+
+		expect(result.syncLog.status).toBe('SUCCESS');
+		expect(oauthTokenService.getAccessToken).toHaveBeenCalled();
+		expect(identitySyncClient.fetchUsersRaw).toHaveBeenCalledWith(
+			oauthConnection.baseUrl,
+			'access-token-1',
+			expect.anything(),
+		);
+	});
+
+	it('OAUTH-SYNC-02: 401 on users → refresh once and retry → success', async () => {
+		setupHappyPathMocks();
+		prisma.apiConnection.findUnique.mockResolvedValue(oauthConnection);
+		oauthTokenService.getAccessToken
+			.mockResolvedValueOnce('stale-token')
+			.mockResolvedValueOnce('fresh-token');
+		identitySyncClient.fetchUsersRaw
+			.mockRejectedValueOnce(
+				new IdentitySyncHttpError('HTTP 401', { statusCode: 401, reachable: true }),
+			)
+			.mockResolvedValueOnce([validExternalUser()]);
+
+		const result = await service.triggerSync(CONNECTION_ID);
+
+		expect(result.syncLog.status).toBe('SUCCESS');
+		expect(oauthTokenService.getAccessToken).toHaveBeenCalledWith(oauthConnection, {
+			forceRefresh: true,
+		});
+		expect(identitySyncClient.fetchUsersRaw).toHaveBeenCalledTimes(2);
+	});
+
+	it('OAUTH-SYNC-03: second 401 after refresh → FAILED', async () => {
+		setupHappyPathMocks();
+		prisma.apiConnection.findUnique.mockResolvedValue(oauthConnection);
+		oauthTokenService.getAccessToken.mockResolvedValue('token');
+		identitySyncClient.fetchUsersRaw.mockRejectedValue(
+			new IdentitySyncHttpError('HTTP 401', { statusCode: 401, reachable: true }),
+		);
+
+		const result = await service.triggerSync(CONNECTION_ID);
+
+		expect(result.syncLog.status).toBe('FAILED');
+		expect(identitySyncClient.fetchUsersRaw).toHaveBeenCalledTimes(2);
+	});
+
+	it('OAUTH-SYNC-04: token acquisition failure → FAILED with oauth error, no fetch', async () => {
+		setupHappyPathMocks();
+		prisma.apiConnection.findUnique.mockResolvedValue(oauthConnection);
+		const { OAuthTokenError } = await import('@api/sync/services/oauth-token.service');
+		oauthTokenService.getAccessToken.mockRejectedValue(
+			new OAuthTokenError('token endpoint: HTTP 401 (invalid_client)', { statusCode: 401 }),
+		);
+
+		const result = await service.triggerSync(CONNECTION_ID);
+
+		expect(result.syncLog.status).toBe('FAILED');
+		expect(identitySyncClient.fetchUsersRaw).not.toHaveBeenCalled();
+		expect(syncLogService.finishLog).toHaveBeenCalledWith(
+			runningLog.id,
+			'FAILED',
+			expect.any(Object),
+			expect.arrayContaining([expect.objectContaining({ phase: 'oauth' })]),
+		);
+	});
+
+	it('OAUTH-SYNC-05: BEARER 401 does NOT trigger an OAuth refresh/retry', async () => {
+		setupHappyPathMocks();
+		identitySyncClient.fetchUsersRaw.mockRejectedValue(
+			new IdentitySyncHttpError('HTTP 401', { statusCode: 401, reachable: true }),
+		);
+
+		const result = await service.triggerSync(CONNECTION_ID);
+
+		expect(result.syncLog.status).toBe('FAILED');
+		expect(oauthTokenService.getAccessToken).not.toHaveBeenCalled();
+		expect(identitySyncClient.fetchUsersRaw).toHaveBeenCalledTimes(1);
+	});
+
+	it('OAUTH-SYNC-06: OAuth dry run resolves a token and reports counts without writes', async () => {
+		setupHappyPathMocks();
+		prisma.apiConnection.findUnique.mockResolvedValue(oauthConnection);
+		oauthTokenService.getAccessToken.mockResolvedValue('AT');
+
+		const result = await service.triggerSync(CONNECTION_ID, { dryRun: true });
+
+		expect(result.syncLog.status).toBe('SUCCESS');
+		expect(oauthTokenService.getAccessToken).toHaveBeenCalled();
+		expect(identityRepository.upsertUser).not.toHaveBeenCalled();
+	});
+
+	it('OAUTH-SYNC-07: a 401 on a membership fetch (after users) is recorded, not OAuth-retried', async () => {
+		setupHappyPathMocks();
+		prisma.apiConnection.findUnique.mockResolvedValue(oauthConnection);
+		oauthTokenService.getAccessToken.mockResolvedValue('AT');
+		identitySyncClient.fetchGroupsRawForUser.mockRejectedValue(
+			new IdentitySyncHttpError('HTTP 401', { statusCode: 401, reachable: true }),
+		);
+
+		const result = await service.triggerSync(CONNECTION_ID);
+
+		// Users succeed; the membership 401 follows the normal row-error path (run still completes).
+		expect(result.syncLog.status).toBe('SUCCESS');
+		expect(oauthTokenService.getAccessToken).toHaveBeenCalledTimes(1);
+		expect(syncLogService.finishLog).toHaveBeenCalledWith(
+			runningLog.id,
+			'SUCCESS',
+			expect.any(Object),
+			expect.arrayContaining([expect.objectContaining({ phase: 'fetch_groups' })]),
+		);
 	});
 });

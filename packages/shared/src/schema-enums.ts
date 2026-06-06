@@ -1,4 +1,4 @@
-export const AUTH_TYPES = ['BEARER'] as const;
+export const AUTH_TYPES = ['BEARER', 'OAUTH2_CLIENT_CREDENTIALS'] as const;
 export type AuthType = (typeof AUTH_TYPES)[number];
 
 export const LAST_SYNC_STATUSES = ['NEVER', 'IN_PROGRESS', 'SUCCESS', 'FAILED'] as const;

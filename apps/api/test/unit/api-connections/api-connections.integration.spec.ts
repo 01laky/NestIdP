@@ -442,7 +442,7 @@ describe('api-connections integration (SQLite)', () => {
 				name: 'Corp',
 				baseUrl: 'https://identity.example.com',
 				bearerToken: 'secret',
-				authType: 'BEARER',
+				bogusUnknownField: 'x',
 			})
 			.expect(400);
 	});

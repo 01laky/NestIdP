@@ -35,3 +35,6 @@ apps/api/prisma/.test-migration-sync.lock
 apps/api/data/
 *.tsbuildinfo
 .claude/
+
+# Local SAML SP test harness — local only, not committed
+sp-app/
