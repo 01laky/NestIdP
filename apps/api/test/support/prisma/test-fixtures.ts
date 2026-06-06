@@ -27,8 +27,12 @@ export const TEST_ENCRYPTION_KEY = 'test-encryption-key-32chars!!';
 export const TEST_PASSWORD_HASH = '$2b$12$test.hash.for.integration.tests.only';
 
 type ApiConnectionOverrides = Partial<
-	Omit<ApiConnection, 'id' | 'createdAt' | 'updatedAt' | 'apiContractConfig'> & {
+	Omit<
+		ApiConnection,
+		'id' | 'createdAt' | 'updatedAt' | 'apiContractConfig' | 'oauthTokenRequestParams'
+	> & {
 		apiContractConfig?: Prisma.InputJsonValue;
+		oauthTokenRequestParams?: Prisma.InputJsonValue;
 	}
 > & {
 	bearerToken?: string;
