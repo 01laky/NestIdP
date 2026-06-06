@@ -50,6 +50,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
   type now exposes `apiContractConfig` as `Prisma.InputJsonValue` (Prisma create inputs reject the
   nullable `JsonValue`), and the `sync.mapper` fixture includes the now-required `apiContractConfig`
   field. No runtime behaviour change.
+- PostgreSQL integration spec `sync.postgres.integration.spec.ts` updated to the renamed sync-client
+  methods (`fetchGroupsRawForUser` / `fetchRolesRawForUser`) introduced in v1.9.0. The file only runs
+  in the Postgres CI job, so the stale method names were not caught by the local SQLite test pass.
 
 ## [1.8.0]
 

@@ -89,8 +89,8 @@ jest.setTimeout(60_000);
 				active: true,
 			},
 		]);
-		jest.spyOn(identitySyncClient, 'fetchGroupsForUser').mockResolvedValue([]);
-		jest.spyOn(identitySyncClient, 'fetchRolesForUser').mockResolvedValue([]);
+		jest.spyOn(identitySyncClient, 'fetchGroupsRawForUser').mockResolvedValue([]);
+		jest.spyOn(identitySyncClient, 'fetchRolesRawForUser').mockResolvedValue([]);
 
 		const result = await syncService.triggerSync(connection.id);
 		expect(result.syncLog.status).toBe('SUCCESS');
