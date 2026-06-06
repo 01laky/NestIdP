@@ -29,6 +29,7 @@ describe('ApiConnectionsService', () => {
 		logCreated: jest.fn(),
 		logUpdated: jest.fn(),
 		logDeleted: jest.fn(),
+		logContractUpdated: jest.fn(),
 	};
 	const service = new ApiConnectionsService(
 		prisma as never,
@@ -290,5 +291,70 @@ describe('ApiConnectionsService', () => {
 			bearerToken: 't',
 		});
 		expect(prisma.apiConnection.create.mock.calls[0][0].data.name).toBe('Corp API');
+	});
+
+	it('API-APICONN-CONTRACT-01: create stores a valid apiContractConfig', async () => {
+		prisma.apiConnection.create.mockResolvedValue(sampleRow);
+		await service.create({
+			name: 'Corp API',
+			baseUrl: 'https://identity.example.com',
+			bearerToken: 't',
+			apiContractConfig: { endpoints: { usersPath: '/v1/accounts' } },
+		});
+		expect(prisma.apiConnection.create.mock.calls[0][0].data.apiContractConfig).toMatchObject({
+			endpoints: { usersPath: '/v1/accounts' },
+		});
+	});
+
+	it('API-APICONN-CONTRACT-02: invalid contract on create → 400', async () => {
+		await expect(
+			service.create({
+				name: 'Corp API',
+				baseUrl: 'https://identity.example.com',
+				bearerToken: 't',
+				apiContractConfig: { endpoints: { usersPath: 'https://evil/users' } },
+			}),
+		).rejects.toThrow(BadRequestException);
+	});
+
+	it('API-APICONN-CONTRACT-03: update with apiContractConfig: null clears to default (JsonNull) + audits', async () => {
+		prisma.apiConnection.findUnique.mockResolvedValue(sampleRow);
+		prisma.apiConnection.update.mockResolvedValue(sampleRow);
+		await service.update(sampleRow.id, { apiContractConfig: null });
+		expect(prisma.apiConnection.update.mock.calls[0][0].data.apiContractConfig).toBe(
+			Prisma.JsonNull,
+		);
+		expect(audit.logContractUpdated).toHaveBeenCalledWith(sampleRow.id, sampleRow.name, ['reset']);
+	});
+
+	it('API-APICONN-CONTRACT-04: update with invalid contract → 400', async () => {
+		prisma.apiConnection.findUnique.mockResolvedValue(sampleRow);
+		await expect(
+			service.update(sampleRow.id, { apiContractConfig: { onRowError: 'nope' } as never }),
+		).rejects.toThrow(BadRequestException);
+	});
+
+	it('API-APICONN-CONTRACT-05: create with explicit null contract stores JsonNull', async () => {
+		prisma.apiConnection.create.mockResolvedValue(sampleRow);
+		await service.create({
+			name: 'Corp API',
+			baseUrl: 'https://identity.example.com',
+			bearerToken: 't',
+			apiContractConfig: null,
+		});
+		expect(prisma.apiConnection.create.mock.calls[0][0].data.apiContractConfig).toBe(
+			Prisma.JsonNull,
+		);
+	});
+
+	it('API-APICONN-CONTRACT-06: getById round-trips the stored contract via the DTO', async () => {
+		prisma.apiConnection.findUnique.mockResolvedValue({
+			...sampleRow,
+			apiContractConfig: { endpoints: { usersPath: '/v1/accounts' } },
+		});
+		const result = await service.getById(sampleRow.id);
+		expect(result.connection.apiContractConfig).toEqual({
+			endpoints: { usersPath: '/v1/accounts' },
+		});
 	});
 });

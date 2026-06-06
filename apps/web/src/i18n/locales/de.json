@@ -207,7 +207,17 @@
 		"loadListFailed": "Failed to load connections",
 		"saveFailed": "Speichern fehlgeschlagen",
 		"deleteFailed": "Löschen fehlgeschlagen",
-		"testFailed": "Test fehlgeschlagen"
+		"testFailed": "Test fehlgeschlagen",
+		"contractAdvanced": "API-Kontrakt (erweitert)",
+		"contractLimitation": "Die Anpassung des Kontrakts betrifft nur die Synchronisierung. Das interne Modell und die Passwort-Hash-Validierung bleiben unverändert.",
+		"contractPreset": "Aus Vorlage starten",
+		"contractPresetChoose": "Vorlage wählen…",
+		"contractJsonLabel": "Kontrakt-JSON",
+		"contractJsonHint": "Leer lassen für den Standard-v1-Kontrakt. Pfade müssen origin-relativ sein (mit \"/\" beginnen).",
+		"contractJsonInvalid": "Kontrakt-JSON ist kein gültiges JSON",
+		"contractReset": "Auf Standardkontrakt zurücksetzen",
+		"contractPreviewCount": "{{count}} Benutzer geparst",
+		"contractPreviewError": "Kontraktproblem: {{error}}"
 	},
 	"spConnections": {
 		"listTitle": "SP-Verbindungen",
@@ -685,7 +695,8 @@
 			"saml_logout_request_rejected": "SAML-LogoutRequest abgelehnt",
 			"saml_logout_completed": "SAML-Abmeldung abgeschlossen",
 			"saml_session_terminated": "SSO-Sitzung beendet",
-			"saml_sso_session_started": "SSO-Sitzung gestartet"
+			"saml_sso_session_started": "SSO-Sitzung gestartet",
+			"api_connection_contract_updated": "API-Kontrakt aktualisiert"
 		}
 	},
 	"samlSessions": {

@@ -51,6 +51,7 @@ model ApiConnection {
 	authType                 AuthType       @default(BEARER)
 	authCredentialsEncrypted String
 	isLocalDirectory         Boolean        @default(false)
+	apiContractConfig        Json?
 	lastSyncAt               DateTime?
 	lastSyncStatus           LastSyncStatus @default(NEVER)
 	createdAt                DateTime       @default(now())

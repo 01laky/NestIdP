@@ -207,7 +207,17 @@
 		"loadListFailed": "Failed to load connections",
 		"saveFailed": "Opslaan mislukt",
 		"deleteFailed": "Verwijderen mislukt",
-		"testFailed": "Test mislukt"
+		"testFailed": "Test mislukt",
+		"contractAdvanced": "API-contract (geavanceerd)",
+		"contractLimitation": "Het aanpassen van het contract beïnvloedt alleen de synchronisatie. Het interne model en de validatieregels voor wachtwoord-hashes blijven ongewijzigd.",
+		"contractPreset": "Starten vanaf voorinstelling",
+		"contractPresetChoose": "Kies een voorinstelling…",
+		"contractJsonLabel": "Contract-JSON",
+		"contractJsonHint": "Leeg laten voor het standaard v1-contract. Paden moeten origin-relatief zijn (beginnen met \"/\").",
+		"contractJsonInvalid": "Contract-JSON is geen geldige JSON",
+		"contractReset": "Terugzetten naar standaardcontract",
+		"contractPreviewCount": "{{count}} gebruikers verwerkt",
+		"contractPreviewError": "Contractprobleem: {{error}}"
 	},
 	"spConnections": {
 		"listTitle": "SP-verbindingen",
@@ -685,7 +695,8 @@
 			"saml_logout_request_rejected": "SAML-LogoutRequest geweigerd",
 			"saml_logout_completed": "SAML-uitloggen voltooid",
 			"saml_session_terminated": "SSO-sessie beëindigd",
-			"saml_sso_session_started": "SSO-sessie gestart"
+			"saml_sso_session_started": "SSO-sessie gestart",
+			"api_connection_contract_updated": "API-contract bijgewerkt"
 		}
 	},
 	"samlSessions": {

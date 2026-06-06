@@ -207,7 +207,17 @@
 		"loadListFailed": "Nepodarilo se načíst pripojenia",
 		"saveFailed": "Uložení sa nepodarilo",
 		"deleteFailed": "Odstránenýí sa nepodarilo",
-		"testFailed": "Test se nezdařil"
+		"testFailed": "Test se nezdařil",
+		"contractAdvanced": "Kontrakt API (pokročilé)",
+		"contractLimitation": "Úprava kontraktu ovplyvní iba synchronizáciu. Interný model a pravidlá validácie hashu hesla zostávajú nezmenené.",
+		"contractPreset": "Začať z predvoľby",
+		"contractPresetChoose": "Vyberte predvoľbu…",
+		"contractJsonLabel": "JSON kontraktu",
+		"contractJsonHint": "Ponechajte prázdne pre predvolený kontrakt v1. Cesty musia byť relatívne k origin (začínať \"/\").",
+		"contractJsonInvalid": "JSON kontraktu nie je platný",
+		"contractReset": "Obnoviť predvolený kontrakt",
+		"contractPreviewCount": "Spracovaných {{count}} používateľov",
+		"contractPreviewError": "Problém kontraktu: {{error}}"
 	},
 	"spConnections": {
 		"listTitle": "SP pripojenia",
@@ -685,7 +695,8 @@
 			"saml_logout_request_rejected": "Zamietnutý SAML LogoutRequest",
 			"saml_logout_completed": "Odhlásenie SAML dokončené",
 			"saml_session_terminated": "SSO relácia ukončená",
-			"saml_sso_session_started": "SSO relácia začatá"
+			"saml_sso_session_started": "SSO relácia začatá",
+			"api_connection_contract_updated": "Kontrakt API aktualizovaný"
 		}
 	},
 	"samlSessions": {

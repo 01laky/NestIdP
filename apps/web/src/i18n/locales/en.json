@@ -207,7 +207,17 @@
 		"loadListFailed": "Failed to load connections",
 		"saveFailed": "Save failed",
 		"deleteFailed": "Delete failed",
-		"testFailed": "Test failed"
+		"testFailed": "Test failed",
+		"contractAdvanced": "API contract (advanced)",
+		"contractLimitation": "Customizing the contract only affects sync. The internal model and password-hash validation rules are unchanged.",
+		"contractPreset": "Start from preset",
+		"contractPresetChoose": "Choose a preset…",
+		"contractJsonLabel": "Contract JSON",
+		"contractJsonHint": "Leave empty for the default v1 contract. Paths must be origin-relative (start with \"/\").",
+		"contractJsonInvalid": "Contract JSON is not valid JSON",
+		"contractReset": "Reset to default contract",
+		"contractPreviewCount": "{{count}} users parsed",
+		"contractPreviewError": "Contract issue: {{error}}"
 	},
 	"spConnections": {
 		"listTitle": "SP connections",
@@ -685,7 +695,8 @@
 			"saml_logout_request_rejected": "SAML LogoutRequest rejected",
 			"saml_logout_completed": "SAML logout completed",
 			"saml_session_terminated": "SSO session terminated",
-			"saml_sso_session_started": "SSO session started"
+			"saml_sso_session_started": "SSO session started",
+			"api_connection_contract_updated": "API contract updated"
 		}
 	},
 	"samlSessions": {

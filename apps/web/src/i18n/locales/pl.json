@@ -207,7 +207,17 @@
 		"loadListFailed": "Failed to load connections",
 		"saveFailed": "Zapis nie powiódł się",
 		"deleteFailed": "Usunięcie nie powiodło się",
-		"testFailed": "Test nie powiódł się"
+		"testFailed": "Test nie powiódł się",
+		"contractAdvanced": "Kontrakt API (zaawansowane)",
+		"contractLimitation": "Dostosowanie kontraktu wpływa tylko na synchronizację. Model wewnętrzny i reguły walidacji skrótu hasła pozostają bez zmian.",
+		"contractPreset": "Zacznij od szablonu",
+		"contractPresetChoose": "Wybierz szablon…",
+		"contractJsonLabel": "JSON kontraktu",
+		"contractJsonHint": "Pozostaw puste dla domyślnego kontraktu v1. Ścieżki muszą być względne do origin (zaczynać się od \"/\").",
+		"contractJsonInvalid": "JSON kontraktu jest nieprawidłowy",
+		"contractReset": "Przywróć domyślny kontrakt",
+		"contractPreviewCount": "Przetworzono {{count}} użytkowników",
+		"contractPreviewError": "Problem z kontraktem: {{error}}"
 	},
 	"spConnections": {
 		"listTitle": "Połączenia SP",
@@ -685,7 +695,8 @@
 			"saml_logout_request_rejected": "Odrzucono SAML LogoutRequest",
 			"saml_logout_completed": "Wylogowanie SAML zakończone",
 			"saml_session_terminated": "Sesja SSO zakończona",
-			"saml_sso_session_started": "Sesja SSO rozpoczęta"
+			"saml_sso_session_started": "Sesja SSO rozpoczęta",
+			"api_connection_contract_updated": "Zaktualizowano kontrakt API"
 		}
 	},
 	"samlSessions": {

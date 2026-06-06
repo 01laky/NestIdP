@@ -16,6 +16,7 @@ const KNOWN_AUDIT_EVENTS = new Set([
 	'saml_request_signature_verified',
 	'saml_request_decrypted',
 	'sp_signing_probe_performed',
+	'api_connection_contract_updated',
 	'saml_logout_request_received',
 	'saml_logout_request_rejected',
 	'saml_logout_completed',

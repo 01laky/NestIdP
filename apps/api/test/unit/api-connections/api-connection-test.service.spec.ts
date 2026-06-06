@@ -60,16 +60,18 @@ describe('ApiConnectionTestService', () => {
 		expect(result).toMatchObject({ ok: false, reachable: false });
 	});
 
-	it('API-CON-TST-04: request URL is baseUrl/users?limit=1 with Authorization header', async () => {
-		const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({ status: 200 } as Response);
+	it('API-CON-TST-04: request URL is baseUrl/users (contract usersPath) with Authorization header', async () => {
+		const fetchMock = jest
+			.spyOn(global, 'fetch')
+			.mockResolvedValue({ status: 200, json: async () => [] } as Response);
 
 		await service.testConnection(connection.id);
 
 		expect(fetchMock).toHaveBeenCalledWith(
-			new URL('/users?limit=1', 'https://identity.example.com').toString(),
+			new URL('/users', 'https://identity.example.com').toString(),
 			expect.objectContaining({
 				method: 'GET',
-				headers: { Authorization: 'Bearer plain-bearer-token' },
+				headers: expect.objectContaining({ Authorization: 'Bearer plain-bearer-token' }),
 			}),
 		);
 	});
@@ -134,12 +136,125 @@ describe('ApiConnectionTestService', () => {
 			...connection,
 			baseUrl: 'https://identity.example.com/api/v1',
 		});
-		const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({ status: 200 } as Response);
+		const fetchMock = jest
+			.spyOn(global, 'fetch')
+			.mockResolvedValue({ status: 200, json: async () => [] } as Response);
 
 		await service.testConnection(connection.id);
 
 		expect(fetchMock).toHaveBeenCalledWith(
-			new URL('/users?limit=1', 'https://identity.example.com/api/v1').toString(),
+			new URL('/users', 'https://identity.example.com/api/v1').toString(),
+			expect.any(Object),
+		);
+	});
+
+	it('API-CONTRACT-E6-01: previewSample (no passwordHash) + previewUsersCount on success', async () => {
+		prisma.apiConnection.findUnique.mockResolvedValue(connection);
+		jest.spyOn(global, 'fetch').mockResolvedValue({
+			status: 200,
+			json: async () => [
+				{
+					id: 'u1',
+					username: 'alice',
+					email: 'alice@example.com',
+					displayName: 'Alice',
+					passwordHash: '$2b$12$abcdefghijklmnopqrstuv',
+					passwordHashAlgorithm: 'bcrypt',
+					active: true,
+				},
+			],
+		} as Response);
+
+		const result = await service.testConnection(connection.id);
+		expect(result.previewUsersCount).toBe(1);
+		expect(result.previewSample?.[0]).toMatchObject({ id: 'u1', username: 'alice' });
+		expect(JSON.stringify(result.previewSample)).not.toContain('"passwordHash"');
+		expect(JSON.stringify(result.previewSample)).not.toContain('$2b$');
+	});
+
+	it('API-APICONN-CONTRACT-05: mapping failure → contractError naming field + path', async () => {
+		prisma.apiConnection.findUnique.mockResolvedValue({
+			...connection,
+			apiContractConfig: { userFieldMap: { username: 'profile.login' } },
+		});
+		jest.spyOn(global, 'fetch').mockResolvedValue({
+			status: 200,
+			json: async () => [
+				{
+					id: 'u1',
+					profile: {},
+					passwordHash: '$2b$12$x',
+					passwordHashAlgorithm: 'bcrypt',
+					active: true,
+				},
+			],
+		} as Response);
+
+		const result = await service.testConnection(connection.id);
+		expect(result.contractError).toMatch(/username.*profile\.login/);
+	});
+
+	it('API-CONTRACT-E8-01: per-collection probe reports groups endpoint HTTP status', async () => {
+		jest
+			.spyOn(global, 'fetch')
+			.mockResolvedValueOnce({
+				status: 200,
+				json: async () => [
+					{
+						id: 'u1',
+						username: 'a',
+						passwordHash: '$2b$12$x',
+						passwordHashAlgorithm: 'bcrypt',
+						active: true,
+					},
+				],
+			} as Response)
+			.mockResolvedValueOnce({ status: 404 } as Response);
+
+		const result = await service.testConnection(connection.id);
+		expect(result.previewUsersCount).toBe(1);
+		expect(result.contractError).toBe('groups endpoint: HTTP 404');
+	});
+
+	it('API-CONTRACT-E8-02: embedded membership → no per-collection probe', async () => {
+		prisma.apiConnection.findUnique.mockResolvedValue({
+			...connection,
+			apiContractConfig: {
+				membershipSource: {
+					groups: { mode: 'embedded', embeddedPath: 'groups' },
+					roles: { mode: 'embedded', embeddedPath: 'roles' },
+				},
+			},
+		});
+		const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({
+			status: 200,
+			json: async () => [
+				{
+					id: 'u1',
+					username: 'a',
+					passwordHash: '$2b$12$x',
+					passwordHashAlgorithm: 'bcrypt',
+					active: true,
+				},
+			],
+		} as Response);
+
+		const result = await service.testConnection(connection.id);
+		expect(result.contractError).toBeUndefined();
+		expect(fetchMock).toHaveBeenCalledTimes(1); // users only — no group/role probe
+	});
+
+	it('EDGE: custom usersPath used for the test request URL', async () => {
+		prisma.apiConnection.findUnique.mockResolvedValue({
+			...connection,
+			apiContractConfig: { endpoints: { usersPath: '/v1/accounts' } },
+		});
+		const fetchMock = jest
+			.spyOn(global, 'fetch')
+			.mockResolvedValue({ status: 200, json: async () => [] } as Response);
+		await service.testConnection(connection.id);
+		expect(fetchMock).toHaveBeenCalledWith(
+			new URL('/v1/accounts', 'https://identity.example.com').toString(),
 			expect.any(Object),
 		);
 	});

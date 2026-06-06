@@ -4,6 +4,45 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.9.0]
+
+### Added
+
+- **Configurable API contract per connection (Prompt 27):** identity sync can now target arbitrary
+  REST APIs without code changes, via a new optional `ApiConnection.apiContractConfig` (JSON; `null` ⇒
+  the fixed v1 contract, so existing connections are unchanged). Configurable per connection:
+  - **Endpoint paths** for users / user-groups / user-roles (path templates with an `:id` placeholder).
+  - **JSON field mapping** to the canonical fields, including nested dot-paths (e.g. `profile.login` →
+    `username`, `credentials.hash` → `passwordHash`); group/role `id`/`name` maps.
+  - **Response envelope** (`responseRoot` dot-path to the array) and fixed **query params**.
+  - **Extra request headers** (non-secret; `Authorization` is reserved).
+  - **Bounded pagination** (offset or page mode, with `pageSize`/`maxPages` caps).
+  - **Embedded memberships** — read groups/roles from the user payload instead of per-user endpoint
+    calls (avoids N+1); endpoint-mode N+1 fetches are bounded by `SYNC_MEMBERSHIP_FETCH_CONCURRENCY`.
+  - **Status→active mapping** (`trueValues` / `inverted`), **field defaults** (`displayNameFromUsername`,
+    default `email`, plus the existing password-hash algorithm constant), and per-user membership caps
+    (`maxGroupsPerUser` / `maxRolesPerUser`, env fallbacks `SYNC_MAX_GROUPS_PER_USER` / `SYNC_MAX_ROLES_PER_USER`).
+  - **Row-error policy** — `skip` (default; record + continue, matching v1) or `fail` (abort the run).
+- **Contract-aware Test connection** — `POST /api/admin/api-connections/:id/test` now reports the parsed
+  user count, a preview of the first mapped users (password hash never returned), the first mapping/
+  validation error (canonical field + source path), and per-collection (groups/roles) reachability.
+- **Admin form** — collapsible "API contract (advanced)" section with a JSON editor, starter **presets**
+  (`generic` / `keycloak-like` / `auth0-like`, shared `API_CONTRACT_PRESETS`), and reset-to-default.
+- New shared module `@nestidp/shared/api-contract`: `ApiContractConfig`, `ResolvedApiContract`,
+  `DEFAULT_API_CONTRACT`, `resolveApiContract`, `assertValidApiContractConfig`, safe `getByPath`
+  (ignores prototype keys), and `API_CONTRACT_PRESETS`. Contract paths are validated to be
+  origin-relative (no absolute/`//`/`..` paths) and re-checked in the sync client.
+- New audit event `api_connection_contract_updated`; new `apiConnections.contract*` i18n strings in all
+  10 locales. Sync flow diagram updated for the contract/embedded/pagination paths.
+
+### Changed
+
+- The mapping layer runs for the default (identity) contract too, so its only behavioural delta vs v1 is
+  an intentional **strict superset**: `active` now also accepts `'true'`/`'false'`/`'1'`/`'0'`/`1`/`0`
+  (previously strict boolean). No previously-valid row becomes invalid.
+- The sync orchestration was restructured into map→upsert→(bounded-parallel membership fetch)→apply
+  phases to support embedded memberships and concurrency while keeping counters deterministic.
+
 ## [1.8.0]
 
 ### Added

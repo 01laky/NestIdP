@@ -297,8 +297,8 @@ Admin authentication is separate from end-user SAML authentication. Admin creden
 
 | Aspect | v1 (MVP) | v2 | v3 |
 |--------|----------|-----|-----|
-| Endpoint paths | **Fixed** — `/users`, `/users/:id/groups`, `/users/:id/roles` | Configurable per API connection | Same as v2 |
-| Response field mapping | **Fixed** — field names below | Configurable | Same as v2 |
+| Endpoint paths | **Fixed** — `/users`, `/users/:id/groups`, `/users/:id/roles` | **Configurable per API connection (v1.9.0)** | Same as v2 |
+| Response field mapping | **Fixed** — field names below | **Configurable incl. nested dot-paths (v1.9.0)** | Same as v2 |
 | Auth to external API | Bearer token only | OAuth 2.0 Client Credentials (optional) | Same as v2 |
 | Outbound proxy | **None** — direct HTTP to `baseUrl` | Optional HTTP/HTTPS proxy per connection | Same as v2 |
 | **Number of sync sources** | **One** API connection | **One** API connection | **Multiple** API connections merged into local identity store |
@@ -365,13 +365,23 @@ Response 200:
 ]
 ```
 
-### 7.3 Configurable Contract (v2 — planned)
+### 7.3 Configurable Contract (implemented — v1.9.0)
 
-Deferred to Phase 2. Admin UI will allow per API connection:
+Per API connection, the admin can override the fixed v1 contract (stored as
+`ApiConnection.apiContractConfig`; `null` ⇒ the v1 default, so existing connections are
+unchanged):
 
-- Custom endpoint paths (e.g. `/api/v1/accounts`, `/api/v1/accounts/:id/memberships`)
-- JSON field mapping (e.g. external `login` → internal `username`, `pwd_hash` → `passwordHash`)
-- Optional pagination/query parameters
+- Custom endpoint paths (e.g. `/api/v1/accounts`, `/api/v1/accounts/:id/memberships`) with an `:id` placeholder
+- JSON field mapping incl. nested dot-paths (e.g. external `profile.login` → internal `username`, `credentials.hash` → `passwordHash`)
+- Response envelope (`responseRoot` dot-path to the array) + fixed query params
+- Extra request headers (non-secret; `Authorization` reserved)
+- Bounded offset/page pagination
+- Embedded groups/roles (read from the user payload — avoids per-user calls)
+- Status→active mapping (value list / inverted), field defaults, per-user membership caps
+- Row-error policy (`skip` default = record + continue; `fail` = abort)
+- The **Test connection** action validates the contract (parsed user count, first mapping error, no-password preview)
+
+The canonical internal model and validation (bcrypt password hash, supported algorithms) are unchanged.
 
 ### 7.4 Outbound Proxy (v2 — planned)
 
@@ -691,7 +701,7 @@ _Phase 1 complete in **v1.0.0** (Prompt 10 — Docker, persistent audit, admin a
 
 ### Phase 2 — Hardening and Configurable API Contract
 
-- [ ] **Configurable API contract** — endpoint paths and JSON field mapping per API connection in admin UI
+- [x] **Configurable API contract** — endpoint paths, JSON field mapping, envelope, headers, pagination, embedded memberships per API connection (v1.9.0)
 - [ ] **Outbound HTTP proxy** — optional proxy URL and auth per API connection for sync requests
 - [ ] Scheduled sync (cron)
 - [ ] Certificate rotation (dual-cert in metadata)

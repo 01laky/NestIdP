@@ -1,60 +1,134 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { getByPath, type ResolvedApiContract } from '@nestidp/shared';
 import { normalizeBaseUrl } from '../../api-connections/utils/base-url.util';
-import {
-	ExternalApiValidationError,
-	parseExternalGroupsJson,
-	parseExternalRolesJson,
-	parseExternalUsersJson,
-} from '../validators/external-api.validator';
-import type { ExternalGroupDto, ExternalRoleDto, ExternalUserDto } from '../external-api.types';
+import { ExternalApiValidationError } from '../validators/external-api.validator';
 import { IdentitySyncHttpError } from '../identity-sync.errors';
 
 export const DEFAULT_SYNC_HTTP_TIMEOUT_MS = 30_000;
 export const DEFAULT_SYNC_STALE_RUN_MINUTES = 30;
 export const DEFAULT_SYNC_MAX_USERS_PER_RUN = 10_000;
+export const DEFAULT_SYNC_MAX_GROUPS_PER_USER = 1000;
+export const DEFAULT_SYNC_MAX_ROLES_PER_USER = 1000;
+export const DEFAULT_SYNC_MEMBERSHIP_FETCH_CONCURRENCY = 5;
 
 @Injectable()
 export class IdentitySyncClientService {
 	constructor(private readonly configService: ConfigService) {}
 
 	getHttpTimeoutMs(): number {
-		const raw = this.configService.get<number | string>('SYNC_HTTP_TIMEOUT_MS');
-		const parsed = Number(raw);
-		if (Number.isFinite(parsed) && parsed >= 1000 && parsed <= 120_000) {
-			return parsed;
-		}
-		return DEFAULT_SYNC_HTTP_TIMEOUT_MS;
+		return this.boundedInt('SYNC_HTTP_TIMEOUT_MS', DEFAULT_SYNC_HTTP_TIMEOUT_MS, 1000, 120_000);
 	}
 
 	getMaxUsersPerRun(): number {
-		const raw = this.configService.get<number | string>('SYNC_MAX_USERS_PER_RUN');
-		const parsed = Number(raw);
-		if (Number.isFinite(parsed) && parsed >= 1 && parsed <= 100_000) {
-			return parsed;
-		}
-		return DEFAULT_SYNC_MAX_USERS_PER_RUN;
+		return this.boundedInt('SYNC_MAX_USERS_PER_RUN', DEFAULT_SYNC_MAX_USERS_PER_RUN, 1, 100_000);
 	}
 
 	getStaleRunMinutes(): number {
-		const raw = this.configService.get<number | string>('SYNC_STALE_RUN_MINUTES');
-		const parsed = Number(raw);
-		if (Number.isFinite(parsed) && parsed >= 1 && parsed <= 1440) {
-			return parsed;
-		}
-		return DEFAULT_SYNC_STALE_RUN_MINUTES;
+		return this.boundedInt('SYNC_STALE_RUN_MINUTES', DEFAULT_SYNC_STALE_RUN_MINUTES, 1, 1440);
 	}
 
-	private buildUrl(baseUrl: string, path: string): string {
+	getMaxGroupsPerUser(contract?: ResolvedApiContract): number {
+		return (
+			contract?.maxGroupsPerUser ??
+			this.boundedInt('SYNC_MAX_GROUPS_PER_USER', DEFAULT_SYNC_MAX_GROUPS_PER_USER, 1, 100_000)
+		);
+	}
+
+	getMaxRolesPerUser(contract?: ResolvedApiContract): number {
+		return (
+			contract?.maxRolesPerUser ??
+			this.boundedInt('SYNC_MAX_ROLES_PER_USER', DEFAULT_SYNC_MAX_ROLES_PER_USER, 1, 100_000)
+		);
+	}
+
+	getMembershipFetchConcurrency(): number {
+		return this.boundedInt(
+			'SYNC_MEMBERSHIP_FETCH_CONCURRENCY',
+			DEFAULT_SYNC_MEMBERSHIP_FETCH_CONCURRENCY,
+			1,
+			50,
+		);
+	}
+
+	/** Paginated + envelope-extracted raw users array. */
+	async fetchUsersRaw(
+		baseUrl: string,
+		bearerToken: string,
+		contract: ResolvedApiContract,
+	): Promise<unknown[]> {
+		return this.fetchCollectionRaw(baseUrl, bearerToken, contract.endpoints.usersPath, contract, {
+			responseRoot: contract.responseRoot.users,
+			cap: this.getMaxUsersPerRun(),
+		});
+	}
+
+	async fetchGroupsRawForUser(
+		baseUrl: string,
+		bearerToken: string,
+		externalUserId: string,
+		contract: ResolvedApiContract,
+	): Promise<unknown[]> {
+		const path = this.substituteId(contract.endpoints.userGroupsPath, externalUserId);
+		return this.fetchCollectionRaw(baseUrl, bearerToken, path, contract, {
+			responseRoot: contract.responseRoot.groups,
+			cap: this.getMaxGroupsPerUser(contract),
+		});
+	}
+
+	async fetchRolesRawForUser(
+		baseUrl: string,
+		bearerToken: string,
+		externalUserId: string,
+		contract: ResolvedApiContract,
+	): Promise<unknown[]> {
+		const path = this.substituteId(contract.endpoints.userRolesPath, externalUserId);
+		return this.fetchCollectionRaw(baseUrl, bearerToken, path, contract, {
+			responseRoot: contract.responseRoot.roles,
+			cap: this.getMaxRolesPerUser(contract),
+		});
+	}
+
+	private substituteId(template: string, externalUserId: string): string {
+		return template.replace(':id', encodeURIComponent(externalUserId));
+	}
+
+	private buildUrl(
+		baseUrl: string,
+		path: string,
+		queryParams: Record<string, string>,
+		extra?: Record<string, string | number>,
+	): string {
 		const normalized = normalizeBaseUrl(baseUrl);
-		return new URL(path, `${normalized}/`).toString();
+		const url = new URL(path, `${normalized}/`);
+		for (const [k, v] of Object.entries(queryParams)) {
+			url.searchParams.set(k, v);
+		}
+		if (extra) {
+			for (const [k, v] of Object.entries(extra)) {
+				url.searchParams.set(k, String(v));
+			}
+		}
+		// Defense-in-depth: a stored path must not redirect off the base origin.
+		if (url.origin !== new URL(normalized).origin) {
+			throw new IdentitySyncHttpError('Resolved request URL left the base origin', {
+				url: url.toString(),
+				reachable: false,
+			});
+		}
+		return url.toString();
 	}
 
-	private async fetchJson(url: string, bearerToken: string): Promise<unknown> {
+	private async fetchJson(
+		url: string,
+		bearerToken: string,
+		headers: Record<string, string>,
+	): Promise<unknown> {
 		try {
 			const response = await fetch(url, {
 				method: 'GET',
 				headers: {
+					...headers,
 					Authorization: `Bearer ${bearerToken}`,
 					Accept: 'application/json',
 				},
@@ -86,59 +160,83 @@ export class IdentitySyncClientService {
 		}
 	}
 
-	async fetchUsersRaw(baseUrl: string, bearerToken: string): Promise<unknown> {
-		const url = this.buildUrl(baseUrl, '/users');
-		return this.fetchJson(url, bearerToken);
-	}
-
-	async fetchUsers(baseUrl: string, bearerToken: string): Promise<ExternalUserDto[]> {
-		const body = await this.fetchUsersRaw(baseUrl, bearerToken);
-		try {
-			return parseExternalUsersJson(body, { maxUsers: this.getMaxUsersPerRun() });
-		} catch (error) {
-			if (error instanceof ExternalApiValidationError) {
-				throw new IdentitySyncHttpError(error.message, {
-					url: this.buildUrl(baseUrl, '/users'),
-					reachable: true,
-				});
-			}
-			throw error;
+	private extractArray(body: unknown, responseRoot: string, url: string): unknown[] {
+		const value = responseRoot ? getByPath(body, responseRoot) : body;
+		if (!Array.isArray(value)) {
+			throw new ExternalApiValidationError(
+				responseRoot
+					? `Response did not contain an array at "${responseRoot}"`
+					: 'Response must be a JSON array',
+			);
 		}
+		void url;
+		return value;
 	}
 
-	async fetchGroupsForUser(
+	private async fetchCollectionRaw(
 		baseUrl: string,
 		bearerToken: string,
-		externalUserId: string,
-	): Promise<ExternalGroupDto[]> {
-		const encoded = encodeURIComponent(externalUserId);
-		const url = this.buildUrl(baseUrl, `/users/${encoded}/groups`);
-		const body = await this.fetchJson(url, bearerToken);
-		try {
-			return parseExternalGroupsJson(body);
-		} catch (error) {
-			if (error instanceof ExternalApiValidationError) {
-				throw new IdentitySyncHttpError(error.message, { url, reachable: true });
-			}
-			throw error;
+		path: string,
+		contract: ResolvedApiContract,
+		opts: { responseRoot: string; cap: number },
+	): Promise<unknown[]> {
+		const { pagination, queryParams, headers } = contract;
+
+		if (pagination.mode === 'none') {
+			const url = this.buildUrl(baseUrl, path, queryParams);
+			return this.extractArray(
+				await this.fetchJson(url, bearerToken, headers),
+				opts.responseRoot,
+				url,
+			);
 		}
+
+		const pageSize = pagination.pageSize ?? 100;
+		const maxPages = pagination.maxPages ?? 50;
+		const accumulated: unknown[] = [];
+		let pageIndex = 0;
+		let offset = 0;
+		let page = pagination.startPage ?? 1;
+
+		while (pageIndex < maxPages) {
+			const extra: Record<string, string | number> = {};
+			if (pagination.limitParam) {
+				extra[pagination.limitParam] = pageSize;
+			}
+			if (pagination.mode === 'offset' && pagination.offsetParam) {
+				extra[pagination.offsetParam] = offset;
+			}
+			if (pagination.mode === 'page' && pagination.pageParam) {
+				extra[pagination.pageParam] = page;
+			}
+			const url = this.buildUrl(baseUrl, path, queryParams, extra);
+			const pageRows = this.extractArray(
+				await this.fetchJson(url, bearerToken, headers),
+				opts.responseRoot,
+				url,
+			);
+			for (const row of pageRows) {
+				accumulated.push(row);
+				if (accumulated.length >= opts.cap) {
+					return accumulated.slice(0, opts.cap);
+				}
+			}
+			if (pageRows.length < pageSize) {
+				break;
+			}
+			pageIndex += 1;
+			offset += pageSize;
+			page += 1;
+		}
+		return accumulated;
 	}
 
-	async fetchRolesForUser(
-		baseUrl: string,
-		bearerToken: string,
-		externalUserId: string,
-	): Promise<ExternalRoleDto[]> {
-		const encoded = encodeURIComponent(externalUserId);
-		const url = this.buildUrl(baseUrl, `/users/${encoded}/roles`);
-		const body = await this.fetchJson(url, bearerToken);
-		try {
-			return parseExternalRolesJson(body);
-		} catch (error) {
-			if (error instanceof ExternalApiValidationError) {
-				throw new IdentitySyncHttpError(error.message, { url, reachable: true });
-			}
-			throw error;
+	private boundedInt(key: string, fallback: number, min: number, max: number): number {
+		const raw = this.configService.get<number | string>(key);
+		const parsed = Number(raw);
+		if (Number.isFinite(parsed) && parsed >= min && parsed <= max) {
+			return parsed;
 		}
+		return fallback;
 	}
 }

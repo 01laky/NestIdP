@@ -59,10 +59,13 @@ describe('SyncService', () => {
 
 	const identitySyncClient = {
 		fetchUsersRaw: jest.fn(),
-		fetchGroupsForUser: jest.fn(),
-		fetchRolesForUser: jest.fn(),
+		fetchGroupsRawForUser: jest.fn(),
+		fetchRolesRawForUser: jest.fn(),
 		getMaxUsersPerRun: jest.fn().mockReturnValue(10_000),
 		getStaleRunMinutes: jest.fn().mockReturnValue(30),
+		getMembershipFetchConcurrency: jest.fn().mockReturnValue(5),
+		getMaxGroupsPerUser: jest.fn().mockReturnValue(1000),
+		getMaxRolesPerUser: jest.fn().mockReturnValue(1000),
 	};
 
 	const encryption: jest.Mocked<CredentialsEncryptionPort> = {
@@ -127,8 +130,8 @@ describe('SyncService', () => {
 		syncLogService.getOpenRunningLog.mockResolvedValue(null);
 		syncLogService.createRunningLog.mockResolvedValue(runningLog);
 		identitySyncClient.fetchUsersRaw.mockResolvedValue([validExternalUser()]);
-		identitySyncClient.fetchGroupsForUser.mockResolvedValue([{ id: 'g1', name: 'Engineering' }]);
-		identitySyncClient.fetchRolesForUser.mockResolvedValue([{ id: 'r1', name: 'Admin' }]);
+		identitySyncClient.fetchGroupsRawForUser.mockResolvedValue([{ id: 'g1', name: 'Engineering' }]);
+		identitySyncClient.fetchRolesRawForUser.mockResolvedValue([{ id: 'r1', name: 'Admin' }]);
 		identityRepository.upsertUser.mockResolvedValue({ id: 'local-user-1' });
 		identityRepository.upsertGroup.mockResolvedValue({ id: 'local-group-1' });
 		identityRepository.upsertRole.mockResolvedValue({ id: 'local-role-1' });
@@ -347,8 +350,8 @@ describe('SyncService', () => {
 
 	it('API-SYNC-SVC-10: Orphan group deleted when no user references it', async () => {
 		setupHappyPathMocks();
-		identitySyncClient.fetchGroupsForUser.mockResolvedValue([]);
-		identitySyncClient.fetchRolesForUser.mockResolvedValue([]);
+		identitySyncClient.fetchGroupsRawForUser.mockResolvedValue([]);
+		identitySyncClient.fetchRolesRawForUser.mockResolvedValue([]);
 
 		await service.triggerSync(CONNECTION_ID);
 
@@ -459,8 +462,8 @@ describe('SyncService', () => {
 
 		await service.triggerSync(CONNECTION_ID);
 
-		expect(identitySyncClient.fetchGroupsForUser).not.toHaveBeenCalled();
-		expect(identitySyncClient.fetchRolesForUser).not.toHaveBeenCalled();
+		expect(identitySyncClient.fetchGroupsRawForUser).not.toHaveBeenCalled();
+		expect(identitySyncClient.fetchRolesRawForUser).not.toHaveBeenCalled();
 		expect(syncLogService.finishLog).toHaveBeenCalledWith(
 			runningLog.id,
 			'SUCCESS',
@@ -566,7 +569,7 @@ describe('SyncService', () => {
 
 	it('API-SYNC-SVC-20: Groups fetch failure per user → SUCCESS with fetch_groups error', async () => {
 		setupHappyPathMocks();
-		identitySyncClient.fetchGroupsForUser.mockRejectedValue(
+		identitySyncClient.fetchGroupsRawForUser.mockRejectedValue(
 			new IdentitySyncHttpError('Identity API returned HTTP 503', {
 				statusCode: 503,
 				reachable: true,
@@ -586,7 +589,7 @@ describe('SyncService', () => {
 
 	it('API-SYNC-SVC-21: Roles fetch failure per user → SUCCESS with fetch_roles error', async () => {
 		setupHappyPathMocks();
-		identitySyncClient.fetchRolesForUser.mockRejectedValue(
+		identitySyncClient.fetchRolesRawForUser.mockRejectedValue(
 			new IdentitySyncHttpError('Identity API returned HTTP 502', {
 				statusCode: 502,
 				reachable: true,
@@ -690,5 +693,173 @@ describe('SyncService', () => {
 
 		expect(syncLogService.listLogsForConnection).toHaveBeenCalledWith(CONNECTION_ID, 10);
 		expect(result.syncLogs).toHaveLength(1);
+	});
+
+	it('API-SYNC-INT-CONTRACT-01: full custom contract (nested field map) upserts mapped users', async () => {
+		setupHappyPathMocks();
+		prisma.apiConnection.findUnique.mockResolvedValue({
+			...baseConnection,
+			apiContractConfig: {
+				userFieldMap: { id: 'uid', username: 'profile.login', passwordHash: 'creds.hash' },
+			},
+		});
+		identitySyncClient.fetchUsersRaw.mockResolvedValue([
+			{
+				uid: 'ext-user-1',
+				profile: { login: 'mapped-alice' },
+				creds: { hash: TEST_PASSWORD_HASH },
+				passwordHashAlgorithm: 'bcrypt',
+				active: true,
+			},
+		]);
+
+		const result = await service.triggerSync(CONNECTION_ID);
+
+		expect(result.syncLog.status).toBe('SUCCESS');
+		expect(identityRepository.upsertUser).toHaveBeenCalledWith(
+			CONNECTION_ID,
+			expect.objectContaining({ externalId: 'ext-user-1', username: 'mapped-alice' }),
+		);
+	});
+
+	it('API-CONTRACT-E1-01: embedded memberships read from user row (no group/role HTTP call)', async () => {
+		setupHappyPathMocks();
+		prisma.apiConnection.findUnique.mockResolvedValue({
+			...baseConnection,
+			apiContractConfig: {
+				membershipSource: {
+					groups: { mode: 'embedded', embeddedPath: 'groups' },
+					roles: { mode: 'embedded', embeddedPath: 'roles' },
+				},
+			},
+		});
+		identitySyncClient.fetchUsersRaw.mockResolvedValue([
+			validExternalUser({
+				groups: [{ id: 'g1', name: 'Engineering' }],
+				roles: [{ id: 'r1', name: 'Admin' }],
+			}),
+		]);
+
+		const result = await service.triggerSync(CONNECTION_ID);
+
+		expect(result.syncLog.groupsSynced).toBe(1);
+		expect(result.syncLog.rolesSynced).toBe(1);
+		expect(identitySyncClient.fetchGroupsRawForUser).not.toHaveBeenCalled();
+		expect(identitySyncClient.fetchRolesRawForUser).not.toHaveBeenCalled();
+		expect(identityRepository.upsertGroup).toHaveBeenCalledWith(
+			CONNECTION_ID,
+			expect.objectContaining({ id: 'g1' }),
+		);
+	});
+
+	it('API-CONTRACT-E5-01: onRowError=skip keeps valid rows (default) ', async () => {
+		setupHappyPathMocks();
+		identitySyncClient.fetchUsersRaw.mockResolvedValue([
+			validExternalUser(),
+			validExternalUser({ id: 'ext-user-2', username: 'bad', passwordHash: 'plaintext' }),
+		]);
+
+		const result = await service.triggerSync(CONNECTION_ID);
+
+		expect(result.syncLog.status).toBe('SUCCESS');
+		expect(result.syncLog.usersSynced).toBe(1);
+		expect(syncLogService.finishLog).toHaveBeenCalledWith(
+			runningLog.id,
+			'SUCCESS',
+			expect.any(Object),
+			expect.arrayContaining([
+				expect.objectContaining({ phase: 'parse_users', externalUserId: 'ext-user-2' }),
+			]),
+		);
+	});
+
+	it('API-CONTRACT-E5-02: onRowError=fail aborts the whole run on first invalid row', async () => {
+		setupHappyPathMocks();
+		prisma.apiConnection.findUnique.mockResolvedValue({
+			...baseConnection,
+			apiContractConfig: { onRowError: 'fail' },
+		});
+		identitySyncClient.fetchUsersRaw.mockResolvedValue([
+			validExternalUser({ id: 'ext-user-2', username: 'bad', passwordHash: 'plaintext' }),
+		]);
+
+		const result = await service.triggerSync(CONNECTION_ID);
+
+		expect(result.syncLog.status).toBe('FAILED');
+	});
+
+	it('API-CONTRACT-E1-02: embedded path missing the array → 0 memberships, no error', async () => {
+		setupHappyPathMocks();
+		prisma.apiConnection.findUnique.mockResolvedValue({
+			...baseConnection,
+			apiContractConfig: {
+				membershipSource: {
+					groups: { mode: 'embedded', embeddedPath: 'groups' },
+					roles: { mode: 'embedded', embeddedPath: 'roles' },
+				},
+			},
+		});
+		identitySyncClient.fetchUsersRaw.mockResolvedValue([validExternalUser()]); // no groups/roles keys
+
+		const result = await service.triggerSync(CONNECTION_ID);
+
+		expect(result.syncLog.status).toBe('SUCCESS');
+		expect(result.syncLog.groupsSynced).toBe(0);
+		expect(result.syncLog.rolesSynced).toBe(0);
+		expect(identityRepository.upsertGroup).not.toHaveBeenCalled();
+	});
+
+	it('API-CONTRACT-E1-03: mixed embedded groups + endpoint roles', async () => {
+		setupHappyPathMocks();
+		prisma.apiConnection.findUnique.mockResolvedValue({
+			...baseConnection,
+			apiContractConfig: {
+				membershipSource: { groups: { mode: 'embedded', embeddedPath: 'groups' } },
+			},
+		});
+		identitySyncClient.fetchUsersRaw.mockResolvedValue([
+			validExternalUser({ groups: [{ id: 'g1', name: 'Eng' }] }),
+		]);
+
+		const result = await service.triggerSync(CONNECTION_ID);
+
+		expect(result.syncLog.status).toBe('SUCCESS');
+		expect(identitySyncClient.fetchGroupsRawForUser).not.toHaveBeenCalled(); // embedded
+		expect(identitySyncClient.fetchRolesRawForUser).toHaveBeenCalled(); // endpoint
+	});
+
+	it('EDGE: invalid group row is recorded (skip) without aborting the run', async () => {
+		setupHappyPathMocks();
+		identitySyncClient.fetchGroupsRawForUser.mockResolvedValue([{ id: 'g1' }]); // missing name
+
+		const result = await service.triggerSync(CONNECTION_ID);
+
+		expect(result.syncLog.status).toBe('SUCCESS');
+		expect(syncLogService.finishLog).toHaveBeenCalledWith(
+			runningLog.id,
+			'SUCCESS',
+			expect.any(Object),
+			expect.arrayContaining([expect.objectContaining({ phase: 'upsert_group' })]),
+		);
+	});
+
+	it('EDGE: endpoint membership fetch is bounded-parallel across multiple users', async () => {
+		setupHappyPathMocks();
+		identitySyncClient.fetchUsersRaw.mockResolvedValue([
+			validExternalUser({ id: 'u1' }),
+			validExternalUser({ id: 'u2', username: 'bob' }),
+			validExternalUser({ id: 'u3', username: 'carol' }),
+		]);
+		identityRepository.upsertUser
+			.mockResolvedValueOnce({ id: 'local-1' })
+			.mockResolvedValueOnce({ id: 'local-2' })
+			.mockResolvedValueOnce({ id: 'local-3' });
+
+		const result = await service.triggerSync(CONNECTION_ID);
+
+		expect(result.syncLog.status).toBe('SUCCESS');
+		expect(result.syncLog.usersSynced).toBe(3);
+		expect(identitySyncClient.fetchGroupsRawForUser).toHaveBeenCalledTimes(3);
+		expect(identitySyncClient.getMembershipFetchConcurrency).toHaveBeenCalled();
 	});
 });

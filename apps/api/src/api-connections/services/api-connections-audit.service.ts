@@ -33,6 +33,19 @@ export class ApiConnectionsAuditService {
 		});
 	}
 
+	logContractUpdated(id: string, name: string, customizedSections: string[]): void {
+		const payload = { event: 'api_connection_contract_updated', id, name, customizedSections };
+		this.logger.log(JSON.stringify(payload));
+		this.audit.recordSafe({
+			category: 'admin_config',
+			event: 'api_connection_contract_updated',
+			actorType: 'admin',
+			subjectType: 'ApiConnection',
+			subjectId: id,
+			metadata: { name, customizedSections },
+		});
+	}
+
 	logDeleted(id: string, name: string): void {
 		const payload = { event: 'api_connection_deleted', id, name };
 		this.logger.log(JSON.stringify(payload));

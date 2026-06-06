@@ -1,5 +1,6 @@
 import { Transform } from 'class-transformer';
-import { IsNotEmpty, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
+import { IsNotEmpty, IsObject, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
+import type { ApiContractConfig } from '@nestidp/shared';
 
 export class UpdateApiConnectionBodyDto {
 	@IsOptional()
@@ -22,4 +23,9 @@ export class UpdateApiConnectionBodyDto {
 	@IsNotEmpty()
 	@MaxLength(4096)
 	bearerToken?: string;
+
+	@IsOptional()
+	@ValidateIf((_, value) => value !== null)
+	@IsObject()
+	apiContractConfig?: ApiContractConfig | null;
 }

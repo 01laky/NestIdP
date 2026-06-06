@@ -72,12 +72,13 @@ describe('external-api.validator', () => {
 		);
 	});
 
-	it('API-SYNC-VAL-06: active: "true" string → throws', () => {
-		expect(() => parseExternalUsersJson([validUser({ active: 'true' })])).toThrow(
+	it('API-SYNC-VAL-06: active string/number is coerced (v1.9.0 strict superset)', () => {
+		expect(parseExternalUsersJson([validUser({ active: 'true' })])[0].active).toBe(true);
+		expect(parseExternalUsersJson([validUser({ active: 'false' })])[0].active).toBe(false);
+		expect(parseExternalUsersJson([validUser({ active: 1 })])[0].active).toBe(true);
+		expect(parseExternalUsersJson([validUser({ active: 0 })])[0].active).toBe(false);
+		expect(() => parseExternalUsersJson([validUser({ active: 'maybe' })])).toThrow(
 			ExternalApiValidationError,
-		);
-		expect(() => parseExternalUsersJson([validUser({ active: 'true' })])).toThrow(
-			/active must be a boolean/,
 		);
 	});
 

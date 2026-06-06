@@ -16,6 +16,7 @@ import type {
 	DeleteApiConnectionResponseDto,
 	UpdateApiConnectionRequestDto,
 } from '@nestidp/shared';
+import { ApiContractValidationError, assertValidApiContractConfig } from '@nestidp/shared';
 import { NodeEnv } from '../../config/env.validation';
 import {
 	CREDENTIALS_ENCRYPTION,
@@ -63,6 +64,7 @@ export class ApiConnectionsService {
 
 		const baseUrl = this.validateBaseUrl(body.baseUrl);
 		const authCredentialsEncrypted = this.encryption.encrypt(body.bearerToken);
+		const apiContractConfig = this.validateContract(body.apiContractConfig);
 
 		const row = await this.prisma.apiConnection.create({
 			data: {
@@ -70,6 +72,9 @@ export class ApiConnectionsService {
 				baseUrl,
 				authType: 'BEARER',
 				authCredentialsEncrypted,
+				apiContractConfig: apiContractConfig
+					? (apiContractConfig as unknown as Prisma.InputJsonValue)
+					: Prisma.JsonNull,
 			},
 		});
 
@@ -77,7 +82,12 @@ export class ApiConnectionsService {
 	}
 
 	async update(id: string, body: UpdateApiConnectionRequestDto): Promise<ApiConnectionResponseDto> {
-		if (!body.name && !body.baseUrl && body.bearerToken === undefined) {
+		if (
+			!body.name &&
+			!body.baseUrl &&
+			body.bearerToken === undefined &&
+			body.apiContractConfig === undefined
+		) {
 			throw new BadRequestException('At least one field must be provided');
 		}
 
@@ -107,12 +117,26 @@ export class ApiConnectionsService {
 			data.authCredentialsEncrypted = this.encryption.encrypt(body.bearerToken);
 		}
 
+		if (body.apiContractConfig !== undefined) {
+			const validated = this.validateContract(body.apiContractConfig);
+			data.apiContractConfig = validated
+				? (validated as unknown as Prisma.InputJsonValue)
+				: Prisma.JsonNull;
+		}
+
 		const row = await this.prisma.apiConnection.update({
 			where: { id: existing.id },
 			data,
 		});
 
 		this.audit.logUpdated(row.id, row.name);
+		if (body.apiContractConfig !== undefined) {
+			const sections =
+				body.apiContractConfig === null
+					? ['reset']
+					: Object.keys(body.apiContractConfig as Record<string, unknown>);
+			this.audit.logContractUpdated(row.id, row.name, sections);
+		}
 		return { connection: toApiConnectionDto(row) };
 	}
 
@@ -139,6 +163,22 @@ export class ApiConnectionsService {
 			throw new ForbiddenException('Local directory connection cannot be modified');
 		}
 		return row;
+	}
+
+	private validateContract(
+		value: import('@nestidp/shared').ApiContractConfig | null | undefined,
+	): import('@nestidp/shared').ApiContractConfig | null {
+		if (value == null) {
+			return null;
+		}
+		try {
+			return assertValidApiContractConfig(value);
+		} catch (error) {
+			if (error instanceof ApiContractValidationError) {
+				throw new BadRequestException(error.message);
+			}
+			throw error;
+		}
 	}
 
 	private validateBaseUrl(raw: string): string {

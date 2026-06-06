@@ -1,5 +1,5 @@
 import { ApiConnection } from '@prisma/client';
-import type { ApiConnectionDto } from '@nestidp/shared';
+import type { ApiConnectionDto, ApiContractConfig } from '@nestidp/shared';
 
 export function toApiConnectionDto(row: ApiConnection): ApiConnectionDto {
 	return {
@@ -8,6 +8,7 @@ export function toApiConnectionDto(row: ApiConnection): ApiConnectionDto {
 		baseUrl: row.baseUrl,
 		authType: row.authType,
 		hasBearerToken: row.authCredentialsEncrypted.length > 0,
+		apiContractConfig: (row.apiContractConfig ?? null) as ApiContractConfig | null,
 		lastSyncAt: row.lastSyncAt?.toISOString() ?? null,
 		lastSyncStatus: row.lastSyncStatus,
 		createdAt: row.createdAt.toISOString(),

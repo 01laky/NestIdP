@@ -1,17 +1,25 @@
 flowchart TD
 	START(["Operator triggers sync"])
-	CONFIG["ApiConnection\nbaseUrl + encrypted token"]
-	AUTH["Bearer auth to external API"]
-	USERS["GET /users → upsert users + password hashes"]
-	GROUPS["GET /users/:id/groups → upsert memberships"]
-	ROLES["GET /users/:id/roles → upsert roles"]
-	LOG["SyncLog · status · counts · errors"]
+	CONFIG["ApiConnection\nbaseUrl + token + apiContractConfig"]
+	RESOLVE["Resolve contract\n(v1 defaults when null)"]
+	AUTH["Bearer auth + extra headers"]
+	USERS["GET usersPath (+ pagination/envelope)\n→ map fields → upsert users"]
+	MEMBER{"membershipSource?"}
+	EMBEDDED["Read groups/roles\nfrom the user payload"]
+	ENDPOINT["GET userGroupsPath/userRolesPath\n(bounded concurrency)"]
+	APPLY["Map + upsert groups/roles"]
+	LOG["SyncLog · counts · errors\n(skip vs fail per row)"]
 	END(["Local identity store ready for login"])
 
-	START --> CONFIG --> AUTH --> USERS --> GROUPS --> ROLES --> LOG --> END
+	START --> CONFIG --> RESOLVE --> AUTH --> USERS --> MEMBER
+	MEMBER -->|embedded| EMBEDDED --> APPLY
+	MEMBER -->|endpoint| ENDPOINT --> APPLY
+	APPLY --> LOG --> END
 
 	classDef step fill:#134e4a,stroke:#2dd4bf,stroke-width:2px,color:#f0fdfa
 	classDef io fill:#1e3a5f,stroke:#60a5fa,stroke-width:2px,color:#eff6ff
+	classDef decision fill:#3f2d12,stroke:#f59e0b,stroke-width:2px,color:#fffbeb
 
-	class CONFIG,AUTH,USERS,GROUPS,ROLES,LOG step
+	class CONFIG,RESOLVE,AUTH,USERS,EMBEDDED,ENDPOINT,APPLY,LOG step
+	class MEMBER decision
 	class START,END io

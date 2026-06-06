@@ -11,7 +11,10 @@ import type {
 	SyncLogResponseDto,
 	SyncStatusResponseDto,
 	TriggerSyncResponseDto,
+	ApiContractConfig,
+	ResolvedApiContract,
 } from '@nestidp/shared';
+import { getByPath, resolveApiContract } from '@nestidp/shared';
 import { ApiConnection } from '@prisma/client';
 import { toApiConnectionDto } from '../../api-connections/mappers/api-connections.mapper';
 import {
@@ -29,8 +32,11 @@ import {
 	assertUsersArrayWithinLimit,
 	detectDuplicateUserIds,
 	ExternalApiValidationError,
-	parseExternalUserRow,
+	mapExternalGroupRow,
+	mapExternalRoleRow,
+	mapExternalUserRow,
 } from '../validators/external-api.validator';
+import type { ExternalGroupDto, ExternalRoleDto } from '../external-api.types';
 import { IdentitySyncClientService } from './identity-sync-client.service';
 import { IdentitySyncHttpError } from '../identity-sync.errors';
 import { AuditPersistenceService } from '../../audit/services/audit-persistence.service';
@@ -41,6 +47,23 @@ import {
 	toSyncLogDto,
 	toSyncStatusResponseDto,
 } from '../mappers/sync.mapper';
+
+/** Thrown to abort the whole run when onRowError='fail'. */
+class StrictRowError extends Error {}
+
+interface ProcessedUser {
+	externalUserId: string;
+	rawRow: unknown;
+	localUserId: string | null;
+}
+
+interface MembershipRaw {
+	externalUserId: string;
+	groupsRaw?: unknown[];
+	rolesRaw?: unknown[];
+	groupsError?: unknown;
+	rolesError?: unknown;
+}
 
 @Injectable()
 export class SyncService {
@@ -67,6 +90,9 @@ export class SyncService {
 			throw new BadRequestException('Local directory is not syncable');
 		}
 		const connectionBefore = { ...connection };
+		const contract = resolveApiContract(
+			(connection.apiContractConfig as ApiContractConfig | null) ?? null,
+		);
 
 		if (!dryRun) {
 			await this.assertRealSyncNotInProgress(connectionId, connection);
@@ -110,9 +136,13 @@ export class SyncService {
 
 			let usersBody: unknown[];
 			try {
-				const raw = await this.identitySyncClient.fetchUsersRaw(connection.baseUrl, bearerToken);
+				const raw = await this.identitySyncClient.fetchUsersRaw(
+					connection.baseUrl,
+					bearerToken,
+					contract,
+				);
 				usersBody = assertUsersArrayWithinLimit(raw, this.identitySyncClient.getMaxUsersPerRun());
-				if (detectDuplicateUserIds(usersBody)) {
+				if (detectDuplicateUserIds(usersBody, contract.userFieldMap.id)) {
 					errors.push({
 						phase: 'parse_users',
 						message: 'Duplicate user ids in external API response; last row wins per id',
@@ -134,23 +164,24 @@ export class SyncService {
 			const seenUserExternalIds = new Set<string>();
 			const userRowsById = new Map<string, unknown>();
 			for (const rawRow of usersBody) {
-				if (
-					typeof rawRow === 'object' &&
-					rawRow !== null &&
-					typeof (rawRow as { id?: unknown }).id === 'string'
-				) {
-					const trimmed = (rawRow as { id: string }).id.trim();
-					if (trimmed.length > 0) {
-						userRowsById.set(trimmed, rawRow);
-					}
+				const idValue = getByPath(rawRow, contract.userFieldMap.id);
+				if (typeof idValue === 'string' && idValue.trim().length > 0) {
+					userRowsById.set(idValue.trim(), rawRow);
 				}
 			}
 
+			// --- Phase 1: map + upsert users (sequential, deterministic order) ---
+			const processed: ProcessedUser[] = [];
 			for (const [externalUserId, rawRow] of userRowsById) {
 				seenUserExternalIds.add(externalUserId);
 				let user;
 				try {
-					user = parseExternalUserRow(rawRow);
+					user = mapExternalUserRow(rawRow, {
+						fieldMap: contract.userFieldMap,
+						passwordHashAlgorithmConstant: contract.passwordHashAlgorithmConstant,
+						activeMapping: contract.activeMapping,
+						defaults: contract.defaults,
+					});
 				} catch (error) {
 					errors.push({
 						phase: 'parse_users',
@@ -158,15 +189,15 @@ export class SyncService {
 						message:
 							error instanceof ExternalApiValidationError ? error.message : 'Invalid user row',
 					});
+					if (contract.onRowError === 'fail') {
+						throw new StrictRowError();
+					}
 					continue;
 				}
 
 				let localUserId: string | null = null;
-				let userUpserted = false;
-
 				if (dryRun) {
 					usersSynced += 1;
-					userUpserted = true;
 				} else {
 					try {
 						const row = await this.identityRepository.upsertUser(connectionId, {
@@ -180,83 +211,62 @@ export class SyncService {
 						});
 						localUserId = row.id;
 						usersSynced += 1;
-						userUpserted = true;
 					} catch (error) {
 						this.pushUpsertUserError(errors, user.id, error);
 						continue;
 					}
 				}
+				processed.push({ externalUserId, rawRow, localUserId });
+			}
 
-				if (!userUpserted) {
-					continue;
-				}
+			// --- Phase 2: gather raw memberships (bounded-parallel HTTP for endpoint mode) ---
+			const memberships = await this.gatherMemberships(
+				connection.baseUrl,
+				bearerToken,
+				contract,
+				processed,
+			);
 
-				try {
-					const groups = await this.identitySyncClient.fetchGroupsForUser(
-						connection.baseUrl,
-						bearerToken,
-						externalUserId,
+			// --- Phase 3: map + upsert memberships (sequential, original order) ---
+			for (const processedUser of processed) {
+				const m = memberships.get(processedUser.externalUserId);
+				// Groups
+				if (m?.groupsError) {
+					this.pushFetchGroupsError(errors, processedUser.externalUserId, m.groupsError);
+				} else if (m?.groupsRaw) {
+					const groupIds = await this.applyMemberships(
+						connectionId,
+						processedUser,
+						m.groupsRaw,
+						contract.groupFieldMap,
+						'group',
+						{ dryRun, seen: seenGroupExternalIds, upserted: upsertedGroupExternalIds, errors },
+						(count) => {
+							groupsSynced += count;
+						},
 					);
-					const groupIds: string[] = [];
-					for (const group of groups) {
-						seenGroupExternalIds.add(group.id);
-						if (dryRun) {
-							if (!upsertedGroupExternalIds.has(group.id)) {
-								upsertedGroupExternalIds.add(group.id);
-								groupsSynced += 1;
-							}
-							continue;
-						}
-						try {
-							const row = await this.identityRepository.upsertGroup(connectionId, group);
-							if (!upsertedGroupExternalIds.has(group.id)) {
-								upsertedGroupExternalIds.add(group.id);
-								groupsSynced += 1;
-							}
-							groupIds.push(row.id);
-						} catch (error) {
-							this.pushUpsertGroupError(errors, externalUserId, group.id, error);
-						}
+					if (!dryRun && processedUser.localUserId) {
+						await this.identityRepository.replaceUserGroups(processedUser.localUserId, groupIds);
 					}
-					if (!dryRun && localUserId) {
-						await this.identityRepository.replaceUserGroups(localUserId, groupIds);
-					}
-				} catch (error) {
-					this.pushFetchGroupsError(errors, externalUserId, error);
 				}
-
-				try {
-					const roles = await this.identitySyncClient.fetchRolesForUser(
-						connection.baseUrl,
-						bearerToken,
-						externalUserId,
+				// Roles
+				if (m?.rolesError) {
+					this.pushFetchRolesError(errors, processedUser.externalUserId, m.rolesError);
+				} else if (m?.rolesRaw) {
+					const roleIds = await this.applyMemberships(
+						connectionId,
+						processedUser,
+						m.rolesRaw,
+						contract.roleFieldMap,
+						'role',
+						{ dryRun, seen: seenRoleExternalIds, upserted: upsertedRoleExternalIds, errors },
+						(count) => {
+							rolesSynced += count;
+						},
 					);
-					const roleIds: string[] = [];
-					for (const role of roles) {
-						seenRoleExternalIds.add(role.id);
-						if (dryRun) {
-							if (!upsertedRoleExternalIds.has(role.id)) {
-								upsertedRoleExternalIds.add(role.id);
-								rolesSynced += 1;
-							}
-							continue;
-						}
-						try {
-							const row = await this.identityRepository.upsertRole(connectionId, role);
-							if (!upsertedRoleExternalIds.has(role.id)) {
-								upsertedRoleExternalIds.add(role.id);
-								rolesSynced += 1;
-							}
-							roleIds.push(row.id);
-						} catch (error) {
-							this.pushUpsertRoleError(errors, externalUserId, role.id, error);
-						}
+					if (!dryRun && processedUser.localUserId) {
+						await this.identityRepository.replaceUserRoles(processedUser.localUserId, roleIds);
 					}
-					if (!dryRun && localUserId) {
-						await this.identityRepository.replaceUserRoles(localUserId, roleIds);
-					}
-				} catch (error) {
-					this.pushFetchRolesError(errors, externalUserId, error);
 				}
 			}
 
@@ -270,10 +280,7 @@ export class SyncService {
 			}
 
 			if (dryRun) {
-				errors.push({
-					phase: DRY_RUN_SUMMARY_PHASE,
-					message: DRY_RUN_SUMMARY_MESSAGE,
-				});
+				errors.push({ phase: DRY_RUN_SUMMARY_PHASE, message: DRY_RUN_SUMMARY_MESSAGE });
 			}
 
 			const finishedLog = await this.syncLogService.finishLog(
@@ -310,9 +317,162 @@ export class SyncService {
 				dryRun,
 				errors,
 				{ usersSynced, groupsSynced, rolesSynced },
-				options,
+				auditContext,
 			);
 		}
+	}
+
+	/** Endpoint mode: bounded-parallel raw fetch. Embedded mode: synchronous extract. */
+	private async gatherMemberships(
+		baseUrl: string,
+		bearerToken: string,
+		contract: ResolvedApiContract,
+		processed: ProcessedUser[],
+	): Promise<Map<string, MembershipRaw>> {
+		const result = new Map<string, MembershipRaw>();
+		const groupsEmbedded = contract.membershipSource.groups.mode === 'embedded';
+		const rolesEmbedded = contract.membershipSource.roles.mode === 'embedded';
+
+		const worker = async (p: ProcessedUser): Promise<void> => {
+			const entry: MembershipRaw = { externalUserId: p.externalUserId };
+			// Groups
+			if (groupsEmbedded) {
+				entry.groupsRaw = this.extractEmbedded(
+					p.rawRow,
+					contract.membershipSource.groups.embeddedPath,
+					contract.maxGroupsPerUser,
+				);
+			} else {
+				try {
+					entry.groupsRaw = await this.identitySyncClient.fetchGroupsRawForUser(
+						baseUrl,
+						bearerToken,
+						p.externalUserId,
+						contract,
+					);
+				} catch (error) {
+					entry.groupsError = error;
+				}
+			}
+			// Roles
+			if (rolesEmbedded) {
+				entry.rolesRaw = this.extractEmbedded(
+					p.rawRow,
+					contract.membershipSource.roles.embeddedPath,
+					contract.maxRolesPerUser,
+				);
+			} else {
+				try {
+					entry.rolesRaw = await this.identitySyncClient.fetchRolesRawForUser(
+						baseUrl,
+						bearerToken,
+						p.externalUserId,
+						contract,
+					);
+				} catch (error) {
+					entry.rolesError = error;
+				}
+			}
+			result.set(p.externalUserId, entry);
+		};
+
+		if (groupsEmbedded && rolesEmbedded) {
+			// No HTTP — extract inline, order irrelevant.
+			for (const p of processed) {
+				await worker(p);
+			}
+			return result;
+		}
+
+		await this.runPool(processed, this.identitySyncClient.getMembershipFetchConcurrency(), worker);
+		return result;
+	}
+
+	private extractEmbedded(
+		rawRow: unknown,
+		embeddedPath: string | undefined,
+		cap: number | null,
+	): unknown[] {
+		const value = embeddedPath ? getByPath(rawRow, embeddedPath) : undefined;
+		const arr = Array.isArray(value) ? value : [];
+		return cap != null ? arr.slice(0, cap) : arr;
+	}
+
+	private async applyMemberships(
+		connectionId: string,
+		processedUser: ProcessedUser,
+		rawRows: unknown[],
+		fieldMap: { id: string; name: string },
+		entity: 'group' | 'role',
+		ctx: {
+			dryRun: boolean;
+			seen: Set<string>;
+			upserted: Set<string>;
+			errors: SyncLogErrorEntryDto[];
+		},
+		addCount: (n: number) => void,
+	): Promise<string[]> {
+		const ids: string[] = [];
+		for (const raw of rawRows) {
+			let mapped: ExternalGroupDto | ExternalRoleDto;
+			try {
+				mapped =
+					entity === 'group'
+						? mapExternalGroupRow(raw, fieldMap)
+						: mapExternalRoleRow(raw, fieldMap);
+			} catch (error) {
+				ctx.errors.push({
+					phase: entity === 'group' ? 'upsert_group' : 'upsert_role',
+					externalUserId: processedUser.externalUserId,
+					message:
+						error instanceof ExternalApiValidationError ? error.message : `Invalid ${entity} row`,
+				});
+				continue;
+			}
+			ctx.seen.add(mapped.id);
+			if (ctx.dryRun) {
+				if (!ctx.upserted.has(mapped.id)) {
+					ctx.upserted.add(mapped.id);
+					addCount(1);
+				}
+				continue;
+			}
+			try {
+				const row =
+					entity === 'group'
+						? await this.identityRepository.upsertGroup(connectionId, mapped)
+						: await this.identityRepository.upsertRole(connectionId, mapped);
+				if (!ctx.upserted.has(mapped.id)) {
+					ctx.upserted.add(mapped.id);
+					addCount(1);
+				}
+				ids.push(row.id);
+			} catch (error) {
+				if (entity === 'group') {
+					this.pushUpsertGroupError(ctx.errors, processedUser.externalUserId, mapped.id, error);
+				} else {
+					this.pushUpsertRoleError(ctx.errors, processedUser.externalUserId, mapped.id, error);
+				}
+			}
+		}
+		return ids;
+	}
+
+	/** Run `worker` over items with at most `concurrency` in flight. */
+	private async runPool<T>(
+		items: T[],
+		concurrency: number,
+		worker: (item: T) => Promise<void>,
+	): Promise<void> {
+		let index = 0;
+		const runners = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+			while (index < items.length) {
+				const current = items[index];
+				index += 1;
+				await worker(current);
+			}
+		});
+		await Promise.all(runners);
 	}
 
 	async getSyncStatus(connectionId: string): Promise<SyncStatusResponseDto> {
