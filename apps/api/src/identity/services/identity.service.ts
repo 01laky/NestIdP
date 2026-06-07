@@ -1,19 +1,19 @@
 import { Injectable } from '@nestjs/common';
-import { IdentityRepository } from '../identity.repository';
+import { ActiveIdentityStore } from '../store/active-identity-store';
 
 @Injectable()
 export class IdentityService {
-	constructor(private readonly identityRepository: IdentityRepository) {}
+	constructor(private readonly store: ActiveIdentityStore) {}
 
 	countUsers(): Promise<number> {
-		return this.identityRepository.countUsers();
+		return this.store.countUsers();
 	}
 
 	countGroups(): Promise<number> {
-		return this.identityRepository.countGroups();
+		return this.store.countGroups();
 	}
 
 	countRoles(): Promise<number> {
-		return this.identityRepository.countRoles();
+		return this.store.countRoles();
 	}
 }

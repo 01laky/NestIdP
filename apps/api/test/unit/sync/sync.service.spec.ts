@@ -3,10 +3,10 @@ import type { SyncLog } from '@prisma/client';
 import type { CredentialsEncryptionPort } from '@api/encryption/credentials-encryption.port';
 import {
 	GroupNameCollisionError,
-	IdentityRepository,
 	RoleNameCollisionError,
 	UsernameCollisionError,
 } from '@api/identity/identity.repository';
+import { ActiveIdentityStore } from '@api/identity/store/active-identity-store';
 import { ExternalApiValidationError } from '@api/sync/validators/external-api.validator';
 import { IdentitySyncClientService } from '@api/sync/services/identity-sync-client.service';
 import { IdentitySyncHttpError } from '@api/sync/identity-sync.errors';
@@ -85,7 +85,7 @@ describe('SyncService', () => {
 
 	const service = new SyncService(
 		prisma as never,
-		identityRepository as unknown as IdentityRepository,
+		identityRepository as unknown as ActiveIdentityStore,
 		syncLogService as unknown as SyncLogService,
 		identitySyncClient as unknown as IdentitySyncClientService,
 		encryption,

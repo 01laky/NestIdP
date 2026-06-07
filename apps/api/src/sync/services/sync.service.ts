@@ -23,10 +23,10 @@ import {
 } from '../../encryption/credentials-encryption.port';
 import {
 	GroupNameCollisionError,
-	IdentityRepository,
 	RoleNameCollisionError,
 	UsernameCollisionError,
 } from '../../identity/identity.repository';
+import { ActiveIdentityStore } from '../../identity/store/active-identity-store';
 import { PrismaService } from '../../prisma/services/prisma.service';
 import {
 	assertUsersArrayWithinLimit,
@@ -70,7 +70,7 @@ interface MembershipRaw {
 export class SyncService {
 	constructor(
 		private readonly prisma: PrismaService,
-		private readonly identityRepository: IdentityRepository,
+		private readonly identityRepository: ActiveIdentityStore,
 		private readonly syncLogService: SyncLogService,
 		private readonly identitySyncClient: IdentitySyncClientService,
 		@Inject(CREDENTIALS_ENCRYPTION)
