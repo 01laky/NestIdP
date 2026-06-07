@@ -24,7 +24,9 @@ for (const f of [scratch, `${scratch}-wal`, `${scratch}-shm`, `${scratch}-journa
 }
 
 try {
-	execFileSync('npx', ['prisma', 'migrate', 'dev', '--name', name], {
+	// --skip-seed: `migrate dev` would otherwise run `prisma db seed`, which fails under ts-node ESM
+	// and is irrelevant to authoring SQL. We only want the generated migration.sql.
+	execFileSync('npx', ['prisma', 'migrate', 'dev', '--name', name, '--skip-seed'], {
 		cwd: apiRoot,
 		stdio: 'inherit',
 		env: { ...process.env, DATABASE_URL: `file:${scratch}` },
