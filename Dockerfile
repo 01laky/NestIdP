@@ -1,6 +1,13 @@
 # syntax=docker/dockerfile:1
 
-FROM node:20-alpine AS base
+# node:20-slim (Debian/glibc), not alpine: @prisma/adapter-libsql pulls @libsql/client@0.8.1 →
+# libsql@0.3.19, whose linux-x64-musl prebuilt is incompatible with current Alpine musl
+# (Error relocating ... fcntl64: symbol not found). The glibc (linux-x64-gnu) prebuilt is fine.
+FROM node:20-slim AS base
+# OpenSSL must be present when `prisma generate` runs so the Prisma query engine is built for the
+# runtime's OpenSSL (3.0). Without it, generate falls back to openssl-1.1.x and the engine fails to
+# load at runtime ("could not locate the Query Engine for ... openssl-3.0.x").
+RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 RUN corepack enable && corepack prepare pnpm@9 --activate
 WORKDIR /app
 
@@ -31,8 +38,8 @@ ENV DATABASE_URL=${DATABASE_URL}
 RUN pnpm --filter @nestidp/api prisma:generate
 RUN pnpm --filter @nestidp/api build
 
-FROM node:20-alpine AS runner
-RUN apk add --no-cache openssl wget
+FROM node:20-slim AS runner
+RUN apt-get update && apt-get install -y --no-install-recommends openssl wget && rm -rf /var/lib/apt/lists/*
 RUN corepack enable && corepack prepare pnpm@9 --activate
 WORKDIR /app
 ENV NODE_ENV=production

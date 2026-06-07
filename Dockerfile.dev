@@ -1,8 +1,10 @@
 # syntax=docker/dockerfile:1
 # Development image: source bind-mount + Nest/Vite watch (see docker-compose.dev.yml).
 
-FROM node:20-alpine
-RUN apk add --no-cache openssl
+# node:20-slim (glibc), not alpine — see Dockerfile: the libsql prebuilt that
+# @prisma/adapter-libsql pulls is incompatible with current Alpine musl.
+FROM node:20-slim
+RUN apt-get update && apt-get install -y --no-install-recommends openssl wget && rm -rf /var/lib/apt/lists/*
 RUN corepack enable && corepack prepare pnpm@9 --activate
 WORKDIR /app
 
