@@ -38,12 +38,17 @@ describe('ApiConnectionsService', () => {
 		fetchDiagnostics: jest.fn(),
 	};
 
+	const identityStore = {
+		connectionHasIdentityRows: jest.fn().mockResolvedValue(false),
+	};
+
 	const service = new ApiConnectionsService(
 		prisma as never,
 		encryption,
 		configService,
 		audit as never,
 		oauthTokenService as never,
+		identityStore as never,
 	);
 
 	const sampleRow = {

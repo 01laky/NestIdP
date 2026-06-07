@@ -26,25 +26,38 @@ const ci = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
 const unitWorkers = ci ? ['--runInBand'] : ['--maxWorkers=4'];
 const e2eWorkers = ci ? ['--runInBand'] : ['--maxWorkers=2'];
 
-function runJest(extraArgs) {
-	// --experimental-vm-modules: PGlite (the in-process Postgres used by external-store tests) loads
-	// its WASM via dynamic import(), which Node's VM needs this flag to allow under Jest.
-	const nodeOptions = [process.env.NODE_OPTIONS, '--experimental-vm-modules'].filter(Boolean).join(' ');
+// The external identity-store specs use PGlite (in-process Postgres), which loads its WASM via dynamic
+// import() — Node's VM needs --experimental-vm-modules for that. That flag slows every other suite, so
+// it is applied ONLY to the PGlite phase; the rest run without it.
+const EXTERNAL_STORE_PATH = 'test/unit/identity/store/';
+
+function runJest(extraArgs, { vmModules = false } = {}) {
+	const nodeOptions = vmModules
+		? [process.env.NODE_OPTIONS, '--experimental-vm-modules'].filter(Boolean).join(' ')
+		: process.env.NODE_OPTIONS;
 	const result = spawnSync('pnpm', ['exec', 'jest', '--forceExit', ...extraArgs], {
 		stdio: 'inherit',
 		shell: true,
 		cwd: apiRoot,
-		env: { ...process.env, NODE_OPTIONS: nodeOptions },
+		env: { ...process.env, ...(nodeOptions ? { NODE_OPTIONS: nodeOptions } : {}) },
 	});
 	return result.status ?? 1;
 }
 
 loadEnvFiles();
 
-const unitStatus = runJest([...unitWorkers]);
+// Phase 1: all unit suites except the PGlite external-store specs.
+const unitStatus = runJest([...unitWorkers, '--testPathIgnorePatterns', '/node_modules/', EXTERNAL_STORE_PATH]);
 if (unitStatus !== 0) {
 	process.exit(unitStatus);
 }
 
+// Phase 2: the PGlite external-store specs, with --experimental-vm-modules.
+const externalStatus = runJest([...unitWorkers, EXTERNAL_STORE_PATH], { vmModules: true });
+if (externalStatus !== 0) {
+	process.exit(externalStatus);
+}
+
+// Phase 3: e2e (no PGlite).
 const e2eStatus = runJest(['--config', './test/jest-e2e.config.js', ...e2eWorkers]);
 process.exit(e2eStatus);

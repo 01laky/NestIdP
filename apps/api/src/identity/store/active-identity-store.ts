@@ -2,7 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { IdentityRepository } from '../identity.repository';
 import type {
 	CreateManualUserInput,
+	IdentitySnapshot,
 	IdentityStore,
+	ImportCounts,
+	ImportMode,
 	ListQuery,
 	ListResult,
 	StoreGroup,
@@ -181,5 +184,19 @@ export class ActiveIdentityStore implements IdentityStore {
 	}
 	isRoleNameTaken(apiConnectionId: string, name: string, excludeId?: string): Promise<boolean> {
 		return this.current.isRoleNameTaken(apiConnectionId, name, excludeId);
+	}
+
+	// --- replication / migration / guard ---
+	exportAll(): Promise<IdentitySnapshot> {
+		return this.current.exportAll();
+	}
+	importSnapshot(snapshot: IdentitySnapshot, mode: ImportMode): Promise<ImportCounts> {
+		return this.current.importSnapshot(snapshot, mode);
+	}
+	wipeAll(): Promise<void> {
+		return this.current.wipeAll();
+	}
+	connectionHasIdentityRows(apiConnectionId: string): Promise<boolean> {
+		return this.current.connectionHasIdentityRows(apiConnectionId);
 	}
 }

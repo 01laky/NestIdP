@@ -116,6 +116,26 @@ export interface UpdateManualUserInput {
 	roleIds?: string[];
 }
 
+/** A full point-in-time copy of the identity data — the unit migrated between stores. */
+export interface IdentitySnapshot {
+	users: StoreUser[];
+	groups: StoreGroup[];
+	roles: StoreRole[];
+	userGroups: Array<{ userId: string; groupId: string }>;
+	userRoles: Array<{ userId: string; roleId: string }>;
+}
+
+export interface ImportCounts {
+	usersInserted: number;
+	usersUpdated: number;
+	groupsInserted: number;
+	groupsUpdated: number;
+	rolesInserted: number;
+	rolesUpdated: number;
+}
+
+export type ImportMode = 'insert-missing' | 'upsert';
+
 export interface IdentityStore {
 	// --- counts (dashboard) ---
 	countUsers(): Promise<number>;
@@ -166,4 +186,13 @@ export interface IdentityStore {
 	deleteRole(id: string): Promise<void>;
 	roleMemberCount(id: string): Promise<number>;
 	isRoleNameTaken(apiConnectionId: string, name: string, excludeId?: string): Promise<boolean>;
+
+	// --- replication / migration (attach, resync, reverse) ---
+	exportAll(): Promise<IdentitySnapshot>;
+	importSnapshot(snapshot: IdentitySnapshot, mode: ImportMode): Promise<ImportCounts>;
+	/** Wipe all identity rows (used after a verified relocate copy). */
+	wipeAll(): Promise<void>;
+
+	// --- cross-store integrity guard ---
+	connectionHasIdentityRows(apiConnectionId: string): Promise<boolean>;
 }

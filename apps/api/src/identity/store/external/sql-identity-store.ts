@@ -21,7 +21,10 @@ import {
 } from './external-schema-types';
 import type {
 	CreateManualUserInput,
+	IdentitySnapshot,
 	IdentityStore,
+	ImportCounts,
+	ImportMode,
 	ListQuery,
 	ListResult,
 	StoreGroup,
@@ -35,6 +38,14 @@ import type {
 	UserProfileForAuth,
 	UserWithMemberships,
 } from '../identity-store';
+
+function chunk<T>(items: T[], size: number): T[][] {
+	const out: T[][] = [];
+	for (let i = 0; i < items.length; i += size) {
+		out.push(items.slice(i, i + size));
+	}
+	return out;
+}
 
 function isUniqueViolation(error: unknown): boolean {
 	const e = error as { code?: string; errno?: number; message?: string };
@@ -697,5 +708,180 @@ export class SqlIdentityStore implements IdentityStore {
 	}
 	isRoleNameTaken(apiConnectionId: string, name: string, excludeId?: string): Promise<boolean> {
 		return this.isNamedTaken(T_ROLE, apiConnectionId, name, excludeId);
+	}
+
+	// --- replication / migration ---
+
+	async exportAll(): Promise<IdentitySnapshot> {
+		const [users, groups, roles, userGroups, userRoles] = await Promise.all([
+			this.db.selectFrom(T_USER).selectAll().execute(),
+			this.db.selectFrom(T_GROUP).selectAll().execute(),
+			this.db.selectFrom(T_ROLE).selectAll().execute(),
+			this.db.selectFrom(T_USER_GROUP).selectAll().execute(),
+			this.db.selectFrom(T_USER_ROLE).selectAll().execute(),
+		]);
+		return {
+			users: users.map(mapUser),
+			groups: groups.map(mapGroup),
+			roles: roles.map(mapGroup),
+			userGroups: userGroups.map((m) => ({ userId: m.user_id, groupId: m.group_id })),
+			userRoles: userRoles.map((m) => ({ userId: m.user_id, roleId: m.role_id })),
+		};
+	}
+
+	async importSnapshot(snapshot: IdentitySnapshot, mode: ImportMode): Promise<ImportCounts> {
+		const counts: ImportCounts = {
+			usersInserted: 0,
+			usersUpdated: 0,
+			groupsInserted: 0,
+			groupsUpdated: 0,
+			rolesInserted: 0,
+			rolesUpdated: 0,
+		};
+
+		const existingGroupIds = new Set(
+			(await this.db.selectFrom(T_GROUP).select('id').execute()).map((r) => r.id),
+		);
+		for (const g of snapshot.groups) {
+			if (!existingGroupIds.has(g.id)) {
+				await this.db
+					.insertInto(T_GROUP)
+					.values({
+						id: g.id,
+						external_id: g.externalId,
+						api_connection_id: g.apiConnectionId,
+						origin: g.origin,
+						name: g.name,
+						created_at: g.createdAt,
+						updated_at: g.updatedAt,
+					})
+					.execute();
+				counts.groupsInserted += 1;
+			} else if (mode === 'upsert') {
+				await this.db.updateTable(T_GROUP).set({ name: g.name, updated_at: this.now() }).where('id', '=', g.id).execute();
+				counts.groupsUpdated += 1;
+			}
+		}
+
+		const existingRoleIds = new Set(
+			(await this.db.selectFrom(T_ROLE).select('id').execute()).map((r) => r.id),
+		);
+		for (const r of snapshot.roles) {
+			if (!existingRoleIds.has(r.id)) {
+				await this.db
+					.insertInto(T_ROLE)
+					.values({
+						id: r.id,
+						external_id: r.externalId,
+						api_connection_id: r.apiConnectionId,
+						origin: r.origin,
+						name: r.name,
+						created_at: r.createdAt,
+						updated_at: r.updatedAt,
+					})
+					.execute();
+				counts.rolesInserted += 1;
+			} else if (mode === 'upsert') {
+				await this.db.updateTable(T_ROLE).set({ name: r.name, updated_at: this.now() }).where('id', '=', r.id).execute();
+				counts.rolesUpdated += 1;
+			}
+		}
+
+		const existingUserIds = new Set(
+			(await this.db.selectFrom(T_USER).select('id').execute()).map((r) => r.id),
+		);
+		for (const u of snapshot.users) {
+			if (!existingUserIds.has(u.id)) {
+				await this.db
+					.insertInto(T_USER)
+					.values({
+						id: u.id,
+						external_id: u.externalId,
+						api_connection_id: u.apiConnectionId,
+						origin: u.origin,
+						username: u.username,
+						email: u.email,
+						display_name: u.displayName,
+						password_hash: u.passwordHash,
+						password_hash_algorithm: u.passwordHashAlgorithm,
+						active: u.active,
+						created_at: u.createdAt,
+						updated_at: u.updatedAt,
+					})
+					.execute();
+				counts.usersInserted += 1;
+			} else if (mode === 'upsert') {
+				await this.db
+					.updateTable(T_USER)
+					.set({
+						username: u.username,
+						email: u.email,
+						display_name: u.displayName,
+						password_hash: u.passwordHash,
+						password_hash_algorithm: u.passwordHashAlgorithm,
+						active: u.active,
+						updated_at: this.now(),
+					})
+					.where('id', '=', u.id)
+					.execute();
+				counts.usersUpdated += 1;
+			}
+		}
+
+		await this.importMemberships(
+			T_USER_GROUP,
+			'group_id',
+			snapshot.userGroups.map((m) => ({ user_id: m.userId, group_id: m.groupId })),
+		);
+		await this.importMemberships(
+			T_USER_ROLE,
+			'role_id',
+			snapshot.userRoles.map((m) => ({ user_id: m.userId, role_id: m.roleId })),
+		);
+		return counts;
+	}
+
+	private async importMemberships(
+		table: typeof T_USER_GROUP | typeof T_USER_ROLE,
+		fk: 'group_id' | 'role_id',
+		rows: Array<Record<string, string>>,
+	): Promise<void> {
+		if (rows.length === 0) {
+			return;
+		}
+		const existing = new Set(
+			(await this.db.selectFrom(table).select(['user_id', fk]).execute()).map(
+				(r) => `${(r as Record<string, string>).user_id}|${(r as Record<string, string>)[fk]}`,
+			),
+		);
+		const toInsert = rows.filter((r) => !existing.has(`${r.user_id}|${r[fk]}`));
+		for (const part of chunk(toInsert, 500)) {
+			await this.db.insertInto(table).values(part as never).execute();
+		}
+	}
+
+	async wipeAll(): Promise<void> {
+		await this.db.transaction().execute(async (trx) => {
+			await trx.deleteFrom(T_USER_GROUP).execute();
+			await trx.deleteFrom(T_USER_ROLE).execute();
+			await trx.deleteFrom(T_USER).execute();
+			await trx.deleteFrom(T_GROUP).execute();
+			await trx.deleteFrom(T_ROLE).execute();
+		});
+	}
+
+	async connectionHasIdentityRows(apiConnectionId: string): Promise<boolean> {
+		const tables = [T_USER, T_GROUP, T_ROLE] as const;
+		for (const table of tables) {
+			const row = await this.db
+				.selectFrom(table)
+				.select((eb) => eb.fn.countAll().as('n'))
+				.where('api_connection_id', '=', apiConnectionId)
+				.executeTakeFirst();
+			if (Number(row?.n ?? 0) > 0) {
+				return true;
+			}
+		}
+		return false;
 	}
 }

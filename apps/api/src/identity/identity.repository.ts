@@ -5,7 +5,10 @@ import { manualExternalId } from './utils/local-directory.util';
 import { PrismaService } from '../prisma/services/prisma.service';
 import type {
 	CreateManualUserInput,
+	IdentitySnapshot,
 	IdentityStore,
+	ImportCounts,
+	ImportMode,
 	ListQuery,
 	ListResult,
 	StoreGroup,
@@ -19,6 +22,14 @@ import type {
 	UserProfileForAuth,
 	UserWithMemberships,
 } from './store/identity-store';
+
+function chunk<T>(items: T[], size: number): T[][] {
+	const out: T[][] = [];
+	for (let i = 0; i < items.length; i += size) {
+		out.push(items.slice(i, i + size));
+	}
+	return out;
+}
 
 // Re-exported for backward-compatible imports across the codebase.
 export type { UserProfileForAuth, UpsertUserInput } from './store/identity-store';
@@ -582,5 +593,145 @@ export class IdentityRepository implements IdentityStore {
 		}
 		const term = search.trim();
 		return { OR: [{ username: { contains: term } }, { email: { contains: term } }] };
+	}
+
+	// --- replication / migration ---
+
+	async exportAll(): Promise<IdentitySnapshot> {
+		const [users, groups, roles, userGroups, userRoles] = await Promise.all([
+			this.prisma.user.findMany(),
+			this.prisma.group.findMany(),
+			this.prisma.role.findMany(),
+			this.prisma.userGroup.findMany(),
+			this.prisma.userRole.findMany(),
+		]);
+		return {
+			users,
+			groups,
+			roles,
+			userGroups: userGroups.map((m) => ({ userId: m.userId, groupId: m.groupId })),
+			userRoles: userRoles.map((m) => ({ userId: m.userId, roleId: m.roleId })),
+		};
+	}
+
+	async importSnapshot(snapshot: IdentitySnapshot, mode: ImportMode): Promise<ImportCounts> {
+		const counts: ImportCounts = {
+			usersInserted: 0,
+			usersUpdated: 0,
+			groupsInserted: 0,
+			groupsUpdated: 0,
+			rolesInserted: 0,
+			rolesUpdated: 0,
+		};
+
+		const existingGroupIds = new Set((await this.prisma.group.findMany({ select: { id: true } })).map((r) => r.id));
+		for (const g of snapshot.groups) {
+			if (!existingGroupIds.has(g.id)) {
+				await this.prisma.group.create({
+					data: {
+						id: g.id,
+						externalId: g.externalId,
+						apiConnectionId: g.apiConnectionId,
+						origin: g.origin,
+						name: g.name,
+						createdAt: g.createdAt,
+					},
+				});
+				counts.groupsInserted += 1;
+			} else if (mode === 'upsert') {
+				await this.prisma.group.update({ where: { id: g.id }, data: { name: g.name } });
+				counts.groupsUpdated += 1;
+			}
+		}
+
+		const existingRoleIds = new Set((await this.prisma.role.findMany({ select: { id: true } })).map((r) => r.id));
+		for (const r of snapshot.roles) {
+			if (!existingRoleIds.has(r.id)) {
+				await this.prisma.role.create({
+					data: {
+						id: r.id,
+						externalId: r.externalId,
+						apiConnectionId: r.apiConnectionId,
+						origin: r.origin,
+						name: r.name,
+						createdAt: r.createdAt,
+					},
+				});
+				counts.rolesInserted += 1;
+			} else if (mode === 'upsert') {
+				await this.prisma.role.update({ where: { id: r.id }, data: { name: r.name } });
+				counts.rolesUpdated += 1;
+			}
+		}
+
+		const existingUserIds = new Set((await this.prisma.user.findMany({ select: { id: true } })).map((r) => r.id));
+		for (const u of snapshot.users) {
+			if (!existingUserIds.has(u.id)) {
+				await this.prisma.user.create({
+					data: {
+						id: u.id,
+						externalId: u.externalId,
+						apiConnectionId: u.apiConnectionId,
+						origin: u.origin,
+						username: u.username,
+						email: u.email,
+						displayName: u.displayName,
+						passwordHash: u.passwordHash,
+						passwordHashAlgorithm: u.passwordHashAlgorithm,
+						active: u.active,
+						createdAt: u.createdAt,
+					},
+				});
+				counts.usersInserted += 1;
+			} else if (mode === 'upsert') {
+				await this.prisma.user.update({
+					where: { id: u.id },
+					data: {
+						username: u.username,
+						email: u.email,
+						displayName: u.displayName,
+						passwordHash: u.passwordHash,
+						passwordHashAlgorithm: u.passwordHashAlgorithm,
+						active: u.active,
+					},
+				});
+				counts.usersUpdated += 1;
+			}
+		}
+
+		const existingUg = new Set(
+			(await this.prisma.userGroup.findMany()).map((m) => `${m.userId}|${m.groupId}`),
+		);
+		const newUg = snapshot.userGroups.filter((m) => !existingUg.has(`${m.userId}|${m.groupId}`));
+		for (const part of chunk(newUg, 500)) {
+			await this.prisma.userGroup.createMany({ data: part });
+		}
+		const existingUr = new Set(
+			(await this.prisma.userRole.findMany()).map((m) => `${m.userId}|${m.roleId}`),
+		);
+		const newUr = snapshot.userRoles.filter((m) => !existingUr.has(`${m.userId}|${m.roleId}`));
+		for (const part of chunk(newUr, 500)) {
+			await this.prisma.userRole.createMany({ data: part });
+		}
+		return counts;
+	}
+
+	async wipeAll(): Promise<void> {
+		await this.prisma.$transaction([
+			this.prisma.userGroup.deleteMany(),
+			this.prisma.userRole.deleteMany(),
+			this.prisma.user.deleteMany(),
+			this.prisma.group.deleteMany(),
+			this.prisma.role.deleteMany(),
+		]);
+	}
+
+	async connectionHasIdentityRows(apiConnectionId: string): Promise<boolean> {
+		const [u, g, r] = await Promise.all([
+			this.prisma.user.count({ where: { apiConnectionId } }),
+			this.prisma.group.count({ where: { apiConnectionId } }),
+			this.prisma.role.count({ where: { apiConnectionId } }),
+		]);
+		return u + g + r > 0;
 	}
 }

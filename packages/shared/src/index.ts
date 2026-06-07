@@ -3,6 +3,7 @@ export * from './connections.js';
 export * from './api-contract.js';
 export * from './oauth.js';
 export * from './database.js';
+export * from './external-identity-db.js';
 export * from './schema-enums.js';
 export * from './password-hash-algorithms.js';
 export * from './admin-types.js';
