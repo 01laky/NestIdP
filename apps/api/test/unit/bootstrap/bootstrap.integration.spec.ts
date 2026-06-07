@@ -25,7 +25,7 @@ describe('bootstrap integration (SQLite)', () => {
 		warnings.length = 0;
 		const tmpDb = join(tmpdir(), `nestidp-bootstrap-${randomUUID()}.db`);
 		databaseUrl = `file:${tmpDb}`;
-		runMigrationsOnTestDb(databaseUrl, 'sqlite');
+		await runMigrationsOnTestDb(databaseUrl);
 		prisma = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
 	});
 

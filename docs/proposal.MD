@@ -112,7 +112,7 @@ NestIdP is a **monolith**: NestJS serves the REST API, SAML endpoints, and the b
 |-------|------------|
 | Backend | NestJS (TypeScript) |
 | Frontend | React + Vite (TypeScript) |
-| Database | SQL via Prisma (`sqlite` dev default, `postgresql` recommended for production) |
+| Database | Encrypted libSQL file via Prisma + `@prisma/adapter-libsql` (embedded, at-rest encrypted) |
 | SAML (IdP) | Custom NestJS `SamlModule` — see Section 5.5 |
 | SAML XML/signing | `xmlbuilder2`, `xml-crypto` (>= 6.0.1), `@xmldom/xmldom`, `xpath` |
 | ORM | Prisma |
@@ -622,28 +622,27 @@ Login page (separate from admin):
 
 ### 12.1 Deployment Model
 
-Single Docker container running the NestJS process. Database as a separate service or SQLite file depending on deployment (`DATABASE_PROVIDER`).
+Single Docker container running the NestJS process. The datastore is an **encrypted libSQL file** on a persistent volume — no separate database service.
 
 ```
+┌─────────────────────┐
+│   Load Balancer     │
+│   (TLS termination) │
+└─────────┬───────────┘
+          │
+          ▼
 ┌─────────────────────┐       ┌─────────────────────┐
-│   Load Balancer     │       │    PostgreSQL       │
-│   (TLS termination) │       │    (managed RDS or  │
-└─────────┬───────────┘       │     docker volume)  │
-          │                   └────────▲────────────┘
-          │                              │
-          ▼                              │
-┌─────────────────────┐                  │
-│   NestIdP container │──────────────────┘
-│   (NestJS + React)  │
-└─────────────────────┘
+│   NestIdP container │──────▶│ Encrypted libSQL    │
+│   (NestJS + React)  │       │ file (docker volume)│
+└─────────────────────┘       └─────────────────────┘
 ```
 
 ### 12.2 Environment Variables
 
 | Variable | Description |
 |----------|-------------|
-| `DATABASE_PROVIDER` | Prisma engine: `sqlite` or `postgresql` |
-| `DATABASE_URL` | Connection string matching the provider (see `docs/database.md`) |
+| `DATABASE_URL` | `file:` path to the libSQL database file (see `docs/database.md`) |
+| `DATABASE_ENCRYPTION_KEY` | At-rest encryption key for the DB file (required in production) |
 | `SESSION_SECRET` | Cookie signing secret |
 | `ENCRYPTION_KEY` | Key for encrypting stored credentials and private keys |
 | `IDP_BASE_URL` | Public base URL (e.g. `https://idp.example.com`) |
@@ -651,7 +650,7 @@ Single Docker container running the NestJS process. Database as a separate servi
 
 ### 12.3 Target Platforms
 
-Any platform supporting Docker containers and a SQL database (SQLite or PostgreSQL via Prisma):
+Any platform supporting Docker containers with a persistent volume (the encrypted libSQL file is embedded — no managed database needed):
 
 - Fly.io
 - Railway
@@ -687,7 +686,7 @@ _Phase 1 complete in **v1.0.0** (Prompt 10 — Docker, persistent audit, admin a
 - [x] NestJS monolith scaffold (API + static serving)
 - [x] React Admin SPA (API connections, SP connections, IdP settings, audit log, admin accounts)
 - [x] React SAML login page (SP-initiated SSO completion)
-- [x] Prisma schema and migrations (portable across sqlite/postgresql)
+- [x] Prisma schema and migrations (encrypted libSQL via driver adapter)
 - [x] API connection CRUD (baseUrl + Bearer token)
 - [x] Manual identity sync from one active source
 - [x] Manual identity CRUD in admin (local directory; synced records read-only) — v1.2.0
@@ -735,7 +734,7 @@ _Deferred. Do not start until the planned feature work in Phases 2 and 3 is comp
 - [ ] **Deploy bundle** — release asset or small repo: `docker-compose.yml`, `.env.docker.example`, link to `docs/RELEASE.md` / `docs/deployment.md` (no local `pnpm build` on customer side)
 - [ ] **Single official install path** in docs — Docker Compose (or Helm later if needed); “advanced” alternatives clearly secondary
 - [ ] **Upgrade runbook** — image bump, env checklist, `prisma migrate deploy`, rollback notes
-- [ ] **Optional native packages (DEB/RPM)** — only if a concrete customer requires on-prem without Docker; separate packaging pipeline (systemd, `/etc/nestidp`, PostgreSQL dependency), not a substitute for the container artifact
+- [ ] **Optional native packages (DEB/RPM)** — only if a concrete customer requires on-prem without Docker; separate packaging pipeline (systemd, `/etc/nestidp`, data-dir for the libSQL file), not a substitute for the container artifact
 
 **Out of scope for Phase 4 unless separately scoped:** managed/hosted IdP SaaS, multi-distro packaging matrix, Shibboleth-style OS vendor repos.
 

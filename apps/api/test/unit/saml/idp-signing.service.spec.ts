@@ -29,7 +29,7 @@ describe('IdpSigningService (SQLite)', () => {
 	beforeAll(async () => {
 		const tmpDb = join(tmpdir(), `nestidp-signing-${randomUUID()}.db`);
 		databaseUrl = `file:${tmpDb}`;
-		runMigrationsOnTestDb(databaseUrl, 'sqlite');
+		await runMigrationsOnTestDb(databaseUrl);
 		prisma = new PrismaService({ datasources: { db: { url: databaseUrl } } });
 		const configService = {
 			get: (key: string) => (key === 'ENCRYPTION_KEY' ? TEST_ENCRYPTION_KEY : undefined),
@@ -111,7 +111,7 @@ describe('IdpSigningService (SQLite)', () => {
 	it('API-SAML-SIGN-07: hasSigningMaterial false before keys exist', async () => {
 		const freshDb = join(tmpdir(), `nestidp-signing-fresh-${randomUUID()}.db`);
 		const url = `file:${freshDb}`;
-		runMigrationsOnTestDb(url, 'sqlite');
+		await runMigrationsOnTestDb(url);
 		const freshPrisma = new PrismaService({ datasources: { db: { url } } });
 		const configService = {
 			get: (key: string) => (key === 'ENCRYPTION_KEY' ? TEST_ENCRYPTION_KEY : undefined),

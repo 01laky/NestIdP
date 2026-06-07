@@ -1,26 +1,26 @@
 flowchart LR
-	ENV[".env\nDATABASE_PROVIDER\nDATABASE_URL"]
-	PREP["pnpm prisma:prepare\nsync schema.prisma provider"]
-	GEN["prisma generate / migrate"]
+	ENV[".env\nDATABASE_URL (file:)\nDATABASE_ENCRYPTION_KEY"]
+	ADAPTER["@prisma/adapter-libsql\nencryptionKey"]
+	MIG["startup migrator\n__app_migrations\nBEGIN IMMEDIATE batch"]
 	APP["NestJS API · PrismaService"]
 
-	ENV --> PREP --> GEN --> APP
+	ENV --> ADAPTER --> MIG --> APP
 
-	subgraph DEV["Development default"]
-		SQLITE["sqlite\nfile:../data/nestidp.db"]
+	subgraph FILE["Encrypted libSQL file"]
+		DB["apps/api/data/nestidp.db\n(AES at rest)"]
 	end
 
-	subgraph PROD["Production typical"]
-		PG["postgresql\nconnection string"]
+	subgraph AUTHOR["Author migrations (dev)"]
+		SCRATCH["pnpm db:new-migration\nprisma migrate dev\non scratch DB"]
 	end
 
-	ENV -.-> SQLITE
-	ENV -.-> PG
+	ADAPTER -.-> DB
+	SCRATCH -.->|"writes SQL"| MIG
 
 	classDef cfg fill:#422006,stroke:#fbbf24,stroke-width:2px,color:#fffbeb
 	classDef step fill:#134e4a,stroke:#2dd4bf,stroke-width:2px,color:#f0fdfa
 	classDef db fill:#1e3a5f,stroke:#60a5fa,stroke-width:2px,color:#eff6ff
 
 	class ENV cfg
-	class PREP,GEN,APP step
-	class SQLITE,PG db
+	class ADAPTER,MIG,APP,SCRATCH step
+	class DB db

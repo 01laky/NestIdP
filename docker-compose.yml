@@ -1,19 +1,4 @@
 services:
-  postgres:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: nestidp
-      POSTGRES_PASSWORD: nestidp
-      POSTGRES_DB: nestidp
-    volumes:
-      - nestidp_pg_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U nestidp -d nestidp']
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
   nestidp:
     build: .
     restart: unless-stopped
@@ -22,14 +7,15 @@ services:
     env_file:
       - .env.docker
     environment:
-      DATABASE_PROVIDER: postgresql
-      DATABASE_URL: postgresql://nestidp:nestidp@postgres:5432/nestidp
+      # Encrypted libSQL file lives on the mounted data volume.
+      DATABASE_URL: file:/app/apps/api/data/nestidp.db
+      # Provide the at-rest key via .env.docker (DATABASE_ENCRYPTION_KEY) or a
+      # mounted secret referenced by DATABASE_ENCRYPTION_KEY_FILE. Required in production.
       NODE_ENV: production
       PORT: '3000'
       IDP_BASE_URL: http://localhost:3000
-    depends_on:
-      postgres:
-        condition: service_healthy
+    volumes:
+      - nestidp_data:/app/apps/api/data
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/health']
       interval: 30s
@@ -38,4 +24,4 @@ services:
       start_period: 60s
 
 volumes:
-  nestidp_pg_data:
+  nestidp_data:

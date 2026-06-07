@@ -23,10 +23,10 @@ describe('identity and admin stats integration (SQLite)', () => {
 	let prisma: PrismaClient;
 	let adminStatsService: AdminStatsService;
 
-	beforeAll(() => {
+	beforeAll(async () => {
 		const tmpDb = join(tmpdir(), `nestidp-stats-${randomUUID()}.db`);
 		databaseUrl = `file:${tmpDb}`;
-		runMigrationsOnTestDb(databaseUrl, 'sqlite');
+		await runMigrationsOnTestDb(databaseUrl);
 		prisma = new PrismaClient({
 			datasources: { db: { url: databaseUrl } },
 		});

@@ -56,7 +56,7 @@ describe('audit integration (SQLite)', () => {
 	beforeAll(async () => {
 		const tmpDb = join(tmpdir(), `nestidp-audit-${randomUUID()}.db`);
 		databaseUrl = `file:${tmpDb}`;
-		runMigrationsOnTestDb(databaseUrl, 'sqlite');
+		await runMigrationsOnTestDb(databaseUrl);
 
 		const prismaService = new PrismaService({
 			datasources: { db: { url: databaseUrl } },
@@ -69,7 +69,6 @@ describe('audit integration (SQLite)', () => {
 					ignoreEnvFile: true,
 					load: [
 						() => ({
-							DATABASE_PROVIDER: 'sqlite',
 							DATABASE_URL: databaseUrl,
 							SESSION_SECRET: 'test-session-secret-min-16',
 							ENCRYPTION_KEY: 'test-encryption-key-32chars!!',

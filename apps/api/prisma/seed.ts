@@ -2,12 +2,16 @@ import { config as loadEnv } from 'dotenv';
 import { resolve } from 'node:path';
 import { PrismaClient } from '@prisma/client';
 import { runBootstrap } from '../src/bootstrap/run-bootstrap';
+import { buildLibsqlAdapter } from '../src/prisma/libsql';
+import { runMigrations } from '../src/prisma/db-migrator';
 
 loadEnv({ path: resolve(__dirname, '../../../.env') });
 loadEnv({ path: resolve(__dirname, '../.env') });
 
 async function main(): Promise<void> {
-	const prisma = new PrismaClient();
+	// Ensure the (optionally encrypted) DB schema is current, then seed through the libSQL adapter.
+	await runMigrations();
+	const prisma = new PrismaClient({ adapter: buildLibsqlAdapter() });
 
 	try {
 		const result = await runBootstrap(

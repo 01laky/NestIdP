@@ -43,6 +43,7 @@ export class HealthService {
 				status: 'ok',
 				service: 'nest-idp-api',
 				database: 'connected',
+				migrations: await this.prisma.appliedMigrationCount(),
 			},
 		};
 	}

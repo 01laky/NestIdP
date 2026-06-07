@@ -12,7 +12,7 @@ Product and developer documentation. Visual assets live in [`img/`](./img/) (UI 
 | [proposal.MD](./proposal.MD)               | Product scope, architecture, data model, roadmap (source of truth)               |
 | [development.md](./development.md)         | Local setup, routing, REST reference, testing, UI registries                     |
 | [integration-api.md](./integration-api.md) | External identity API v1 contract (bcrypt, endpoints)                            |
-| [database.md](./database.md)               | SQLite vs PostgreSQL, migrations, bootstrap admin                                |
+| [database.md](./database.md)               | Encrypted libSQL file, migrations, rekey/backup, bootstrap admin                 |
 | [deployment.md](./deployment.md)           | Docker Compose, migrations, backup/restore                                       |
 | [RELEASE.md](./RELEASE.md)                 | Production go-live checklist                                                     |
 

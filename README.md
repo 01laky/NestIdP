@@ -2,11 +2,11 @@
 
 **A deployable SAML Identity Provider you run yourself** — one Docker image, one admin console, identity from your REST API, SAML assertions to your apps.
 
-[![Version](https://img.shields.io/badge/version-1.10.0-blue)](package.json)
+[![Version](https://img.shields.io/badge/version-1.11.0-blue)](package.json)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-green)](package.json)
 [![pnpm](https://img.shields.io/badge/pnpm-%3E%3D9-orange)](package.json)
 
-> **SAML 2.0 Identity Provider** (NestJS + React + PostgreSQL/SQLite) for teams that already have users in an internal API and need standards-based SSO to Grafana, custom apps, and other service providers.
+> **SAML 2.0 Identity Provider** (NestJS + React + embedded encrypted libSQL) for teams that already have users in an internal API and need standards-based SSO to Grafana, custom apps, and other service providers.
 
 ---
 
@@ -121,15 +121,15 @@ End users authenticate here when redirected from a service provider.
 
 ## Quick start
 
-**Prerequisites:** Node.js ≥ 18, pnpm ≥ 9. Docker optional for SQLite dev; recommended for production-like Compose.
+**Prerequisites:** Node.js ≥ 18, pnpm ≥ 9. No database server needed — the datastore is an embedded encrypted libSQL file. Docker is optional for dev, recommended for production-like Compose.
 
-### Local dev (SQLite)
+### Local dev
 
 ```bash
 git clone <your-repo-url> NestIdP && cd NestIdP
 cp .env.example .env
 mkdir -p apps/api/data
-pnpm install && pnpm db:migrate && pnpm dev
+pnpm install && pnpm db:migrate:deploy && pnpm dev
 ```
 
 | What           | URL                                                               |
@@ -140,11 +140,11 @@ pnpm install && pnpm db:migrate && pnpm dev
 
 Bootstrap admin: set `ADMIN_USERNAME` and `ADMIN_PASSWORD` in `.env` before first start ([details](docs/database.md#first-admin-bootstrap-v030)).
 
-### Docker (PostgreSQL, production-like)
+### Docker (production-like)
 
 ```bash
 cp .env.docker.example .env.docker
-# Set SESSION_SECRET, ENCRYPTION_KEY, ADMIN_PASSWORD, IDP_BASE_URL
+# Set SESSION_SECRET, ENCRYPTION_KEY, DATABASE_ENCRYPTION_KEY, ADMIN_PASSWORD, IDP_BASE_URL
 pnpm dev:docker
 # or: docker compose -f docker-compose.dev.yml up
 ```
@@ -168,7 +168,7 @@ In admin: API connection → base URL `http://localhost:4010`, bearer `mock-sync
 | [docs/tutorial.md](docs/tutorial.md)               | First-time operators — UI screenshots step by step |
 | [docs/development.md](docs/development.md)         | Routing, REST API, tests, Evergreen UI             |
 | [docs/integration-api.md](docs/integration-api.md) | External identity API contract (v1)                |
-| [docs/database.md](docs/database.md)               | SQLite vs PostgreSQL, migrations                   |
+| [docs/database.md](docs/database.md)               | Encrypted libSQL file, migrations, rekey/backup    |
 | [docs/deployment.md](docs/deployment.md)           | Docker, env, operations                            |
 | [docs/RELEASE.md](docs/RELEASE.md)                 | Production go-live checklist                       |
 | [docs/README.md](docs/README.md)                   | Full doc index + diagrams                          |
@@ -179,20 +179,21 @@ In admin: API connection → base URL `http://localhost:4010`, bearer `mock-sync
 
 ## Developer commands
 
-| Command           | Description                           |
-| ----------------- | ------------------------------------- |
-| `pnpm dev`        | Shared package watch + API + Vite web |
-| `pnpm dev:docker` | PostgreSQL + hot-reload in Docker     |
-| `pnpm build`      | Production build                      |
-| `pnpm test`       | Monorepo tests                        |
-| `pnpm lint`       | ESLint + TypeScript                   |
-| `pnpm db:migrate` | Apply migrations (dev)                |
+| Command                  | Description                           |
+| ------------------------ | ------------------------------------- |
+| `pnpm dev`               | Shared package watch + API + Vite web |
+| `pnpm dev:docker`        | Hot-reload stack in Docker            |
+| `pnpm build`             | Production build                      |
+| `pnpm test`              | Monorepo tests                        |
+| `pnpm lint`              | ESLint + TypeScript                   |
+| `pnpm db:migrate:deploy` | Apply pending migrations              |
+| `pnpm db:new-migration`  | Author a new migration                |
 
 ---
 
 ## Tech stack
 
-NestJS · React (Vite) · Prisma · SAML 2.0 (signed assertions) · pnpm workspaces · Docker
+NestJS · React (Vite) · Prisma + encrypted libSQL · SAML 2.0 (signed assertions) · pnpm workspaces · Docker
 
 ---
 

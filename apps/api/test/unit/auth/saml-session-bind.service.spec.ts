@@ -25,7 +25,7 @@ describe('SamlSessionBindService (SQLite)', () => {
 	beforeAll(async () => {
 		const tmpDb = join(tmpdir(), `nestidp-saml-bind-${randomUUID()}.db`);
 		databaseUrl = `file:${tmpDb}`;
-		runMigrationsOnTestDb(databaseUrl, 'sqlite');
+		await runMigrationsOnTestDb(databaseUrl);
 		prisma = new PrismaService({ datasources: { db: { url: databaseUrl } } });
 		service = new SamlSessionBindService(prisma as unknown as PrismaService);
 		const sp = await createTestSpConnection(prisma);

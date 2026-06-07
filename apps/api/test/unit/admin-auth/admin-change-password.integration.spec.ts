@@ -77,7 +77,7 @@ describe('admin change-password integration (SQLite)', () => {
 	beforeAll(async () => {
 		const tmpDb = join(tmpdir(), `nestidp-adm-pwd-${randomUUID()}.db`);
 		databaseUrl = `file:${tmpDb}`;
-		runMigrationsOnTestDb(databaseUrl, 'sqlite');
+		await runMigrationsOnTestDb(databaseUrl);
 
 		const prismaService = new PrismaService({
 			datasources: { db: { url: databaseUrl } },
@@ -90,7 +90,6 @@ describe('admin change-password integration (SQLite)', () => {
 					ignoreEnvFile: true,
 					load: [
 						() => ({
-							DATABASE_PROVIDER: 'sqlite',
 							DATABASE_URL: databaseUrl,
 							SESSION_SECRET: 'test-session-secret-min-16',
 							ENCRYPTION_KEY: 'test-encryption-key-32chars!!',
@@ -248,7 +247,7 @@ describe('admin change-password production policy (SQLite)', () => {
 	beforeAll(async () => {
 		const tmpDb = join(tmpdir(), `nestidp-adm-pwd-prod-${randomUUID()}.db`);
 		databaseUrl = `file:${tmpDb}`;
-		runMigrationsOnTestDb(databaseUrl, 'sqlite');
+		await runMigrationsOnTestDb(databaseUrl);
 
 		const prismaService = new PrismaService({
 			datasources: { db: { url: databaseUrl } },
@@ -261,7 +260,6 @@ describe('admin change-password production policy (SQLite)', () => {
 					ignoreEnvFile: true,
 					load: [
 						() => ({
-							DATABASE_PROVIDER: 'sqlite',
 							DATABASE_URL: databaseUrl,
 							SESSION_SECRET: 'test-session-secret-min-16',
 							ENCRYPTION_KEY: 'test-encryption-key-32chars!!',
@@ -332,7 +330,7 @@ describe('admin change-password validation edge cases (SQLite)', () => {
 	beforeAll(async () => {
 		const tmpDb = join(tmpdir(), `nestidp-adm-pwd-val-${randomUUID()}.db`);
 		databaseUrl = `file:${tmpDb}`;
-		runMigrationsOnTestDb(databaseUrl, 'sqlite');
+		await runMigrationsOnTestDb(databaseUrl);
 
 		const prismaService = new PrismaService({
 			datasources: { db: { url: databaseUrl } },
@@ -345,7 +343,6 @@ describe('admin change-password validation edge cases (SQLite)', () => {
 					ignoreEnvFile: true,
 					load: [
 						() => ({
-							DATABASE_PROVIDER: 'sqlite',
 							DATABASE_URL: databaseUrl,
 							SESSION_SECRET: 'test-session-secret-min-16',
 							ENCRYPTION_KEY: 'test-encryption-key-32chars!!',

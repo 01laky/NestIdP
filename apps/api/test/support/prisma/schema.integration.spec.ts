@@ -23,10 +23,10 @@ describe('schema integration (SQLite)', () => {
 	let databaseUrl: string;
 	let prisma: PrismaClient;
 
-	beforeAll(() => {
+	beforeAll(async () => {
 		const tmpDb = join(tmpdir(), `nestidp-test-${randomUUID()}.db`);
 		databaseUrl = `file:${tmpDb}`;
-		runMigrationsOnTestDb(databaseUrl, 'sqlite');
+		await runMigrationsOnTestDb(databaseUrl);
 		prisma = new PrismaClient({
 			datasources: { db: { url: databaseUrl } },
 		});

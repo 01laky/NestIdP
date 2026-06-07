@@ -1,6 +1,6 @@
 {
 	"name": "@nestidp/api",
-	"version": "1.10.0",
+	"version": "1.11.0",
 	"private": true,
 	"scripts": {
 		"dev": "node scripts/run-dev.mjs",
@@ -13,21 +13,26 @@
 		"test": "node scripts/run-jest-tests.mjs",
 		"test:e2e": "jest --config ./test/jest-e2e.config.js",
 		"test:watch": "jest --watch",
-		"prisma:prepare": "node scripts/sync-prisma-provider.mjs",
-		"prisma:generate": "pnpm prisma:prepare && prisma generate",
-		"prisma:migrate": "pnpm prisma:prepare && prisma migrate dev",
-		"prisma:migrate:deploy": "pnpm prisma:prepare && prisma migrate deploy"
+		"prisma:generate": "prisma generate",
+		"db:new-migration": "node scripts/author-migration.mjs",
+		"db:migrate:deploy": "node scripts/db-cli.mjs migrate",
+		"db:rekey": "node scripts/db-cli.mjs rekey",
+		"db:backup": "node scripts/db-cli.mjs backup",
+		"db:dump": "node scripts/db-cli.mjs dump",
+		"db:restore": "node scripts/db-cli.mjs restore"
 	},
 	"prisma": {
 		"seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
 	},
 	"dependencies": {
+		"@libsql/client": "^0.17.3",
 		"@nestidp/shared": "workspace:*",
 		"@nestjs/common": "^11.0.12",
 		"@nestjs/config": "^4.0.1",
 		"@nestjs/core": "^11.0.12",
 		"@nestjs/platform-express": "^11.0.12",
 		"@nestjs/serve-static": "^5.0.3",
+		"@prisma/adapter-libsql": "6.19.3",
 		"@prisma/client": "^6.5.0",
 		"@xmldom/xmldom": "^0.9.10",
 		"bcrypt": "^6.0.0",

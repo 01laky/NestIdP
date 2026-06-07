@@ -4,6 +4,47 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.11.0]
+
+### Changed
+
+- **Single encrypted libSQL datastore — PostgreSQL removed (Prompt 30):** the dual-provider
+  (`sqlite` / `postgresql`) Prisma setup is replaced by **one encrypted libSQL file** opened through
+  **`@prisma/adapter-libsql`** with an at-rest `encryptionKey`. PostgreSQL is removed entirely from
+  runtime, Docker, CI, and tests. The whole identity store is now one file on a mounted volume.
+  - **`DATABASE_URL`** must be a `file:` URL. New **`DATABASE_ENCRYPTION_KEY`** (or
+    **`DATABASE_ENCRYPTION_KEY_FILE`**, mutually exclusive) sets the at-rest key — **required in
+    production**, optional in development (unset → plaintext file for easy inspection). This is
+    independent of the app-layer `ENCRYPTION_KEY` used for secret columns.
+  - **`DATABASE_PROVIDER`** is gone; `validateDatabaseUrl` now accepts only `file:` URLs.
+  - **Startup migrator** (`apps/api/src/prisma/db-migrator.ts`): because Prisma's bundled SQLite
+    engine and the `prisma migrate` CLI cannot open an encrypted libSQL file, the API applies pending
+    migrations itself through the keyed adapter before listening. Migrations are tracked in
+    `__app_migrations` (name + checksum), applied as one atomic `BEGIN IMMEDIATE` batch, with
+    **checksum-drift detection** and an integrity check that distinguishes a wrong key from a corrupt
+    file. **`MIGRATE_ONLY=1`** migrates and exits (init-container/job pattern).
+  - **Single migration history** under `prisma/migrations/` (sqlite dialect). The per-provider
+    `migrations-sqlite/` and `migrations-postgresql/` folders and the `prisma:prepare` /
+    `sync-prisma-provider` machinery are removed.
+
+### Added
+
+- **Migration & ops tooling:** `pnpm db:new-migration` authors SQL via `prisma migrate dev` against an
+  unencrypted scratch DB; `pnpm db:migrate:deploy` applies pending migrations through the adapter; and
+  a `db-cli.mjs` helper provides `pnpm db:rekey` (`PRAGMA rekey` in-place re-encrypt), `pnpm db:backup`
+  (`VACUUM INTO` encrypted copy), `pnpm db:dump`, and `pnpm db:restore`.
+- **Tests:** encrypted round-trip / wrong-key / no-key / raw-bytes specs, rekey and backup specs, and
+  migrator specs (idempotency, ordering, atomic rollback, drift, encrypted DB). Each integration spec
+  applies migrations to its own temp libSQL file via the in-process migrator — no external DB, no
+  `prisma migrate deploy` in the test path. Postgres smoke specs and `POSTGRES_TEST_URL` are removed.
+
+### Removed
+
+- PostgreSQL service from `docker-compose.yml` / `docker-compose.dev.yml` and the Postgres service
+  container + `POSTGRES_TEST_URL` from CI. Docker images now mount a `data/` volume and pass
+  `DATABASE_URL` + `DATABASE_ENCRYPTION_KEY`; the entrypoint no longer runs `prisma migrate deploy`
+  (migrations run at startup).
+
 ## [1.10.0]
 
 ### Added

@@ -11,6 +11,6 @@ ALTER TABLE "IdpSettings" ADD COLUMN "pendingEncryptionKeyFamily" TEXT;
 ALTER TABLE "IdpSettings" ADD COLUMN "pendingEncryptionKeyTransportAlgorithmId" TEXT;
 ALTER TABLE "IdpSettings" ADD COLUMN "pendingEncryptionRsaModulusBits" INTEGER;
 ALTER TABLE "IdpSettings" ADD COLUMN "pendingEncryptionEcCurve" TEXT;
-ALTER TABLE "IdpSettings" ADD COLUMN "encryptionRotationStartedAt" TIMESTAMP(3);
+ALTER TABLE "IdpSettings" ADD COLUMN "encryptionRotationStartedAt" DATETIME;
 
 ALTER TABLE "SpConnection" ADD COLUMN "wantAssertionsEncrypted" BOOLEAN NOT NULL DEFAULT false;

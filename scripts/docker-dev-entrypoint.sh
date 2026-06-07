@@ -16,13 +16,10 @@ if [ "$CURRENT_HASH" != "$STORED_HASH" ]; then
 	echo "$CURRENT_HASH" > "$LOCK_HASH_FILE"
 fi
 
-echo "NestIdP [dev]: preparing Prisma for ${DATABASE_PROVIDER:-postgresql}..."
-node ./apps/api/scripts/sync-prisma-provider.mjs
-
-echo "NestIdP [dev]: running database migrations..."
-./apps/api/node_modules/.bin/prisma migrate deploy --schema=./apps/api/prisma/schema.prisma
-
-echo "NestIdP [dev]: generating Prisma client for ${DATABASE_PROVIDER}..."
+# Migrations run at API startup (main.ts → runMigrations) through the keyed
+# libSQL adapter; the encrypted file cannot be opened by the Prisma CLI.
+echo "NestIdP [dev]: generating Prisma client..."
+mkdir -p /app/apps/api/data
 ./apps/api/node_modules/.bin/prisma generate --schema=./apps/api/prisma/schema.prisma
 
 echo "NestIdP [dev]: building @nestidp/shared (watch mode)..."

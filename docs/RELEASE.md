@@ -8,8 +8,9 @@ Use this checklist before exposing the IdP to end users. Detailed deploy steps: 
 
 - [ ] TLS terminates in front of IdP; `IDP_BASE_URL` is the public HTTPS URL
 - [ ] `TRUST_PROXY=true` when behind a load balancer (single proxy hop)
-- [ ] PostgreSQL backups scheduled (`pg_dump` per [deployment.md](./deployment.md))
-- [ ] `SESSION_SECRET` and `ENCRYPTION_KEY` generated and stored in a secrets manager (not in git)
+- [ ] DB file on a persistent volume; encrypted backups scheduled (`pnpm db:backup` per [deployment.md](./deployment.md))
+- [ ] `SESSION_SECRET`, `ENCRYPTION_KEY`, and `DATABASE_ENCRYPTION_KEY` generated and stored in a secrets manager (not in git)
+- [ ] `DATABASE_ENCRYPTION_KEY` set (required in production) and backed up — loss makes the DB file unreadable
 - [ ] `ENCRYPTION_KEY` backup stored securely (loss requires re-entering API tokens and re-uploading IdP keys)
 
 ---

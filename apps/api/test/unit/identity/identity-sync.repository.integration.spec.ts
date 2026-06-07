@@ -31,7 +31,7 @@ describe('IdentityRepository sync methods (SQLite)', () => {
 	beforeAll(async () => {
 		const tmpDb = join(tmpdir(), `nestidp-idn-sync-${randomUUID()}.db`);
 		databaseUrl = `file:${tmpDb}`;
-		runMigrationsOnTestDb(databaseUrl, 'sqlite');
+		await runMigrationsOnTestDb(databaseUrl);
 		prisma = new PrismaService({ datasources: { db: { url: databaseUrl } } });
 		repository = new IdentityRepository(prisma as unknown as PrismaService);
 		const connection = await createTestApiConnection(prisma);

@@ -27,7 +27,7 @@ describe('HealthController', () => {
 	});
 
 	it('getReady sets 200 when service reports connected database', async () => {
-		configService.get.mockReturnValue('postgresql://localhost:5432/nestidp');
+		configService.get.mockReturnValue('file:../data/nestidp.db');
 		healthService.getReady.mockResolvedValue({
 			httpStatus: 200,
 			body: { status: 'ok', service: 'nest-idp-api', database: 'connected' },
@@ -35,7 +35,7 @@ describe('HealthController', () => {
 		const json = jest.fn();
 		const status = jest.fn().mockReturnValue({ json });
 		await controller.getReady({ status } as unknown as Response);
-		expect(healthService.getReady).toHaveBeenCalledWith('postgresql://localhost:5432/nestidp');
+		expect(healthService.getReady).toHaveBeenCalledWith('file:../data/nestidp.db');
 		expect(status).toHaveBeenCalledWith(200);
 		expect(json).toHaveBeenCalledWith({
 			status: 'ok',
