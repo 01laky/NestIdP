@@ -1,4 +1,4 @@
-import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Optional, OnModuleDestroy } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { buildLibsqlAdapter } from '../libsql';
 
@@ -8,12 +8,19 @@ export class PrismaService extends PrismaClient implements OnModuleDestroy {
 	 * No-arg in production (reads DATABASE_URL / key from the environment). Tests may pass a specific
 	 * file via `{ url }` or the legacy `{ datasources: { db: { url } } }` shape, plus an optional
 	 * `encryptionKey`, and the adapter is built for that file.
+	 *
+	 * `@Optional()` is required because the constructor has a typed (object) parameter: with
+	 * emitDecoratorMetadata the compiled paramtype is `Object`, which Nest would otherwise try to
+	 * inject and fail on at runtime. With @Optional it is simply left undefined when Nest builds it.
 	 */
-	constructor(options?: {
-		url?: string;
-		encryptionKey?: string;
-		datasources?: { db?: { url?: string } };
-	}) {
+	constructor(
+		@Optional()
+		options?: {
+			url?: string;
+			encryptionKey?: string;
+			datasources?: { db?: { url?: string } };
+		},
+	) {
 		const url = options?.url ?? options?.datasources?.db?.url;
 		const env =
 			url !== undefined
