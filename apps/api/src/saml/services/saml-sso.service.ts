@@ -12,7 +12,7 @@ import {
 	SAML_SESSION_QUERY_PARAM,
 	type ParsedAuthnRequestDto,
 } from '@nestidp/shared';
-import { IdentityRepository } from '../../identity/identity.repository';
+import { ActiveIdentityStore } from '../../identity/store/active-identity-store';
 import { PrismaService } from '../../prisma/services/prisma.service';
 import { toEndUserPublicDto } from '../../auth/mappers/end-user-auth.mapper';
 import { SamlAuthAuditService } from './saml-auth-audit.service';
@@ -56,7 +56,7 @@ export class SamlSsoService {
 		private readonly responseBuilder: SamlResponseBuilderService,
 		private readonly postBinding: SamlPostBindingService,
 		private readonly metadataService: SamlMetadataService,
-		private readonly identityRepository: IdentityRepository,
+		private readonly identityRepository: ActiveIdentityStore,
 		private readonly audit: SamlAuthAuditService,
 		private readonly ssoSessions: SamlSsoSessionService,
 	) {}

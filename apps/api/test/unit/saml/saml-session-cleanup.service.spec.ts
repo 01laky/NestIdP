@@ -20,7 +20,7 @@ describe('SamlSessionCleanupService (SQLite)', () => {
 	beforeAll(async () => {
 		const tmpDb = join(tmpdir(), `nestidp-saml-clean-${randomUUID()}.db`);
 		databaseUrl = `file:${tmpDb}`;
-		runMigrationsOnTestDb(databaseUrl, 'sqlite');
+		await runMigrationsOnTestDb(databaseUrl);
 		prisma = new PrismaService({ datasources: { db: { url: databaseUrl } } });
 		const configService = {
 			get: () => 0,

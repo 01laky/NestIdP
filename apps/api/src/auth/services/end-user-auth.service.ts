@@ -6,7 +6,7 @@ import type {
 } from '@nestidp/shared';
 import { isPasswordHashAlgorithm } from '@nestidp/shared';
 import { verifyPasswordTimingSafe } from '../../admin-auth/utils/password.util';
-import { IdentityRepository } from '../../identity/identity.repository';
+import { ActiveIdentityStore } from '../../identity/store/active-identity-store';
 import { PrismaService } from '../../prisma/services/prisma.service';
 import { EndUserAuthAuditService } from './end-user-auth-audit.service';
 import { toEndUserPublicDto } from '../mappers/end-user-auth.mapper';
@@ -18,7 +18,7 @@ export const INVALID_CREDENTIALS_MESSAGE = 'Invalid username or password';
 @Injectable()
 export class EndUserAuthService {
 	constructor(
-		private readonly identityRepository: IdentityRepository,
+		private readonly identityRepository: ActiveIdentityStore,
 		private readonly samlSessionBindService: SamlSessionBindService,
 		private readonly prisma: PrismaService,
 		private readonly idpSigningService: IdpSigningService,

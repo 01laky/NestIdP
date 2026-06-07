@@ -53,7 +53,7 @@ describe('IdP settings SAML metadata & rotation (SQLite)', () => {
 	beforeAll(async () => {
 		const tmpDb = join(tmpdir(), `nestidp-idp-saml-${randomUUID()}.db`);
 		databaseUrl = `file:${tmpDb}`;
-		runMigrationsOnTestDb(databaseUrl, 'sqlite');
+		await runMigrationsOnTestDb(databaseUrl);
 		const prismaService = new PrismaService({ datasources: { db: { url: databaseUrl } } });
 		const moduleFixture: TestingModule = await Test.createTestingModule({
 			imports: [
@@ -62,7 +62,6 @@ describe('IdP settings SAML metadata & rotation (SQLite)', () => {
 					ignoreEnvFile: true,
 					load: [
 						() => ({
-							DATABASE_PROVIDER: 'sqlite',
 							DATABASE_URL: databaseUrl,
 							SESSION_SECRET: 'test-session-secret-min-16',
 							ENCRYPTION_KEY: 'test-encryption-key-32chars!!',

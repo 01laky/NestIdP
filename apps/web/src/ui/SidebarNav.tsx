@@ -104,6 +104,13 @@ export function SidebarNav({
 				>
 					{t('adminAccounts')}
 				</NavLink>
+				<NavLink
+					to="/admin/settings/identity-database"
+					className={({ isActive }) => `evg-nav__link${isActive ? ' evg-nav__link--active' : ''}`}
+					onClick={onNavigate}
+				>
+					{t('externalDb')}
+				</NavLink>
 				{SHOW_AUDIT_LOG_NAV ? (
 					<NavLink
 						to={AUDIT_ROUTE_PREFIX}

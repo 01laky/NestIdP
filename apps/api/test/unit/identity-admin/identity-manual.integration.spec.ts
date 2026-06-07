@@ -89,7 +89,7 @@ describe('Identity manual CRUD (SQLite)', () => {
 	beforeAll(async () => {
 		const tmpDb = join(tmpdir(), `nestidp-idn-man-${randomUUID()}.db`);
 		databaseUrl = `file:${tmpDb}`;
-		runMigrationsOnTestDb(databaseUrl, 'sqlite');
+		await runMigrationsOnTestDb(databaseUrl);
 		const prismaService = new PrismaService({ datasources: { db: { url: databaseUrl } } });
 		const moduleFixture: TestingModule = await Test.createTestingModule({
 			imports: [
@@ -98,7 +98,6 @@ describe('Identity manual CRUD (SQLite)', () => {
 					ignoreEnvFile: true,
 					load: [
 						() => ({
-							DATABASE_PROVIDER: 'sqlite',
 							DATABASE_URL: databaseUrl,
 							SESSION_SECRET: 'test-session-secret-min-16',
 							ENCRYPTION_KEY: TEST_ENCRYPTION_KEY,

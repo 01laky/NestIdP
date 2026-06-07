@@ -31,8 +31,13 @@ apps/web/playwright-report/
 # Prisma
 apps/api/prisma/*.db
 apps/api/prisma/*.db-journal
+apps/api/prisma/*.db-wal
+apps/api/prisma/*.db-shm
+apps/api/prisma/.scratch.db*
 apps/api/prisma/.test-migration-sync.lock
 apps/api/data/
+# Local DB backup/dump artifacts (db-cli.mjs)
+*.dump.sql
 *.tsbuildinfo
 .claude/
 

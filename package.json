@@ -1,6 +1,6 @@
 {
 	"name": "nest-idp",
-	"version": "1.10.0",
+	"version": "1.12.0",
 	"private": true,
 	"packageManager": "pnpm@9.15.9",
 	"engines": {
@@ -22,8 +22,8 @@
 		"diagrams:check": "node scripts/check-diagrams.mjs",
 		"check:i18n-keys": "node scripts/check-i18n-keys.mjs",
 		"setup:githooks": "sh scripts/setup-githooks.sh",
-		"db:migrate": "pnpm --filter @nestidp/api prisma:migrate",
-		"db:migrate:deploy": "pnpm --filter @nestidp/api prisma:migrate:deploy"
+		"db:new-migration": "pnpm --filter @nestidp/api db:new-migration",
+		"db:migrate:deploy": "pnpm --filter @nestidp/api db:migrate:deploy"
 	},
 	"devDependencies": {
 		"@eslint/js": "^9.22.0",

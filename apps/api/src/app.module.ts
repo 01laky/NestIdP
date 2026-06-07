@@ -15,6 +15,7 @@ import {
 import { validateEnv } from './config/env.validation';
 import { HealthModule } from './health/health.module';
 import { IdentityModule } from './identity/identity.module';
+import { ExternalIdentityDatabaseModule } from './identity/store/external/external-identity-database.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { SamlModule } from './saml/saml.module';
 import { SpaModule } from './spa/spa.module';
@@ -54,6 +55,7 @@ const enableStaticServing = shouldEnableStaticServing(
 		AdminModule,
 		AuthModule,
 		IdentityModule,
+		ExternalIdentityDatabaseModule,
 		SamlModule,
 		SpaModule,
 	],

@@ -1,311 +1,350 @@
 generator client {
-	provider = "prisma-client-js"
+  provider = "prisma-client-js"
 }
 
 datasource db {
-	provider = "postgresql"
-	url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
 }
 
 enum AuthType {
-	BEARER
-	OAUTH2_CLIENT_CREDENTIALS
+  BEARER
+  OAUTH2_CLIENT_CREDENTIALS
 }
 
 enum LastSyncStatus {
-	NEVER
-	IN_PROGRESS
-	SUCCESS
-	FAILED
+  NEVER
+  IN_PROGRESS
+  SUCCESS
+  FAILED
 }
 
 enum SyncLogStatus {
-	RUNNING
-	SUCCESS
-	FAILED
+  RUNNING
+  SUCCESS
+  FAILED
 }
 
 enum AuditActorType {
-	admin
-	end_user
-	system
+  admin
+  end_user
+  system
 }
 
 enum AuditCategory {
-	admin_auth
-	admin_config
-	end_user_auth
-	saml
-	sync
-	identity
+  admin_auth
+  admin_config
+  end_user_auth
+  saml
+  sync
+  identity
 }
 
 enum IdentityOrigin {
-	SYNCED
-	MANUAL
+  SYNCED
+  MANUAL
 }
 
 model ApiConnection {
-	id                       String         @id @default(cuid())
-	name                     String
-	baseUrl                  String
-	authType                 AuthType       @default(BEARER)
-	authCredentialsEncrypted String
-	isLocalDirectory         Boolean        @default(false)
-	apiContractConfig        Json?
-	oauthTokenUrl              String?
-	oauthClientId              String?
-	oauthClientSecretEncrypted String?
-	oauthScope                 String?
-	oauthAudience              String?
-	oauthClientAuthMethod      String?
-	oauthTokenRequestParams    Json?
-	lastSyncAt               DateTime?
-	lastSyncStatus           LastSyncStatus @default(NEVER)
-	createdAt                DateTime       @default(now())
-	updatedAt                DateTime       @updatedAt
+  id                         String         @id @default(cuid())
+  name                       String
+  baseUrl                    String
+  authType                   AuthType       @default(BEARER)
+  authCredentialsEncrypted   String
+  isLocalDirectory           Boolean        @default(false)
+  apiContractConfig          Json?
+  oauthTokenUrl              String?
+  oauthClientId              String?
+  oauthClientSecretEncrypted String?
+  oauthScope                 String?
+  oauthAudience              String?
+  oauthClientAuthMethod      String?
+  oauthTokenRequestParams    Json?
+  lastSyncAt                 DateTime?
+  lastSyncStatus             LastSyncStatus @default(NEVER)
+  createdAt                  DateTime       @default(now())
+  updatedAt                  DateTime       @updatedAt
 
-	users    User[]
-	groups   Group[]
-	roles    Role[]
-	syncLogs SyncLog[]
+  users    User[]
+  groups   Group[]
+  roles    Role[]
+  syncLogs SyncLog[]
 }
 
 model User {
-	id                      String         @id @default(cuid())
-	externalId              String
-	apiConnectionId         String
-	origin                  IdentityOrigin @default(SYNCED)
-	username                String         @unique
-	email                   String?
-	displayName             String?
-	passwordHash            String
-	passwordHashAlgorithm   String         @default("bcrypt")
-	active                  Boolean        @default(true)
-	createdAt               DateTime @default(now())
-	updatedAt               DateTime @updatedAt
+  id                    String         @id @default(cuid())
+  externalId            String
+  apiConnectionId       String
+  origin                IdentityOrigin @default(SYNCED)
+  username              String         @unique
+  email                 String?
+  displayName           String?
+  passwordHash          String
+  passwordHashAlgorithm String         @default("bcrypt")
+  active                Boolean        @default(true)
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
 
-	apiConnection ApiConnection @relation(fields: [apiConnectionId], references: [id], onDelete: Restrict)
-	groups        UserGroup[]
-	roles         UserRole[]
-	samlSessions  SamlSession[]
-	samlSsoSessions SamlSsoSession[]
+  apiConnection   ApiConnection    @relation(fields: [apiConnectionId], references: [id], onDelete: Restrict)
+  groups          UserGroup[]
+  roles           UserRole[]
+  samlSessions    SamlSession[]
+  samlSsoSessions SamlSsoSession[]
 
-	@@unique([apiConnectionId, externalId])
-	@@index([apiConnectionId])
+  @@unique([apiConnectionId, externalId])
+  @@index([apiConnectionId])
 }
 
 model Group {
-	id              String         @id @default(cuid())
-	externalId      String
-	apiConnectionId String
-	origin          IdentityOrigin @default(SYNCED)
-	name            String
-	createdAt       DateTime @default(now())
-	updatedAt       DateTime @updatedAt
+  id              String         @id @default(cuid())
+  externalId      String
+  apiConnectionId String
+  origin          IdentityOrigin @default(SYNCED)
+  name            String
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
-	apiConnection ApiConnection @relation(fields: [apiConnectionId], references: [id], onDelete: Restrict)
-	users         UserGroup[]
+  apiConnection ApiConnection @relation(fields: [apiConnectionId], references: [id], onDelete: Restrict)
+  users         UserGroup[]
 
-	@@unique([apiConnectionId, externalId])
-	@@unique([apiConnectionId, name])
-	@@index([apiConnectionId])
+  @@unique([apiConnectionId, externalId])
+  @@unique([apiConnectionId, name])
+  @@index([apiConnectionId])
 }
 
 model Role {
-	id              String         @id @default(cuid())
-	externalId      String
-	apiConnectionId String
-	origin          IdentityOrigin @default(SYNCED)
-	name            String
-	createdAt       DateTime @default(now())
-	updatedAt       DateTime @updatedAt
+  id              String         @id @default(cuid())
+  externalId      String
+  apiConnectionId String
+  origin          IdentityOrigin @default(SYNCED)
+  name            String
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
-	apiConnection ApiConnection @relation(fields: [apiConnectionId], references: [id], onDelete: Restrict)
-	users         UserRole[]
+  apiConnection ApiConnection @relation(fields: [apiConnectionId], references: [id], onDelete: Restrict)
+  users         UserRole[]
 
-	@@unique([apiConnectionId, externalId])
-	@@unique([apiConnectionId, name])
-	@@index([apiConnectionId])
+  @@unique([apiConnectionId, externalId])
+  @@unique([apiConnectionId, name])
+  @@index([apiConnectionId])
 }
 
 model UserGroup {
-	userId  String
-	groupId String
+  userId  String
+  groupId String
 
-	user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-	group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
-	@@id([userId, groupId])
+  @@id([userId, groupId])
 }
 
 model UserRole {
-	userId String
-	roleId String
+  userId String
+  roleId String
 
-	user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-	role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
-	@@id([userId, roleId])
+  @@id([userId, roleId])
 }
 
 model SpConnection {
-	id                      String   @id @default(cuid())
-	name                    String
-	spEntityId              String   @unique
-	acsUrl                  String
-	sloUrl                  String?
-	spCertificate           String?
-	nameIdFormat            String   @default("urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress")
-	attributeMapping        Json?
-	active                  Boolean  @default(true)
-	wantAssertionsEncrypted Boolean  @default(false)
-	wantAuthnRequestsSigned Boolean  @default(false)
-	wantLogoutRequestsSigned Boolean @default(false)
-	createdAt               DateTime @default(now())
-	updatedAt               DateTime @updatedAt
+  id                       String   @id @default(cuid())
+  name                     String
+  spEntityId               String   @unique
+  acsUrl                   String
+  sloUrl                   String?
+  spCertificate            String?
+  nameIdFormat             String   @default("urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress")
+  attributeMapping         Json?
+  active                   Boolean  @default(true)
+  wantAssertionsEncrypted  Boolean  @default(false)
+  wantAuthnRequestsSigned  Boolean  @default(false)
+  wantLogoutRequestsSigned Boolean  @default(false)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
 
-	samlSessions      SamlSession[]
-	samlParticipations SamlSpParticipation[]
+  samlSessions       SamlSession[]
+  samlParticipations SamlSpParticipation[]
 }
 
 model AdminUser {
-	id           String   @id @default(cuid())
-	username     String   @unique
-	passwordHash String
-	createdAt    DateTime @default(now())
-	updatedAt    DateTime @updatedAt
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 model SyncLog {
-	id              String        @id @default(cuid())
-	apiConnectionId String
-	startedAt       DateTime      @default(now())
-	finishedAt      DateTime?
-	status          SyncLogStatus
-	usersSynced     Int           @default(0)
-	groupsSynced    Int           @default(0)
-	rolesSynced     Int           @default(0)
-	errors          Json?
+  id              String        @id @default(cuid())
+  apiConnectionId String
+  startedAt       DateTime      @default(now())
+  finishedAt      DateTime?
+  status          SyncLogStatus
+  usersSynced     Int           @default(0)
+  groupsSynced    Int           @default(0)
+  rolesSynced     Int           @default(0)
+  errors          Json?
 
-	apiConnection ApiConnection @relation(fields: [apiConnectionId], references: [id], onDelete: Restrict)
+  apiConnection ApiConnection @relation(fields: [apiConnectionId], references: [id], onDelete: Restrict)
 
-	@@index([apiConnectionId])
-	@@index([startedAt])
+  @@index([apiConnectionId])
+  @@index([startedAt])
 }
 
 model SamlSession {
-	id             String   @id @default(cuid())
-	samlRequestId  String   @unique
-	relayState     String?
-	spConnectionId String
-	userId         String?
-	expiresAt      DateTime
-	createdAt      DateTime @default(now())
+  id             String   @id @default(cuid())
+  samlRequestId  String   @unique
+  relayState     String?
+  spConnectionId String
+  userId         String?
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
 
-	spConnection SpConnection @relation(fields: [spConnectionId], references: [id], onDelete: Cascade)
-	user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  spConnection SpConnection @relation(fields: [spConnectionId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-	@@index([expiresAt])
-	@@index([spConnectionId])
+  @@index([expiresAt])
+  @@index([spConnectionId])
 }
 
 model SamlSsoSession {
-	id                  String    @id @default(cuid())
-	userId              String?
-	username            String
-	createdAt           DateTime  @default(now())
-	lastSeenAt          DateTime  @default(now())
-	expiresAt           DateTime
-	loginIp             String?
-	userAgent           String?
-	lastSeenIp          String?
-	status              String    @default("active")
-	terminatedAt        DateTime?
-	terminatedReason    String?
-	terminatedByAdminId String?
+  id                  String    @id @default(cuid())
+  userId              String?
+  username            String
+  createdAt           DateTime  @default(now())
+  lastSeenAt          DateTime  @default(now())
+  expiresAt           DateTime
+  loginIp             String?
+  userAgent           String?
+  lastSeenIp          String?
+  status              String    @default("active")
+  terminatedAt        DateTime?
+  terminatedReason    String?
+  terminatedByAdminId String?
 
-	user           User?                 @relation(fields: [userId], references: [id], onDelete: SetNull)
-	participations SamlSpParticipation[]
+  user           User?                 @relation(fields: [userId], references: [id], onDelete: SetNull)
+  participations SamlSpParticipation[]
 
-	@@index([status, expiresAt])
-	@@index([userId])
+  @@index([status, expiresAt])
+  @@index([userId])
 }
 
 model SamlSpParticipation {
-	id             String   @id @default(cuid())
-	ssoSessionId   String
-	spConnectionId String
-	sessionIndex   String
-	nameId         String
-	nameIdFormat   String
-	createdAt      DateTime @default(now())
+  id             String   @id @default(cuid())
+  ssoSessionId   String
+  spConnectionId String
+  sessionIndex   String
+  nameId         String
+  nameIdFormat   String
+  createdAt      DateTime @default(now())
 
-	ssoSession   SamlSsoSession @relation(fields: [ssoSessionId], references: [id], onDelete: Cascade)
-	spConnection SpConnection   @relation(fields: [spConnectionId], references: [id], onDelete: Cascade)
+  ssoSession   SamlSsoSession @relation(fields: [ssoSessionId], references: [id], onDelete: Cascade)
+  spConnection SpConnection   @relation(fields: [spConnectionId], references: [id], onDelete: Cascade)
 
-	@@index([spConnectionId, sessionIndex])
-	@@index([ssoSessionId])
+  @@index([spConnectionId, sessionIndex])
+  @@index([ssoSessionId])
 }
 
 model SamlLogoutRequestLog {
-	id             String   @id @default(cuid())
-	requestId      String   @unique
-	spConnectionId String
-	createdAt      DateTime @default(now())
+  id             String   @id @default(cuid())
+  requestId      String   @unique
+  spConnectionId String
+  createdAt      DateTime @default(now())
 
-	@@index([createdAt])
+  @@index([createdAt])
 }
 
 model AuditEvent {
-	id          String         @id @default(cuid())
-	category    AuditCategory
-	event       String
-	actorType   AuditActorType
-	actorId     String?
-	actorLabel  String?
-	subjectType String?
-	subjectId   String?
-	clientIp    String?
-	metadata    Json?
-	createdAt   DateTime       @default(now())
+  id          String         @id @default(cuid())
+  category    AuditCategory
+  event       String
+  actorType   AuditActorType
+  actorId     String?
+  actorLabel  String?
+  subjectType String?
+  subjectId   String?
+  clientIp    String?
+  metadata    Json?
+  createdAt   DateTime       @default(now())
 
-	@@index([category, createdAt])
-	@@index([event, createdAt])
-	@@index([createdAt])
+  @@index([category, createdAt])
+  @@index([event, createdAt])
+  @@index([createdAt])
 }
 
 model IdpSettings {
-	id                                String    @id @default("default")
-	entityId                          String
-	signingCertPem                    String?
-	signingKeyEncrypted               String?
-	signingKeyFamily                  String?
-	signingSignatureAlgorithmId       String?
-	signingRsaModulusBits             Int?
-	signingEcCurve                    String?
-	pendingSigningCertPem             String?
-	pendingSigningKeyEncrypted        String?
-	pendingSigningKeyFamily           String?
-	pendingSigningSignatureAlgorithmId String?
-	pendingSigningRsaModulusBits      Int?
-	pendingSigningEcCurve             String?
-	rotationStartedAt                 DateTime?
-	encryptionCertPem                      String?
-	encryptionKeyEncrypted                 String?
-	encryptionKeyFamily                    String?
-	encryptionKeyTransportAlgorithmId      String?
-	encryptionRsaModulusBits               Int?
-	encryptionEcCurve                      String?
-	pendingEncryptionCertPem               String?
-	pendingEncryptionKeyEncrypted          String?
-	pendingEncryptionKeyFamily             String?
-	pendingEncryptionKeyTransportAlgorithmId String?
-	pendingEncryptionRsaModulusBits        Int?
-	pendingEncryptionEcCurve               String?
-	encryptionRotationStartedAt            DateTime?
-	nameIdFormat                      String    @default("urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress")
-	wantAuthnRequestsSigned           Boolean   @default(false)
-	createdAt                         DateTime  @default(now())
-	updatedAt                         DateTime  @updatedAt
+  id                                       String    @id @default("default")
+  entityId                                 String
+  signingCertPem                           String?
+  signingKeyEncrypted                      String?
+  signingKeyFamily                         String?
+  signingSignatureAlgorithmId              String?
+  signingRsaModulusBits                    Int?
+  signingEcCurve                           String?
+  pendingSigningCertPem                    String?
+  pendingSigningKeyEncrypted               String?
+  pendingSigningKeyFamily                  String?
+  pendingSigningSignatureAlgorithmId       String?
+  pendingSigningRsaModulusBits             Int?
+  pendingSigningEcCurve                    String?
+  rotationStartedAt                        DateTime?
+  encryptionCertPem                        String?
+  encryptionKeyEncrypted                   String?
+  encryptionKeyFamily                      String?
+  encryptionKeyTransportAlgorithmId        String?
+  encryptionRsaModulusBits                 Int?
+  encryptionEcCurve                        String?
+  pendingEncryptionCertPem                 String?
+  pendingEncryptionKeyEncrypted            String?
+  pendingEncryptionKeyFamily               String?
+  pendingEncryptionKeyTransportAlgorithmId String?
+  pendingEncryptionRsaModulusBits          Int?
+  pendingEncryptionEcCurve                 String?
+  encryptionRotationStartedAt              DateTime?
+  nameIdFormat                             String    @default("urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress")
+  wantAuthnRequestsSigned                  Boolean   @default(false)
+  createdAt                                DateTime  @default(now())
+  updatedAt                                DateTime  @updatedAt
+}
+
+// External identity database (Prompt 31 / v1.12.0).
+// At most one row (singleton, id = "default"). Holds the connection config + lifecycle state for an
+// optional external SQL database that stores the identity entities (User/Group/Role + memberships).
+// The DB password is encrypted with EncryptionService (v1: prefix). Core/system data always stays in
+// the local libSQL file; this row itself lives in libSQL.
+model ExternalIdentityDatabase {
+  id                String    @id @default("default")
+  dialect           String // "postgres" | "mysql"
+  host              String
+  port              Int
+  database          String
+  username          String
+  passwordEncrypted String
+  sslMode           String    @default("require") // disable | require | verify-ca | verify-full
+  sslCaCertPem      String? // optional CA for private CAs (not a secret)
+  schemaPrefix      String    @default("nestidp_")
+  pgSchema          String? // optional Postgres schema / search_path
+  keepLocalCopy     Boolean   @default(false) // true = mirror (local authoritative), false = relocate
+  mode              String    @default("relocate") // relocate | mirror
+  status            String    @default("disconnected") // disconnected|testing|migrating|active|error
+  schemaVersion     Int       @default(0)
+  outOfSync         Boolean   @default(false)
+  reachable         Boolean   @default(false)
+  poolMax           Int       @default(10)
+  connectTimeoutMs  Int       @default(5000)
+  queryTimeoutMs    Int       @default(10000)
+  probeIntervalMs   Int       @default(20000)
+  migrationPhase    String? // current phase label during connect/reverse
+  migrationDone     Int       @default(0)
+  migrationTotal    Int       @default(0)
+  lastSyncAt        DateTime?
+  lastError         String?
+  lastProbeAt       DateTime?
+  lastProbeError    String?
+  connectedAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 }

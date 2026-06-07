@@ -6,44 +6,41 @@ ALTER TABLE "SpConnection" ADD COLUMN "wantLogoutRequestsSigned" BOOLEAN NOT NUL
 
 -- CreateTable
 CREATE TABLE "SamlSsoSession" (
-    "id" TEXT NOT NULL,
+    "id" TEXT NOT NULL PRIMARY KEY,
     "userId" TEXT,
     "username" TEXT NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "lastSeenAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "lastSeenAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "expiresAt" DATETIME NOT NULL,
     "loginIp" TEXT,
     "userAgent" TEXT,
     "lastSeenIp" TEXT,
     "status" TEXT NOT NULL DEFAULT 'active',
-    "terminatedAt" TIMESTAMP(3),
+    "terminatedAt" DATETIME,
     "terminatedReason" TEXT,
     "terminatedByAdminId" TEXT,
-
-    CONSTRAINT "SamlSsoSession_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "SamlSsoSession_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
 CREATE TABLE "SamlSpParticipation" (
-    "id" TEXT NOT NULL,
+    "id" TEXT NOT NULL PRIMARY KEY,
     "ssoSessionId" TEXT NOT NULL,
     "spConnectionId" TEXT NOT NULL,
     "sessionIndex" TEXT NOT NULL,
     "nameId" TEXT NOT NULL,
     "nameIdFormat" TEXT NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "SamlSpParticipation_pkey" PRIMARY KEY ("id")
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "SamlSpParticipation_ssoSessionId_fkey" FOREIGN KEY ("ssoSessionId") REFERENCES "SamlSsoSession" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "SamlSpParticipation_spConnectionId_fkey" FOREIGN KEY ("spConnectionId") REFERENCES "SpConnection" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateTable
 CREATE TABLE "SamlLogoutRequestLog" (
-    "id" TEXT NOT NULL,
+    "id" TEXT NOT NULL PRIMARY KEY,
     "requestId" TEXT NOT NULL,
     "spConnectionId" TEXT NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "SamlLogoutRequestLog_pkey" PRIMARY KEY ("id")
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- CreateIndex
@@ -63,12 +60,3 @@ CREATE UNIQUE INDEX "SamlLogoutRequestLog_requestId_key" ON "SamlLogoutRequestLo
 
 -- CreateIndex
 CREATE INDEX "SamlLogoutRequestLog_createdAt_idx" ON "SamlLogoutRequestLog"("createdAt");
-
--- AddForeignKey
-ALTER TABLE "SamlSsoSession" ADD CONSTRAINT "SamlSsoSession_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "SamlSpParticipation" ADD CONSTRAINT "SamlSpParticipation_ssoSessionId_fkey" FOREIGN KEY ("ssoSessionId") REFERENCES "SamlSsoSession"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "SamlSpParticipation" ADD CONSTRAINT "SamlSpParticipation_spConnectionId_fkey" FOREIGN KEY ("spConnectionId") REFERENCES "SpConnection"("id") ON DELETE CASCADE ON UPDATE CASCADE;

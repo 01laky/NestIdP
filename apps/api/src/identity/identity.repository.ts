@@ -1,7 +1,39 @@
 import { Injectable } from '@nestjs/common';
-import { Group, IdentityOrigin, Prisma, Role, User } from '@prisma/client';
+import { IdentityOrigin, Prisma } from '@prisma/client';
 import { normalizeSyncedEmail } from './utils/normalize-synced-email.util';
+import { manualExternalId } from './utils/local-directory.util';
 import { PrismaService } from '../prisma/services/prisma.service';
+import type {
+	CreateManualUserInput,
+	IdentitySnapshot,
+	IdentityStore,
+	ImportCounts,
+	ImportMode,
+	ImportProgress,
+	ListQuery,
+	ListResult,
+	StoreGroup,
+	StoreGroupWithCount,
+	StoreMember,
+	StoreRole,
+	StoreRoleWithCount,
+	StoreUser,
+	UpdateManualUserInput,
+	UpsertUserInput,
+	UserProfileForAuth,
+	UserWithMemberships,
+} from './store/identity-store';
+
+function chunk<T>(items: T[], size: number): T[][] {
+	const out: T[][] = [];
+	for (let i = 0; i < items.length; i += size) {
+		out.push(items.slice(i, i + size));
+	}
+	return out;
+}
+
+// Re-exported for backward-compatible imports across the codebase.
+export type { UserProfileForAuth, UpsertUserInput } from './store/identity-store';
 
 export class UsernameCollisionError extends Error {
 	constructor(
@@ -33,28 +65,9 @@ export class RoleNameCollisionError extends Error {
 	}
 }
 
-export type UserProfileForAuth = {
-	id: string;
-	username: string;
-	email: string | null;
-	displayName: string | null;
-	active: boolean;
-	groups: string[];
-	roles: string[];
-};
-
-export type UpsertUserInput = {
-	externalId: string;
-	username: string;
-	email: string | null;
-	displayName: string | null;
-	passwordHash: string;
-	passwordHashAlgorithm: string;
-	active: boolean;
-};
-
+/** Local (libSQL/Prisma) implementation of {@link IdentityStore}. */
 @Injectable()
-export class IdentityRepository {
+export class IdentityRepository implements IdentityStore {
 	constructor(private readonly prisma: PrismaService) {}
 
 	countUsers(): Promise<number> {
@@ -69,7 +82,7 @@ export class IdentityRepository {
 		return this.prisma.role.count();
 	}
 
-	findUserByUsername(username: string): Promise<User | null> {
+	findUserByUsername(username: string): Promise<StoreUser | null> {
 		return this.prisma.user.findUnique({ where: { username } });
 	}
 
@@ -104,7 +117,7 @@ export class IdentityRepository {
 		};
 	}
 
-	async upsertUser(connectionId: string, user: UpsertUserInput): Promise<User> {
+	async upsertUser(connectionId: string, user: UpsertUserInput): Promise<StoreUser> {
 		const existingByUsername = await this.prisma.user.findUnique({
 			where: { username: user.username },
 		});
@@ -191,7 +204,7 @@ export class IdentityRepository {
 	async upsertGroup(
 		connectionId: string,
 		externalGroup: { id: string; name: string },
-	): Promise<Group> {
+	): Promise<StoreGroup> {
 		try {
 			return await this.prisma.group.upsert({
 				where: {
@@ -221,7 +234,7 @@ export class IdentityRepository {
 	async upsertRole(
 		connectionId: string,
 		externalRole: { id: string; name: string },
-	): Promise<Role> {
+	): Promise<StoreRole> {
 		try {
 			return await this.prisma.role.upsert({
 				where: {
@@ -295,5 +308,484 @@ export class IdentityRepository {
 			},
 		});
 		return result.count;
+	}
+
+	// --- admin: users ---
+
+	async listUsers(query: ListQuery): Promise<ListResult<StoreUser>> {
+		const where: Prisma.UserWhereInput = {
+			...this.userSearchWhere(query.search),
+			...(query.origin ? { origin: query.origin } : {}),
+		};
+		const [items, total] = await Promise.all([
+			this.prisma.user.findMany({
+				where,
+				orderBy: { username: 'asc' },
+				skip: query.offset,
+				take: query.limit,
+			}),
+			this.prisma.user.count({ where }),
+		]);
+		return { items, total };
+	}
+
+	getUserById(id: string): Promise<StoreUser | null> {
+		return this.prisma.user.findUnique({ where: { id } });
+	}
+
+	async getUserWithMemberships(id: string): Promise<UserWithMemberships | null> {
+		const row = await this.prisma.user.findUnique({
+			where: { id },
+			include: {
+				groups: { select: { group: { select: { id: true, name: true, origin: true } } } },
+				roles: { select: { role: { select: { id: true, name: true, origin: true } } } },
+			},
+		});
+		if (!row) {
+			return null;
+		}
+		const { groups, roles, ...user } = row;
+		return {
+			user,
+			groups: groups.map((g) => ({ id: g.group.id, name: g.group.name, origin: g.group.origin })),
+			roles: roles.map((r) => ({ id: r.role.id, name: r.role.name, origin: r.role.origin })),
+		};
+	}
+
+	async createManualUser(input: CreateManualUserInput): Promise<StoreUser> {
+		return this.prisma.$transaction(async (tx) => {
+			const created = await tx.user.create({
+				data: {
+					apiConnectionId: input.apiConnectionId,
+					origin: IdentityOrigin.MANUAL,
+					externalId: 'manual:pending',
+					username: input.username,
+					email: input.email,
+					displayName: input.displayName,
+					passwordHash: input.passwordHash,
+					passwordHashAlgorithm: input.passwordHashAlgorithm,
+					active: input.active,
+				},
+			});
+			const updated = await tx.user.update({
+				where: { id: created.id },
+				data: { externalId: manualExternalId('user', created.id) },
+			});
+			if (input.groupIds.length > 0) {
+				await tx.userGroup.createMany({
+					data: input.groupIds.map((groupId) => ({ userId: created.id, groupId })),
+				});
+			}
+			if (input.roleIds.length > 0) {
+				await tx.userRole.createMany({
+					data: input.roleIds.map((roleId) => ({ userId: created.id, roleId })),
+				});
+			}
+			return updated;
+		});
+	}
+
+	async updateManualUser(id: string, input: UpdateManualUserInput): Promise<void> {
+		const data: Prisma.UserUpdateInput = {};
+		if (input.username !== undefined) {
+			data.username = input.username;
+		}
+		if (input.email !== undefined) {
+			data.email = input.email;
+		}
+		if (input.displayName !== undefined) {
+			data.displayName = input.displayName;
+		}
+		if (input.active !== undefined) {
+			data.active = input.active;
+		}
+		if (input.passwordHash !== undefined) {
+			data.passwordHash = input.passwordHash;
+		}
+		await this.prisma.$transaction(async (tx) => {
+			await tx.user.update({ where: { id }, data });
+			if (input.groupIds !== undefined) {
+				await tx.userGroup.deleteMany({ where: { userId: id } });
+				if (input.groupIds.length > 0) {
+					await tx.userGroup.createMany({
+						data: input.groupIds.map((groupId) => ({ userId: id, groupId })),
+					});
+				}
+			}
+			if (input.roleIds !== undefined) {
+				await tx.userRole.deleteMany({ where: { userId: id } });
+				if (input.roleIds.length > 0) {
+					await tx.userRole.createMany({
+						data: input.roleIds.map((roleId) => ({ userId: id, roleId })),
+					});
+				}
+			}
+		});
+	}
+
+	async deleteUser(id: string): Promise<void> {
+		await this.prisma.user.delete({ where: { id } });
+	}
+
+	async isUsernameTaken(username: string, excludeId?: string): Promise<boolean> {
+		const existing = await this.prisma.user.findUnique({ where: { username } });
+		return existing !== null && existing.id !== excludeId;
+	}
+
+	async groupsExistAll(ids: string[]): Promise<boolean> {
+		if (ids.length === 0) {
+			return true;
+		}
+		const count = await this.prisma.group.count({ where: { id: { in: ids } } });
+		return count === ids.length;
+	}
+
+	async rolesExistAll(ids: string[]): Promise<boolean> {
+		if (ids.length === 0) {
+			return true;
+		}
+		const count = await this.prisma.role.count({ where: { id: { in: ids } } });
+		return count === ids.length;
+	}
+
+	// --- admin: groups ---
+
+	async listGroups(query: ListQuery): Promise<ListResult<StoreGroupWithCount>> {
+		const where: Prisma.GroupWhereInput = query.origin ? { origin: query.origin } : {};
+		const [rows, total] = await Promise.all([
+			this.prisma.group.findMany({
+				where,
+				orderBy: { name: 'asc' },
+				skip: query.offset,
+				take: query.limit,
+				include: { _count: { select: { users: true } } },
+			}),
+			this.prisma.group.count({ where }),
+		]);
+		return {
+			items: rows.map(({ _count, ...group }) => ({ ...group, memberCount: _count.users })),
+			total,
+		};
+	}
+
+	async getGroupById(id: string): Promise<StoreGroupWithCount | null> {
+		const row = await this.prisma.group.findUnique({
+			where: { id },
+			include: { _count: { select: { users: true } } },
+		});
+		if (!row) {
+			return null;
+		}
+		const { _count, ...group } = row;
+		return { ...group, memberCount: _count.users };
+	}
+
+	async getGroupMembers(id: string, max: number): Promise<StoreMember[]> {
+		const rows = await this.prisma.userGroup.findMany({
+			where: { groupId: id },
+			take: max,
+			select: { user: { select: { id: true, username: true, origin: true } } },
+			orderBy: { user: { username: 'asc' } },
+		});
+		return rows.map((row) => ({
+			id: row.user.id,
+			username: row.user.username,
+			origin: row.user.origin,
+		}));
+	}
+
+	async createManualGroup(apiConnectionId: string, name: string): Promise<StoreGroup> {
+		return this.prisma.$transaction(async (tx) => {
+			const created = await tx.group.create({
+				data: {
+					apiConnectionId,
+					origin: IdentityOrigin.MANUAL,
+					externalId: 'manual:pending',
+					name,
+				},
+			});
+			return tx.group.update({
+				where: { id: created.id },
+				data: { externalId: manualExternalId('group', created.id) },
+			});
+		});
+	}
+
+	async updateGroupName(id: string, name: string): Promise<void> {
+		await this.prisma.group.update({ where: { id }, data: { name } });
+	}
+
+	async deleteGroup(id: string): Promise<void> {
+		await this.prisma.group.delete({ where: { id } });
+	}
+
+	groupMemberCount(id: string): Promise<number> {
+		return this.prisma.userGroup.count({ where: { groupId: id } });
+	}
+
+	async isGroupNameTaken(
+		apiConnectionId: string,
+		name: string,
+		excludeId?: string,
+	): Promise<boolean> {
+		const row = await this.prisma.group.findUnique({
+			where: { apiConnectionId_name: { apiConnectionId, name } },
+		});
+		return row !== null && row.id !== excludeId;
+	}
+
+	// --- admin: roles ---
+
+	async listRoles(query: ListQuery): Promise<ListResult<StoreRoleWithCount>> {
+		const where: Prisma.RoleWhereInput = query.origin ? { origin: query.origin } : {};
+		const [rows, total] = await Promise.all([
+			this.prisma.role.findMany({
+				where,
+				orderBy: { name: 'asc' },
+				skip: query.offset,
+				take: query.limit,
+				include: { _count: { select: { users: true } } },
+			}),
+			this.prisma.role.count({ where }),
+		]);
+		return {
+			items: rows.map(({ _count, ...role }) => ({ ...role, memberCount: _count.users })),
+			total,
+		};
+	}
+
+	async getRoleById(id: string): Promise<StoreRoleWithCount | null> {
+		const row = await this.prisma.role.findUnique({
+			where: { id },
+			include: { _count: { select: { users: true } } },
+		});
+		if (!row) {
+			return null;
+		}
+		const { _count, ...role } = row;
+		return { ...role, memberCount: _count.users };
+	}
+
+	async getRoleMembers(id: string, max: number): Promise<StoreMember[]> {
+		const rows = await this.prisma.userRole.findMany({
+			where: { roleId: id },
+			take: max,
+			select: { user: { select: { id: true, username: true, origin: true } } },
+			orderBy: { user: { username: 'asc' } },
+		});
+		return rows.map((row) => ({
+			id: row.user.id,
+			username: row.user.username,
+			origin: row.user.origin,
+		}));
+	}
+
+	async createManualRole(apiConnectionId: string, name: string): Promise<StoreRole> {
+		return this.prisma.$transaction(async (tx) => {
+			const created = await tx.role.create({
+				data: {
+					apiConnectionId,
+					origin: IdentityOrigin.MANUAL,
+					externalId: 'manual:pending',
+					name,
+				},
+			});
+			return tx.role.update({
+				where: { id: created.id },
+				data: { externalId: manualExternalId('role', created.id) },
+			});
+		});
+	}
+
+	async updateRoleName(id: string, name: string): Promise<void> {
+		await this.prisma.role.update({ where: { id }, data: { name } });
+	}
+
+	async deleteRole(id: string): Promise<void> {
+		await this.prisma.role.delete({ where: { id } });
+	}
+
+	roleMemberCount(id: string): Promise<number> {
+		return this.prisma.userRole.count({ where: { roleId: id } });
+	}
+
+	async isRoleNameTaken(
+		apiConnectionId: string,
+		name: string,
+		excludeId?: string,
+	): Promise<boolean> {
+		const row = await this.prisma.role.findUnique({
+			where: { apiConnectionId_name: { apiConnectionId, name } },
+		});
+		return row !== null && row.id !== excludeId;
+	}
+
+	private userSearchWhere(search?: string): Prisma.UserWhereInput {
+		if (!search || search.trim().length === 0) {
+			return {};
+		}
+		const term = search.trim();
+		return { OR: [{ username: { contains: term } }, { email: { contains: term } }] };
+	}
+
+	// --- replication / migration ---
+
+	async exportAll(): Promise<IdentitySnapshot> {
+		const [users, groups, roles, userGroups, userRoles] = await Promise.all([
+			this.prisma.user.findMany(),
+			this.prisma.group.findMany(),
+			this.prisma.role.findMany(),
+			this.prisma.userGroup.findMany(),
+			this.prisma.userRole.findMany(),
+		]);
+		return {
+			users,
+			groups,
+			roles,
+			userGroups: userGroups.map((m) => ({ userId: m.userId, groupId: m.groupId })),
+			userRoles: userRoles.map((m) => ({ userId: m.userId, roleId: m.roleId })),
+		};
+	}
+
+	async importSnapshot(
+		snapshot: IdentitySnapshot,
+		mode: ImportMode,
+		onProgress?: ImportProgress,
+	): Promise<ImportCounts> {
+		const counts: ImportCounts = {
+			usersInserted: 0,
+			usersUpdated: 0,
+			groupsInserted: 0,
+			groupsUpdated: 0,
+			rolesInserted: 0,
+			rolesUpdated: 0,
+		};
+		const total = snapshot.groups.length + snapshot.roles.length + snapshot.users.length;
+		let done = 0;
+		const tick = () => {
+			done += 1;
+			if (onProgress && (done % 100 === 0 || done === total)) {
+				onProgress(done, total);
+			}
+		};
+
+		const existingGroupIds = new Set(
+			(await this.prisma.group.findMany({ select: { id: true } })).map((r) => r.id),
+		);
+		for (const g of snapshot.groups) {
+			if (!existingGroupIds.has(g.id)) {
+				await this.prisma.group.create({
+					data: {
+						id: g.id,
+						externalId: g.externalId,
+						apiConnectionId: g.apiConnectionId,
+						origin: g.origin,
+						name: g.name,
+						createdAt: g.createdAt,
+					},
+				});
+				counts.groupsInserted += 1;
+			} else if (mode === 'upsert') {
+				await this.prisma.group.update({ where: { id: g.id }, data: { name: g.name } });
+				counts.groupsUpdated += 1;
+			}
+			tick();
+		}
+
+		const existingRoleIds = new Set(
+			(await this.prisma.role.findMany({ select: { id: true } })).map((r) => r.id),
+		);
+		for (const r of snapshot.roles) {
+			if (!existingRoleIds.has(r.id)) {
+				await this.prisma.role.create({
+					data: {
+						id: r.id,
+						externalId: r.externalId,
+						apiConnectionId: r.apiConnectionId,
+						origin: r.origin,
+						name: r.name,
+						createdAt: r.createdAt,
+					},
+				});
+				counts.rolesInserted += 1;
+			} else if (mode === 'upsert') {
+				await this.prisma.role.update({ where: { id: r.id }, data: { name: r.name } });
+				counts.rolesUpdated += 1;
+			}
+			tick();
+		}
+
+		const existingUserIds = new Set(
+			(await this.prisma.user.findMany({ select: { id: true } })).map((r) => r.id),
+		);
+		for (const u of snapshot.users) {
+			if (!existingUserIds.has(u.id)) {
+				await this.prisma.user.create({
+					data: {
+						id: u.id,
+						externalId: u.externalId,
+						apiConnectionId: u.apiConnectionId,
+						origin: u.origin,
+						username: u.username,
+						email: u.email,
+						displayName: u.displayName,
+						passwordHash: u.passwordHash,
+						passwordHashAlgorithm: u.passwordHashAlgorithm,
+						active: u.active,
+						createdAt: u.createdAt,
+					},
+				});
+				counts.usersInserted += 1;
+			} else if (mode === 'upsert') {
+				await this.prisma.user.update({
+					where: { id: u.id },
+					data: {
+						username: u.username,
+						email: u.email,
+						displayName: u.displayName,
+						passwordHash: u.passwordHash,
+						passwordHashAlgorithm: u.passwordHashAlgorithm,
+						active: u.active,
+					},
+				});
+				counts.usersUpdated += 1;
+			}
+			tick();
+		}
+
+		const existingUg = new Set(
+			(await this.prisma.userGroup.findMany()).map((m) => `${m.userId}|${m.groupId}`),
+		);
+		const newUg = snapshot.userGroups.filter((m) => !existingUg.has(`${m.userId}|${m.groupId}`));
+		for (const part of chunk(newUg, 500)) {
+			await this.prisma.userGroup.createMany({ data: part });
+		}
+		const existingUr = new Set(
+			(await this.prisma.userRole.findMany()).map((m) => `${m.userId}|${m.roleId}`),
+		);
+		const newUr = snapshot.userRoles.filter((m) => !existingUr.has(`${m.userId}|${m.roleId}`));
+		for (const part of chunk(newUr, 500)) {
+			await this.prisma.userRole.createMany({ data: part });
+		}
+		return counts;
+	}
+
+	async wipeAll(): Promise<void> {
+		await this.prisma.$transaction([
+			this.prisma.userGroup.deleteMany(),
+			this.prisma.userRole.deleteMany(),
+			this.prisma.user.deleteMany(),
+			this.prisma.group.deleteMany(),
+			this.prisma.role.deleteMany(),
+		]);
+	}
+
+	async connectionHasIdentityRows(apiConnectionId: string): Promise<boolean> {
+		const [u, g, r] = await Promise.all([
+			this.prisma.user.count({ where: { apiConnectionId } }),
+			this.prisma.group.count({ where: { apiConnectionId } }),
+			this.prisma.role.count({ where: { apiConnectionId } }),
+		]);
+		return u + g + r > 0;
 	}
 }

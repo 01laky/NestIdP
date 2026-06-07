@@ -1,4 +1,4 @@
-# Development stack: PostgreSQL + hot reload (Nest watch + Vite HMR).
+# Development stack: encrypted libSQL file + hot reload (Nest watch + Vite HMR).
 # Usage: pnpm dev:docker
 # Production (unchanged): docker compose up --build
 #
@@ -26,8 +26,7 @@ services:
     env_file:
       - .env.docker
     environment:
-      DATABASE_PROVIDER: postgresql
-      DATABASE_URL: postgresql://nestidp:nestidp@postgres:5432/nestidp
+      DATABASE_URL: file:/app/apps/api/data/nestidp.db
       NODE_ENV: development
       PORT: '3000'
       IDP_BASE_URL: http://localhost:5173
@@ -43,9 +42,6 @@ services:
       - dev_shared_node_modules:/app/packages/shared/node_modules
     extra_hosts:
       - localhost:host-gateway
-    depends_on:
-      postgres:
-        condition: service_healthy
 
 volumes:
   dev_root_node_modules:

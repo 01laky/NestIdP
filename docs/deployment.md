@@ -1,6 +1,6 @@
 # Deployment guide
 
-NestIdP **v1.0.0** ships as a single Docker image (NestJS API + built React SPA). Production deployments should use **PostgreSQL**; SQLite is for local development only.
+NestIdP ships as a single Docker image (NestJS API + built React SPA) with an **encrypted libSQL file** as the only datastore — no external database server. Persist the file on a volume and supply an at-rest encryption key.
 
 Related: [RELEASE.md](./RELEASE.md) (go-live checklist) · [database.md](./database.md) · [integration-api.md](./integration-api.md)
 
@@ -9,9 +9,12 @@ Related: [RELEASE.md](./RELEASE.md) (go-live checklist) · [database.md](./datab
 ## Prerequisites
 
 - Docker and Docker Compose (v2)
-- Secrets: `SESSION_SECRET`, `ENCRYPTION_KEY` (≥ 16 characters; generate with `openssl rand -hex 32`)
+- Secrets: `SESSION_SECRET`, `ENCRYPTION_KEY`, and `DATABASE_ENCRYPTION_KEY` (≥ 16 characters; generate with `openssl rand -hex 32`)
+- A persistent volume for the database file (`apps/api/data/`)
 - Public URL for browsers and SAML SPs: `IDP_BASE_URL` (HTTPS in production)
 - Optional: TLS-terminating load balancer in front of the container
+
+> **Three independent keys.** `SESSION_SECRET` signs cookies, `ENCRYPTION_KEY` encrypts secret columns (tokens, private keys), and `DATABASE_ENCRYPTION_KEY` encrypts the whole DB file at rest. Back them up together — losing any one makes the corresponding data unrecoverable.
 
 ---
 
@@ -23,9 +26,9 @@ Related: [RELEASE.md](./RELEASE.md) (go-live checklist) · [database.md](./datab
 cp .env.docker.example .env.docker
 ```
 
-2. Edit `.env.docker` — set strong `SESSION_SECRET`, `ENCRYPTION_KEY`, `ADMIN_PASSWORD` (min 12 chars in production), and `IDP_BASE_URL` to the URL users and SPs use (e.g. `https://idp.example.com`).
+2. Edit `.env.docker` — set strong `SESSION_SECRET`, `ENCRYPTION_KEY`, `DATABASE_ENCRYPTION_KEY`, `ADMIN_PASSWORD` (min 12 chars in production), and `IDP_BASE_URL` to the URL users and SPs use (e.g. `https://idp.example.com`).
 
-3. Build and start the stack (PostgreSQL + NestIdP):
+3. Build and start the stack (the DB file lives on the `nestidp_data` volume):
 
 ```bash
 docker compose up --build -d
@@ -42,7 +45,7 @@ curl -sf http://localhost:3000/ready
 
 6. Complete operator setup per [RELEASE.md](./RELEASE.md).
 
-The entrypoint runs `prisma migrate deploy` before starting the API. Bootstrap creates the first `AdminUser` when the table is empty and `ADMIN_USERNAME` / `ADMIN_PASSWORD` are set.
+The API applies pending migrations through the keyed libSQL adapter at startup (the encrypted file cannot be opened by the Prisma CLI). Bootstrap creates the first `AdminUser` when the table is empty and `ADMIN_USERNAME` / `ADMIN_PASSWORD` are set.
 
 ### Admin session lifetime
 
@@ -61,7 +64,7 @@ After session expiry, the admin UI redirects to `/admin/login?reason=session_exp
 
 | Mode                                     | How                                                                                    |
 | ---------------------------------------- | -------------------------------------------------------------------------------------- |
-| **Default (compose / single container)** | Automatic on container start via `scripts/docker-entrypoint.sh`                        |
+| **Default (compose / single container)** | Automatic at API startup (`main.ts` → `runMigrations`) before the HTTP server listens  |
 | **Init container / job only**            | Set `MIGRATE_ONLY=1` — migrations run, process exits **0**, HTTP server does not start |
 
 Kubernetes init container example:
@@ -78,8 +81,11 @@ initContainers:
 					secretKeyRef:
 						name: nestidp-db
 						key: url
-			- name: DATABASE_PROVIDER
-				value: postgresql
+			- name: DATABASE_ENCRYPTION_KEY
+				valueFrom:
+					secretKeyRef:
+						name: nestidp-db
+						key: encryptionKey
 			- name: SESSION_SECRET
 				valueFrom:
 					secretKeyRef:
@@ -110,12 +116,14 @@ NODE_ENV=production node apps/api/dist/main.js
 
 ---
 
-## PostgreSQL vs SQLite
+## Database file
 
-| Environment      | `DATABASE_PROVIDER` | Notes                           |
-| ---------------- | ------------------- | ------------------------------- |
-| Production       | `postgresql`        | Required for compose stack      |
-| Local `pnpm dev` | `sqlite` (default)  | File `apps/api/data/nestidp.db` |
+| Environment      | `DATABASE_URL`                       | Encryption                                                |
+| ---------------- | ------------------------------------ | --------------------------------------------------------- |
+| Production       | `file:/app/apps/api/data/nestidp.db` | `DATABASE_ENCRYPTION_KEY` **required**                    |
+| Local `pnpm dev` | `file:../data/nestidp.db`            | Optional (key unset → plaintext file for easy inspection) |
+
+Persist the `data/` directory on a volume so the file survives container restarts/upgrades.
 
 `IDP_BASE_URL` must be the **public** URL (browser/SP facing), not internal Docker DNS names like `http://nestidp:3000`.
 
@@ -129,52 +137,57 @@ NODE_ENV=production node apps/api/dist/main.js
 
 ---
 
-## Backup and restore (PostgreSQL)
+## Backup and restore
 
-**Secrets warning:** backing up PostgreSQL without also backing up **`ENCRYPTION_KEY`** makes `authCredentialsEncrypted` and IdP private keys unusable after restore with a new key. Store both together in your secrets manager.
+**Secrets warning:** a backup is useless without its keys. Store **`DATABASE_ENCRYPTION_KEY`** (opens the file at all), **`ENCRYPTION_KEY`** (`authCredentialsEncrypted` + IdP private keys), and **`SESSION_SECRET`** together in your secrets manager.
 
-### Backup (compose stack running)
+### Consistent encrypted backup (`VACUUM INTO`)
 
-```bash
-docker compose exec -T postgres pg_dump -U nestidp -d nestidp --format=custom -f /tmp/nestidp.dump
-docker compose cp postgres:/tmp/nestidp.dump ./backups/nestidp-$(date +%Y%m%d).dump
-```
-
-### Restore (destructive — target DB should be empty or disposable)
+`pnpm db:backup` produces an encrypted copy that is readable only with the same `DATABASE_ENCRYPTION_KEY`:
 
 ```bash
-docker compose cp ./backups/nestidp-YYYYMMDD.dump postgres:/tmp/nestidp.dump
-docker compose exec -T postgres pg_restore -U nestidp -d nestidp --clean --if-exists /tmp/nestidp.dump
+docker compose exec nestidp pnpm db:backup -- /app/apps/api/data/backup-$(date +%Y%m%d).db
+docker compose cp nestidp:/app/apps/api/data/backup-YYYYMMDD.db ./backups/
 ```
 
-### SQLite (development only)
+### Cold copy
 
-Copy the file:
+With the container stopped (or briefly quiesced), copy the file and its `-wal`/`-shm` siblings together:
 
 ```bash
-cp apps/api/data/nestidp.db ./backups/nestidp-dev-$(date +%Y%m%d).db
+cp apps/api/data/nestidp.db* ./backups/
 ```
 
-Not supported for production deployments.
+### Restore
+
+Stop the API, put the backup file at `DATABASE_URL`'s path, and start with the matching `DATABASE_ENCRYPTION_KEY`. For a plaintext-dump round-trip (e.g. re-keying or migrating media) use `pnpm db:dump` / `pnpm db:restore` — see [database.md](./database.md#operations-rekey-backup-restore).
+
+### Rekey (rotate the at-rest key)
+
+```bash
+docker compose exec nestidp pnpm db:rekey -- "$NEW_KEY"
+# then update DATABASE_ENCRYPTION_KEY and restart
+```
 
 ---
 
 ## Environment reference (compose / production)
 
-| Variable                                 | Default                 | Purpose                                    |
-| ---------------------------------------- | ----------------------- | ------------------------------------------ |
-| `DATABASE_PROVIDER`                      | `postgresql` in compose | Prisma engine                              |
-| `DATABASE_URL`                           | set in compose          | PostgreSQL connection string               |
-| `SESSION_SECRET`                         | —                       | Admin + end-user cookie signing            |
-| `ENCRYPTION_KEY`                         | —                       | API tokens and IdP private keys at rest    |
-| `IDP_BASE_URL`                           | —                       | Public IdP base URL                        |
-| `ADMIN_USERNAME` / `ADMIN_PASSWORD`      | —                       | First admin when table empty               |
-| `TRUST_PROXY`                            | `false`                 | `true` behind load balancer                |
-| `AUDIT_RETENTION_DAYS`                   | `90`                    | Delete `AuditEvent` rows older than N days |
-| `AUDIT_CLEANUP_INTERVAL_MS`              | `86400000`              | Cleanup interval; `0` = once on startup    |
-| `ADMIN_USER_CREATE_RATE_LIMIT_MAX`       | `5`                     | Max admin creates per window               |
-| `ADMIN_USER_CREATE_RATE_LIMIT_WINDOW_MS` | `900000`                | Admin create rate window (15 min)          |
-| `MIGRATE_ONLY`                           | `0`                     | `1` = migrate and exit                     |
+| Variable                                 | Default        | Purpose                                      |
+| ---------------------------------------- | -------------- | -------------------------------------------- |
+| `DATABASE_URL`                           | set in compose | `file:` path to the libSQL DB file           |
+| `DATABASE_ENCRYPTION_KEY`                | —              | At-rest DB encryption key (required in prod) |
+| `DATABASE_ENCRYPTION_KEY_FILE`           | —              | Alt: read the DB key from a secret file      |
+| `SESSION_SECRET`                         | —              | Admin + end-user cookie signing              |
+| `ENCRYPTION_KEY`                         | —              | API tokens and IdP private keys at rest      |
+| `IDP_BASE_URL`                           | —              | Public IdP base URL                          |
+| `ADMIN_USERNAME` / `ADMIN_PASSWORD`      | —              | First admin when table empty                 |
+| `TRUST_PROXY`                            | `false`        | `true` behind load balancer                  |
+| `AUDIT_RETENTION_DAYS`                   | `90`           | Delete `AuditEvent` rows older than N days   |
+| `AUDIT_CLEANUP_INTERVAL_MS`              | `86400000`     | Cleanup interval; `0` = once on startup      |
+| `ADMIN_USER_CREATE_RATE_LIMIT_MAX`       | `5`            | Max admin creates per window                 |
+| `ADMIN_USER_CREATE_RATE_LIMIT_WINDOW_MS` | `900000`       | Admin create rate window (15 min)            |
+| `MIGRATE_ONLY`                           | `0`            | `1` = migrate and exit                       |
 
 See also `.env.docker.example` and root `.env.example` for optional SAML, sync, and login tuning.
 
@@ -207,16 +220,15 @@ pnpm dev:docker
 # Browser: http://localhost:5173 (SPA) — API: http://localhost:3000
 ```
 
-**API + web on host, PostgreSQL in Docker:**
+**API + web on host (no Docker, no DB server):**
 
 ```bash
-# .env: DATABASE_PROVIDER=postgresql, DATABASE_URL=postgresql://nestidp:nestidp@localhost:5432/nestidp
-docker compose up -d postgres
-pnpm db:migrate
+# .env: DATABASE_URL=file:../data/nestidp.db (DATABASE_ENCRYPTION_KEY optional in dev)
+pnpm db:migrate:deploy
 pnpm dev
 ```
 
-**SQLite only (no Docker):** see [development.md](./development.md).
+See [development.md](./development.md) for details.
 
 ---
 

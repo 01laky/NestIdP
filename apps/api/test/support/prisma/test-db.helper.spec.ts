@@ -8,11 +8,11 @@ import { runMigrationsOnTestDb } from '@test/support/prisma/test-db.helper';
 jest.setTimeout(30_000);
 
 describe('test-db.helper', () => {
-	it('API-DBH-01: runMigrationsOnTestDb creates usable schema on temp SQLite file', () => {
+	it('API-DBH-01: runMigrationsOnTestDb creates usable schema on temp SQLite file', async () => {
 		const tmpDb = join(tmpdir(), `nestidp-helper-${randomUUID()}.db`);
 		const databaseUrl = `file:${tmpDb}`;
 
-		runMigrationsOnTestDb(databaseUrl, 'sqlite');
+		await runMigrationsOnTestDb(databaseUrl);
 		expect(existsSync(tmpDb)).toBe(true);
 
 		const prisma = new PrismaClient({

@@ -4,7 +4,7 @@ Companion to [proposal.MD](./proposal.MD) for local setup (**v1.1.0** — Phase 
 
 Integration guide: [integration-api.md](./integration-api.md) · Deploy: [deployment.md](./deployment.md) · Go-live: [RELEASE.md](./RELEASE.md)
 
-Database selection: **[database.md](./database.md)** — SQLite for local dev, PostgreSQL (or SQLite) at deploy time.
+Database: **[database.md](./database.md)** — a single encrypted libSQL file (no external DB server).
 
 Diagram index: **[img/README.md](./img/README.md)** · regenerate with `pnpm diagrams:build`.
 
@@ -24,27 +24,21 @@ docs/img/          Mermaid (.mmd) sources + committed SVGs
 
 **Prisma** ORM with full MVP schema (12 models including `AuditEvent`). See [database.md](./database.md) and the [ER diagram](./img/schema-entities.svg).
 
-| Variable            | Default (dev)             | Purpose                                 |
-| ------------------- | ------------------------- | --------------------------------------- |
-| `DATABASE_PROVIDER` | `sqlite`                  | Prisma engine: `sqlite` or `postgresql` |
-| `DATABASE_URL`      | `file:../data/nestidp.db` | Connection string matching the provider |
+| Variable                  | Default (dev)             | Purpose                                                  |
+| ------------------------- | ------------------------- | -------------------------------------------------------- |
+| `DATABASE_URL`            | `file:../data/nestidp.db` | `file:` path to the embedded libSQL DB                   |
+| `DATABASE_ENCRYPTION_KEY` | unset (dev)               | At-rest key; optional in dev, **required in production** |
 
 First-time setup after clone:
 
 ```bash
 cp .env.example .env
 mkdir -p apps/api/data
-pnpm install
-pnpm db:migrate
+pnpm install            # runs prisma generate
+pnpm db:migrate:deploy  # applies migrations to the local file
 ```
 
-Before `prisma generate` or `prisma migrate`, run:
-
-```bash
-pnpm --filter @nestidp/api prisma:prepare
-```
-
-This syncs `schema.prisma` with `DATABASE_PROVIDER`. Root `pnpm install` runs `prisma:generate` via `postinstall` but **not** migrate.
+To author a new migration, run `pnpm db:new-migration` — it uses `prisma migrate dev` against an unencrypted scratch DB to produce the SQL under `prisma/migrations/`. Root `pnpm install` runs `prisma:generate` via `postinstall` but **not** migrate.
 
 ## Routing conventions
 
@@ -636,7 +630,14 @@ Long or interrupted test runs can leave **`node (vitest N)`** workers running an
 If the machine still feels slow after aborting tests in the IDE, run **`pnpm test:cleanup`**. Web Vitest is capped at **4 workers** (`apps/web/vitest.config.ts`); API Jest uses **`--forceExit`** and limited **`--maxWorkers`** to reduce hangs and migration races.
 
 - `@nestidp/shared` — schema enums, password hash constants, route prefixes, database validation
-- `@nestidp/api` — unit tests, schema integration tests (SQLite temp DB), optional PostgreSQL smoke (`POSTGRES_TEST_URL`), e2e routing (mocked Prisma)
+- `@nestidp/api` — unit tests, schema integration tests (libSQL temp file via the in-process migrator), encrypted-DB/rekey/backup specs, external identity-store specs against **in-process Postgres (PGlite)**, e2e routing (mocked Prisma)
+
+> **Identity data access** goes through the `IdentityStore` seam and a runtime-swappable
+> `ActiveIdentityStore` holder (`apps/api/src/identity/store/`). The local implementation is
+> Prisma/libSQL; the external one (Prompt 31 / v1.12.0) is Kysely over Postgres/MySQL. The PGlite
+> specs run in a dedicated jest phase with `--experimental-vm-modules` (see `run-jest-tests.mjs`), so
+> the rest of the suite is unaffected and CI needs no database service.
+
 - `@nestidp/web` — React route tests (admin vs login separation), Evergreen `WEB-EVG-*` registry
 
 ### Repository layout (tests vs source)
@@ -649,7 +650,7 @@ If the machine still feels slow after aborting tests in the IDE, run **`pnpm tes
 
 API integration specs that need temp DBs live under `apps/api/test/unit/**` (not beside handlers). Web static guards use `@test/helpers/paths` (`webSrc`, `webRoot`, `repoRoot`).
 
-CI (`.github/workflows/ci.yml`) runs lint, test (with Postgres + `CI=true`), build, bundle size check, `diagrams:build` + `diagrams:check`, and Playwright **`test:e2e:ci`** (responsive shell smoke; full PNG baselines are local-only) on push/PR to `main`.
+CI (`.github/workflows/ci.yml`) runs lint, test (`CI=true`; no DB service needed — tests use temp libSQL files), build, bundle size check, `diagrams:build` + `diagrams:check`, and Playwright **`test:e2e:ci`** (responsive shell smoke; full PNG baselines are local-only) on push/PR to `main`.
 
 ## Git hooks
 
@@ -663,10 +664,9 @@ This sets `core.hooksPath=.githooks`. Hooks run on `prepare-commit-msg` and `com
 
 ## Docker
 
-- **Default dev:** SQLite — no containers required; `pnpm dev` on the host
-- **Production stack:** `docker compose up --build` — PostgreSQL + built NestIdP image. See [deployment.md](./deployment.md)
-- **Hot reload in Docker (v1.3.4):** `pnpm dev:docker` — Postgres + **Nest watch** + **Vite HMR** at **http://localhost:5173** (no rebuild for TS/CSS edits). Stop: `pnpm dev:docker:down`. `node_modules` are stored in **named volumes** (not the bind mount); the dev entrypoint runs `pnpm install` when `pnpm-lock.yaml` changes. If dependencies are still missing after a git pull, run `pnpm dev:docker:reset` then `pnpm dev:docker` (removes dev volumes).
-- **Host dev + Postgres only:** `docker compose up -d postgres` then `pnpm dev` with `DATABASE_PROVIDER=postgresql`
+- **Default dev:** embedded libSQL file — no containers, no DB server; `pnpm dev` on the host
+- **Production stack:** `docker compose up --build` — single NestIdP image; the encrypted DB file lives on the `nestidp_data` volume. See [deployment.md](./deployment.md)
+- **Hot reload in Docker (v1.3.4):** `pnpm dev:docker` — **Nest watch** + **Vite HMR** at **http://localhost:5173** (no rebuild for TS/CSS edits). Stop: `pnpm dev:docker:down`. `node_modules` are stored in **named volumes** (not the bind mount); the dev entrypoint runs `pnpm install` when `pnpm-lock.yaml` changes. If dependencies are still missing after a git pull, run `pnpm dev:docker:reset` then `pnpm dev:docker` (removes dev volumes).
 - **`MIGRATE_ONLY=1`:** run migrations without starting HTTP (init containers)
 - **`TRUST_PROXY`:** set `true` when behind a TLS-terminating reverse proxy
 

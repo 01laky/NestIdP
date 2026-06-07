@@ -26,6 +26,7 @@ describe('Routing (e2e)', () => {
 
 	const prismaMock = {
 		pingDatabase: jest.fn(),
+		appliedMigrationCount: jest.fn().mockResolvedValue(0),
 		$disconnect: jest.fn(),
 		user: {
 			count: jest.fn().mockResolvedValue(0),
@@ -115,7 +116,6 @@ describe('Routing (e2e)', () => {
 					ignoreEnvFile: true,
 					load: [
 						() => ({
-							DATABASE_PROVIDER: 'sqlite',
 							DATABASE_URL: 'file:../data/nestidp.db',
 							SESSION_SECRET: 'test-session-secret',
 							ENCRYPTION_KEY: 'test-encryption-key-32chars!!',
@@ -625,7 +625,11 @@ describe('Routing (e2e)', () => {
 
 describe('Ready edge cases (e2e)', () => {
 	let app: INestApplication;
-	const prismaMock = { pingDatabase: jest.fn(), $disconnect: jest.fn() };
+	const prismaMock = {
+		pingDatabase: jest.fn(),
+		appliedMigrationCount: jest.fn().mockResolvedValue(0),
+		$disconnect: jest.fn(),
+	};
 
 	beforeAll(async () => {
 		const moduleFixture: TestingModule = await Test.createTestingModule({

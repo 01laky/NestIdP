@@ -2,7 +2,6 @@ import { validateEnv, NodeEnv } from '@api/config/env.validation';
 
 describe('validateEnv', () => {
 	const validConfig = {
-		DATABASE_PROVIDER: 'sqlite',
 		DATABASE_URL: 'file:../data/nestidp.db',
 		SESSION_SECRET: 'session-secret-min-16-chars',
 		ENCRYPTION_KEY: 'encryption-key-min-16-chars',
@@ -13,57 +12,83 @@ describe('validateEnv', () => {
 	it('accepts a complete valid configuration', () => {
 		const result = validateEnv(validConfig);
 		expect(result.NODE_ENV).toBe(NodeEnv.Test);
-		expect(result.DATABASE_PROVIDER).toBe('sqlite');
 		expect(result.DATABASE_URL).toBe(validConfig.DATABASE_URL);
 	});
 
-	it('defaults DATABASE_PROVIDER to sqlite when omitted', () => {
-		const { DATABASE_PROVIDER, ...rest } = validConfig;
-		void DATABASE_PROVIDER;
-		const result = validateEnv(rest);
-		expect(result.DATABASE_PROVIDER).toBe('sqlite');
+	it('ENV-DB-01: rejects a non-file DATABASE_URL (no more multi-provider)', () => {
+		expect(() =>
+			validateEnv({ ...validConfig, DATABASE_URL: 'postgresql://localhost:5432/nestidp' }),
+		).toThrow(/file:/);
 	});
 
-	it('accepts postgresql provider with matching URL', () => {
-		const result = validateEnv({
-			...validConfig,
-			DATABASE_PROVIDER: 'postgresql',
-			DATABASE_URL: 'postgresql://localhost:5432/nestidp',
-		});
-		expect(result.DATABASE_PROVIDER).toBe('postgresql');
-	});
-
-	it('rejects sqlite URL with postgresql provider', () => {
+	it('ENV-DB-02: production requires a DB encryption key (inline or file)', () => {
+		expect(() => validateEnv({ ...validConfig, NODE_ENV: 'production' })).toThrow(
+			/DATABASE_ENCRYPTION_KEY/,
+		);
+		expect(() =>
+			validateEnv({ ...validConfig, NODE_ENV: 'production', DATABASE_ENCRYPTION_KEY: 'k' }),
+		).not.toThrow();
 		expect(() =>
 			validateEnv({
 				...validConfig,
-				DATABASE_PROVIDER: 'postgresql',
-				DATABASE_URL: 'file:../data/nestidp.db',
+				NODE_ENV: 'production',
+				DATABASE_ENCRYPTION_KEY_FILE: '/run/secrets/dbkey',
 			}),
-		).toThrow(/postgresql/);
+		).not.toThrow();
 	});
 
-	it('rejects postgresql URL with sqlite provider', () => {
+	it('ENV-DB-03: non-production allows an unencrypted DB (no key)', () => {
+		expect(() => validateEnv({ ...validConfig, NODE_ENV: 'development' })).not.toThrow();
+	});
+
+	it('ENV-DB-04: rejects setting both inline key and key file', () => {
 		expect(() =>
 			validateEnv({
 				...validConfig,
-				DATABASE_PROVIDER: 'sqlite',
-				DATABASE_URL: 'postgresql://localhost:5432/nestidp',
+				DATABASE_ENCRYPTION_KEY: 'k',
+				DATABASE_ENCRYPTION_KEY_FILE: '/run/secrets/dbkey',
+			}),
+		).toThrow(/only one of/i);
+	});
+
+	it('ENV-DB-05: rejects a whitespace-only DATABASE_URL', () => {
+		expect(() => validateEnv({ ...validConfig, DATABASE_URL: '   ' })).toThrow();
+	});
+
+	it('ENV-DB-06: rejects a non-file scheme even with a valid encryption key', () => {
+		expect(() =>
+			validateEnv({
+				...validConfig,
+				DATABASE_URL: 'libsql://remote',
+				DATABASE_ENCRYPTION_KEY: 'k',
 			}),
 		).toThrow(/file:/);
 	});
 
-	it('rejects invalid DATABASE_PROVIDER', () => {
-		expect(() => validateEnv({ ...validConfig, DATABASE_PROVIDER: 'mysql' })).toThrow();
+	it('ENV-DB-07: production with only a key FILE (no inline key) is accepted', () => {
+		expect(() =>
+			validateEnv({
+				...validConfig,
+				NODE_ENV: 'production',
+				DATABASE_ENCRYPTION_KEY_FILE: '/run/secrets/dbkey',
+			}),
+		).not.toThrow();
+	});
+
+	it('ENV-DB-08: an empty-string key in production still fails the guard', () => {
+		expect(() =>
+			validateEnv({ ...validConfig, NODE_ENV: 'production', DATABASE_ENCRYPTION_KEY: '' }),
+		).toThrow(/DATABASE_ENCRYPTION_KEY/);
 	});
 
 	it('accepts all supported NODE_ENV values', () => {
 		expect(validateEnv({ ...validConfig, NODE_ENV: 'development' }).NODE_ENV).toBe(
 			NodeEnv.Development,
 		);
-		expect(validateEnv({ ...validConfig, NODE_ENV: 'production' }).NODE_ENV).toBe(
-			NodeEnv.Production,
-		);
+		expect(
+			validateEnv({ ...validConfig, NODE_ENV: 'production', DATABASE_ENCRYPTION_KEY: 'k' })
+				.NODE_ENV,
+		).toBe(NodeEnv.Production);
 		expect(validateEnv({ ...validConfig, NODE_ENV: 'test' }).NODE_ENV).toBe(NodeEnv.Test);
 	});
 

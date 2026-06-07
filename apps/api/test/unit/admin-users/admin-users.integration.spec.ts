@@ -72,7 +72,7 @@ describe('admin-users integration (SQLite)', () => {
 	beforeAll(async () => {
 		const tmpDb = join(tmpdir(), `nestidp-adm-usr-${randomUUID()}.db`);
 		databaseUrl = `file:${tmpDb}`;
-		runMigrationsOnTestDb(databaseUrl, 'sqlite');
+		await runMigrationsOnTestDb(databaseUrl);
 
 		const prismaService = new PrismaService({
 			datasources: { db: { url: databaseUrl } },
@@ -85,7 +85,6 @@ describe('admin-users integration (SQLite)', () => {
 					ignoreEnvFile: true,
 					load: [
 						() => ({
-							DATABASE_PROVIDER: 'sqlite',
 							DATABASE_URL: databaseUrl,
 							SESSION_SECRET: 'test-session-secret-min-16',
 							ENCRYPTION_KEY: 'test-encryption-key-32chars!!',
@@ -460,7 +459,7 @@ describe('admin-users create rate limit (SQLite)', () => {
 	beforeAll(async () => {
 		const tmpDb = join(tmpdir(), `nestidp-adm-usr-rl-${randomUUID()}.db`);
 		databaseUrl = `file:${tmpDb}`;
-		runMigrationsOnTestDb(databaseUrl, 'sqlite');
+		await runMigrationsOnTestDb(databaseUrl);
 
 		const prismaService = new PrismaService({
 			datasources: { db: { url: databaseUrl } },
@@ -473,7 +472,6 @@ describe('admin-users create rate limit (SQLite)', () => {
 					ignoreEnvFile: true,
 					load: [
 						() => ({
-							DATABASE_PROVIDER: 'sqlite',
 							DATABASE_URL: databaseUrl,
 							SESSION_SECRET: 'test-session-secret-min-16',
 							ENCRYPTION_KEY: 'test-encryption-key-32chars!!',
@@ -580,7 +578,7 @@ describe('admin-users integration production password policy (SQLite)', () => {
 	beforeAll(async () => {
 		const tmpDb = join(tmpdir(), `nestidp-adm-usr-prod-${randomUUID()}.db`);
 		databaseUrl = `file:${tmpDb}`;
-		runMigrationsOnTestDb(databaseUrl, 'sqlite');
+		await runMigrationsOnTestDb(databaseUrl);
 
 		const prismaService = new PrismaService({
 			datasources: { db: { url: databaseUrl } },
@@ -593,7 +591,6 @@ describe('admin-users integration production password policy (SQLite)', () => {
 					ignoreEnvFile: true,
 					load: [
 						() => ({
-							DATABASE_PROVIDER: 'sqlite',
 							DATABASE_URL: databaseUrl,
 							SESSION_SECRET: 'test-session-secret-min-16',
 							ENCRYPTION_KEY: 'test-encryption-key-32chars!!',

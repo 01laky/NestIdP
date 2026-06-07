@@ -16,12 +16,11 @@ RUN pnpm install --ignore-scripts
 
 COPY . .
 
-# Match docker-compose.dev.yml postgresql so the image layer is not sqlite-only.
-ENV DATABASE_PROVIDER=postgresql
-ENV DATABASE_URL=postgresql://nestidp:nestidp@postgres:5432/nestidp
+# Build-time URL is only used by `prisma generate` (client codegen); the runtime
+# URL/key come from docker-compose.dev.yml. No external DB is contacted.
+ENV DATABASE_URL=file:/tmp/build.db
 
 RUN pnpm --filter @nestidp/shared build \
-	&& node ./apps/api/scripts/sync-prisma-provider.mjs \
 	&& ./apps/api/node_modules/.bin/prisma generate --schema=./apps/api/prisma/schema.prisma
 
 EXPOSE 3000 5173

@@ -1,49 +1,8 @@
-import { closeSync, openSync, unlinkSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
-import { join, resolve } from 'node:path';
 import type { PrismaClient } from '@prisma/client';
+import { createLibsqlClient } from '@api/prisma/libsql';
+import { applyMigrations } from '@api/prisma/db-migrator';
 
-const apiRoot = resolve(__dirname, '../../..');
-const migrationSyncLockFile = join(apiRoot, 'prisma/.test-migration-sync.lock');
-const MIGRATION_SYNC_LOCK_TIMEOUT_MS = 120_000;
-const MIGRATION_SYNC_LOCK_RETRY_MS = 25;
-
-function withMigrationSyncLock(run: () => void): void {
-	const started = Date.now();
-	let lockFd: number | undefined;
-
-	while (Date.now() - started < MIGRATION_SYNC_LOCK_TIMEOUT_MS) {
-		try {
-			lockFd = openSync(migrationSyncLockFile, 'wx');
-			break;
-		} catch (err) {
-			if ((err as NodeJS.ErrnoException).code !== 'EEXIST') {
-				throw err;
-			}
-			const until = Date.now() + MIGRATION_SYNC_LOCK_RETRY_MS;
-			while (Date.now() < until) {
-				// spin until retry
-			}
-		}
-	}
-
-	if (lockFd === undefined) {
-		throw new Error('Timed out waiting for Prisma migration sync lock');
-	}
-
-	try {
-		run();
-	} finally {
-		closeSync(lockFd);
-		try {
-			unlinkSync(migrationSyncLockFile);
-		} catch {
-			// ignore stale lock cleanup
-		}
-	}
-}
-
-/** Clears identity/sync rows that reference ApiConnection (PostgreSQL enforces FK order). */
+/** Clears identity/sync rows that reference ApiConnection (FK order matters). */
 export async function clearApiConnectionScopedTestData(
 	prisma: Pick<
 		PrismaClient,
@@ -67,30 +26,15 @@ export async function clearApiConnectionScopedTestData(
 	await prisma.apiConnection.deleteMany();
 }
 
-export function runMigrationsOnTestDb(databaseUrl: string, provider = 'sqlite'): void {
-	const env = {
-		...process.env,
-		DATABASE_PROVIDER: provider,
-		DATABASE_URL: databaseUrl,
-	};
-
-	withMigrationSyncLock(() => {
-		execFileSync('node', ['scripts/sync-prisma-provider.mjs'], {
-			cwd: apiRoot,
-			env,
-			stdio: 'pipe',
-		});
-	});
-
-	execFileSync('npx', ['prisma', 'migrate', 'deploy'], {
-		cwd: apiRoot,
-		env,
-		stdio: 'pipe',
-	});
-
-	execFileSync('npx', ['prisma', 'generate'], {
-		cwd: apiRoot,
-		env,
-		stdio: 'pipe',
-	});
+/**
+ * Apply the migration history to a fresh test database file through the libSQL client (the same
+ * runtime migrator the app uses on boot). Test DBs are unencrypted for speed.
+ */
+export async function runMigrationsOnTestDb(databaseUrl: string): Promise<void> {
+	const client = createLibsqlClient({ url: databaseUrl, encryptionKey: undefined });
+	try {
+		await applyMigrations(client);
+	} finally {
+		client.close();
+	}
 }

@@ -1,40 +1,51 @@
 import { describe, expect, it } from 'vitest';
-import {
-	DATABASE_PROVIDERS,
-	DEFAULT_DATABASE_PROVIDER,
-	isDatabaseProvider,
-	validateDatabaseUrlForProvider,
-} from '@shared/database.js';
+import { validateDatabaseUrl } from '@shared/database.js';
 
-describe('database providers', () => {
-	it('defaults development to sqlite', () => {
-		expect(DEFAULT_DATABASE_PROVIDER).toBe('sqlite');
+describe('validateDatabaseUrl', () => {
+	it('SH-DB-01: accepts a file: URL', () => {
+		expect(() => validateDatabaseUrl('file:./data/nestidp.db')).not.toThrow();
+		expect(() => validateDatabaseUrl('file:/abs/path.db')).not.toThrow();
 	});
 
-	it('lists sqlite and postgresql as supported providers', () => {
-		expect(DATABASE_PROVIDERS).toEqual(['sqlite', 'postgresql']);
+	it('SH-DB-02: rejects empty', () => {
+		expect(() => validateDatabaseUrl('')).toThrow(/must not be empty/);
+		expect(() => validateDatabaseUrl('   ')).toThrow(/must not be empty/);
 	});
 
-	it('type-guards known providers', () => {
-		expect(isDatabaseProvider('sqlite')).toBe(true);
-		expect(isDatabaseProvider('postgresql')).toBe(true);
-		expect(isDatabaseProvider('mysql')).toBe(false);
-	});
-});
-
-describe('validateDatabaseUrlForProvider', () => {
-	it('requires file: scheme for sqlite', () => {
-		expect(() => validateDatabaseUrlForProvider('sqlite', 'file:./data.db')).not.toThrow();
-		expect(() => validateDatabaseUrlForProvider('sqlite', 'postgresql://x')).toThrow(/file:/);
+	it('SH-DB-03: rejects non-file schemes (no more postgres/multi-provider)', () => {
+		expect(() => validateDatabaseUrl('postgresql://localhost/db')).toThrow(/file:/);
+		expect(() => validateDatabaseUrl('libsql://remote')).toThrow(/file:/);
 	});
 
-	it('requires postgres scheme for postgresql', () => {
-		expect(() =>
-			validateDatabaseUrlForProvider('postgresql', 'postgresql://localhost/db'),
-		).not.toThrow();
-		expect(() =>
-			validateDatabaseUrlForProvider('postgresql', 'postgres://localhost/db'),
-		).not.toThrow();
-		expect(() => validateDatabaseUrlForProvider('postgresql', 'file:./x')).toThrow(/postgresql/);
+	it('SH-DB-04: rejects every other known scheme and bare paths', () => {
+		for (const url of [
+			'postgres://localhost/db',
+			'mysql://localhost/db',
+			'mongodb://localhost/db',
+			'http://localhost/db',
+			'https://localhost/db',
+			'sqlite:./x.db',
+			'./relative.db',
+			'/absolute/path.db',
+			'nestidp.db',
+		]) {
+			expect(() => validateDatabaseUrl(url)).toThrow(/file:/);
+		}
+	});
+
+	it('SH-DB-05: scheme check is case-sensitive (FILE: / File: are rejected)', () => {
+		expect(() => validateDatabaseUrl('FILE:./x.db')).toThrow(/file:/);
+		expect(() => validateDatabaseUrl('File:./x.db')).toThrow(/file:/);
+	});
+
+	it('SH-DB-06: trims surrounding whitespace before validating', () => {
+		expect(() => validateDatabaseUrl('  file:./x.db  ')).not.toThrow();
+		expect(() => validateDatabaseUrl('\tfile:/abs.db\n')).not.toThrow();
+		expect(() => validateDatabaseUrl('\n\t  ')).toThrow(/must not be empty/);
+	});
+
+	it('SH-DB-07: accepts bare and in-memory file URLs', () => {
+		expect(() => validateDatabaseUrl('file:')).not.toThrow();
+		expect(() => validateDatabaseUrl('file::memory:')).not.toThrow();
 	});
 });

@@ -2,25 +2,59 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { IdentityOrigin } from '@prisma/client';
 import { IdentityAdminAuditService } from '@api/identity-admin/services/identity-admin-audit.service';
 import { IdentityAdminService } from '@api/identity-admin/services/identity-admin.service';
-import { IdentityRepository } from '@api/identity/identity.repository';
+import { ActiveIdentityStore } from '@api/identity/store/active-identity-store';
+
+function makeStoreMock() {
+	return {
+		listUsers: jest.fn(),
+		getUserById: jest.fn(),
+		getUserWithMemberships: jest.fn(),
+		createManualUser: jest.fn(),
+		updateManualUser: jest.fn(),
+		deleteUser: jest.fn(),
+		isUsernameTaken: jest.fn(),
+		groupsExistAll: jest.fn(),
+		rolesExistAll: jest.fn(),
+		listGroups: jest.fn(),
+		getGroupById: jest.fn(),
+		getGroupMembers: jest.fn(),
+		createManualGroup: jest.fn(),
+		updateGroupName: jest.fn(),
+		deleteGroup: jest.fn(),
+		groupMemberCount: jest.fn(),
+		isGroupNameTaken: jest.fn(),
+		listRoles: jest.fn(),
+		getRoleById: jest.fn(),
+		getRoleMembers: jest.fn(),
+		createManualRole: jest.fn(),
+		updateRoleName: jest.fn(),
+		deleteRole: jest.fn(),
+		roleMemberCount: jest.fn(),
+		isRoleNameTaken: jest.fn(),
+	};
+}
+
+const baseUser = {
+	id: 'u1',
+	externalId: 'ext-1',
+	apiConnectionId: 'conn-1',
+	origin: IdentityOrigin.MANUAL,
+	username: 'alice',
+	email: null,
+	displayName: null,
+	passwordHash: 'hash',
+	passwordHashAlgorithm: 'bcrypt',
+	active: true,
+	createdAt: new Date(),
+	updatedAt: new Date(),
+};
 
 describe('IdentityAdminService', () => {
 	const prisma = {
-		user: {
-			findMany: jest.fn(),
-			count: jest.fn(),
-			findUnique: jest.fn(),
-			update: jest.fn(),
-			delete: jest.fn(),
-		},
-		group: { findMany: jest.fn(), count: jest.fn() },
-		role: { findMany: jest.fn(), count: jest.fn() },
-		apiConnection: { findFirst: jest.fn() },
+		apiConnection: { findUnique: jest.fn(), findFirst: jest.fn(), create: jest.fn() },
 		auditEvent: { findMany: jest.fn() },
-		$transaction: jest.fn(),
 	};
-
-	const identityRepository = {} as IdentityRepository;
+	let store: ReturnType<typeof makeStoreMock>;
 	const encryption = { encrypt: jest.fn() } as never;
 	const audit = {
 		logUserCreated: jest.fn(),
@@ -33,49 +67,32 @@ describe('IdentityAdminService', () => {
 		logRoleUpdated: jest.fn(),
 		logRoleDeleted: jest.fn(),
 	} as unknown as IdentityAdminAuditService;
-
-	const ssoSessions = {
-		terminateAllForUser: jest.fn().mockResolvedValue(0),
-	};
-	const service = new IdentityAdminService(
-		prisma as never,
-		identityRepository,
-		encryption,
-		audit,
-		ssoSessions as never,
-	);
+	const ssoSessions = { terminateAllForUser: jest.fn().mockResolvedValue(0) };
+	let service: IdentityAdminService;
 
 	beforeEach(() => {
 		jest.clearAllMocks();
+		store = makeStoreMock();
+		service = new IdentityAdminService(
+			prisma as never,
+			store as unknown as ActiveIdentityStore,
+			encryption,
+			audit,
+			ssoSessions as never,
+		);
 	});
 
 	it('H4: deleteUser terminates the user’s SSO sessions before delete', async () => {
-		prisma.user.findUnique.mockResolvedValue({
-			id: 'u1',
-			origin: IdentityOrigin.MANUAL,
-			username: 'alice',
-			active: true,
-		});
-		prisma.user.delete.mockResolvedValue({});
+		store.getUserById.mockResolvedValue({ ...baseUser });
+		store.deleteUser.mockResolvedValue(undefined);
 		await service.deleteUser('u1');
 		expect(ssoSessions.terminateAllForUser).toHaveBeenCalledWith('u1', 'user_deactivated');
-		expect(prisma.user.delete).toHaveBeenCalledWith({ where: { id: 'u1' } });
+		expect(store.deleteUser).toHaveBeenCalledWith('u1');
 	});
 
 	it('H4: updateUser deactivation (active true→false) terminates SSO sessions', async () => {
-		prisma.user.findUnique.mockResolvedValue({
-			id: 'u1',
-			origin: IdentityOrigin.MANUAL,
-			username: 'alice',
-			active: true,
-		});
-		prisma.$transaction.mockImplementation(async (cb: (tx: unknown) => unknown) =>
-			cb({
-				user: { update: jest.fn() },
-				userGroup: { deleteMany: jest.fn(), createMany: jest.fn() },
-				userRole: { deleteMany: jest.fn(), createMany: jest.fn() },
-			}),
-		);
+		store.getUserById.mockResolvedValue({ ...baseUser, active: true });
+		store.updateManualUser.mockResolvedValue(undefined);
 		const spy = jest.spyOn(service, 'getUserById').mockResolvedValue({} as never);
 		await service.updateUser('u1', { active: false });
 		expect(ssoSessions.terminateAllForUser).toHaveBeenCalledWith('u1', 'user_deactivated');
@@ -83,34 +100,18 @@ describe('IdentityAdminService', () => {
 	});
 
 	it('H4: updateUser without deactivation does NOT terminate sessions', async () => {
-		prisma.user.findUnique.mockResolvedValue({
-			id: 'u1',
-			origin: IdentityOrigin.MANUAL,
-			username: 'alice',
-			active: true,
-		});
-		prisma.$transaction.mockImplementation(async (cb: (tx: unknown) => unknown) =>
-			cb({
-				user: { update: jest.fn() },
-				userGroup: { deleteMany: jest.fn(), createMany: jest.fn() },
-				userRole: { deleteMany: jest.fn(), createMany: jest.fn() },
-			}),
-		);
+		store.getUserById.mockResolvedValue({ ...baseUser, active: true });
+		store.updateManualUser.mockResolvedValue(undefined);
 		const spy = jest.spyOn(service, 'getUserById').mockResolvedValue({} as never);
 		await service.updateUser('u1', { displayName: 'New Name' });
 		expect(ssoSessions.terminateAllForUser).not.toHaveBeenCalled();
 		spy.mockRestore();
 	});
 
-	it('API-IDN-SVC-01: listUsers default limit 50', async () => {
-		prisma.user.findMany.mockResolvedValue([]);
-		prisma.user.count.mockResolvedValue(0);
-
+	it('API-IDN-SVC-01: listUsers default limit 50 / offset 0', async () => {
+		store.listUsers.mockResolvedValue({ items: [], total: 0 });
 		await service.listUsers();
-
-		expect(prisma.user.findMany).toHaveBeenCalledWith(
-			expect.objectContaining({ take: 50, skip: 0 }),
-		);
+		expect(store.listUsers).toHaveBeenCalledWith(expect.objectContaining({ limit: 50, offset: 0 }));
 	});
 
 	it('API-IDN-SVC-02: listUsers invalid limit → BadRequestException', async () => {
@@ -125,139 +126,79 @@ describe('IdentityAdminService', () => {
 		);
 	});
 
-	it('API-IDN-SVC-04: search builds OR on username and email', async () => {
-		prisma.user.findMany.mockResolvedValue([]);
-		prisma.user.count.mockResolvedValue(0);
-
+	it('API-IDN-SVC-04: passes the search term through to the store', async () => {
+		store.listUsers.mockResolvedValue({ items: [], total: 0 });
 		await service.listUsers(undefined, undefined, '  alice  ');
-
-		expect(prisma.user.findMany).toHaveBeenCalledWith(
-			expect.objectContaining({
-				where: {
-					OR: [{ username: { contains: 'alice' } }, { email: { contains: 'alice' } }],
-				},
-			}),
-		);
-	});
-
-	it('API-IDN-SVC-05: whitespace-only search uses empty where', async () => {
-		prisma.user.findMany.mockResolvedValue([]);
-		prisma.user.count.mockResolvedValue(0);
-
-		await service.listUsers(undefined, undefined, '   ');
-
-		expect(prisma.user.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: {} }));
+		expect(store.listUsers).toHaveBeenCalledWith(expect.objectContaining({ search: '  alice  ' }));
 	});
 
 	it('API-IDN-SVC-06: getUserById unknown → NotFoundException', async () => {
-		prisma.user.findUnique.mockResolvedValue(null);
+		store.getUserWithMemberships.mockResolvedValue(null);
 		await expect(service.getUserById('c1234567890123456789012345')).rejects.toThrow(
 			NotFoundException,
 		);
 	});
 
-	it('API-IDN-SVC-07: getUserById sorts groups and roles by name', async () => {
-		prisma.user.findUnique.mockResolvedValue({
-			id: 'u1',
-			username: 'alice',
-			email: null,
-			displayName: null,
-			active: true,
-			externalId: 'ext-1',
-			apiConnectionId: 'conn-1',
-			origin: IdentityOrigin.SYNCED,
+	it('API-IDN-SVC-07: getUserById sorts groups and roles by name and omits the password hash', async () => {
+		store.getUserWithMemberships.mockResolvedValue({
+			user: { ...baseUser, apiConnectionId: 'conn-1', origin: IdentityOrigin.SYNCED },
 			groups: [
-				{ group: { id: 'g2', name: 'zeta', origin: IdentityOrigin.SYNCED } },
-				{ group: { id: 'g1', name: 'alpha', origin: IdentityOrigin.SYNCED } },
+				{ id: 'g2', name: 'zeta', origin: IdentityOrigin.SYNCED },
+				{ id: 'g1', name: 'alpha', origin: IdentityOrigin.SYNCED },
 			],
 			roles: [
-				{ role: { id: 'r2', name: 'viewer', origin: IdentityOrigin.SYNCED } },
-				{ role: { id: 'r1', name: 'admin', origin: IdentityOrigin.SYNCED } },
+				{ id: 'r2', name: 'viewer', origin: IdentityOrigin.SYNCED },
+				{ id: 'r1', name: 'admin', origin: IdentityOrigin.SYNCED },
 			],
-			apiConnection: { id: 'conn-1', name: 'HR', isLocalDirectory: false },
+		});
+		prisma.apiConnection.findUnique.mockResolvedValue({
+			id: 'conn-1',
+			name: 'HR',
+			isLocalDirectory: false,
 		});
 
 		const result = await service.getUserById('u1');
 
 		expect(result.groups.map((g) => g.name)).toEqual(['alpha', 'zeta']);
 		expect(result.roles.map((r) => r.name)).toEqual(['admin', 'viewer']);
+		expect((result.user as unknown as Record<string, unknown>).passwordHash).toBeUndefined();
 	});
 
 	it('API-IDN-SVC-08: listGroups returns total count', async () => {
-		prisma.group.findMany.mockResolvedValue([
-			{
-				id: 'g1',
-				name: 'a',
-				externalId: 'e',
-				apiConnectionId: 'c',
-				origin: IdentityOrigin.SYNCED,
-				_count: { users: 0 },
-			},
-		]);
-		prisma.group.count.mockResolvedValue(1);
-
+		store.listGroups.mockResolvedValue({
+			items: [
+				{
+					id: 'g1',
+					name: 'a',
+					externalId: 'e',
+					apiConnectionId: 'c',
+					origin: IdentityOrigin.SYNCED,
+					createdAt: new Date(),
+					updatedAt: new Date(),
+					memberCount: 0,
+				},
+			],
+			total: 1,
+		});
 		const result = await service.listGroups(10, 0);
 		expect(result.total).toBe(1);
 		expect(result.items).toHaveLength(1);
 	});
 
-	it('API-IDN-SVC-09: listUsers select omits password fields', async () => {
-		prisma.user.findMany.mockResolvedValue([]);
-		prisma.user.count.mockResolvedValue(0);
-
-		await service.listUsers();
-
-		const select = prisma.user.findMany.mock.calls[0][0].select as Record<string, boolean>;
-		expect(select.passwordHash).toBeUndefined();
-		expect(select.passwordHashAlgorithm).toBeUndefined();
-	});
-
-	it('API-IDN-SVC-11: listUsers origin=manual adds where clause', async () => {
-		prisma.user.findMany.mockResolvedValue([]);
-		prisma.user.count.mockResolvedValue(0);
+	it('API-IDN-SVC-11: listUsers origin=manual passes the MANUAL origin to the store', async () => {
+		store.listUsers.mockResolvedValue({ items: [], total: 0 });
 		await service.listUsers(undefined, undefined, undefined, 'manual');
-		expect(prisma.user.findMany).toHaveBeenCalledWith(
-			expect.objectContaining({
-				where: expect.objectContaining({ origin: IdentityOrigin.MANUAL }),
-			}),
+		expect(store.listUsers).toHaveBeenCalledWith(
+			expect.objectContaining({ origin: IdentityOrigin.MANUAL }),
 		);
 	});
 
 	it('API-IDN-SVC-12: parseAuditLimit rejects value above max', async () => {
-		prisma.user.findUnique.mockResolvedValue({
-			id: 'u1',
-			username: 'alice',
-			email: null,
-			displayName: null,
-			active: true,
-			externalId: 'ext-1',
-			apiConnectionId: 'conn-1',
-			origin: IdentityOrigin.MANUAL,
+		store.getUserWithMemberships.mockResolvedValue({
+			user: { ...baseUser },
 			groups: [],
 			roles: [],
-			apiConnection: { id: 'conn-1', name: 'Local directory', isLocalDirectory: true },
 		});
 		await expect(service.getUserById('u1', 25)).rejects.toThrow(BadRequestException);
-	});
-
-	it('API-IDN-SVC-10: getUserById select omits password fields', async () => {
-		prisma.user.findUnique.mockResolvedValue({
-			id: 'u1',
-			username: 'alice',
-			email: null,
-			displayName: null,
-			active: true,
-			externalId: 'ext-1',
-			apiConnectionId: 'conn-1',
-			origin: IdentityOrigin.SYNCED,
-			groups: [],
-			roles: [],
-			apiConnection: { id: 'conn-1', name: 'HR', isLocalDirectory: false },
-		});
-
-		await service.getUserById('u1');
-
-		const select = prisma.user.findUnique.mock.calls[0][0].select as Record<string, boolean>;
-		expect(select.passwordHash).toBeUndefined();
 	});
 });

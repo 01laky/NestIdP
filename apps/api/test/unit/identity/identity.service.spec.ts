@@ -1,5 +1,5 @@
-import { IdentityRepository } from '@api/identity/identity.repository';
 import { IdentityService } from '@api/identity/services/identity.service';
+import { ActiveIdentityStore } from '@api/identity/store/active-identity-store';
 
 describe('IdentityService', () => {
 	const repository = {
@@ -7,7 +7,7 @@ describe('IdentityService', () => {
 		countGroups: jest.fn(),
 		countRoles: jest.fn(),
 	};
-	const service = new IdentityService(repository as unknown as IdentityRepository);
+	const service = new IdentityService(repository as unknown as ActiveIdentityStore);
 
 	beforeEach(() => {
 		jest.clearAllMocks();

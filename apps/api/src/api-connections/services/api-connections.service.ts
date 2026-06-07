@@ -29,6 +29,7 @@ import {
 	type CredentialsEncryptionPort,
 } from '../../encryption/credentials-encryption.port';
 import { PrismaService } from '../../prisma/services/prisma.service';
+import { ActiveIdentityStore } from '../../identity/store/active-identity-store';
 import { OAuthTokenService } from '../../sync/services/oauth-token.service';
 import { assertValidBaseUrl, BaseUrlValidationError } from '../utils/base-url.util';
 import { ApiConnectionsAuditService } from './api-connections-audit.service';
@@ -45,6 +46,7 @@ export class ApiConnectionsService {
 		private readonly configService: ConfigService,
 		private readonly audit: ApiConnectionsAuditService,
 		private readonly oauthTokenService: OAuthTokenService,
+		private readonly identityStore: ActiveIdentityStore,
 	) {}
 
 	async list(): Promise<ApiConnectionListResponseDto> {
@@ -194,6 +196,11 @@ export class ApiConnectionsService {
 
 	async delete(id: string): Promise<DeleteApiConnectionResponseDto> {
 		const existing = await this.findOrThrow(id);
+		// Cross-store guard (Prompt 31): the local FK Restrict cannot see identity rows that live in an
+		// external database (relocate mode), so check the active identity store explicitly.
+		if (await this.identityStore.connectionHasIdentityRows(id)) {
+			throw new ConflictException('Cannot delete API connection with synced identity data');
+		}
 		try {
 			await this.prisma.apiConnection.delete({ where: { id } });
 		} catch (error) {

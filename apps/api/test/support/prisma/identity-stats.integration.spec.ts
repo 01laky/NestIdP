@@ -6,6 +6,7 @@ import { PrismaClient } from '@prisma/client';
 import { AdminStatsService } from '@api/admin/services/admin-stats.service';
 import { IdentityRepository } from '@api/identity/identity.repository';
 import { IdentityService } from '@api/identity/services/identity.service';
+import { ActiveIdentityStore } from '@api/identity/store/active-identity-store';
 import {
 	createTestAdminUser,
 	createTestApiConnection,
@@ -23,14 +24,16 @@ describe('identity and admin stats integration (SQLite)', () => {
 	let prisma: PrismaClient;
 	let adminStatsService: AdminStatsService;
 
-	beforeAll(() => {
+	beforeAll(async () => {
 		const tmpDb = join(tmpdir(), `nestidp-stats-${randomUUID()}.db`);
 		databaseUrl = `file:${tmpDb}`;
-		runMigrationsOnTestDb(databaseUrl, 'sqlite');
+		await runMigrationsOnTestDb(databaseUrl);
 		prisma = new PrismaClient({
 			datasources: { db: { url: databaseUrl } },
 		});
-		const identityService = new IdentityService(new IdentityRepository(prisma as never));
+		const identityService = new IdentityService(
+			new ActiveIdentityStore(new IdentityRepository(prisma as never)),
+		);
 		adminStatsService = new AdminStatsService(identityService, prisma as never);
 	});
 

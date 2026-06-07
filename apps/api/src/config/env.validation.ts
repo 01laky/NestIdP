@@ -1,7 +1,6 @@
 import { plainToInstance, Transform } from 'class-transformer';
 import {
 	IsEnum,
-	IsIn,
 	IsInt,
 	IsNotEmpty,
 	IsOptional,
@@ -10,14 +9,7 @@ import {
 	Min,
 	validateSync,
 } from 'class-validator';
-import {
-	DATABASE_PROVIDERS,
-	DatabaseProvider,
-	DEFAULT_DATABASE_PROVIDER,
-	MAX_ADMIN_SESSION_REMEMBER_TTL_SECONDS,
-	validateDatabaseUrlForProvider,
-} from '@nestidp/shared';
-import { resolveDatabaseProvider } from './database.config';
+import { MAX_ADMIN_SESSION_REMEMBER_TTL_SECONDS, validateDatabaseUrl } from '@nestidp/shared';
 
 export enum NodeEnv {
 	Development = 'development',
@@ -26,13 +18,19 @@ export enum NodeEnv {
 }
 
 export class EnvironmentVariables {
-	@IsIn([...DATABASE_PROVIDERS])
-	@Transform(({ value }) => resolveDatabaseProvider(value))
-	DATABASE_PROVIDER!: DatabaseProvider;
-
 	@IsString()
 	@IsNotEmpty()
 	DATABASE_URL!: string;
+
+	/** At-rest DB encryption key (inline). Mutually exclusive with DATABASE_ENCRYPTION_KEY_FILE. */
+	@IsOptional()
+	@IsString()
+	DATABASE_ENCRYPTION_KEY?: string;
+
+	/** Path to a file containing the at-rest DB encryption key (Docker/K8s secret). */
+	@IsOptional()
+	@IsString()
+	DATABASE_ENCRYPTION_KEY_FILE?: string;
 
 	@IsString()
 	@IsNotEmpty()
@@ -292,17 +290,25 @@ export class EnvironmentVariables {
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {
-	const configWithDefaults = {
-		DATABASE_PROVIDER: DEFAULT_DATABASE_PROVIDER,
-		...config,
-	};
-	const validated = plainToInstance(EnvironmentVariables, configWithDefaults, {
+	const validated = plainToInstance(EnvironmentVariables, config, {
 		enableImplicitConversion: true,
 	});
 	const errors = validateSync(validated, { skipMissingProperties: false });
 	if (errors.length > 0) {
 		throw new Error(errors.toString());
 	}
-	validateDatabaseUrlForProvider(validated.DATABASE_PROVIDER, validated.DATABASE_URL);
+	validateDatabaseUrl(validated.DATABASE_URL);
+	if (validated.DATABASE_ENCRYPTION_KEY && validated.DATABASE_ENCRYPTION_KEY_FILE) {
+		throw new Error('Set only one of DATABASE_ENCRYPTION_KEY or DATABASE_ENCRYPTION_KEY_FILE');
+	}
+	if (
+		validated.NODE_ENV === NodeEnv.Production &&
+		!validated.DATABASE_ENCRYPTION_KEY &&
+		!validated.DATABASE_ENCRYPTION_KEY_FILE
+	) {
+		throw new Error(
+			'DATABASE_ENCRYPTION_KEY (or DATABASE_ENCRYPTION_KEY_FILE) is required in production',
+		);
+	}
 	return validated;
 }

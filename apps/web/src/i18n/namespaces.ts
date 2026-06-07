@@ -15,6 +15,7 @@ export const I18N_NAMESPACES = [
 	'sync',
 	'errors',
 	'enums',
+	'externalDb',
 ] as const;
 
 export type I18nNamespace = (typeof I18N_NAMESPACES)[number];

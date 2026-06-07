@@ -79,7 +79,7 @@ describe('end-user auth after sync integration (SQLite)', () => {
 
 		const tmpDb = join(tmpdir(), `nestidp-auth-sync-${randomUUID()}.db`);
 		databaseUrl = `file:${tmpDb}`;
-		runMigrationsOnTestDb(databaseUrl, 'sqlite');
+		await runMigrationsOnTestDb(databaseUrl);
 
 		const prismaService = new PrismaService({
 			datasources: { db: { url: databaseUrl } },
@@ -92,7 +92,6 @@ describe('end-user auth after sync integration (SQLite)', () => {
 					ignoreEnvFile: true,
 					load: [
 						() => ({
-							DATABASE_PROVIDER: 'sqlite',
 							DATABASE_URL: databaseUrl,
 							SESSION_SECRET: 'test-session-secret-min-16',
 							ENCRYPTION_KEY: 'test-encryption-key-32chars!!',
