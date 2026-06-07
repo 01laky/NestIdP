@@ -20,6 +20,7 @@ import { SpConnectionFormPage } from './pages/SpConnectionFormPage';
 import { SpConnectionTestSsoPage } from './pages/SpConnectionTestSsoPage';
 import { IdpSettingsPage } from './pages/IdpSettingsPage';
 import { AdminUsersPage } from './pages/AdminUsersPage';
+import { ExternalIdentityDatabasePage } from './pages/ExternalIdentityDatabasePage';
 import { AuditLogPage } from './pages/AuditLogPage';
 import { SpConnectionsListPage } from './pages/SpConnectionsListPage';
 import { SamlSessionsPage } from './pages/SamlSessionsPage';
@@ -116,6 +117,7 @@ export function AdminLayout() {
 						<Route path="settings" element={<Navigate to={IDP_SETTINGS_ROUTE_PREFIX} replace />} />
 						<Route path="settings/idp" element={<IdpSettingsPage />} />
 						<Route path="settings/admins" element={<AdminUsersPage />} />
+						<Route path="settings/identity-database" element={<ExternalIdentityDatabasePage />} />
 						<Route path="audit" element={<AuditLogPage />} />
 						<Route
 							path="*"
