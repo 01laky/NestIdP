@@ -11,7 +11,14 @@ import { ApiConnectionsService } from './services/api-connections.service';
 import { OAuthCoreModule } from '../sync/oauth-core.module';
 
 @Module({
-	imports: [PrismaModule, AuditCoreModule, AdminAuthModule, EncryptionModule, OAuthCoreModule, IdentityModule],
+	imports: [
+		PrismaModule,
+		AuditCoreModule,
+		AdminAuthModule,
+		EncryptionModule,
+		OAuthCoreModule,
+		IdentityModule,
+	],
 	controllers: [ApiConnectionsController],
 	providers: [ApiConnectionsService, ApiConnectionTestService, ApiConnectionsAuditService],
 })

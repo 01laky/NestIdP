@@ -150,8 +150,14 @@ export interface IdentityStore {
 	upsertUser(connectionId: string, user: UpsertUserInput): Promise<{ id: string }>;
 	replaceUserGroups(userId: string, groupIds: string[]): Promise<void>;
 	replaceUserRoles(userId: string, roleIds: string[]): Promise<void>;
-	upsertGroup(connectionId: string, externalGroup: { id: string; name: string }): Promise<{ id: string }>;
-	upsertRole(connectionId: string, externalRole: { id: string; name: string }): Promise<{ id: string }>;
+	upsertGroup(
+		connectionId: string,
+		externalGroup: { id: string; name: string },
+	): Promise<{ id: string }>;
+	upsertRole(
+		connectionId: string,
+		externalRole: { id: string; name: string },
+	): Promise<{ id: string }>;
 	deactivateUsersNotInExternalIds(connectionId: string, externalIds: Set<string>): Promise<number>;
 	deleteOrphanGroups(connectionId: string, seenExternalIds: Set<string>): Promise<number>;
 	deleteOrphanRoles(connectionId: string, seenExternalIds: Set<string>): Promise<number>;

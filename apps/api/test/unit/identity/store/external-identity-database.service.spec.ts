@@ -15,7 +15,12 @@ import type {
 import { ExternalIdentityDatabaseService } from '@api/identity/store/external/external-identity-database.service';
 import type { ExternalIdentityDB } from '@api/identity/store/external/external-schema-types';
 import { PrismaService } from '@api/prisma/services/prisma.service';
-import { createTestApiConnection, createTestGroup, createTestRole, createTestUser } from '@test/support/prisma/test-fixtures';
+import {
+	createTestApiConnection,
+	createTestGroup,
+	createTestRole,
+	createTestUser,
+} from '@test/support/prisma/test-fixtures';
 import { runMigrationsOnTestDb } from '@test/support/prisma/test-db.helper';
 
 jest.setTimeout(40_000);
@@ -28,12 +33,18 @@ class SharedPgliteFactory implements ExternalKyselyFactory {
 		const client = {
 			query: async (sql: string, params: unknown[]) => {
 				const r = await this.pglite.query(sql, params ?? []);
-				return { rows: r.rows, rowCount: (r as { affectedRows?: number }).affectedRows ?? r.rows.length, command: '' };
+				return {
+					rows: r.rows,
+					rowCount: (r as { affectedRows?: number }).affectedRows ?? r.rows.length,
+					command: '',
+				};
 			},
 			release() {},
 		};
 		const pool = { connect: async () => client, end: async () => {} };
-		const db = new Kysely<ExternalIdentityDB>({ dialect: new PostgresDialect({ pool: pool as never }) });
+		const db = new Kysely<ExternalIdentityDB>({
+			dialect: new PostgresDialect({ pool: pool as never }),
+		});
 		return { db, destroy: () => db.destroy() };
 	}
 	close() {
@@ -71,9 +82,17 @@ describe('ExternalIdentityDatabaseService (PGlite)', () => {
 		repo = new IdentityRepository(prisma);
 		active = new ActiveIdentityStore(repo);
 		factory = new SharedPgliteFactory();
-		const encryption = new EncryptionService({ get: () => 'encryption-key-32-chars-min!!!' } as unknown as ConfigService);
+		const encryption = new EncryptionService({
+			get: () => 'encryption-key-32-chars-min!!!',
+		} as unknown as ConfigService);
 		const audit = { recordSafe: jest.fn() };
-		service = new ExternalIdentityDatabaseService(prisma, active, encryption, factory, audit as never);
+		service = new ExternalIdentityDatabaseService(
+			prisma,
+			active,
+			encryption,
+			factory,
+			audit as never,
+		);
 
 		const conn = await createTestApiConnection(prisma);
 		connId = conn.id;
@@ -91,7 +110,10 @@ describe('ExternalIdentityDatabaseService (PGlite)', () => {
 		await prisma.$disconnect();
 		process.env.DATABASE_URL = prevDatabaseUrl;
 		for (const f of readdirSync(dirname(dbPath))) {
-			if (f.startsWith(`nestidp-extsvc-`) && f.includes(dbPath.split('/').pop()!.replace('.db', ''))) {
+			if (
+				f.startsWith(`nestidp-extsvc-`) &&
+				f.includes(dbPath.split('/').pop()!.replace('.db', ''))
+			) {
 				try {
 					unlinkSync(join(dirname(dbPath), f));
 				} catch {
@@ -116,7 +138,11 @@ describe('ExternalIdentityDatabaseService (PGlite)', () => {
 	});
 
 	it('EXT-SVC-RELOCATE-01: connect relocate + ack copies to external, backs up + wipes local, reads external', async () => {
-		const res = await service.connect({ ...connInput, keepLocalCopy: false, acknowledgeBackup: true });
+		const res = await service.connect({
+			...connInput,
+			keepLocalCopy: false,
+			acknowledgeBackup: true,
+		});
 		expect(res.localWiped).toBe(true);
 		expect(res.backupPath).toBeTruthy();
 		expect(existsSync(res.backupPath as string)).toBe(true);
@@ -126,14 +152,20 @@ describe('ExternalIdentityDatabaseService (PGlite)', () => {
 		// local identity was wiped
 		expect(await repo.countUsers()).toBe(0);
 		// SAML profile resolves from external (membership preserved)
-		const alice = (await active.listUsers({ limit: 10, offset: 0 })).items.find((u) => u.username === 'alice');
+		const alice = (await active.listUsers({ limit: 10, offset: 0 })).items.find(
+			(u) => u.username === 'alice',
+		);
 		const profile = await active.findUserProfileById(alice!.id);
 		expect(profile?.groups).toEqual(['Eng']);
 		expect(profile?.roles).toEqual(['admin']);
 	});
 
 	it('EXT-SVC-WIPEACK-01: connect relocate WITHOUT ack copies but does not wipe local', async () => {
-		const res = await service.connect({ ...connInput, keepLocalCopy: false, acknowledgeBackup: false });
+		const res = await service.connect({
+			...connInput,
+			keepLocalCopy: false,
+			acknowledgeBackup: false,
+		});
 		expect(res.localWiped).toBe(false);
 		expect(res.wipeSkipped).toBe(true);
 		expect(await repo.countUsers()).toBe(2);
@@ -160,7 +192,10 @@ describe('ExternalIdentityDatabaseService (PGlite)', () => {
 				} as never,
 			}),
 		});
-		const count = await ext.selectFrom('nestidp_user').select((eb) => eb.fn.countAll().as('n')).executeTakeFirst();
+		const count = await ext
+			.selectFrom('nestidp_user')
+			.select((eb) => eb.fn.countAll().as('n'))
+			.executeTakeFirst();
 		expect(Number(count?.n)).toBe(2);
 		await ext.destroy();
 	});

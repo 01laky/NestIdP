@@ -1,4 +1,15 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Post, Req, UseGuards, ValidationPipe } from '@nestjs/common';
+import {
+	Body,
+	Controller,
+	Delete,
+	Get,
+	HttpCode,
+	HttpStatus,
+	Post,
+	Req,
+	UseGuards,
+	ValidationPipe,
+} from '@nestjs/common';
 import type {
 	ConnectExternalDbResponseDto,
 	ExternalDbPreviewResponseDto,
@@ -8,10 +19,18 @@ import type {
 import { AdminAuthenticatedRequest } from '../../../admin-auth/admin-auth.types';
 import { AdminAuthGuard } from '../../../admin-auth/guards/admin-auth.guard';
 import { AdminCsrfGuard } from '../../../admin-auth/guards/admin-csrf.guard';
-import { ConnectExternalDbBodyDto, DisconnectExternalDbBodyDto, TestExternalDbBodyDto } from './external-identity-db.dto';
+import {
+	ConnectExternalDbBodyDto,
+	DisconnectExternalDbBodyDto,
+	TestExternalDbBodyDto,
+} from './external-identity-db.dto';
 import { ExternalIdentityDatabaseService } from './external-identity-database.service';
 
-const bodyPipe = new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true });
+const bodyPipe = new ValidationPipe({
+	whitelist: true,
+	forbidNonWhitelisted: true,
+	transform: true,
+});
 
 @Controller('api/admin/identity-database')
 @UseGuards(AdminAuthGuard)

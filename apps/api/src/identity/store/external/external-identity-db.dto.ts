@@ -1,5 +1,14 @@
 import { Type } from 'class-transformer';
-import { IsBoolean, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+	IsBoolean,
+	IsIn,
+	IsInt,
+	IsNotEmpty,
+	IsOptional,
+	IsString,
+	Max,
+	Min,
+} from 'class-validator';
 import type {
 	ConnectExternalDbRequest,
 	DisconnectExternalDbRequest,
@@ -47,7 +56,10 @@ export class TestExternalDbBodyDto implements ExternalDbConnectionInput {
 	pgSchema?: string | null;
 }
 
-export class ConnectExternalDbBodyDto extends TestExternalDbBodyDto implements ConnectExternalDbRequest {
+export class ConnectExternalDbBodyDto
+	extends TestExternalDbBodyDto
+	implements ConnectExternalDbRequest
+{
 	@IsOptional()
 	@IsBoolean()
 	keepLocalCopy?: boolean;

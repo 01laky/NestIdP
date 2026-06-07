@@ -1,0 +1,33 @@
+flowchart TB
+	subgraph APP["NestIdP"]
+		direction TB
+		CONSUMERS["Login · SAML · Sync · Identity admin · Dashboard"]
+		ACTIVE["ActiveIdentityStore (hot-swap)"]
+		LOCAL["Local store · Prisma + libSQL"]
+		EXTSTORE["External store · Kysely"]
+		CONSUMERS --> ACTIVE
+		ACTIVE -->|"default / mirror reads"| LOCAL
+		ACTIVE -->|"relocate reads/writes"| EXTSTORE
+	end
+
+	CORE[("Local encrypted libSQL\nsystem + config (always)")]
+	EXT[("External DB\nPostgres / MySQL\nidentity only (nestidp_*)")]
+
+	LOCAL --> CORE
+	EXTSTORE -->|"resilience: timeout + breaker + TLS"| EXT
+
+	subgraph MODES["Attach toggle"]
+		RELOCATE["off = relocate\nexternal authoritative\nlocal identity wiped (after backup + ack)"]
+		MIRROR["on = mirror\nlocal authoritative\nexternal kept in sync"]
+	end
+
+	classDef ui fill:#1e3a5f,stroke:#60a5fa,stroke-width:2px,color:#eff6ff
+	classDef core fill:#134e4a,stroke:#2dd4bf,stroke-width:2px,color:#f0fdfa
+	classDef store fill:#422006,stroke:#fbbf24,stroke-width:2px,color:#fffbeb
+	classDef ext fill:#3b0764,stroke:#c084fc,stroke-width:2px,color:#faf5ff
+
+	class CONSUMERS,ACTIVE ui
+	class LOCAL,EXTSTORE core
+	class CORE store
+	class EXT ext
+	class RELOCATE,MIRROR core

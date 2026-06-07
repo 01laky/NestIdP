@@ -29,12 +29,11 @@ import {
 } from '../../encryption/credentials-encryption.port';
 import { normalizeSyncedEmail } from '../../identity/utils/normalize-synced-email.util';
 import { ActiveIdentityStore } from '../../identity/store/active-identity-store';
-import type {
-	StoreGroup,
-	StoreRole,
-	StoreUser,
-} from '../../identity/store/identity-store';
-import { ensureLocalDirectoryConnection, toOriginLiteral } from '../../identity/utils/local-directory.util';
+import type { StoreGroup, StoreRole, StoreUser } from '../../identity/store/identity-store';
+import {
+	ensureLocalDirectoryConnection,
+	toOriginLiteral,
+} from '../../identity/utils/local-directory.util';
 import { PrismaService } from '../../prisma/services/prisma.service';
 import { SamlSsoSessionService } from '../../saml-sessions/services/saml-sso-session.service';
 import { IdentityAdminAuditService } from './identity-admin-audit.service';
@@ -143,8 +142,7 @@ export class IdentityAdminService {
 		await this.store.updateManualUser(id, {
 			username: body.username !== undefined ? body.username.trim() : undefined,
 			email,
-			displayName:
-				body.displayName !== undefined ? body.displayName?.trim() || null : undefined,
+			displayName: body.displayName !== undefined ? body.displayName?.trim() || null : undefined,
 			active: body.active,
 			passwordHash:
 				body.password !== undefined && body.password.length > 0
@@ -209,7 +207,11 @@ export class IdentityAdminService {
 				origin: toOriginLiteral(group.origin),
 				memberCount: group.memberCount,
 			},
-			members: members.map((m) => ({ id: m.id, username: m.username, origin: toOriginLiteral(m.origin) })),
+			members: members.map((m) => ({
+				id: m.id,
+				username: m.username,
+				origin: toOriginLiteral(m.origin),
+			})),
 			memberCount: group.memberCount,
 		};
 	}
@@ -285,7 +287,11 @@ export class IdentityAdminService {
 				origin: toOriginLiteral(role.origin),
 				memberCount: role.memberCount,
 			},
-			members: members.map((m) => ({ id: m.id, username: m.username, origin: toOriginLiteral(m.origin) })),
+			members: members.map((m) => ({
+				id: m.id,
+				username: m.username,
+				origin: toOriginLiteral(m.origin),
+			})),
 			memberCount: role.memberCount,
 		};
 	}

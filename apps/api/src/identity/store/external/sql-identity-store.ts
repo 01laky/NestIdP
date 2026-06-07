@@ -101,7 +101,10 @@ export class SqlIdentityStore implements IdentityStore {
 	}
 
 	private async count(table: typeof T_USER | typeof T_GROUP | typeof T_ROLE): Promise<number> {
-		const row = await this.db.selectFrom(table).select((eb) => eb.fn.countAll().as('n')).executeTakeFirst();
+		const row = await this.db
+			.selectFrom(table)
+			.select((eb) => eb.fn.countAll().as('n'))
+			.executeTakeFirst();
 		return Number(row?.n ?? 0);
 	}
 
@@ -116,7 +119,11 @@ export class SqlIdentityStore implements IdentityStore {
 	}
 
 	async findUserByUsername(username: string): Promise<StoreUser | null> {
-		const row = await this.db.selectFrom(T_USER).selectAll().where('username', '=', username).executeTakeFirst();
+		const row = await this.db
+			.selectFrom(T_USER)
+			.selectAll()
+			.where('username', '=', username)
+			.executeTakeFirst();
 		return row ? mapUser(row) : null;
 	}
 
@@ -292,19 +299,28 @@ export class SqlIdentityStore implements IdentityStore {
 		}
 	}
 
-	upsertGroup(connectionId: string, externalGroup: { id: string; name: string }): Promise<{ id: string }> {
+	upsertGroup(
+		connectionId: string,
+		externalGroup: { id: string; name: string },
+	): Promise<{ id: string }> {
 		return this.upsertNamed(T_GROUP, connectionId, externalGroup, () => {
 			throw new GroupNameCollisionError(externalGroup.id, externalGroup.name);
 		});
 	}
 
-	upsertRole(connectionId: string, externalRole: { id: string; name: string }): Promise<{ id: string }> {
+	upsertRole(
+		connectionId: string,
+		externalRole: { id: string; name: string },
+	): Promise<{ id: string }> {
 		return this.upsertNamed(T_ROLE, connectionId, externalRole, () => {
 			throw new RoleNameCollisionError(externalRole.id, externalRole.name);
 		});
 	}
 
-	async deactivateUsersNotInExternalIds(connectionId: string, externalIds: Set<string>): Promise<number> {
+	async deactivateUsersNotInExternalIds(
+		connectionId: string,
+		externalIds: Set<string>,
+	): Promise<number> {
 		const ids = Array.from(externalIds);
 		let q = this.db
 			.selectFrom(T_USER)
@@ -320,7 +336,11 @@ export class SqlIdentityStore implements IdentityStore {
 			await this.db.transaction().execute(async (trx) => {
 				await trx.deleteFrom(T_USER_GROUP).where('user_id', '=', id).execute();
 				await trx.deleteFrom(T_USER_ROLE).where('user_id', '=', id).execute();
-				await trx.updateTable(T_USER).set({ active: false, updated_at: this.now() }).where('id', '=', id).execute();
+				await trx
+					.updateTable(T_USER)
+					.set({ active: false, updated_at: this.now() })
+					.where('id', '=', id)
+					.execute();
 			});
 		}
 		return toDeactivate.length;
@@ -393,12 +413,20 @@ export class SqlIdentityStore implements IdentityStore {
 	}
 
 	async getUserById(id: string): Promise<StoreUser | null> {
-		const row = await this.db.selectFrom(T_USER).selectAll().where('id', '=', id).executeTakeFirst();
+		const row = await this.db
+			.selectFrom(T_USER)
+			.selectAll()
+			.where('id', '=', id)
+			.executeTakeFirst();
 		return row ? mapUser(row) : null;
 	}
 
 	async getUserWithMemberships(id: string): Promise<UserWithMemberships | null> {
-		const row = await this.db.selectFrom(T_USER).selectAll().where('id', '=', id).executeTakeFirst();
+		const row = await this.db
+			.selectFrom(T_USER)
+			.selectAll()
+			.where('id', '=', id)
+			.executeTakeFirst();
 		if (!row) {
 			return null;
 		}
@@ -507,7 +535,11 @@ export class SqlIdentityStore implements IdentityStore {
 	}
 
 	async isUsernameTaken(username: string, excludeId?: string): Promise<boolean> {
-		const row = await this.db.selectFrom(T_USER).select('id').where('username', '=', username).executeTakeFirst();
+		const row = await this.db
+			.selectFrom(T_USER)
+			.select('id')
+			.where('username', '=', username)
+			.executeTakeFirst();
 		return row != null && row.id !== excludeId;
 	}
 
@@ -544,9 +576,17 @@ export class SqlIdentityStore implements IdentityStore {
 			base = base.where('origin', '=', query.origin);
 			countQ = countQ.where('origin', '=', query.origin);
 		}
-		const rows = await base.orderBy('name', 'asc').limit(query.limit).offset(query.offset).execute();
+		const rows = await base
+			.orderBy('name', 'asc')
+			.limit(query.limit)
+			.offset(query.offset)
+			.execute();
 		const totalRow = await countQ.executeTakeFirst();
-		const counts = await this.memberCounts(joinTable, fk, rows.map((r) => r.id));
+		const counts = await this.memberCounts(
+			joinTable,
+			fk,
+			rows.map((r) => r.id),
+		);
 		return {
 			items: rows.map((r) => ({ ...mapGroup(r), memberCount: counts.get(r.id) ?? 0 })),
 			total: Number(totalRow?.n ?? 0),
@@ -610,12 +650,20 @@ export class SqlIdentityStore implements IdentityStore {
 		const rows = await this.db
 			.selectFrom(joinTable)
 			.innerJoin(T_USER, `${T_USER}.id`, `${joinTable}.user_id`)
-			.select([`${T_USER}.id as id`, `${T_USER}.username as username`, `${T_USER}.origin as origin`])
+			.select([
+				`${T_USER}.id as id`,
+				`${T_USER}.username as username`,
+				`${T_USER}.origin as origin`,
+			])
 			.where(fk, '=', id)
 			.orderBy(`${T_USER}.username`, 'asc')
 			.limit(max)
 			.execute();
-		return rows.map((r) => ({ id: r.id, username: r.username, origin: r.origin as IdentityOrigin }));
+		return rows.map((r) => ({
+			id: r.id,
+			username: r.username,
+			origin: r.origin as IdentityOrigin,
+		}));
 	}
 
 	private async createNamed(
@@ -673,7 +721,11 @@ export class SqlIdentityStore implements IdentityStore {
 		return this.createNamed(T_GROUP, 'group', apiConnectionId, name);
 	}
 	async updateGroupName(id: string, name: string): Promise<void> {
-		await this.db.updateTable(T_GROUP).set({ name, updated_at: this.now() }).where('id', '=', id).execute();
+		await this.db
+			.updateTable(T_GROUP)
+			.set({ name, updated_at: this.now() })
+			.where('id', '=', id)
+			.execute();
 	}
 	async deleteGroup(id: string): Promise<void> {
 		await this.db.deleteFrom(T_GROUP).where('id', '=', id).execute();
@@ -698,7 +750,11 @@ export class SqlIdentityStore implements IdentityStore {
 		return this.createNamed(T_ROLE, 'role', apiConnectionId, name);
 	}
 	async updateRoleName(id: string, name: string): Promise<void> {
-		await this.db.updateTable(T_ROLE).set({ name, updated_at: this.now() }).where('id', '=', id).execute();
+		await this.db
+			.updateTable(T_ROLE)
+			.set({ name, updated_at: this.now() })
+			.where('id', '=', id)
+			.execute();
 	}
 	async deleteRole(id: string): Promise<void> {
 		await this.db.deleteFrom(T_ROLE).where('id', '=', id).execute();
@@ -758,7 +814,11 @@ export class SqlIdentityStore implements IdentityStore {
 					.execute();
 				counts.groupsInserted += 1;
 			} else if (mode === 'upsert') {
-				await this.db.updateTable(T_GROUP).set({ name: g.name, updated_at: this.now() }).where('id', '=', g.id).execute();
+				await this.db
+					.updateTable(T_GROUP)
+					.set({ name: g.name, updated_at: this.now() })
+					.where('id', '=', g.id)
+					.execute();
 				counts.groupsUpdated += 1;
 			}
 		}
@@ -782,7 +842,11 @@ export class SqlIdentityStore implements IdentityStore {
 					.execute();
 				counts.rolesInserted += 1;
 			} else if (mode === 'upsert') {
-				await this.db.updateTable(T_ROLE).set({ name: r.name, updated_at: this.now() }).where('id', '=', r.id).execute();
+				await this.db
+					.updateTable(T_ROLE)
+					.set({ name: r.name, updated_at: this.now() })
+					.where('id', '=', r.id)
+					.execute();
 				counts.rolesUpdated += 1;
 			}
 		}
@@ -856,7 +920,10 @@ export class SqlIdentityStore implements IdentityStore {
 		);
 		const toInsert = rows.filter((r) => !existing.has(`${r.user_id}|${r[fk]}`));
 		for (const part of chunk(toInsert, 500)) {
-			await this.db.insertInto(table).values(part as never).execute();
+			await this.db
+				.insertInto(table)
+				.values(part as never)
+				.execute();
 		}
 	}
 

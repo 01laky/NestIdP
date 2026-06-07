@@ -1,11 +1,12 @@
 import { IdentityOrigin } from '@prisma/client';
-import {
-	GroupNameCollisionError,
-	UsernameCollisionError,
-} from '@api/identity/identity.repository';
+import { GroupNameCollisionError, UsernameCollisionError } from '@api/identity/identity.repository';
 import { classifyOwnership } from '@api/identity/store/external/external-schema';
 import type { SqlIdentityStore } from '@api/identity/store/external/sql-identity-store';
-import { createPgliteKysely, createPgliteStore, type PgliteStoreHandle } from '@test/support/identity/pglite-store';
+import {
+	createPgliteKysely,
+	createPgliteStore,
+	type PgliteStoreHandle,
+} from '@test/support/identity/pglite-store';
 
 jest.setTimeout(30_000);
 
@@ -101,7 +102,10 @@ describe('SqlIdentityStore (external, PGlite)', () => {
 	});
 
 	it('STORE-ADMIN-USERS-01: paginated list with search + origin filter', async () => {
-		await store.upsertUser(CONN, upsertInput({ externalId: 'e1', username: 'alice', email: 'a@x' }));
+		await store.upsertUser(
+			CONN,
+			upsertInput({ externalId: 'e1', username: 'alice', email: 'a@x' }),
+		);
 		await store.upsertUser(CONN, upsertInput({ externalId: 'e2', username: 'bob', email: 'b@x' }));
 		await store.createManualUser({
 			apiConnectionId: CONN,

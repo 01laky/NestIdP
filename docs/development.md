@@ -630,7 +630,14 @@ Long or interrupted test runs can leave **`node (vitest N)`** workers running an
 If the machine still feels slow after aborting tests in the IDE, run **`pnpm test:cleanup`**. Web Vitest is capped at **4 workers** (`apps/web/vitest.config.ts`); API Jest uses **`--forceExit`** and limited **`--maxWorkers`** to reduce hangs and migration races.
 
 - `@nestidp/shared` — schema enums, password hash constants, route prefixes, database validation
-- `@nestidp/api` — unit tests, schema integration tests (libSQL temp file via the in-process migrator), encrypted-DB/rekey/backup specs, e2e routing (mocked Prisma)
+- `@nestidp/api` — unit tests, schema integration tests (libSQL temp file via the in-process migrator), encrypted-DB/rekey/backup specs, external identity-store specs against **in-process Postgres (PGlite)**, e2e routing (mocked Prisma)
+
+> **Identity data access** goes through the `IdentityStore` seam and a runtime-swappable
+> `ActiveIdentityStore` holder (`apps/api/src/identity/store/`). The local implementation is
+> Prisma/libSQL; the external one (Prompt 31 / v1.12.0) is Kysely over Postgres/MySQL. The PGlite
+> specs run in a dedicated jest phase with `--experimental-vm-modules` (see `run-jest-tests.mjs`), so
+> the rest of the suite is unaffected and CI needs no database service.
+
 - `@nestidp/web` — React route tests (admin vs login separation), Evergreen `WEB-EVG-*` registry
 
 ### Repository layout (tests vs source)

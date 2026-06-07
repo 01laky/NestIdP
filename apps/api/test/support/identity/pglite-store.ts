@@ -19,7 +19,11 @@ export async function createPgliteKysely(): Promise<Kysely<ExternalIdentityDB>> 
 	const client = {
 		async query(sql: string, params: unknown[]) {
 			const r = await pg.query(sql, params ?? []);
-			return { rows: r.rows, rowCount: (r as { affectedRows?: number }).affectedRows ?? r.rows.length, command: '' };
+			return {
+				rows: r.rows,
+				rowCount: (r as { affectedRows?: number }).affectedRows ?? r.rows.length,
+				command: '',
+			};
 		},
 		release() {},
 	};
@@ -34,7 +38,9 @@ export async function createPgliteKysely(): Promise<Kysely<ExternalIdentityDB>> 
 	return new Kysely<ExternalIdentityDB>({ dialect: new PostgresDialect({ pool: pool as never }) });
 }
 
-export async function createPgliteStore(options?: { ensureSchema?: boolean }): Promise<PgliteStoreHandle> {
+export async function createPgliteStore(options?: {
+	ensureSchema?: boolean;
+}): Promise<PgliteStoreHandle> {
 	const db = await createPgliteKysely();
 	if (options?.ensureSchema !== false) {
 		await ensureSchema(db, 'postgres', 'test-instance');

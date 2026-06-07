@@ -89,10 +89,16 @@ export class ActiveIdentityStore implements IdentityStore {
 	replaceUserRoles(userId: string, roleIds: string[]): Promise<void> {
 		return this.current.replaceUserRoles(userId, roleIds);
 	}
-	upsertGroup(connectionId: string, externalGroup: { id: string; name: string }): Promise<{ id: string }> {
+	upsertGroup(
+		connectionId: string,
+		externalGroup: { id: string; name: string },
+	): Promise<{ id: string }> {
 		return this.current.upsertGroup(connectionId, externalGroup);
 	}
-	upsertRole(connectionId: string, externalRole: { id: string; name: string }): Promise<{ id: string }> {
+	upsertRole(
+		connectionId: string,
+		externalRole: { id: string; name: string },
+	): Promise<{ id: string }> {
 		return this.current.upsertRole(connectionId, externalRole);
 	}
 	deactivateUsersNotInExternalIds(connectionId: string, externalIds: Set<string>): Promise<number> {

@@ -69,7 +69,11 @@ describe('ExternalIdentityDatabasePage', () => {
 		fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'svc' } });
 		fireEvent.click(screen.getByRole('button', { name: 'Test connection' }));
 		await waitFor(() => expect(test).toHaveBeenCalledTimes(1));
-		expect(test.mock.calls[0][0]).toMatchObject({ host: 'db.example.com', database: 'idp', username: 'svc' });
+		expect(test.mock.calls[0][0]).toMatchObject({
+			host: 'db.example.com',
+			database: 'idp',
+			username: 'svc',
+		});
 	});
 
 	it('WEB-EXTDB-03: relocate shows the backup acknowledgement checkbox', async () => {
@@ -78,7 +82,9 @@ describe('ExternalIdentityDatabasePage', () => {
 		await screen.findByText(/Connect an external database/i);
 		// keepLocalCopy is off by default → relocate warning + ack checkbox visible
 		expect(screen.getByText(/Relocate mode copies identity/i)).toBeTruthy();
-		expect(screen.getByLabelText(/local identity will be backed up and then deleted/i)).toBeTruthy();
+		expect(
+			screen.getByLabelText(/local identity will be backed up and then deleted/i),
+		).toBeTruthy();
 	});
 
 	it('WEB-EXTDB-04: shows status + Re-sync/Disconnect when active', async () => {

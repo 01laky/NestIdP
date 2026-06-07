@@ -27,12 +27,19 @@ export async function listTableNames(db: Kysely<ExternalIdentityDB>): Promise<Se
 	return new Set(tables.map((t) => t.name));
 }
 
-export async function getMetaValue(db: Kysely<ExternalIdentityDB>, key: string): Promise<string | null> {
+export async function getMetaValue(
+	db: Kysely<ExternalIdentityDB>,
+	key: string,
+): Promise<string | null> {
 	const row = await db.selectFrom(T_META).select('value').where('key', '=', key).executeTakeFirst();
 	return row?.value ?? null;
 }
 
-export async function setMetaValue(db: Kysely<ExternalIdentityDB>, key: string, value: string): Promise<void> {
+export async function setMetaValue(
+	db: Kysely<ExternalIdentityDB>,
+	key: string,
+	value: string,
+): Promise<void> {
 	await db
 		.insertInto(T_META)
 		.values({ key, value })
@@ -53,7 +60,10 @@ export async function classifyOwnership(db: Kysely<ExternalIdentityDB>): Promise
 }
 
 /** Create the v1 schema (idempotent). */
-export async function createSchemaV1(db: Kysely<ExternalIdentityDB>, dialect: ExternalDialect): Promise<void> {
+export async function createSchemaV1(
+	db: Kysely<ExternalIdentityDB>,
+	dialect: ExternalDialect,
+): Promise<void> {
 	const ts = tsType(dialect);
 
 	await db.schema
@@ -103,8 +113,12 @@ export async function createSchemaV1(db: Kysely<ExternalIdentityDB>, dialect: Ex
 		.addColumn('user_id', 'varchar(255)', (c) => c.notNull())
 		.addColumn('group_id', 'varchar(255)', (c) => c.notNull())
 		.addPrimaryKeyConstraint('nestidp_user_group_pk', ['user_id', 'group_id'])
-		.addForeignKeyConstraint('nestidp_ug_user_fk', ['user_id'], T_USER, ['id'], (fk) => fk.onDelete('cascade'))
-		.addForeignKeyConstraint('nestidp_ug_group_fk', ['group_id'], T_GROUP, ['id'], (fk) => fk.onDelete('cascade'))
+		.addForeignKeyConstraint('nestidp_ug_user_fk', ['user_id'], T_USER, ['id'], (fk) =>
+			fk.onDelete('cascade'),
+		)
+		.addForeignKeyConstraint('nestidp_ug_group_fk', ['group_id'], T_GROUP, ['id'], (fk) =>
+			fk.onDelete('cascade'),
+		)
 		.execute();
 
 	await db.schema
@@ -113,8 +127,12 @@ export async function createSchemaV1(db: Kysely<ExternalIdentityDB>, dialect: Ex
 		.addColumn('user_id', 'varchar(255)', (c) => c.notNull())
 		.addColumn('role_id', 'varchar(255)', (c) => c.notNull())
 		.addPrimaryKeyConstraint('nestidp_user_role_pk', ['user_id', 'role_id'])
-		.addForeignKeyConstraint('nestidp_ur_user_fk', ['user_id'], T_USER, ['id'], (fk) => fk.onDelete('cascade'))
-		.addForeignKeyConstraint('nestidp_ur_role_fk', ['role_id'], T_ROLE, ['id'], (fk) => fk.onDelete('cascade'))
+		.addForeignKeyConstraint('nestidp_ur_user_fk', ['user_id'], T_USER, ['id'], (fk) =>
+			fk.onDelete('cascade'),
+		)
+		.addForeignKeyConstraint('nestidp_ur_role_fk', ['role_id'], T_ROLE, ['id'], (fk) =>
+			fk.onDelete('cascade'),
+		)
 		.execute();
 }
 

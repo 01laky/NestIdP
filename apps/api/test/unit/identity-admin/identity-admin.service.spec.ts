@@ -111,9 +111,7 @@ describe('IdentityAdminService', () => {
 	it('API-IDN-SVC-01: listUsers default limit 50 / offset 0', async () => {
 		store.listUsers.mockResolvedValue({ items: [], total: 0 });
 		await service.listUsers();
-		expect(store.listUsers).toHaveBeenCalledWith(
-			expect.objectContaining({ limit: 50, offset: 0 }),
-		);
+		expect(store.listUsers).toHaveBeenCalledWith(expect.objectContaining({ limit: 50, offset: 0 }));
 	});
 
 	it('API-IDN-SVC-02: listUsers invalid limit → BadRequestException', async () => {
@@ -131,9 +129,7 @@ describe('IdentityAdminService', () => {
 	it('API-IDN-SVC-04: passes the search term through to the store', async () => {
 		store.listUsers.mockResolvedValue({ items: [], total: 0 });
 		await service.listUsers(undefined, undefined, '  alice  ');
-		expect(store.listUsers).toHaveBeenCalledWith(
-			expect.objectContaining({ search: '  alice  ' }),
-		);
+		expect(store.listUsers).toHaveBeenCalledWith(expect.objectContaining({ search: '  alice  ' }));
 	});
 
 	it('API-IDN-SVC-06: getUserById unknown → NotFoundException', async () => {

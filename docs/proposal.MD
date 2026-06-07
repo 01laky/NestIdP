@@ -717,6 +717,7 @@ _Phase 1 complete in **v1.0.0** (Prompt 10 — Docker, persistent audit, admin a
 
 ### Phase 3 — Extensibility
 
+- [x] **External identity database** — relocate or mirror users/groups/roles to an external Postgres/MySQL database, attached at runtime from the admin console (v1.12.0)
 - [ ] **Multiple API connections for sync** — merge users, groups, and roles from more than one identity API into the local store
 - [ ] Additional hash algorithms (argon2, pbkdf2)
 - [ ] SCIM connector

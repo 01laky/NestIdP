@@ -705,7 +705,9 @@ export function connectExternalIdentityDb(
 }
 
 export function resyncExternalIdentityDb(): Promise<ExternalDbStatusResponseDto> {
-	return adminFetch<ExternalDbStatusResponseDto>(`${IDENTITY_DB_API_PATH}/resync`, { method: 'POST' });
+	return adminFetch<ExternalDbStatusResponseDto>(`${IDENTITY_DB_API_PATH}/resync`, {
+		method: 'POST',
+	});
 }
 
 export function disconnectExternalIdentityDb(

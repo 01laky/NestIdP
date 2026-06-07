@@ -200,7 +200,10 @@ export class IdentityRepository implements IdentityStore {
 		});
 	}
 
-	async upsertGroup(connectionId: string, externalGroup: { id: string; name: string }): Promise<StoreGroup> {
+	async upsertGroup(
+		connectionId: string,
+		externalGroup: { id: string; name: string },
+	): Promise<StoreGroup> {
 		try {
 			return await this.prisma.group.upsert({
 				where: {
@@ -227,7 +230,10 @@ export class IdentityRepository implements IdentityStore {
 		}
 	}
 
-	async upsertRole(connectionId: string, externalRole: { id: string; name: string }): Promise<StoreRole> {
+	async upsertRole(
+		connectionId: string,
+		externalRole: { id: string; name: string },
+	): Promise<StoreRole> {
 		try {
 			return await this.prisma.role.upsert({
 				where: {
@@ -480,13 +486,22 @@ export class IdentityRepository implements IdentityStore {
 			select: { user: { select: { id: true, username: true, origin: true } } },
 			orderBy: { user: { username: 'asc' } },
 		});
-		return rows.map((row) => ({ id: row.user.id, username: row.user.username, origin: row.user.origin }));
+		return rows.map((row) => ({
+			id: row.user.id,
+			username: row.user.username,
+			origin: row.user.origin,
+		}));
 	}
 
 	async createManualGroup(apiConnectionId: string, name: string): Promise<StoreGroup> {
 		return this.prisma.$transaction(async (tx) => {
 			const created = await tx.group.create({
-				data: { apiConnectionId, origin: IdentityOrigin.MANUAL, externalId: 'manual:pending', name },
+				data: {
+					apiConnectionId,
+					origin: IdentityOrigin.MANUAL,
+					externalId: 'manual:pending',
+					name,
+				},
 			});
 			return tx.group.update({
 				where: { id: created.id },
@@ -507,7 +522,11 @@ export class IdentityRepository implements IdentityStore {
 		return this.prisma.userGroup.count({ where: { groupId: id } });
 	}
 
-	async isGroupNameTaken(apiConnectionId: string, name: string, excludeId?: string): Promise<boolean> {
+	async isGroupNameTaken(
+		apiConnectionId: string,
+		name: string,
+		excludeId?: string,
+	): Promise<boolean> {
 		const row = await this.prisma.group.findUnique({
 			where: { apiConnectionId_name: { apiConnectionId, name } },
 		});
@@ -553,13 +572,22 @@ export class IdentityRepository implements IdentityStore {
 			select: { user: { select: { id: true, username: true, origin: true } } },
 			orderBy: { user: { username: 'asc' } },
 		});
-		return rows.map((row) => ({ id: row.user.id, username: row.user.username, origin: row.user.origin }));
+		return rows.map((row) => ({
+			id: row.user.id,
+			username: row.user.username,
+			origin: row.user.origin,
+		}));
 	}
 
 	async createManualRole(apiConnectionId: string, name: string): Promise<StoreRole> {
 		return this.prisma.$transaction(async (tx) => {
 			const created = await tx.role.create({
-				data: { apiConnectionId, origin: IdentityOrigin.MANUAL, externalId: 'manual:pending', name },
+				data: {
+					apiConnectionId,
+					origin: IdentityOrigin.MANUAL,
+					externalId: 'manual:pending',
+					name,
+				},
 			});
 			return tx.role.update({
 				where: { id: created.id },
@@ -580,7 +608,11 @@ export class IdentityRepository implements IdentityStore {
 		return this.prisma.userRole.count({ where: { roleId: id } });
 	}
 
-	async isRoleNameTaken(apiConnectionId: string, name: string, excludeId?: string): Promise<boolean> {
+	async isRoleNameTaken(
+		apiConnectionId: string,
+		name: string,
+		excludeId?: string,
+	): Promise<boolean> {
 		const row = await this.prisma.role.findUnique({
 			where: { apiConnectionId_name: { apiConnectionId, name } },
 		});
@@ -624,7 +656,9 @@ export class IdentityRepository implements IdentityStore {
 			rolesUpdated: 0,
 		};
 
-		const existingGroupIds = new Set((await this.prisma.group.findMany({ select: { id: true } })).map((r) => r.id));
+		const existingGroupIds = new Set(
+			(await this.prisma.group.findMany({ select: { id: true } })).map((r) => r.id),
+		);
 		for (const g of snapshot.groups) {
 			if (!existingGroupIds.has(g.id)) {
 				await this.prisma.group.create({
@@ -644,7 +678,9 @@ export class IdentityRepository implements IdentityStore {
 			}
 		}
 
-		const existingRoleIds = new Set((await this.prisma.role.findMany({ select: { id: true } })).map((r) => r.id));
+		const existingRoleIds = new Set(
+			(await this.prisma.role.findMany({ select: { id: true } })).map((r) => r.id),
+		);
 		for (const r of snapshot.roles) {
 			if (!existingRoleIds.has(r.id)) {
 				await this.prisma.role.create({
@@ -664,7 +700,9 @@ export class IdentityRepository implements IdentityStore {
 			}
 		}
 
-		const existingUserIds = new Set((await this.prisma.user.findMany({ select: { id: true } })).map((r) => r.id));
+		const existingUserIds = new Set(
+			(await this.prisma.user.findMany({ select: { id: true } })).map((r) => r.id),
+		);
 		for (const u of snapshot.users) {
 			if (!existingUserIds.has(u.id)) {
 				await this.prisma.user.create({

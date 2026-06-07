@@ -59,11 +59,18 @@ export class HealthService {
 
 	private async externalIdentityDbStatus(): Promise<ReadyExternalIdentityDb | undefined> {
 		try {
-			const row = await this.prisma.externalIdentityDatabase.findUnique({ where: { id: 'default' } });
+			const row = await this.prisma.externalIdentityDatabase.findUnique({
+				where: { id: 'default' },
+			});
 			if (!row) {
 				return undefined;
 			}
-			return { status: row.status, mode: row.mode, reachable: row.reachable, outOfSync: row.outOfSync };
+			return {
+				status: row.status,
+				mode: row.mode,
+				reachable: row.reachable,
+				outOfSync: row.outOfSync,
+			};
 		} catch {
 			return undefined;
 		}

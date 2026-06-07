@@ -208,8 +208,61 @@ The `db-cli.mjs` helper opens the file through the libSQL adapter with the curre
 
 Key rotation outline: take a backup, run `pnpm db:rekey` with the new key, then update `DATABASE_ENCRYPTION_KEY` and restart. A wrong key surfaces as a clear integrity error at startup rather than silent corruption.
 
+## External identity database (v1.12.0)
+
+By default **all** data — system/config **and** identity — lives in the local encrypted libSQL file.
+Optionally, an operator can attach an **external PostgreSQL or MySQL database** (Settings → External
+database, or `POST /api/admin/identity-database`) that holds **only the identity entities** (`User`,
+`Group`, `Role`, and the membership join tables). System/config data (admins, IdP settings, certs,
+SP/API connections, audit, SAML sessions) **always stays local** and never moves.
+
+![External identity database — store hot-swap, relocate vs mirror](./img/external-identity-db.svg)
+
+### Relocate vs mirror (the "keep a copy locally" toggle)
+
+| Toggle (default **off**) | Authoritative store | Local identity                | External database                                                                                          |
+| ------------------------ | ------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| **off — relocate**       | external            | deleted after a verified copy | source of truth; a **hard runtime dependency** (login fails if it is unreachable, with no local fallback)  |
+| **on — mirror**          | local               | kept                          | continuously-reconciled copy for downstream apps; mutations flag it out-of-sync and **Re-sync** reconciles |
+
+### How it works
+
+- All identity access goes through an `IdentityStore` seam and a runtime-swappable `ActiveIdentityStore`
+  holder, so the active store hot-swaps with **no restart**. The local impl uses Prisma/libSQL; the
+  external impl uses **Kysely** (Prisma stays single-provider on libSQL — Postgres/MySQL are reached
+  through Kysely, not Prisma).
+- NestIdP owns a small set of **`nestidp_`-prefixed** tables + a `nestidp_meta` marker in the external
+  database (a versioned migrator manages them). It never touches other tables; a database whose prefixed
+  tables are not ours is classified **foreign** and refused.
+- **Cross-store note:** identity rows reference `apiConnectionId` (and `SamlSession`/`SamlSsoSession`
+  reference `userId`), but those parent tables stay local. In the external schema `apiConnectionId` is a
+  plain value column; referential integrity to the local `ApiConnection` is enforced at the app layer
+  (e.g. deleting an `ApiConnection` is blocked while the active store still has its identity rows).
+
+### Attach / preview / disconnect
+
+- **Test** runs `SELECT 1` with friendly auth/host/TLS error messages.
+- **Preview** (no writes) reports ownership (`empty`/`ours`/`foreign`), the create/update diff counts,
+  detected username/external-id conflicts, and whether local will be wiped.
+- **Connect** ensures the schema, imports the snapshot, verifies, and — in relocate mode — takes a
+  **local backup (`VACUUM INTO`) and deletes local identity only when you tick the acknowledgement**
+  (otherwise it keeps local and reports the wipe was skipped).
+- **Disconnect** offers to **move identity back to local** (reverse migration) before detaching.
+
+### Hardening & security
+
+- A **circuit breaker + per-query timeout** make a slow/unreachable external DB fail fast (login/SAML
+  never hang); a background probe updates reachability; `/ready` reflects it.
+- TLS via `sslMode` (`disable` | `require` | `verify-ca` | `verify-full`) + optional CA PEM.
+- The DB password is encrypted with `EncryptionService`; the DSN/password are never logged or returned.
+- **At-rest:** the external database is **not** covered by the local libSQL encryption — securing it
+  (including the bcrypt password hashes it now holds) is the operator's responsibility.
+
 ## Tests
 
-Each spec applies migrations to its own temporary file via the in-process migrator — there is no external database and no `prisma migrate deploy` in the test path. Tests run against unencrypted temp files; dedicated specs cover the encrypted path, rekey, and backup.
+Each spec applies migrations to its own temporary file via the in-process migrator — there is no
+external database server and no `prisma migrate deploy` in the test path. Tests run against unencrypted
+temp files; dedicated specs cover the encrypted path, rekey, and backup. The external identity store is
+exercised against an **in-process Postgres (PGlite)** so CI stays serviceless.
 
 See also [development.md](./development.md), [img/README.md](./img/README.md), and [proposal.MD](./proposal.MD).

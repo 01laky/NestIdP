@@ -249,7 +249,12 @@ export function ExternalIdentityDatabasePage() {
 								</option>
 							))}
 						</Select>
-						<TextInput label={t('host')} value={form.host} onChange={(e) => update('host', e.target.value)} required />
+						<TextInput
+							label={t('host')}
+							value={form.host}
+							onChange={(e) => update('host', e.target.value)}
+							required
+						/>
 						<TextInput
 							label={t('port')}
 							type="number"
@@ -316,10 +321,20 @@ export function ExternalIdentityDatabasePage() {
 						) : null}
 
 						<div className="evg-form-actions">
-							<Button type="button" variant="secondary" onClick={() => void onTest()} disabled={busy}>
+							<Button
+								type="button"
+								variant="secondary"
+								onClick={() => void onTest()}
+								disabled={busy}
+							>
 								{t('testButton')}
 							</Button>
-							<Button type="button" variant="secondary" onClick={() => void onPreview()} disabled={busy}>
+							<Button
+								type="button"
+								variant="secondary"
+								onClick={() => void onPreview()}
+								disabled={busy}
+							>
 								{t('previewButton')}
 							</Button>
 							<Button type="submit" variant="primary" disabled={busy}>
@@ -350,10 +365,13 @@ export function ExternalIdentityDatabasePage() {
 							</p>
 							{preview.conflicts.length > 0 ? (
 								<Callout variant="danger">
-									{t('conflicts')}: {preview.conflicts.map((c) => `${c.table}.${c.kind}=${c.value}`).join(', ')}
+									{t('conflicts')}:{' '}
+									{preview.conflicts.map((c) => `${c.table}.${c.kind}=${c.value}`).join(', ')}
 								</Callout>
 							) : null}
-							{preview.willWipeLocal ? <Callout variant="warning">{t('willWipeLocal')}</Callout> : null}
+							{preview.willWipeLocal ? (
+								<Callout variant="warning">{t('willWipeLocal')}</Callout>
+							) : null}
 						</div>
 					) : null}
 				</Panel>

@@ -11,7 +11,12 @@ export type ExternalDbMode = 'relocate' | 'mirror';
 export type ExternalDbOwnership = 'empty' | 'ours' | 'foreign';
 
 export const EXTERNAL_DB_DIALECTS: ExternalDbDialect[] = ['postgres', 'mysql'];
-export const EXTERNAL_DB_SSL_MODES: ExternalDbSslMode[] = ['disable', 'require', 'verify-ca', 'verify-full'];
+export const EXTERNAL_DB_SSL_MODES: ExternalDbSslMode[] = [
+	'disable',
+	'require',
+	'verify-ca',
+	'verify-full',
+];
 
 /** Connection attributes accepted by test/preview/connect. Password is write-only. */
 export interface ExternalDbConnectionInput {
@@ -41,7 +46,11 @@ export interface ExternalDbPreviewResponseDto {
 	willWipeLocal: boolean;
 	toCreate: { users: number; groups: number; roles: number };
 	toUpdate: { users: number; groups: number; roles: number };
-	conflicts: Array<{ kind: 'username' | 'external_id'; table: 'user' | 'group' | 'role'; value: string }>;
+	conflicts: Array<{
+		kind: 'username' | 'external_id';
+		table: 'user' | 'group' | 'role';
+		value: string;
+	}>;
 	error?: string;
 }
 

@@ -1,4 +1,12 @@
-import { BadRequestException, ConflictException, Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+	BadRequestException,
+	ConflictException,
+	Inject,
+	Injectable,
+	Logger,
+	OnModuleDestroy,
+	OnModuleInit,
+} from '@nestjs/common';
 import type { ExternalIdentityDatabase } from '@prisma/client';
 import type {
 	ConnectExternalDbRequest,
@@ -10,11 +18,14 @@ import type {
 	TestExternalDbResponseDto,
 } from '@nestidp/shared';
 import { AuditPersistenceService } from '../../../audit/services/audit-persistence.service';
-import { CREDENTIALS_ENCRYPTION, type CredentialsEncryptionPort } from '../../../encryption/credentials-encryption.port';
+import {
+	CREDENTIALS_ENCRYPTION,
+	type CredentialsEncryptionPort,
+} from '../../../encryption/credentials-encryption.port';
 import { createLibsqlClient, requireDatabaseUrl } from '../../../prisma/libsql';
 import { PrismaService } from '../../../prisma/services/prisma.service';
 import { ActiveIdentityStore } from '../active-identity-store';
-import type { IdentitySnapshot, IdentityStore } from '../identity-store';
+import type { IdentitySnapshot } from '../identity-store';
 import {
 	type ExternalDbConfig,
 	type ExternalKysely,
@@ -134,7 +145,8 @@ export class ExternalIdentityDatabaseService implements OnModuleInit, OnModuleDe
 					toCreate: { users: 0, groups: 0, roles: 0 },
 					toUpdate: { users: 0, groups: 0, roles: 0 },
 					conflicts: [],
-					error: 'The target database already contains tables under the nestidp_ prefix that are not ours.',
+					error:
+						'The target database already contains tables under the nestidp_ prefix that are not ours.',
 				};
 			}
 			if (ownership === 'empty') {
@@ -143,7 +155,11 @@ export class ExternalIdentityDatabaseService implements OnModuleInit, OnModuleDe
 					ownership,
 					schemaPresent: false,
 					willWipeLocal,
-					toCreate: { users: local.users.length, groups: local.groups.length, roles: local.roles.length },
+					toCreate: {
+						users: local.users.length,
+						groups: local.groups.length,
+						roles: local.roles.length,
+					},
 					toUpdate: { users: 0, groups: 0, roles: 0 },
 					conflicts: [],
 				};
@@ -169,7 +185,10 @@ export class ExternalIdentityDatabaseService implements OnModuleInit, OnModuleDe
 		}
 	}
 
-	async connect(req: ConnectExternalDbRequest, actor?: { id?: string; label?: string }): Promise<ConnectExternalDbResponseDto> {
+	async connect(
+		req: ConnectExternalDbRequest,
+		actor?: { id?: string; label?: string },
+	): Promise<ConnectExternalDbResponseDto> {
 		this.acquireLock();
 		try {
 			const password = await this.resolvePassword(req.password);
@@ -179,7 +198,13 @@ export class ExternalIdentityDatabaseService implements OnModuleInit, OnModuleDe
 			const relocate = !req.keepLocalCopy;
 			const dbConfig = this.toDbConfig(req, password);
 			await this.upsertConfig(req, password, 'migrating');
-			this.audit.recordSafe({ category: 'identity', actorType: 'admin', event: 'identity_db_test', actorId: actor?.id, actorLabel: actor?.label });
+			this.audit.recordSafe({
+				category: 'identity',
+				actorType: 'admin',
+				event: 'identity_db_test',
+				actorId: actor?.id,
+				actorLabel: actor?.label,
+			});
 
 			const conn = this.factory.create(dbConfig);
 			let imported = { users: 0, groups: 0, roles: 0 };
@@ -189,7 +214,9 @@ export class ExternalIdentityDatabaseService implements OnModuleInit, OnModuleDe
 			try {
 				const ownership = await classifyOwnership(conn.db);
 				if (ownership === 'foreign') {
-					throw new ConflictException('The target database already has nestidp_ tables that are not ours.');
+					throw new ConflictException(
+						'The target database already has nestidp_ tables that are not ours.',
+					);
 				}
 				await ensureSchema(conn.db, req.dialect, await this.instanceId());
 				const ext = new SqlIdentityStore(conn.db, req.dialect);
@@ -200,7 +227,9 @@ export class ExternalIdentityDatabaseService implements OnModuleInit, OnModuleDe
 					const existing = await ext.exportAll();
 					const conflicts = this.diff(local, existing).conflicts;
 					if (conflicts.length > 0) {
-						throw new ConflictException(`Pre-existing data conflicts: ${conflicts.map((c) => `${c.table}.${c.kind}=${c.value}`).join(', ')}`);
+						throw new ConflictException(
+							`Pre-existing data conflicts: ${conflicts.map((c) => `${c.table}.${c.kind}=${c.value}`).join(', ')}`,
+						);
 					}
 				}
 
@@ -260,14 +289,23 @@ export class ExternalIdentityDatabaseService implements OnModuleInit, OnModuleDe
 				where: { id: CONFIG_ID },
 				data: { outOfSync: false, lastSyncAt: new Date() },
 			});
-			this.audit.recordSafe({ category: 'identity', actorType: 'admin', event: 'identity_db_resynced', actorId: actor?.id, actorLabel: actor?.label });
+			this.audit.recordSafe({
+				category: 'identity',
+				actorType: 'admin',
+				event: 'identity_db_resynced',
+				actorId: actor?.id,
+				actorLabel: actor?.label,
+			});
 			return this.getStatus();
 		} finally {
 			this.releaseLock();
 		}
 	}
 
-	async disconnect(req: DisconnectExternalDbRequest, actor?: { id?: string; label?: string }): Promise<ExternalDbStatusResponseDto> {
+	async disconnect(
+		req: DisconnectExternalDbRequest,
+		actor?: { id?: string; label?: string },
+	): Promise<ExternalDbStatusResponseDto> {
 		this.acquireLock();
 		try {
 			const cfg = await this.loadConfig();
@@ -290,7 +328,9 @@ export class ExternalIdentityDatabaseService implements OnModuleInit, OnModuleDe
 			await this.active?.destroy().catch(() => undefined);
 			this.active = null;
 			this.breaker = null;
-			await this.prisma.externalIdentityDatabase.delete({ where: { id: CONFIG_ID } }).catch(() => undefined);
+			await this.prisma.externalIdentityDatabase
+				.delete({ where: { id: CONFIG_ID } })
+				.catch(() => undefined);
 			this.audit.recordSafe({
 				category: 'identity',
 				actorType: 'admin',
@@ -315,12 +355,19 @@ export class ExternalIdentityDatabaseService implements OnModuleInit, OnModuleDe
 		await this.active?.destroy().catch(() => undefined);
 		const password = this.encryption.decrypt(cfg.passwordEncrypted);
 		this.active = this.factory.create(this.toDbConfigFromRow(cfg, password));
-		await ensureSchema(this.active.db, cfg.dialect as 'postgres' | 'mysql', await this.instanceId());
+		await ensureSchema(
+			this.active.db,
+			cfg.dialect as 'postgres' | 'mysql',
+			await this.instanceId(),
+		);
 		this.breaker = new CircuitBreaker();
 		const sql = new SqlIdentityStore(this.active.db, cfg.dialect as 'postgres' | 'mysql');
 		const resilient = withResilience(sql, this.breaker, cfg.queryTimeoutMs);
 		if (cfg.mode === 'mirror') {
-			this.store.setActive(createMirroringStore(this.store.getLocal(), () => this.flagDrift()), 'mirror');
+			this.store.setActive(
+				createMirroringStore(this.store.getLocal(), () => this.flagDrift()),
+				'mirror',
+			);
 		} else {
 			this.store.setActive(resilient, 'external');
 		}
@@ -367,7 +414,9 @@ export class ExternalIdentityDatabaseService implements OnModuleInit, OnModuleDe
 		const exUserExt = new Set(existing.users.map((u) => `${u.apiConnectionId}|${u.externalId}`));
 		const exGroupExt = new Set(existing.groups.map((g) => `${g.apiConnectionId}|${g.externalId}`));
 		const exRoleExt = new Set(existing.roles.map((r) => `${r.apiConnectionId}|${r.externalId}`));
-		const exUsernames = new Map(existing.users.map((u) => [u.username, `${u.apiConnectionId}|${u.externalId}`]));
+		const exUsernames = new Map(
+			existing.users.map((u) => [u.username, `${u.apiConnectionId}|${u.externalId}`]),
+		);
 		const toCreate = { users: 0, groups: 0, roles: 0 };
 		const toUpdate = { users: 0, groups: 0, roles: 0 };
 		const conflicts: ExternalDbPreviewResponseDto['conflicts'] = [];
@@ -384,10 +433,18 @@ export class ExternalIdentityDatabaseService implements OnModuleInit, OnModuleDe
 			}
 		}
 		for (const g of local.groups) {
-			exGroupExt.has(`${g.apiConnectionId}|${g.externalId}`) ? (toUpdate.groups += 1) : (toCreate.groups += 1);
+			if (exGroupExt.has(`${g.apiConnectionId}|${g.externalId}`)) {
+				toUpdate.groups += 1;
+			} else {
+				toCreate.groups += 1;
+			}
 		}
 		for (const r of local.roles) {
-			exRoleExt.has(`${r.apiConnectionId}|${r.externalId}`) ? (toUpdate.roles += 1) : (toCreate.roles += 1);
+			if (exRoleExt.has(`${r.apiConnectionId}|${r.externalId}`)) {
+				toUpdate.roles += 1;
+			} else {
+				toCreate.roles += 1;
+			}
 		}
 		return { toCreate, toUpdate, conflicts };
 	}
@@ -415,7 +472,9 @@ export class ExternalIdentityDatabaseService implements OnModuleInit, OnModuleDe
 		return this.prisma.externalIdentityDatabase.findUnique({ where: { id: CONFIG_ID } });
 	}
 
-	private async safeCounts(): Promise<{ users: number; groups: number; roles: number } | undefined> {
+	private async safeCounts(): Promise<
+		{ users: number; groups: number; roles: number } | undefined
+	> {
 		try {
 			const [users, groups, roles] = await Promise.all([
 				this.store.countUsers(),
@@ -470,7 +529,11 @@ export class ExternalIdentityDatabaseService implements OnModuleInit, OnModuleDe
 		};
 	}
 
-	private async upsertConfig(req: ConnectExternalDbRequest, password: string, status: string): Promise<void> {
+	private async upsertConfig(
+		req: ConnectExternalDbRequest,
+		password: string,
+		status: string,
+	): Promise<void> {
 		const passwordEncrypted = this.encryption.encrypt(password);
 		const data = {
 			dialect: req.dialect,
@@ -515,13 +578,19 @@ export class ExternalIdentityDatabaseService implements OnModuleInit, OnModuleDe
 
 	private async markReachable(reachable: boolean, error: string | null): Promise<void> {
 		await this.prisma.externalIdentityDatabase
-			.update({ where: { id: CONFIG_ID }, data: { reachable, lastProbeAt: new Date(), lastProbeError: error } })
+			.update({
+				where: { id: CONFIG_ID },
+				data: { reachable, lastProbeAt: new Date(), lastProbeError: error },
+			})
 			.catch(() => undefined);
 	}
 
 	private async setProgress(phase: string, done: number, total: number): Promise<void> {
 		await this.prisma.externalIdentityDatabase
-			.update({ where: { id: CONFIG_ID }, data: { migrationPhase: phase, migrationDone: done, migrationTotal: total } })
+			.update({
+				where: { id: CONFIG_ID },
+				data: { migrationPhase: phase, migrationDone: done, migrationTotal: total },
+			})
 			.catch(() => undefined);
 	}
 
@@ -533,7 +602,9 @@ export class ExternalIdentityDatabaseService implements OnModuleInit, OnModuleDe
 
 	private acquireLock(): void {
 		if (this.busy) {
-			throw new ConflictException('An external identity database operation is already in progress.');
+			throw new ConflictException(
+				'An external identity database operation is already in progress.',
+			);
 		}
 		this.busy = true;
 	}

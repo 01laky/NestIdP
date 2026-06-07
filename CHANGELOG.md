@@ -4,6 +4,42 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.12.0]
+
+### Added
+
+- **External identity database (Prompt 31):** identity entities (`User`, `Group`, `Role` + memberships)
+  can be attached at runtime to an external **PostgreSQL or MySQL** database from the admin console.
+  System/config data (admins, IdP settings, certs, SP/API connections, audit, sessions) always stays
+  in the local encrypted libSQL file.
+  - **Two modes via one toggle** ("keep a copy locally", default **off**): **relocate** — identity is
+    moved to the external DB which becomes authoritative and the local identity rows are deleted; or
+    **mirror** — local stays authoritative and the external DB receives a synchronized copy.
+  - **IdentityStore abstraction** + a runtime-swappable `ActiveIdentityStore` holder: every identity
+    consumer (login, SAML assertions, inbound sync, identity-admin CRUD, dashboard) goes through it,
+    so the active store can be hot-swapped with **no restart**. Local impl uses Prisma/libSQL; the
+    external impl uses **Kysely** (Prisma stays single-provider on libSQL).
+  - **Attach flow** (admin API + UI): test connection, **preview** (ownership empty/ours/foreign +
+    create/update diff counts + conflict detection, no writes), then connect — ensure the
+    `nestidp_`-prefixed schema (versioned migrator), import the snapshot, verify, and in relocate mode
+    **back up the local DB and wipe local identity only with an explicit acknowledgement**. Disconnect
+    offers a reverse migration (external → local) before detaching.
+  - **Hardening:** circuit breaker + per-query timeout (a slow/unreachable external DB fails fast and
+    never hangs login/SAML), background liveness probe, TLS (`sslMode` + optional CA), pool sizing,
+    single-flight lock for connect/resync/disconnect, and a cross-store guard that blocks deleting an
+    `ApiConnection` while identity rows for it still exist in the active store.
+  - **Admin API** `POST/GET/DELETE /api/admin/identity-database` (+ `/test`, `/preview`, `/resync`),
+    a new admin page (Settings → External database) in all 10 locales, and `/ready` now reports the
+    external DB status (degrading to 503 when an active relocate-mode DB is unreachable).
+  - **Security:** the DB password is encrypted at rest with `EncryptionService`; DSN/password never
+    logged or returned (`hasPassword` only). The external DB is **not** covered by the local at-rest
+    encryption — the UI and docs state this is the operator's responsibility.
+
+### Changed
+
+- `pnpm db:new-migration` now runs `prisma migrate dev --skip-seed` (the auto-seed failed under
+  ts-node ESM after authoring the SQL).
+
 ## [1.11.0]
 
 ### Changed
