@@ -14,6 +14,9 @@ module.exports = {
 	},
 	collectCoverageFrom: ['src/**/*.(t|j)s'],
 	coverageDirectory: 'coverage',
+	// Integration specs apply the full migration history to a fresh libSQL file each run; under load
+	// (CI / serial --runInBand) that can exceed Jest's 60s default, so allow a safe margin.
+	testTimeout: 120_000,
 	testEnvironment: 'node',
 	setupFilesAfterEnv: ['<rootDir>/test/jest.setup.ts'],
 	moduleNameMapper: {

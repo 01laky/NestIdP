@@ -203,6 +203,15 @@ describe('ApiConnectionsService', () => {
 		});
 	});
 
+	it('API-CON-10b: delete blocked by cross-store guard when identity rows exist in the active store', async () => {
+		prisma.apiConnection.findUnique.mockResolvedValue(sampleRow);
+		identityStore.connectionHasIdentityRows.mockResolvedValueOnce(true);
+		await expect(service.delete(sampleRow.id)).rejects.toThrow(ConflictException);
+		// the DB delete must not even be attempted (the local FK cannot see external rows)
+		expect(prisma.apiConnection.delete).not.toHaveBeenCalled();
+		expect(identityStore.connectionHasIdentityRows).toHaveBeenCalledWith(sampleRow.id);
+	});
+
 	it('API-CON-11: getById not found → NotFoundException', async () => {
 		prisma.apiConnection.findUnique.mockResolvedValue(null);
 		await expect(service.getById('missing')).rejects.toThrow(NotFoundException);

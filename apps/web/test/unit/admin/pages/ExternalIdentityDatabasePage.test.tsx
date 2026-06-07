@@ -1,10 +1,17 @@
 import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import { renderWithUi } from '@test/helpers/renderWithUi';
+import { clickDialogConfirm } from '@test/helpers/confirm-dialog-helpers';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ExternalDbStatusResponseDto } from '@nestidp/shared';
 import * as adminApi from '@/admin/adminApi';
 import { ExternalIdentityDatabasePage } from '@/admin/pages/ExternalIdentityDatabasePage';
+
+function fillConnForm() {
+	fireEvent.change(screen.getByLabelText('Host'), { target: { value: 'db.example.com' } });
+	fireEvent.change(screen.getByLabelText('Database name'), { target: { value: 'idp' } });
+	fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'svc' } });
+}
 
 function notConfigured(): ExternalDbStatusResponseDto {
 	return {
@@ -85,6 +92,59 @@ describe('ExternalIdentityDatabasePage', () => {
 		expect(
 			screen.getByLabelText(/local identity will be backed up and then deleted/i),
 		).toBeTruthy();
+	});
+
+	it('WEB-EXTDB-05: Preview renders ownership, counts and conflicts', async () => {
+		vi.spyOn(adminApi, 'getExternalIdentityDbStatus').mockResolvedValue(notConfigured());
+		vi.spyOn(adminApi, 'previewExternalIdentityDb').mockResolvedValue({
+			reachable: true,
+			ownership: 'ours',
+			schemaPresent: true,
+			willWipeLocal: true,
+			toCreate: { users: 3, groups: 1, roles: 0 },
+			toUpdate: { users: 2, groups: 0, roles: 0 },
+			conflicts: [{ kind: 'username', table: 'user', value: 'dup' }],
+		});
+		renderPage();
+		await screen.findByText(/Connect an external database/i);
+		fillConnForm();
+		fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
+		expect(await screen.findByTestId('external-db-preview')).toBeTruthy();
+		expect(screen.getByText(/Already contains our data/i)).toBeTruthy();
+		expect(screen.getByText(/user\.username=dup/i)).toBeTruthy();
+	});
+
+	it('WEB-EXTDB-06: Connect submits the request and surfaces the wipe-skipped toast', async () => {
+		vi.spyOn(adminApi, 'getExternalIdentityDbStatus').mockResolvedValue(notConfigured());
+		const connect = vi.spyOn(adminApi, 'connectExternalIdentityDb').mockResolvedValue({
+			status: active(),
+			imported: { users: 2, groups: 0, roles: 0 },
+			localWiped: false,
+			wipeSkipped: true,
+		});
+		renderPage();
+		await screen.findByText(/Connect an external database/i);
+		fillConnForm();
+		fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
+		await waitFor(() => expect(connect).toHaveBeenCalledTimes(1));
+		expect(connect.mock.calls[0][0]).toMatchObject({
+			host: 'db.example.com',
+			keepLocalCopy: false,
+		});
+		expect(await screen.findByText(/local identity was kept/i)).toBeTruthy();
+	});
+
+	it('WEB-EXTDB-07: Disconnect confirms and calls the API', async () => {
+		vi.spyOn(adminApi, 'getExternalIdentityDbStatus').mockResolvedValue(active());
+		const disconnect = vi
+			.spyOn(adminApi, 'disconnectExternalIdentityDb')
+			.mockResolvedValue(notConfigured());
+		renderPage();
+		await screen.findByRole('button', { name: 'Disconnect' });
+		fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
+		await screen.findByRole('dialog');
+		clickDialogConfirm('Move data back & disconnect');
+		await waitFor(() => expect(disconnect).toHaveBeenCalledWith({ moveDataToLocal: true }));
 	});
 
 	it('WEB-EXTDB-04: shows status + Re-sync/Disconnect when active', async () => {

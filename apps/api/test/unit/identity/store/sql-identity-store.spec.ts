@@ -1,6 +1,10 @@
 import { IdentityOrigin } from '@prisma/client';
 import { GroupNameCollisionError, UsernameCollisionError } from '@api/identity/identity.repository';
-import { classifyOwnership } from '@api/identity/store/external/external-schema';
+import {
+	classifyOwnership,
+	getMetaValue,
+	runExternalMigrations,
+} from '@api/identity/store/external/external-schema';
 import type { SqlIdentityStore } from '@api/identity/store/external/sql-identity-store';
 import {
 	createPgliteKysely,
@@ -240,6 +244,71 @@ describe('SqlIdentityStore (external, PGlite)', () => {
 		} finally {
 			await target.destroy();
 		}
+	});
+
+	it('STORE-USER-03: upsertUser onto a MANUAL row is rejected as a collision', async () => {
+		const manual = await store.createManualUser({
+			apiConnectionId: CONN,
+			username: 'manualu',
+			email: null,
+			displayName: null,
+			passwordHash: 'h',
+			passwordHashAlgorithm: 'bcrypt',
+			active: true,
+			groupIds: [],
+			roleIds: [],
+		});
+		// a sync upsert targeting the same (conn, externalId) of a MANUAL row must not overwrite it
+		await expect(
+			store.upsertUser(CONN, upsertInput({ externalId: manual.externalId, username: 'sync-name' })),
+		).rejects.toBeInstanceOf(UsernameCollisionError);
+	});
+
+	it('STORE-WIPE-01: wipeAll removes all identity rows', async () => {
+		const u = await store.upsertUser(CONN, upsertInput());
+		const g = await store.upsertGroup(CONN, { id: 'g1', name: 'G' });
+		await store.replaceUserGroups(u.id, [g.id]);
+		await store.upsertRole(CONN, { id: 'r1', name: 'R' });
+		await store.wipeAll();
+		expect(await store.countUsers()).toBe(0);
+		expect(await store.countGroups()).toBe(0);
+		expect(await store.countRoles()).toBe(0);
+	});
+
+	it('STORE-GUARD-01: connectionHasIdentityRows reflects whether a connection has rows', async () => {
+		expect(await store.connectionHasIdentityRows(CONN)).toBe(false);
+		await store.upsertGroup(CONN, { id: 'g1', name: 'G' });
+		expect(await store.connectionHasIdentityRows(CONN)).toBe(true);
+		expect(await store.connectionHasIdentityRows('other-conn')).toBe(false);
+	});
+
+	it('STORE-IMPORT-02: insert-missing mode never updates existing rows', async () => {
+		await store.upsertUser(
+			CONN,
+			upsertInput({ externalId: 'e1', username: 'alice', displayName: 'Old' }),
+		);
+		const snapshot = await store.exportAll();
+		snapshot.users[0] = { ...snapshot.users[0], displayName: 'NEW' };
+		const counts = await store.importSnapshot(snapshot, 'insert-missing');
+		expect(counts.usersUpdated).toBe(0);
+		expect((await store.getUserById(snapshot.users[0].id))?.displayName).toBe('Old');
+	});
+
+	it('STORE-ORPHAN-02: empty external-id set deactivates / deletes all synced rows', async () => {
+		const u = await store.upsertUser(CONN, upsertInput({ externalId: 'e1', username: 'u1' }));
+		await store.upsertGroup(CONN, { id: 'g1', name: 'G1' });
+		expect(await store.deactivateUsersNotInExternalIds(CONN, new Set())).toBe(1);
+		expect((await store.getUserById(u.id))?.active).toBe(false);
+		expect(await store.deleteOrphanGroups(CONN, new Set())).toBe(1);
+		expect(await store.countGroups()).toBe(0);
+	});
+
+	it('EXT-SCHEMA-02: runExternalMigrations is idempotent and stamps the schema version', async () => {
+		expect(await getMetaValue(handle.db, 'schema_version')).toBe('1');
+		await expect(runExternalMigrations(handle.db, 'postgres')).resolves.toBe(1);
+		// running again does not error or change the version
+		await expect(runExternalMigrations(handle.db, 'postgres')).resolves.toBe(1);
+		expect(await getMetaValue(handle.db, 'schema_version')).toBe('1');
 	});
 
 	it('EXT-OWN-01: empty database is "empty"; foreign tables are not classified as ours', async () => {

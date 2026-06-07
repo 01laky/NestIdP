@@ -256,4 +256,81 @@ describe('ExternalIdentityDatabaseService (PGlite)', () => {
 		await expect(service.resync()).rejects.toThrow(/in progress/i);
 		await p;
 	});
+
+	it('EXT-SVC-STATUS-01: not configured + no secret leakage in the status payload', async () => {
+		const status = await service.getStatus();
+		expect(status.configured).toBe(false);
+		expect(status.mode).toBe('relocate');
+		expect('password' in status).toBe(false);
+		expect('passwordEncrypted' in status).toBe(false);
+		// after connect, only hasPassword is exposed (never the secret)
+		const secret = 'Sup3rSecretDbPassw0rd!';
+		await service.connect({ ...connInput, password: secret, keepLocalCopy: true });
+		const connected = await service.getStatus();
+		expect(connected.hasPassword).toBe(true);
+		expect(JSON.stringify(connected)).not.toContain(secret);
+	});
+
+	it('EXT-SVC-FOREIGN-01: connect aborts (and local untouched) when the target has foreign tables', async () => {
+		await factory.pglite.query('CREATE TABLE nestidp_user (id text primary key)');
+		await expect(
+			service.connect({ ...connInput, keepLocalCopy: false, acknowledgeBackup: true }),
+		).rejects.toThrow(/not ours/i);
+		expect(active.mode()).toBe('local');
+		expect(await repo.countUsers()).toBe(2);
+		expect((await service.getStatus()).status).toBe('error');
+	});
+
+	it('EXT-SVC-TEST-01: testConnection returns a friendly error when the DB is unreachable', async () => {
+		jest.spyOn(factory, 'create').mockReturnValueOnce({
+			db: { selectNoFrom: () => ({ execute: () => Promise.reject(new Error('ECONNREFUSED')) }) },
+			destroy: async () => undefined,
+		} as never);
+		const res = await service.testConnection(connInput);
+		expect(res.ok).toBe(false);
+		expect(res.error).toMatch(/reach the database/i);
+	});
+
+	it('EXT-SVC-RESYNC-01: resync clears the out-of-sync flag (mirror)', async () => {
+		await service.connect({ ...connInput, keepLocalCopy: true });
+		await prisma.externalIdentityDatabase.update({
+			where: { id: 'default' },
+			data: { outOfSync: true },
+		});
+		const status = await service.resync();
+		expect(status.outOfSync).toBe(false);
+	});
+
+	it('EXT-SVC-DISCONNECT-02: relocate detach without moving data requires acknowledgeDataLoss', async () => {
+		await service.connect({ ...connInput, keepLocalCopy: false, acknowledgeBackup: true });
+		await expect(service.disconnect({ moveDataToLocal: false })).rejects.toThrow(
+			/acknowledgeDataLoss/i,
+		);
+		const status = await service.disconnect({ moveDataToLocal: false, acknowledgeDataLoss: true });
+		expect(status.configured).toBe(false);
+		expect(active.mode()).toBe('local');
+		expect(await repo.countUsers()).toBe(0); // intentionally empty — data was not moved back
+	});
+
+	it('EXT-SVC-BOOT-01: a fresh service activates an already-attached external DB on module init', async () => {
+		await service.connect({ ...connInput, keepLocalCopy: false, acknowledgeBackup: true });
+		await service.onModuleDestroy();
+
+		// simulate a restart: new holder + service over the SAME prisma + shared external DB
+		const repo2 = new IdentityRepository(prisma);
+		const active2 = new ActiveIdentityStore(repo2);
+		const encryption2 = new EncryptionService({
+			get: () => 'encryption-key-32-chars-min!!!',
+		} as unknown as ConfigService);
+		const service2 = new ExternalIdentityDatabaseService(prisma, active2, encryption2, factory, {
+			recordSafe: jest.fn(),
+		} as never);
+		try {
+			await service2.onModuleInit();
+			expect(active2.mode()).toBe('external');
+			expect(await active2.countUsers()).toBe(2);
+		} finally {
+			await service2.onModuleDestroy();
+		}
+	});
 });

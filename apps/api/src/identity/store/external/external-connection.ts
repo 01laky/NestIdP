@@ -31,7 +31,7 @@ export interface ExternalKyselyFactory {
 	create(config: ExternalDbConfig): ExternalKysely;
 }
 
-function pgSslOption(
+export function pgSslOption(
 	config: ExternalDbConfig,
 ): false | { rejectUnauthorized: boolean; ca?: string } {
 	switch (config.sslMode) {
@@ -48,7 +48,7 @@ function pgSslOption(
 	}
 }
 
-function mysqlSslOption(
+export function mysqlSslOption(
 	config: ExternalDbConfig,
 ): undefined | { rejectUnauthorized: boolean; ca?: string } {
 	switch (config.sslMode) {
