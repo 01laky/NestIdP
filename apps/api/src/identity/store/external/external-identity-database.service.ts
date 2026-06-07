@@ -43,9 +43,12 @@ const CONFIG_ID = 'default';
 export class ExternalIdentityDatabaseService implements OnModuleInit, OnModuleDestroy {
 	private readonly logger = new Logger('ExternalIdentityDatabase');
 	private active: ExternalKysely | null = null;
+	private activeDialect: 'postgres' | 'mysql' | null = null;
 	private breaker: CircuitBreaker | null = null;
 	private probe: NodeJS.Timeout | null = null;
 	private busy = false;
+	private mirrorQueued = false;
+	private mirrorRunning: Promise<void> | null = null;
 
 	constructor(
 		private readonly prisma: PrismaService,
@@ -233,7 +236,14 @@ export class ExternalIdentityDatabaseService implements OnModuleInit, OnModuleDe
 					}
 				}
 
-				const counts = await ext.importSnapshot(local, 'upsert');
+				await this.setProgress(
+					'copying',
+					0,
+					local.users.length + local.groups.length + local.roles.length,
+				);
+				const counts = await ext.importSnapshot(local, 'upsert', (done, total) => {
+					void this.setProgress('copying', done, total);
+				});
 				imported = {
 					users: counts.usersInserted + counts.usersUpdated,
 					groups: counts.groupsInserted + counts.groupsUpdated,
@@ -327,6 +337,7 @@ export class ExternalIdentityDatabaseService implements OnModuleInit, OnModuleDe
 			this.stopProbe();
 			await this.active?.destroy().catch(() => undefined);
 			this.active = null;
+			this.activeDialect = null;
 			this.breaker = null;
 			await this.prisma.externalIdentityDatabase
 				.delete({ where: { id: CONFIG_ID } })
@@ -361,11 +372,12 @@ export class ExternalIdentityDatabaseService implements OnModuleInit, OnModuleDe
 			await this.instanceId(),
 		);
 		this.breaker = new CircuitBreaker();
-		const sql = new SqlIdentityStore(this.active.db, cfg.dialect as 'postgres' | 'mysql');
+		this.activeDialect = cfg.dialect as 'postgres' | 'mysql';
+		const sql = new SqlIdentityStore(this.active.db, this.activeDialect);
 		const resilient = withResilience(sql, this.breaker, cfg.queryTimeoutMs);
 		if (cfg.mode === 'mirror') {
 			this.store.setActive(
-				createMirroringStore(this.store.getLocal(), () => this.flagDrift()),
+				createMirroringStore(this.store.getLocal(), () => this.requestMirrorReconcile()),
 				'mirror',
 			);
 		} else {
@@ -408,6 +420,57 @@ export class ExternalIdentityDatabaseService implements OnModuleInit, OnModuleDe
 		void this.prisma.externalIdentityDatabase
 			.update({ where: { id: CONFIG_ID }, data: { outOfSync: true } })
 			.catch(() => undefined);
+	}
+
+	/**
+	 * Mirror write-through: after a local mutation, push the change to the external copy. Calls are
+	 * coalesced (a burst of writes triggers one reconcile) and never block or fail the local write; a
+	 * failed push leaves `outOfSync = true` for the Re-sync action.
+	 */
+	private requestMirrorReconcile(): void {
+		this.flagDrift();
+		this.mirrorQueued = true;
+		if (!this.mirrorRunning) {
+			this.mirrorRunning = this.drainMirrorReconcile();
+		}
+	}
+
+	private async drainMirrorReconcile(): Promise<void> {
+		try {
+			while (this.mirrorQueued) {
+				this.mirrorQueued = false;
+				await this.runMirrorReconcileOnce();
+			}
+		} finally {
+			this.mirrorRunning = null;
+		}
+	}
+
+	private async runMirrorReconcileOnce(): Promise<void> {
+		if (!this.active || !this.activeDialect) {
+			return;
+		}
+		try {
+			const ext = new SqlIdentityStore(this.active.db, this.activeDialect);
+			const snapshot = await this.store.getLocal().exportAll();
+			// Wipe + re-import keeps the external copy an exact mirror (handles deletes/updates/inserts).
+			await ext.wipeAll();
+			await ext.importSnapshot(snapshot, 'upsert');
+			await this.prisma.externalIdentityDatabase
+				.update({ where: { id: CONFIG_ID }, data: { outOfSync: false, lastSyncAt: new Date() } })
+				.catch(() => undefined);
+		} catch (error) {
+			await this.prisma.externalIdentityDatabase
+				.update({ where: { id: CONFIG_ID }, data: { outOfSync: true, lastError: this.msg(error) } })
+				.catch(() => undefined);
+		}
+	}
+
+	/** Test/ops helper: resolves once any pending mirror reconcile has finished. */
+	async whenMirrorIdle(): Promise<void> {
+		if (this.mirrorRunning) {
+			await this.mirrorRunning;
+		}
 	}
 
 	private diff(local: IdentitySnapshot, existing: IdentitySnapshot) {

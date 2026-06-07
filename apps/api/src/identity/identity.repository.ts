@@ -9,6 +9,7 @@ import type {
 	IdentityStore,
 	ImportCounts,
 	ImportMode,
+	ImportProgress,
 	ListQuery,
 	ListResult,
 	StoreGroup,
@@ -646,7 +647,11 @@ export class IdentityRepository implements IdentityStore {
 		};
 	}
 
-	async importSnapshot(snapshot: IdentitySnapshot, mode: ImportMode): Promise<ImportCounts> {
+	async importSnapshot(
+		snapshot: IdentitySnapshot,
+		mode: ImportMode,
+		onProgress?: ImportProgress,
+	): Promise<ImportCounts> {
 		const counts: ImportCounts = {
 			usersInserted: 0,
 			usersUpdated: 0,
@@ -654,6 +659,14 @@ export class IdentityRepository implements IdentityStore {
 			groupsUpdated: 0,
 			rolesInserted: 0,
 			rolesUpdated: 0,
+		};
+		const total = snapshot.groups.length + snapshot.roles.length + snapshot.users.length;
+		let done = 0;
+		const tick = () => {
+			done += 1;
+			if (onProgress && (done % 100 === 0 || done === total)) {
+				onProgress(done, total);
+			}
 		};
 
 		const existingGroupIds = new Set(
@@ -676,6 +689,7 @@ export class IdentityRepository implements IdentityStore {
 				await this.prisma.group.update({ where: { id: g.id }, data: { name: g.name } });
 				counts.groupsUpdated += 1;
 			}
+			tick();
 		}
 
 		const existingRoleIds = new Set(
@@ -698,6 +712,7 @@ export class IdentityRepository implements IdentityStore {
 				await this.prisma.role.update({ where: { id: r.id }, data: { name: r.name } });
 				counts.rolesUpdated += 1;
 			}
+			tick();
 		}
 
 		const existingUserIds = new Set(
@@ -735,6 +750,7 @@ export class IdentityRepository implements IdentityStore {
 				});
 				counts.usersUpdated += 1;
 			}
+			tick();
 		}
 
 		const existingUg = new Set(

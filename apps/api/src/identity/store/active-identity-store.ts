@@ -6,6 +6,7 @@ import type {
 	IdentityStore,
 	ImportCounts,
 	ImportMode,
+	ImportProgress,
 	ListQuery,
 	ListResult,
 	StoreGroup,
@@ -196,8 +197,12 @@ export class ActiveIdentityStore implements IdentityStore {
 	exportAll(): Promise<IdentitySnapshot> {
 		return this.current.exportAll();
 	}
-	importSnapshot(snapshot: IdentitySnapshot, mode: ImportMode): Promise<ImportCounts> {
-		return this.current.importSnapshot(snapshot, mode);
+	importSnapshot(
+		snapshot: IdentitySnapshot,
+		mode: ImportMode,
+		onProgress?: ImportProgress,
+	): Promise<ImportCounts> {
+		return this.current.importSnapshot(snapshot, mode, onProgress);
 	}
 	wipeAll(): Promise<void> {
 		return this.current.wipeAll();

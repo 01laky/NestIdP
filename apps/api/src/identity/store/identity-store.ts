@@ -136,6 +136,9 @@ export interface ImportCounts {
 
 export type ImportMode = 'insert-missing' | 'upsert';
 
+/** Coarse progress callback for long copies (done/total rows across users+groups+roles). */
+export type ImportProgress = (done: number, total: number) => void;
+
 export interface IdentityStore {
 	// --- counts (dashboard) ---
 	countUsers(): Promise<number>;
@@ -195,7 +198,11 @@ export interface IdentityStore {
 
 	// --- replication / migration (attach, resync, reverse) ---
 	exportAll(): Promise<IdentitySnapshot>;
-	importSnapshot(snapshot: IdentitySnapshot, mode: ImportMode): Promise<ImportCounts>;
+	importSnapshot(
+		snapshot: IdentitySnapshot,
+		mode: ImportMode,
+		onProgress?: ImportProgress,
+	): Promise<ImportCounts>;
 	/** Wipe all identity rows (used after a verified relocate copy). */
 	wipeAll(): Promise<void>;
 

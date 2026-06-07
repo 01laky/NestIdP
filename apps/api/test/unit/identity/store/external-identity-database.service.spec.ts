@@ -200,6 +200,47 @@ describe('ExternalIdentityDatabaseService (PGlite)', () => {
 		await ext.destroy();
 	});
 
+	it('EXT-SVC-MIRROR-WT-01: a local write in mirror mode is pushed to the external copy', async () => {
+		await service.connect({ ...connInput, keepLocalCopy: true });
+		// a write through the active (mirroring) store
+		await active.createManualUser({
+			apiConnectionId: connId,
+			username: 'mirrored',
+			email: null,
+			displayName: null,
+			passwordHash: 'h',
+			passwordHashAlgorithm: 'bcrypt',
+			active: true,
+			groupIds: [],
+			roleIds: [],
+		});
+		await service.whenMirrorIdle();
+		// local stays authoritative (3 users) and the external copy received the new user
+		expect(await repo.countUsers()).toBe(3);
+		const ext = new Kysely<ExternalIdentityDB>({
+			dialect: new PostgresDialect({
+				pool: {
+					connect: async () => ({
+						query: async (sql: string, params: unknown[]) => {
+							const r = await factory.pglite.query(sql, params ?? []);
+							return { rows: r.rows, rowCount: 0, command: '' };
+						},
+						release() {},
+					}),
+					end: async () => {},
+				} as never,
+			}),
+		});
+		const row = await ext
+			.selectFrom('nestidp_user')
+			.select('username')
+			.where('username', '=', 'mirrored')
+			.executeTakeFirst();
+		await ext.destroy();
+		expect(row?.username).toBe('mirrored');
+		expect((await service.getStatus()).outOfSync).toBe(false);
+	});
+
 	it('EXT-SVC-DISCONNECT-01: disconnect (relocate) moves data back to local and reverts active', async () => {
 		await service.connect({ ...connInput, keepLocalCopy: false, acknowledgeBackup: true });
 		expect(await repo.countUsers()).toBe(0);

@@ -215,6 +215,33 @@ describe('SqlIdentityStore (external, PGlite)', () => {
 		expect(await store.isRoleNameTaken(CONN, 'Viewer')).toBe(true);
 	});
 
+	it('STORE-IMPORT-01: importSnapshot reports progress and ends at total', async () => {
+		const u1 = await store.upsertUser(CONN, upsertInput({ externalId: 'e1', username: 'src-a' }));
+		await store.upsertUser(CONN, upsertInput({ externalId: 'e2', username: 'src-b' }));
+		const g = await store.upsertGroup(CONN, { id: 'g1', name: 'SrcGroup' });
+		await store.replaceUserGroups(u1.id, [g.id]);
+		const snapshot = await store.exportAll();
+
+		const target = await createPgliteStore();
+		try {
+			const progress: Array<[number, number]> = [];
+			const counts = await target.store.importSnapshot(snapshot, 'upsert', (done, total) =>
+				progress.push([done, total]),
+			);
+			expect(counts.usersInserted).toBe(2);
+			expect(counts.groupsInserted).toBe(1);
+			// progress fires at least once and the last tick reaches total = users+groups+roles
+			expect(progress.length).toBeGreaterThan(0);
+			const total = snapshot.users.length + snapshot.groups.length + snapshot.roles.length;
+			expect(progress[progress.length - 1]).toEqual([total, total]);
+			// the copy is faithful (ids + membership preserved)
+			expect(await target.store.countUsers()).toBe(2);
+			expect((await target.store.findUserProfileById(u1.id))?.groups).toEqual(['SrcGroup']);
+		} finally {
+			await target.destroy();
+		}
+	});
+
 	it('EXT-OWN-01: empty database is "empty"; foreign tables are not classified as ours', async () => {
 		const fresh = await createPgliteKysely();
 		try {
