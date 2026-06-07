@@ -18,10 +18,10 @@ services:
       - nestidp_data:/app/apps/api/data
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/health']
-      interval: 30s
+      interval: 10s
       timeout: 5s
-      retries: 3
-      start_period: 60s
+      retries: 5
+      start_period: 120s
 
 volumes:
   nestidp_data:
