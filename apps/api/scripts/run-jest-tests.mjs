@@ -27,10 +27,14 @@ const unitWorkers = ci ? ['--runInBand'] : ['--maxWorkers=4'];
 const e2eWorkers = ci ? ['--runInBand'] : ['--maxWorkers=2'];
 
 function runJest(extraArgs) {
+	// --experimental-vm-modules: PGlite (the in-process Postgres used by external-store tests) loads
+	// its WASM via dynamic import(), which Node's VM needs this flag to allow under Jest.
+	const nodeOptions = [process.env.NODE_OPTIONS, '--experimental-vm-modules'].filter(Boolean).join(' ');
 	const result = spawnSync('pnpm', ['exec', 'jest', '--forceExit', ...extraArgs], {
 		stdio: 'inherit',
 		shell: true,
 		cwd: apiRoot,
+		env: { ...process.env, NODE_OPTIONS: nodeOptions },
 	});
 	return result.status ?? 1;
 }
