@@ -116,6 +116,12 @@ export class IdpSettingsController {
 		return this.idpSettingsService.cancelEncryptionRotation();
 	}
 
+	@Post('cert-rotation/run-check')
+	@UseGuards(AdminCsrfGuard)
+	runCertRotationCheck(): Promise<IdpSettingsPublicDto> {
+		return this.idpSettingsService.runAutoRotationCheckOnDemand();
+	}
+
 	@Get('encryption-cert/public-pem')
 	getEncryptionCertPublicPem(): Promise<{ certPem: string }> {
 		return this.idpSettingsService.getEncryptionCertPublicPem();

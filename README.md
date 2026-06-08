@@ -2,7 +2,7 @@
 
 **A deployable SAML Identity Provider you run yourself** — one Docker image, one admin console, identity from your REST API, SAML assertions to your apps.
 
-[![Version](https://img.shields.io/badge/version-1.14.0-blue)](package.json)
+[![Version](https://img.shields.io/badge/version-1.15.0-blue)](package.json)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-green)](package.json)
 [![pnpm](https://img.shields.io/badge/pnpm-%3E%3D9-orange)](package.json)
 
@@ -49,11 +49,11 @@ NestIdP separates **three** kinds of X.509 material. They must not be mixed up w
 
 ![Signing certificate, encryption certificate, and metadata on IdP settings](docs/img/idp-settings-signing-and-encryption.png)
 
-| Certificate        | Where configured                        | Role                                                                                                                                                                                                                                                                                  |
-| ------------------ | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **IdP signing**    | IdP settings → Signing certificate      | Signs SAML assertions and IdP metadata. Required for real SSO. Generate in admin (RSA or EC, eight XML-DSig algorithms, expiry up to 10 years) or upload PEM. Supports **dual-cert rotation** (old + new keys in metadata until cutover).                                             |
-| **IdP encryption** | IdP settings → Encryption certificate   | Optional second key pair published as `KeyDescriptor use="encryption"` in metadata. Independent lifecycle from signing: RSA or EC, RSA-OAEP key-transport catalog, generate/upload/rotation, copy or download public PEM. **Does not** encrypt assertions to a specific SP by itself. |
-| **SP certificate** | Each SP connection → SP certificate PEM | That application’s public key. Required when **Encrypt SAML assertions** is enabled — the IdP encrypts the signed assertion to this SP (AES-256-CBC + RSA-OAEP key transport). Distinct from the IdP encryption cert in metadata.                                                     |
+| Certificate        | Where configured                        | Role                                                                                                                                                                                                                                                                                                             |
+| ------------------ | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **IdP signing**    | IdP settings → Signing certificate      | Signs SAML assertions and IdP metadata. Required for real SSO. Generate in admin (RSA or EC, eight XML-DSig algorithms, expiry up to 10 years) or upload PEM. Supports **dual-cert rotation** (old + new keys in metadata until cutover), **manual or automatic** (opt-in scheduler that rotates before expiry). |
+| **IdP encryption** | IdP settings → Encryption certificate   | Optional second key pair published as `KeyDescriptor use="encryption"` in metadata. Independent lifecycle from signing: RSA or EC, RSA-OAEP key-transport catalog, generate/upload/rotation, copy or download public PEM. **Does not** encrypt assertions to a specific SP by itself.                            |
+| **SP certificate** | Each SP connection → SP certificate PEM | That application’s public key. Required when **Encrypt SAML assertions** is enabled — the IdP encrypts the signed assertion to this SP (AES-256-CBC + RSA-OAEP key transport). Distinct from the IdP encryption cert in metadata.                                                                                |
 
 **Assertion content encryption (when enabled):** fixed **AES-256-CBC** for SAML XML Encryption in v1. **Key transport** toward the SP uses the SP’s certificate, not the IdP encryption cert.
 

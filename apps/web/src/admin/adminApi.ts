@@ -561,6 +561,12 @@ export function updateIdpSettings(
 	});
 }
 
+export function runCertRotationCheck(): Promise<IdpSettingsPublicDto> {
+	return adminFetch<IdpSettingsPublicDto>(`${IDP_SETTINGS_API_PATH}/cert-rotation/run-check`, {
+		method: 'POST',
+	});
+}
+
 export function generateIdpSigningCert(
 	body: GenerateIdpSigningCertRequestDto = {},
 ): Promise<IdpSettingsPublicDto> {

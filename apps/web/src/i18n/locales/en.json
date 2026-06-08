@@ -528,6 +528,22 @@
 					"rsa-1_5": "RSA-1_5"
 				}
 			}
+		},
+		"autoRotation": {
+			"title": "Automatic rotation",
+			"callout": "Let the IdP automatically rotate a certificate as it nears expiry: start a dual-cert overlap, then promote the new key after the overlap window. Opt-in per certificate, off by default.",
+			"enableSigning": "Auto-rotate the signing certificate",
+			"enableEncryption": "Auto-rotate the encryption certificate",
+			"enableHint": "The scheduler starts a rotation before expiry and completes it after the overlap window.",
+			"backoffDisabled": "Auto-rotation was disabled after repeated failures. Re-enable the toggle to resume.",
+			"lastError": "Last error: {{error}}",
+			"willStartBy": "Will auto-start by {{date}}",
+			"willCompleteAt": "Will auto-complete on {{date}}",
+			"lastCheck": "Last check: {{date}}",
+			"lastAction": "Last action: {{date}}",
+			"runCheck": "Run rotation check now",
+			"toastUpdated": "Automatic rotation updated",
+			"toastChecked": "Rotation check complete"
 		}
 	},
 	"identity": {

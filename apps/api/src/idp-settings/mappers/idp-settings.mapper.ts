@@ -7,7 +7,10 @@ import type {
 	IdpMetadataUrlResponseDto,
 	IdpSettingsPublicDto,
 } from '@nestidp/shared';
+import type { IdpAutoRotationStatusDto } from '@nestidp/shared';
 import {
+	CERT_ROTATION_DEFAULT_LEAD_DAYS,
+	CERT_ROTATION_DEFAULT_OVERLAP_DAYS,
 	IDP_CERT_EXPIRY_WARNING_DAYS,
 	IDP_SETTINGS_ROUTE_PREFIX,
 	SAML_METADATA_PATH,
@@ -18,6 +21,22 @@ import {
 	isCertExpiringSoon,
 	parseCertNotAfterIso,
 } from '../utils/idp-cert.util';
+
+/**
+ * Fingerprint a cert for the public DTO, tolerating a null or unparseable PEM (returns null) — mirrors
+ * the defensive `parseCertNotAfterIso`. A corrupted stored cert must never make `GET /idp/settings` or
+ * the auto-rotation check throw a 500.
+ */
+function safeFingerprintSha256Hex(certPem: string | null): string | null {
+	if (!certPem) {
+		return null;
+	}
+	try {
+		return fingerprintSha256Hex(certPem);
+	} catch {
+		return null;
+	}
+}
 
 export function resolveIdpBaseUrl(idpBaseUrl: string): string {
 	return idpBaseUrl.replace(/\/+$/, '');
@@ -132,6 +151,43 @@ export function toDashboardIdpStatus(settings: IdpSettings): AdminDashboardIdpSt
 	};
 }
 
+/**
+ * Compute the non-secret auto-rotation status for one cert. `willAutoStartBy` / `willAutoCompleteAt`
+ * use the shared default lead/overlap days (exact for the default config; approximate when an operator
+ * overrides them via env).
+ */
+function buildAutoRotationStatus(opts: {
+	enabled: boolean;
+	disabledAt: Date | null;
+	consecutiveFailures: number;
+	lastError: string | null;
+	activeNotAfter: string | null;
+	rotationActive: boolean;
+	rotationStartedAt: Date | null;
+}): IdpAutoRotationStatusDto {
+	const live = opts.enabled && !opts.disabledAt;
+	let willAutoStartBy: string | null = null;
+	if (live && !opts.rotationActive && opts.activeNotAfter) {
+		willAutoStartBy = new Date(
+			new Date(opts.activeNotAfter).getTime() - CERT_ROTATION_DEFAULT_LEAD_DAYS * 86_400_000,
+		).toISOString();
+	}
+	let willAutoCompleteAt: string | null = null;
+	if (live && opts.rotationActive && opts.rotationStartedAt) {
+		willAutoCompleteAt = new Date(
+			opts.rotationStartedAt.getTime() + CERT_ROTATION_DEFAULT_OVERLAP_DAYS * 86_400_000,
+		).toISOString();
+	}
+	return {
+		enabled: opts.enabled,
+		disabledAt: opts.disabledAt?.toISOString() ?? null,
+		consecutiveFailures: opts.consecutiveFailures,
+		lastError: opts.lastError,
+		willAutoStartBy,
+		willAutoCompleteAt,
+	};
+}
+
 export function toIdpSettingsPublicDto(
 	settings: IdpSettings,
 	idpBaseUrl: string,
@@ -150,17 +206,13 @@ export function toIdpSettingsPublicDto(
 		nameIdFormat: settings.nameIdFormat,
 		wantAuthnRequestsSigned: settings.wantAuthnRequestsSigned,
 		hasSigningCertificate: Boolean(settings.signingCertPem && settings.signingKeyEncrypted),
-		signingCertFingerprintSha256: settings.signingCertPem
-			? fingerprintSha256Hex(settings.signingCertPem)
-			: null,
+		signingCertFingerprintSha256: safeFingerprintSha256Hex(settings.signingCertPem),
 		signingCertNotAfter: parseCertNotAfterIso(settings.signingCertPem),
 		...crypto,
 		hasEncryptionCertificate: Boolean(
 			settings.encryptionCertPem && settings.encryptionKeyEncrypted,
 		),
-		encryptionCertFingerprintSha256: settings.encryptionCertPem
-			? fingerprintSha256Hex(settings.encryptionCertPem)
-			: null,
+		encryptionCertFingerprintSha256: safeFingerprintSha256Hex(settings.encryptionCertPem),
 		encryptionCertNotAfter: parseCertNotAfterIso(settings.encryptionCertPem),
 		...encryptionCrypto,
 		metadataUrl: urls.metadataUrl,
@@ -170,23 +222,28 @@ export function toIdpSettingsPublicDto(
 			active: rotationActive,
 			startedAt: settings.rotationStartedAt?.toISOString() ?? null,
 			hasPendingCertificate: Boolean(settings.pendingSigningCertPem),
-			pendingCertFingerprintSha256: settings.pendingSigningCertPem
-				? fingerprintSha256Hex(settings.pendingSigningCertPem)
-				: null,
+			pendingCertFingerprintSha256: safeFingerprintSha256Hex(settings.pendingSigningCertPem),
 			pendingSigningKeyFamily: (settings.pendingSigningKeyFamily as 'rsa' | 'ec' | null) ?? null,
 			pendingSigningSignatureAlgorithmId: settings.pendingSigningSignatureAlgorithmId ?? null,
 			pendingSigningRsaModulusBits: settings.pendingSigningRsaModulusBits ?? null,
 			pendingSigningEcCurve:
 				(settings.pendingSigningEcCurve as 'P-256' | 'P-384' | 'P-521' | null) ?? null,
 			pendingSigningCertNotAfter: parseCertNotAfterIso(settings.pendingSigningCertPem),
+			auto: buildAutoRotationStatus({
+				enabled: settings.autoRotateSigningEnabled,
+				disabledAt: settings.signingAutoRotationDisabledAt,
+				consecutiveFailures: settings.signingAutoRotationConsecutiveFailures,
+				lastError: settings.signingAutoRotationLastError,
+				activeNotAfter: parseCertNotAfterIso(settings.signingCertPem),
+				rotationActive,
+				rotationStartedAt: settings.rotationStartedAt,
+			}),
 		},
 		encryptionRotation: {
 			active: encryptionRotationActive,
 			startedAt: settings.encryptionRotationStartedAt?.toISOString() ?? null,
 			hasPendingCertificate: Boolean(settings.pendingEncryptionCertPem),
-			pendingCertFingerprintSha256: settings.pendingEncryptionCertPem
-				? fingerprintSha256Hex(settings.pendingEncryptionCertPem)
-				: null,
+			pendingCertFingerprintSha256: safeFingerprintSha256Hex(settings.pendingEncryptionCertPem),
 			pendingEncryptionKeyFamily:
 				(settings.pendingEncryptionKeyFamily as 'rsa' | 'ec' | null) ?? null,
 			pendingEncryptionKeyTransportAlgorithmId:
@@ -195,7 +252,18 @@ export function toIdpSettingsPublicDto(
 			pendingEncryptionEcCurve:
 				(settings.pendingEncryptionEcCurve as 'P-256' | 'P-384' | 'P-521' | null) ?? null,
 			pendingEncryptionCertNotAfter: parseCertNotAfterIso(settings.pendingEncryptionCertPem),
+			auto: buildAutoRotationStatus({
+				enabled: settings.autoRotateEncryptionEnabled,
+				disabledAt: settings.encryptionAutoRotationDisabledAt,
+				consecutiveFailures: settings.encryptionAutoRotationConsecutiveFailures,
+				lastError: settings.encryptionAutoRotationLastError,
+				activeNotAfter: parseCertNotAfterIso(settings.encryptionCertPem),
+				rotationActive: encryptionRotationActive,
+				rotationStartedAt: settings.encryptionRotationStartedAt,
+			}),
 		},
+		lastAutoRotationCheckAt: settings.lastAutoRotationCheckAt?.toISOString() ?? null,
+		lastAutoRotationActionAt: settings.lastAutoRotationActionAt?.toISOString() ?? null,
 		updatedAt: settings.updatedAt.toISOString(),
 	};
 }

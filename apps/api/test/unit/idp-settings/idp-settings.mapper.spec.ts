@@ -46,6 +46,16 @@ describe('idp-settings.mapper', () => {
 			pendingEncryptionKeyFamily: null,
 			pendingEncryptionRsaModulusBits: null,
 			encryptionRotationStartedAt: null,
+			autoRotateSigningEnabled: false,
+			autoRotateEncryptionEnabled: false,
+			lastAutoRotationCheckAt: null,
+			lastAutoRotationActionAt: null,
+			signingAutoRotationLastError: null,
+			encryptionAutoRotationLastError: null,
+			signingAutoRotationConsecutiveFailures: 0,
+			encryptionAutoRotationConsecutiveFailures: 0,
+			signingAutoRotationDisabledAt: null,
+			encryptionAutoRotationDisabledAt: null,
 			createdAt: new Date('2026-01-01T00:00:00.000Z'),
 			updatedAt: new Date('2026-01-02T00:00:00.000Z'),
 			...overrides,
@@ -251,5 +261,118 @@ describe('idp-settings.mapper', () => {
 				}),
 			),
 		).toBe('rotation_active');
+	});
+
+	// --- auto-rotation status block (Prompt 34) ----------------------------------------------------
+
+	it('CERT-ROT-API-02a: auto status is off by default (enabled false, no computed hints)', () => {
+		const dto = toIdpSettingsPublicDto(settingsRow(), 'http://localhost:3000');
+		expect(dto.rotation.auto.enabled).toBe(false);
+		expect(dto.rotation.auto.willAutoStartBy).toBeNull();
+		expect(dto.rotation.auto.willAutoCompleteAt).toBeNull();
+		expect(dto.rotation.auto.disabledAt).toBeNull();
+	});
+
+	it('CERT-ROT-API-02b: willAutoStartBy = active notAfter − default lead days when enabled and not rotating', () => {
+		const { certPem } = getTestSigningMaterialWithDays('http://localhost:3000', 200);
+		const dto = toIdpSettingsPublicDto(
+			settingsRow({ signingCertPem: certPem, autoRotateSigningEnabled: true }),
+			'http://localhost:3000',
+		);
+		expect(dto.rotation.auto.enabled).toBe(true);
+		const notAfter = new Date(dto.signingCertNotAfter!).getTime();
+		const expected = new Date(notAfter - 30 * 86_400_000).toISOString();
+		expect(dto.rotation.auto.willAutoStartBy).toBe(expected);
+		expect(dto.rotation.auto.willAutoCompleteAt).toBeNull();
+	});
+
+	it('CERT-ROT-API-02c: willAutoCompleteAt = rotationStartedAt + default overlap days when rotating', () => {
+		const started = new Date('2026-03-01T00:00:00.000Z');
+		const dto = toIdpSettingsPublicDto(
+			settingsRow({
+				autoRotateSigningEnabled: true,
+				pendingSigningCertPem: certPem,
+				pendingSigningKeyEncrypted: 'pending',
+				rotationStartedAt: started,
+			}),
+			'http://localhost:3000',
+		);
+		const expected = new Date(started.getTime() + 7 * 86_400_000).toISOString();
+		expect(dto.rotation.auto.willAutoCompleteAt).toBe(expected);
+		expect(dto.rotation.auto.willAutoStartBy).toBeNull(); // not computed while rotating
+	});
+
+	it('CERT-ROT-API-02d: a backoff-disabled cert reports disabledAt and stops computing willAutoStartBy', () => {
+		const disabledAt = new Date('2026-02-15T08:00:00.000Z');
+		const dto = toIdpSettingsPublicDto(
+			settingsRow({
+				autoRotateSigningEnabled: true,
+				signingAutoRotationDisabledAt: disabledAt,
+				signingAutoRotationConsecutiveFailures: 5,
+				signingAutoRotationLastError: 'openssl exited non-zero',
+			}),
+			'http://localhost:3000',
+		);
+		expect(dto.rotation.auto.enabled).toBe(true);
+		expect(dto.rotation.auto.disabledAt).toBe(disabledAt.toISOString());
+		expect(dto.rotation.auto.consecutiveFailures).toBe(5);
+		expect(dto.rotation.auto.lastError).toBe('openssl exited non-zero');
+		expect(dto.rotation.auto.willAutoStartBy).toBeNull();
+	});
+
+	it('CERT-ROT-API-02e: encryption auto status is independent of signing', () => {
+		const enc = generateTestRsaEncryptionCert('https://enc-auto.example.com', 200);
+		const dto = toIdpSettingsPublicDto(
+			settingsRow({
+				autoRotateSigningEnabled: false,
+				autoRotateEncryptionEnabled: true,
+				encryptionCertPem: enc.certPem,
+				encryptionKeyEncrypted: 'enc',
+				encryptionKeyFamily: 'rsa',
+			}),
+			'http://localhost:3000',
+		);
+		expect(dto.rotation.auto.enabled).toBe(false);
+		expect(dto.encryptionRotation.auto.enabled).toBe(true);
+		expect(dto.encryptionRotation.auto.willAutoStartBy).not.toBeNull();
+	});
+
+	it('CERT-ROT-API-02f: top-level observability timestamps are surfaced (last check / last action)', () => {
+		const checkAt = new Date('2026-06-01T10:00:00.000Z');
+		const actionAt = new Date('2026-06-01T11:00:00.000Z');
+		const dto = toIdpSettingsPublicDto(
+			settingsRow({ lastAutoRotationCheckAt: checkAt, lastAutoRotationActionAt: actionAt }),
+			'http://localhost:3000',
+		);
+		expect(dto.lastAutoRotationCheckAt).toBe(checkAt.toISOString());
+		expect(dto.lastAutoRotationActionAt).toBe(actionAt.toISOString());
+	});
+
+	it('CERT-ROT-MAP-CORRUPT-01: an unparseable stored cert PEM maps to null fingerprint without throwing', () => {
+		expect(() =>
+			toIdpSettingsPublicDto(
+				settingsRow({ signingCertPem: 'not-a-valid-pem', signingKeyEncrypted: 'enc' }),
+				'http://localhost:3000',
+			),
+		).not.toThrow();
+		const dto = toIdpSettingsPublicDto(
+			settingsRow({ signingCertPem: 'not-a-valid-pem', signingKeyEncrypted: 'enc' }),
+			'http://localhost:3000',
+		);
+		expect(dto.signingCertFingerprintSha256).toBeNull();
+		expect(dto.signingCertNotAfter).toBeNull();
+	});
+
+	it('CERT-ROT-API-02g: the auto status block never leaks key material', () => {
+		const dto = toIdpSettingsPublicDto(
+			settingsRow({
+				autoRotateSigningEnabled: true,
+				signingAutoRotationLastError: 'boom',
+				pendingSigningKeyEncrypted: 'encrypted-blob-not-pem',
+			}),
+			'http://localhost:3000',
+		);
+		expect(JSON.stringify(dto.rotation.auto)).not.toContain('encrypted-blob');
+		expect(JSON.stringify(dto.rotation.auto)).not.toContain('BEGIN PRIVATE KEY');
 	});
 });

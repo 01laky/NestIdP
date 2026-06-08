@@ -528,6 +528,22 @@
 					"rsa-1_5": "RSA-1_5"
 				}
 			}
+		},
+		"autoRotation": {
+			"title": "Rotazione automatica",
+			"callout": "Lascia che l'IdP ruoti automaticamente un certificato in scadenza: avvia una sovrapposizione a due certificati, poi promuove la nuova chiave dopo la finestra di sovrapposizione. Opzionale per certificato, disattivato per impostazione predefinita.",
+			"enableSigning": "Ruota automaticamente il certificato di firma",
+			"enableEncryption": "Ruota automaticamente il certificato di cifratura",
+			"enableHint": "Lo scheduler avvia la rotazione prima della scadenza e la completa dopo la finestra di sovrapposizione.",
+			"backoffDisabled": "Rotazione automatica disattivata dopo ripetuti errori. Riattiva il selettore per riprendere.",
+			"lastError": "Ultimo errore: {{error}}",
+			"willStartBy": "Avvio automatico entro il {{date}}",
+			"willCompleteAt": "Completamento automatico il {{date}}",
+			"lastCheck": "Ultimo controllo: {{date}}",
+			"lastAction": "Ultima azione: {{date}}",
+			"runCheck": "Esegui controllo rotazione ora",
+			"toastUpdated": "Rotazione automatica aggiornata",
+			"toastChecked": "Controllo rotazione completato"
 		}
 	},
 	"identity": {

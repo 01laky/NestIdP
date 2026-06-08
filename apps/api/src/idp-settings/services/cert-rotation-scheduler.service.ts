@@ -1,0 +1,91 @@
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { CertRotationConfig } from '../cert-rotation.config';
+import { IdpSettingsService } from './idp-settings.service';
+
+/**
+ * Drives automatic certificate rotation (Prompt 34): a single in-process `setInterval` that, each tick,
+ * asks {@link IdpSettingsService.runAutoRotationCheck} to evaluate signing + encryption and start /
+ * complete rotations as the lead/overlap windows dictate. Mirrors `SyncSchedulerService`:
+ * `CERT_ROTATION_SCHEDULER_TICK_MS` (`0` disables), fresh-DB read per tick, single instance only.
+ * Re-entrancy-guarded (key generation shells out to openssl) and jitter-spread.
+ */
+@Injectable()
+export class CertRotationSchedulerService implements OnModuleInit, OnModuleDestroy {
+	private readonly logger = new Logger(CertRotationSchedulerService.name);
+	private intervalHandle: ReturnType<typeof setInterval> | null = null;
+	private ticking = false;
+	private bootTickPending = true;
+
+	constructor(
+		private readonly idpSettingsService: IdpSettingsService,
+		private readonly config: CertRotationConfig,
+		private readonly configService: ConfigService,
+	) {}
+
+	onModuleInit(): void {
+		if (this.isMigrateOnly()) {
+			return;
+		}
+		const tickMs = this.config.tickMs();
+		if (tickMs <= 0) {
+			this.logger.log(
+				JSON.stringify({
+					event: 'cert_rotation_scheduler_disabled',
+					reason: 'CERT_ROTATION_SCHEDULER_TICK_MS=0',
+				}),
+			);
+			return;
+		}
+		this.intervalHandle = setInterval(() => {
+			void this.runTick();
+		}, tickMs);
+		this.logger.log(JSON.stringify({ event: 'cert_rotation_scheduler_started', tickMs }));
+	}
+
+	onModuleDestroy(): void {
+		if (this.intervalHandle) {
+			clearInterval(this.intervalHandle);
+			this.intervalHandle = null;
+		}
+	}
+
+	/** One scheduler tick: jitter, then a re-entrancy-guarded auto-rotation evaluation. */
+	async runTick(): Promise<void> {
+		if (this.ticking) {
+			return; // a previous (slow, openssl-bound) tick is still running — never overlap
+		}
+		this.ticking = true;
+		const trigger = this.bootTickPending ? 'boot' : 'scheduled';
+		this.bootTickPending = false;
+		try {
+			await this.applyJitter();
+			await this.idpSettingsService.runAutoRotationCheck({ trigger });
+		} catch (error) {
+			this.logger.warn(
+				JSON.stringify({ event: 'cert_rotation_tick_failed', message: messageOf(error) }),
+			);
+		} finally {
+			this.ticking = false;
+		}
+	}
+
+	private async applyJitter(): Promise<void> {
+		const maxSeconds = this.config.jitterMaxSeconds();
+		if (maxSeconds <= 0) {
+			return;
+		}
+		// Vary by elapsed time (no Math.random dependency for determinism in tests with fake timers).
+		const delayMs = Date.now() % (maxSeconds * 1000 + 1);
+		await new Promise((resolve) => setTimeout(resolve, delayMs));
+	}
+
+	private isMigrateOnly(): boolean {
+		const raw = (this.configService.get<string>('MIGRATE_ONLY') ?? '').toLowerCase();
+		return raw === '1' || raw === 'true';
+	}
+}
+
+function messageOf(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
+}

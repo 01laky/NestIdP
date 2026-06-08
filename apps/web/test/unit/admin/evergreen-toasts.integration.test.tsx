@@ -275,6 +275,14 @@ describe('Evergreen toast integration — mutation flows', () => {
 				pendingSigningRsaModulusBits: null,
 				pendingSigningEcCurve: null,
 				pendingSigningCertNotAfter: null,
+				auto: {
+					enabled: false,
+					disabledAt: null,
+					consecutiveFailures: 0,
+					lastError: null,
+					willAutoStartBy: null,
+					willAutoCompleteAt: null,
+				},
 			},
 			hasEncryptionCertificate: false,
 			encryptionCertFingerprintSha256: null,
@@ -293,8 +301,18 @@ describe('Evergreen toast integration — mutation flows', () => {
 				pendingEncryptionRsaModulusBits: null,
 				pendingEncryptionEcCurve: null,
 				pendingEncryptionCertNotAfter: null,
+				auto: {
+					enabled: false,
+					disabledAt: null,
+					consecutiveFailures: 0,
+					lastError: null,
+					willAutoStartBy: null,
+					willAutoCompleteAt: null,
+				},
 			},
 			updatedAt: '2026-01-01T00:00:00.000Z',
+			lastAutoRotationCheckAt: null,
+			lastAutoRotationActionAt: null,
 		});
 		vi.spyOn(adminApi, 'updateIdpSettings').mockResolvedValue({
 			entityId: 'https://idp.example.com',
@@ -320,6 +338,14 @@ describe('Evergreen toast integration — mutation flows', () => {
 				pendingSigningRsaModulusBits: null,
 				pendingSigningEcCurve: null,
 				pendingSigningCertNotAfter: null,
+				auto: {
+					enabled: false,
+					disabledAt: null,
+					consecutiveFailures: 0,
+					lastError: null,
+					willAutoStartBy: null,
+					willAutoCompleteAt: null,
+				},
 			},
 			hasEncryptionCertificate: false,
 			encryptionCertFingerprintSha256: null,
@@ -338,8 +364,18 @@ describe('Evergreen toast integration — mutation flows', () => {
 				pendingEncryptionRsaModulusBits: null,
 				pendingEncryptionEcCurve: null,
 				pendingEncryptionCertNotAfter: null,
+				auto: {
+					enabled: false,
+					disabledAt: null,
+					consecutiveFailures: 0,
+					lastError: null,
+					willAutoStartBy: null,
+					willAutoCompleteAt: null,
+				},
 			},
 			updatedAt: '2026-01-01T00:00:00.000Z',
+			lastAutoRotationCheckAt: null,
+			lastAutoRotationActionAt: null,
 		});
 
 		renderWithUi(

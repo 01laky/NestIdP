@@ -528,6 +528,22 @@
 					"rsa-1_5": "RSA-1_5"
 				}
 			}
+		},
+		"autoRotation": {
+			"title": "Automatická rotácia",
+			"callout": "Nechajte IdP automaticky rotovať certifikát pred vypršaním: spustí prekryv dvoch certifikátov a po prekryvnom okne povýši nový kľúč. Voliteľné pre každý certifikát, predvolene vypnuté.",
+			"enableSigning": "Automaticky rotovať podpisový certifikát",
+			"enableEncryption": "Automaticky rotovať šifrovací certifikát",
+			"enableHint": "Plánovač spustí rotáciu pred vypršaním a dokončí ju po prekryvnom okne.",
+			"backoffDisabled": "Automatická rotácia bola zakázaná po opakovaných zlyhaniach. Pre obnovenie prepínač znova zapnite.",
+			"lastError": "Posledná chyba: {{error}}",
+			"willStartBy": "Automatický štart do {{date}}",
+			"willCompleteAt": "Automatické dokončenie {{date}}",
+			"lastCheck": "Posledná kontrola: {{date}}",
+			"lastAction": "Posledná akcia: {{date}}",
+			"runCheck": "Spustiť kontrolu rotácie teraz",
+			"toastUpdated": "Automatická rotácia aktualizovaná",
+			"toastChecked": "Kontrola rotácie dokončená"
 		}
 	},
 	"identity": {

@@ -528,6 +528,22 @@
 					"rsa-1_5": "RSA-1_5"
 				}
 			}
+		},
+		"autoRotation": {
+			"title": "Automatische Rotation",
+			"callout": "Lassen Sie den IdP ein Zertifikat vor Ablauf automatisch rotieren: zuerst eine Dual-Zertifikat-Überlappung, dann nach dem Überlappungsfenster den neuen Schlüssel übernehmen. Pro Zertifikat optional, standardmäßig aus.",
+			"enableSigning": "Signaturzertifikat automatisch rotieren",
+			"enableEncryption": "Verschlüsselungszertifikat automatisch rotieren",
+			"enableHint": "Der Scheduler startet die Rotation vor Ablauf und schließt sie nach dem Überlappungsfenster ab.",
+			"backoffDisabled": "Automatische Rotation nach wiederholten Fehlern deaktiviert. Schalter erneut aktivieren, um fortzufahren.",
+			"lastError": "Letzter Fehler: {{error}}",
+			"willStartBy": "Automatischer Start bis {{date}}",
+			"willCompleteAt": "Automatischer Abschluss am {{date}}",
+			"lastCheck": "Letzte Prüfung: {{date}}",
+			"lastAction": "Letzte Aktion: {{date}}",
+			"runCheck": "Rotationsprüfung jetzt ausführen",
+			"toastUpdated": "Automatische Rotation aktualisiert",
+			"toastChecked": "Rotationsprüfung abgeschlossen"
 		}
 	},
 	"identity": {

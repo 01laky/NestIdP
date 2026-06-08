@@ -27,6 +27,7 @@ import {
 	createTestIdpSettingsWithSigningKey,
 	createTestSpConnection,
 	createTestUserWithPassword,
+	getTestSigningMaterialWithDays,
 } from '@test/support/prisma/test-fixtures';
 import { runMigrationsOnTestDb } from '@test/support/prisma/test-db.helper';
 import { SamlModule } from '@api/saml/saml.module';
@@ -68,6 +69,12 @@ describe('IdP settings SAML metadata & rotation (SQLite)', () => {
 							IDP_BASE_URL: 'http://localhost:3000',
 							NODE_ENV: 'test',
 							SAML_SESSION_CLEANUP_INTERVAL_MS: 0,
+							// Auto-rotation (Prompt 34): scheduler off (drive manually via run-check); lead huge
+							// so any cert is "expiring"; overlap 0 so a second check completes immediately.
+							CERT_ROTATION_SCHEDULER_TICK_MS: 0,
+							CERT_ROTATION_LEAD_DAYS: 365,
+							CERT_ROTATION_OVERLAP_DAYS: 0,
+							CERT_ROTATION_NOTIFY_LEAD_DAYS: 366,
 						}),
 					],
 				}),
@@ -514,5 +521,116 @@ describe('IdP settings SAML metadata & rotation (SQLite)', () => {
 			.post(`${IDP_SETTINGS_API_PATH}/encryption-cert/rotation/cancel`)
 			.set(csrfHeader(csrf))
 			.expect(201);
+	});
+
+	// --- Automatic rotation (Prompt 34) ----------------------------------------------------------
+
+	async function resetSigningAutoState(): Promise<void> {
+		await prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: {
+				autoRotateSigningEnabled: false,
+				signingAutoRotationDisabledAt: null,
+				signingAutoRotationConsecutiveFailures: 0,
+				signingAutoRotationLastError: null,
+				pendingSigningCertPem: null,
+				pendingSigningKeyEncrypted: null,
+				rotationStartedAt: null,
+			},
+		});
+	}
+
+	const countSigning = (xml: string): number => (xml.match(/use="signing"/g) ?? []).length;
+
+	it('CERT-ROT-INT-01: PATCH toggles auto-rotation; GET exposes rotation.auto.enabled', async () => {
+		await resetSigningAutoState();
+		const { agent, csrf } = await adminCsrfAgent();
+		const patched = await agent
+			.patch(IDP_SETTINGS_API_PATH)
+			.set(csrfHeader(csrf))
+			.send({ autoRotateSigningEnabled: true })
+			.expect(200);
+		expect(patched.body.rotation.auto.enabled).toBe(true);
+		const got = await agent.get(IDP_SETTINGS_API_PATH).expect(200);
+		expect(got.body.rotation.auto.enabled).toBe(true);
+		expect(got.body.rotation.auto.willAutoStartBy).not.toBeNull();
+	});
+
+	it('CERT-ROT-INT-02/03: run-check auto-starts (dual-cert metadata) then auto-completes', async () => {
+		await resetSigningAutoState();
+		// Put a near-expiry active signing cert in place so it is unambiguously within the lead window.
+		const near = getTestSigningMaterialWithDays('http://localhost:3000', 10);
+		await prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: {
+				signingCertPem: near.certPem,
+				signingKeyEncrypted: 'enc:near-key',
+				signingKeyFamily: 'rsa',
+				signingSignatureAlgorithmId: 'rsa-sha256',
+				signingRsaModulusBits: 2048,
+				signingEcCurve: null,
+			},
+		});
+		const { agent, csrf } = await adminCsrfAgent();
+		await agent
+			.patch(IDP_SETTINGS_API_PATH)
+			.set(csrfHeader(csrf))
+			.send({ autoRotateSigningEnabled: true })
+			.expect(200);
+
+		// Tick 1 → auto-start: pending generated, metadata shows two signing certs.
+		const started = await agent
+			.post(`${IDP_SETTINGS_API_PATH}/cert-rotation/run-check`)
+			.set(csrfHeader(csrf))
+			.expect(201);
+		expect(started.body.rotation.active).toBe(true);
+		expect(started.body.lastAutoRotationActionAt).not.toBeNull();
+		const metaDuring = await request(app.getHttpServer() as App)
+			.get('/saml/metadata')
+			.expect(200);
+		expect(countSigning(metaDuring.text)).toBe(2);
+
+		// Tick 2 → auto-complete (overlap 0): promoted, metadata back to one signing cert.
+		const completed = await agent
+			.post(`${IDP_SETTINGS_API_PATH}/cert-rotation/run-check`)
+			.set(csrfHeader(csrf))
+			.expect(201);
+		expect(completed.body.rotation.active).toBe(false);
+		const metaAfter = await request(app.getHttpServer() as App)
+			.get('/saml/metadata')
+			.expect(200);
+		expect(countSigning(metaAfter.text)).toBe(1);
+		await resetSigningAutoState();
+	});
+
+	it('CERT-ROT-INT-04: run-check requires CSRF', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		await agent
+			.post('/api/admin/auth/login')
+			.send({ username: 'admin', password: adminPassword })
+			.expect(200);
+		await agent.post(`${IDP_SETTINGS_API_PATH}/cert-rotation/run-check`).expect(403);
+	});
+
+	it('CERT-ROT-INT-05: re-enabling auto-rotation clears the failure backoff', async () => {
+		await prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: {
+				autoRotateSigningEnabled: false,
+				signingAutoRotationDisabledAt: new Date(),
+				signingAutoRotationConsecutiveFailures: 9,
+				signingAutoRotationLastError: 'boom',
+			},
+		});
+		const { agent, csrf } = await adminCsrfAgent();
+		const patched = await agent
+			.patch(IDP_SETTINGS_API_PATH)
+			.set(csrfHeader(csrf))
+			.send({ autoRotateSigningEnabled: true })
+			.expect(200);
+		expect(patched.body.rotation.auto.disabledAt).toBeNull();
+		expect(patched.body.rotation.auto.consecutiveFailures).toBe(0);
+		expect(patched.body.rotation.auto.lastError).toBeNull();
+		await resetSigningAutoState();
 	});
 });
