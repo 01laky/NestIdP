@@ -6,8 +6,13 @@ import { IdentityModule } from '../identity/identity.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { IdentitySyncClientService } from './services/identity-sync-client.service';
 import { SyncController } from './controllers/sync.controller';
+import { SyncScheduleController } from './controllers/sync-schedule.controller';
 import { SyncLogService } from './services/sync-log.service';
 import { SyncService } from './services/sync.service';
+import { SyncSchedulerService } from './services/sync-scheduler.service';
+import { SyncScheduleService } from './services/sync-schedule.service';
+import { SyncScheduleConfigService } from './services/sync-schedule-config.service';
+import { NoopScheduledSyncNotifier, SCHEDULED_SYNC_NOTIFIER } from './scheduled-sync-notifier';
 import { OAuthCoreModule } from './oauth-core.module';
 
 @Module({
@@ -19,8 +24,16 @@ import { OAuthCoreModule } from './oauth-core.module';
 		AdminAuthModule,
 		OAuthCoreModule,
 	],
-	controllers: [SyncController],
-	providers: [SyncService, SyncLogService, IdentitySyncClientService],
-	exports: [SyncService],
+	controllers: [SyncController, SyncScheduleController],
+	providers: [
+		SyncService,
+		SyncLogService,
+		IdentitySyncClientService,
+		SyncScheduleConfigService,
+		SyncScheduleService,
+		SyncSchedulerService,
+		{ provide: SCHEDULED_SYNC_NOTIFIER, useClass: NoopScheduledSyncNotifier },
+	],
+	exports: [SyncService, SyncScheduleConfigService],
 })
 export class SyncModule {}

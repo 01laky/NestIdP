@@ -112,7 +112,8 @@
 		"auditLog": "Auditlogboek",
 		"samlLogin": "SAML-login",
 		"samlSessions": "Actieve sessies",
-		"externalDb": "Externe database"
+		"externalDb": "Externe database",
+		"schedules": "Schema’s"
 	},
 	"adminAuth": {
 		"title": "Admin Login",
@@ -182,7 +183,12 @@
 			"idpAdvertisesWithoutEnforcement": "IdP metadata advertises signed AuthnRequests, but no SP connection currently enforces signature verification.",
 			"ecKeyAdvisory": "IdP encryption uses an EC key (ECDH-ES). Service Providers must support XML Encryption 1.1 (xenc11:AgreementMethod). Older SPs may not be compatible — consider using an RSA key for broader compatibility."
 		},
-		"activeSamlSessionsLabel": "Actieve SSO-sessies"
+		"activeSamlSessionsLabel": "Actieve SSO-sessies",
+		"schedulerSummary": "Geplande synchronisatie",
+		"schedulerOn": "Planner ingeschakeld",
+		"schedulerOff": "Planner uitgeschakeld",
+		"schedulerCounts": "{{enabled}} actief, {{paused}} gepauzeerd",
+		"openSchedules": "Schema’s openen"
 	},
 	"apiConnections": {
 		"listTitle": "API-verbindingen",
@@ -645,7 +651,71 @@
 		"backToApiConnections": "Back to API connections",
 		"loadFailed": "Failed to load sync data",
 		"loadLogFailed": "Failed to load sync log",
-		"syncFailed": "Synchronisatie mislukt"
+		"syncFailed": "Synchronisatie mislukt",
+		"schedule": {
+			"sectionTitle": "Schema",
+			"enableLabel": "Geplande synchronisatie inschakelen",
+			"pausedLabel": "Pauzeren (schema behouden, runs overslaan)",
+			"dryRunLabel": "Geplande synchronisaties als proefrun uitvoeren (geen DB-schrijfacties)",
+			"cronLabel": "Cron-expressie",
+			"cronHint": "Vijf velden: minuut uur dag maand weekdag. Minimaal interval {{minutes}} minuten.",
+			"presetLabel": "Voorinstelling",
+			"presetCustom": "Aangepast…",
+			"timezoneLabel": "Tijdzone",
+			"save": "Schema opslaan",
+			"saved": "Schema opgeslagen",
+			"saveFailed": "Schema kon niet worden opgeslagen",
+			"loadFailed": "Schema kon niet worden geladen",
+			"invalidCron": "Ongeldige cron-expressie",
+			"runNow": "Nu uitvoeren",
+			"nextRuns": "Volgende runs ({{tz}})",
+			"nextRunsLocal": "Volgende runs in jouw tijdzone ({{tz}})",
+			"noPreview": "Voer een geldige cron-expressie in om de volgende runs te bekijken.",
+			"statusTitle": "Status",
+			"nextRunAt": "Volgende run",
+			"lastScheduledRunAt": "Laatste geplande run",
+			"lastScheduledRunStatus": "Laatste geplande resultaat",
+			"lastError": "Laatste fout",
+			"consecutiveFailures": "Opeenvolgende fouten",
+			"autoPaused": "Automatisch gepauzeerd na herhaalde fouten",
+			"none": "Geen",
+			"dryRunBadge": "Proefrun",
+			"stateEnabled": "Ingeschakeld",
+			"statePaused": "Gepauzeerd",
+			"stateDisabled": "Uitgeschakeld",
+			"sourceLabel": "Bron",
+			"sourceAll": "Alle runs",
+			"sourceManual": "Handmatig",
+			"sourceScheduled": "Gepland",
+			"triggerManual": "Handmatig",
+			"triggerScheduled": "Gepland",
+			"preset": {
+				"every15min": "Elke 15 minuten",
+				"every30min": "Elke 30 minuten",
+				"hourly": "Elk uur",
+				"every6h": "Elke 6 uur",
+				"daily2am": "Dagelijks om 02:00",
+				"weekdays6am": "Op werkdagen om 06:00",
+				"weeklySun3am": "Wekelijks, zondag om 03:00"
+			},
+			"overview": {
+				"title": "Synchronisatieschema’s",
+				"subtitle": "Automatische identiteitssynchronisatieschema’s voor API-verbindingen.",
+				"schedulerEnabled": "Planner ingeschakeld",
+				"schedulerDisabled": "Planner uitgeschakeld",
+				"empty": "Nog geen schema’s geconfigureerd.",
+				"colConnection": "Verbinding",
+				"colState": "Status",
+				"colCron": "Cron",
+				"colTimezone": "Tijdzone",
+				"colNextRun": "Volgende run",
+				"colLastRun": "Laatste geplande run",
+				"colFailures": "Fouten",
+				"manualRuns": "Handmatige runs",
+				"scheduledRuns": "Geplande runs",
+				"loadFailed": "Schema’s konden niet worden geladen"
+			}
+		}
 	},
 	"errors": {
 		"managedBySync": "This record is managed by identity sync.",

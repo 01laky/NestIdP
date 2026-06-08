@@ -78,6 +78,7 @@ function syncLogStub(): SyncLogDto {
 		finishedAt: '2026-01-01T01:00:00Z',
 		durationMs: 3600000,
 		dryRun: false,
+		triggerSource: 'manual',
 		errors: [],
 		usersSynced: 0,
 		groupsSynced: 0,

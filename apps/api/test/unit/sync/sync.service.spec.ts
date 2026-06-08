@@ -115,6 +115,7 @@ describe('SyncService', () => {
 		groupsSynced: 0,
 		rolesSynced: 0,
 		errors: null,
+		triggerSource: null,
 	};
 
 	function mockFinishedLog(overrides: Partial<SyncLog> = {}): SyncLog {
@@ -349,6 +350,10 @@ describe('SyncService', () => {
 			data: {
 				lastSyncAt: finishedAt,
 				lastSyncStatus: 'SUCCESS',
+				// A successful run also clears any scheduled-failure backoff state (Prompt 32).
+				scheduleConsecutiveFailures: 0,
+				scheduleAutoPausedAt: null,
+				scheduleLastError: null,
 			},
 		});
 		expect(result.connection.lastSyncStatus).toBe('SUCCESS');
@@ -698,7 +703,7 @@ describe('SyncService', () => {
 
 		const result = await service.listSyncLogs(CONNECTION_ID, 10);
 
-		expect(syncLogService.listLogsForConnection).toHaveBeenCalledWith(CONNECTION_ID, 10);
+		expect(syncLogService.listLogsForConnection).toHaveBeenCalledWith(CONNECTION_ID, 10, undefined);
 		expect(result.syncLogs).toHaveLength(1);
 	});
 
@@ -1002,5 +1007,43 @@ describe('SyncService', () => {
 			expect.any(Object),
 			expect.arrayContaining([expect.objectContaining({ phase: 'fetch_groups' })]),
 		);
+	});
+
+	describe('isSyncInProgress (HARD-STALE-01: stale-run reclaim for the scheduler)', () => {
+		it('returns true when a fresh open running log exists', async () => {
+			prisma.apiConnection.findUnique.mockResolvedValue({ ...baseConnection });
+			syncLogService.getOpenRunningLog.mockResolvedValue({ id: 'log', startedAt: new Date() });
+			await expect(service.isSyncInProgress(CONNECTION_ID)).resolves.toBe(true);
+		});
+
+		it('returns false for a STALE open running log (reclaimable, not "busy forever")', async () => {
+			prisma.apiConnection.findUnique.mockResolvedValue({ ...baseConnection });
+			// stale threshold is 30 min; started 2 h ago.
+			syncLogService.getOpenRunningLog.mockResolvedValue({
+				id: 'log',
+				startedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+			});
+			await expect(service.isSyncInProgress(CONNECTION_ID)).resolves.toBe(false);
+		});
+
+		it('falls back to lastSyncStatus when there is no open log', async () => {
+			syncLogService.getOpenRunningLog.mockResolvedValue(null);
+			prisma.apiConnection.findUnique.mockResolvedValue({
+				...baseConnection,
+				lastSyncStatus: 'IN_PROGRESS',
+			});
+			await expect(service.isSyncInProgress(CONNECTION_ID)).resolves.toBe(true);
+
+			prisma.apiConnection.findUnique.mockResolvedValue({
+				...baseConnection,
+				lastSyncStatus: 'SUCCESS',
+			});
+			await expect(service.isSyncInProgress(CONNECTION_ID)).resolves.toBe(false);
+		});
+
+		it('returns false when the connection no longer exists', async () => {
+			prisma.apiConnection.findUnique.mockResolvedValue(null);
+			await expect(service.isSyncInProgress(CONNECTION_ID)).resolves.toBe(false);
+		});
 	});
 });

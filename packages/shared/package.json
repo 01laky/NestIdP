@@ -1,6 +1,6 @@
 {
 	"name": "@nestidp/shared",
-	"version": "1.12.0",
+	"version": "1.13.0",
 	"private": true,
 	"type": "module",
 	"main": "./dist/index.js",
@@ -23,5 +23,8 @@
 	"devDependencies": {
 		"typescript": "^5.8.2",
 		"vitest": "^3.0.9"
+	},
+	"dependencies": {
+		"cron-parser": "^5.5.0"
 	}
 }

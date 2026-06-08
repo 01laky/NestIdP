@@ -10,6 +10,7 @@ import type {
 	SyncLogListResponseDto,
 	SyncLogResponseDto,
 	SyncStatusResponseDto,
+	SyncTriggerSource,
 	TriggerSyncResponseDto,
 	ApiContractConfig,
 	ResolvedApiContract,
@@ -81,9 +82,15 @@ export class SyncService {
 
 	async triggerSync(
 		connectionId: string,
-		options?: { dryRun?: boolean; adminId?: string; adminUsername?: string },
+		options?: {
+			dryRun?: boolean;
+			adminId?: string;
+			adminUsername?: string;
+			triggerSource?: SyncTriggerSource;
+		},
 	): Promise<TriggerSyncResponseDto> {
 		const dryRun = options?.dryRun === true;
+		const triggerSource: SyncTriggerSource = options?.triggerSource ?? 'manual';
 		const connection = await this.prisma.apiConnection.findUnique({ where: { id: connectionId } });
 		if (!connection) {
 			throw new NotFoundException('API connection not found');
@@ -100,7 +107,7 @@ export class SyncService {
 			await this.assertRealSyncNotInProgress(connectionId, connection);
 		}
 
-		const runningLog = await this.syncLogService.createRunningLog(connectionId);
+		const runningLog = await this.syncLogService.createRunningLog(connectionId, triggerSource);
 
 		if (!dryRun) {
 			await this.prisma.apiConnection.update({
@@ -315,11 +322,18 @@ export class SyncService {
 
 			let connectionAfter = connectionBefore;
 			if (!dryRun) {
+				// A successful real run clears any scheduled-failure backoff state and lifts an auto-pause
+				// (Prompt 32, deliverable 13) — both for scheduled runs and for a manual "Run now" recovery.
+				const clearAutoPause = connectionBefore.scheduleAutoPausedAt != null;
 				connectionAfter = await this.prisma.apiConnection.update({
 					where: { id: connectionId },
 					data: {
 						lastSyncAt: finishedLog.finishedAt ?? new Date(),
 						lastSyncStatus: 'SUCCESS',
+						scheduleConsecutiveFailures: 0,
+						scheduleAutoPausedAt: null,
+						scheduleLastError: null,
+						...(clearAutoPause ? { schedulePaused: false } : {}),
 					},
 				});
 			}
@@ -498,6 +512,19 @@ export class SyncService {
 		await Promise.all(runners);
 	}
 
+	/**
+	 * True when a real (non-stale) sync is currently running for the connection. A stale open run is
+	 * treated as NOT in progress (it is reclaimable). Used by the scheduler to pre-check before
+	 * triggering, so a stale/hung run never blocks future scheduled slots (Prompt 32, deliverable 15).
+	 */
+	async isSyncInProgress(connectionId: string): Promise<boolean> {
+		const connection = await this.prisma.apiConnection.findUnique({ where: { id: connectionId } });
+		if (!connection) {
+			return false;
+		}
+		return this.isRealSyncInProgress(connectionId, connection);
+	}
+
 	async getSyncStatus(connectionId: string): Promise<SyncStatusResponseDto> {
 		const connection = await this.prisma.apiConnection.findUnique({ where: { id: connectionId } });
 		if (!connection) {
@@ -508,12 +535,20 @@ export class SyncService {
 		return toSyncStatusResponseDto(connection, latestLog, syncInProgress);
 	}
 
-	async listSyncLogs(connectionId: string, limit: number): Promise<SyncLogListResponseDto> {
+	async listSyncLogs(
+		connectionId: string,
+		limit: number,
+		triggerSource?: SyncTriggerSource,
+	): Promise<SyncLogListResponseDto> {
 		const connection = await this.prisma.apiConnection.findUnique({ where: { id: connectionId } });
 		if (!connection) {
 			throw new NotFoundException('API connection not found');
 		}
-		const logs = await this.syncLogService.listLogsForConnection(connectionId, limit);
+		const logs = await this.syncLogService.listLogsForConnection(
+			connectionId,
+			limit,
+			triggerSource,
+		);
 		return {
 			syncLogs: logs.map((row) => toSyncLogDto(row)),
 		};

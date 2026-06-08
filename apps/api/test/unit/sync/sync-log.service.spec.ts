@@ -80,7 +80,17 @@ describe('SyncLogService', () => {
 
 		await expect(service.createRunningLog('conn-1')).resolves.toBe(row);
 		expect(prisma.syncLog.create).toHaveBeenCalledWith({
-			data: { apiConnectionId: 'conn-1', status: 'RUNNING' },
+			data: { apiConnectionId: 'conn-1', status: 'RUNNING', triggerSource: 'manual' },
+		});
+	});
+
+	it('createRunningLog records the trigger source when scheduled', async () => {
+		const row = { id: 'log-2', status: 'RUNNING' };
+		prisma.syncLog.create.mockResolvedValue(row);
+
+		await expect(service.createRunningLog('conn-1', 'scheduled')).resolves.toBe(row);
+		expect(prisma.syncLog.create).toHaveBeenCalledWith({
+			data: { apiConnectionId: 'conn-1', status: 'RUNNING', triggerSource: 'scheduled' },
 		});
 	});
 

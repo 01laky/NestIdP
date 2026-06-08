@@ -62,6 +62,20 @@ model ApiConnection {
   oauthTokenRequestParams    Json?
   lastSyncAt                 DateTime?
   lastSyncStatus             LastSyncStatus @default(NEVER)
+
+  // Scheduled sync (Prompt 32) — opt-in, off by default; never set for the local-directory connection.
+  scheduleEnabled             Boolean         @default(false)
+  scheduleCron                String?
+  scheduleTimezone            String?
+  schedulePaused              Boolean         @default(false)
+  scheduleDryRun              Boolean         @default(false)
+  nextRunAt                   DateTime?
+  lastScheduledRunAt          DateTime?
+  lastScheduledRunStatus      LastSyncStatus?
+  scheduleLastError           String?
+  scheduleConsecutiveFailures Int             @default(0)
+  scheduleAutoPausedAt        DateTime?
+
   createdAt                  DateTime       @default(now())
   updatedAt                  DateTime       @updatedAt
 
@@ -187,11 +201,14 @@ model SyncLog {
   groupsSynced    Int           @default(0)
   rolesSynced     Int           @default(0)
   errors          Json?
+  // How the run was started (Prompt 32): "manual" | "scheduled". Null on legacy rows = manual.
+  triggerSource   String?
 
   apiConnection ApiConnection @relation(fields: [apiConnectionId], references: [id], onDelete: Restrict)
 
   @@index([apiConnectionId])
   @@index([startedAt])
+  @@index([triggerSource])
 }
 
 model SamlSession {

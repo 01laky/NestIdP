@@ -112,7 +112,8 @@
 		"auditLog": "Registro di audit",
 		"samlLogin": "Accesso SAML",
 		"samlSessions": "Sessioni attive",
-		"externalDb": "Database esterno"
+		"externalDb": "Database esterno",
+		"schedules": "Pianificazioni"
 	},
 	"adminAuth": {
 		"title": "Admin Login",
@@ -182,7 +183,12 @@
 			"idpAdvertisesWithoutEnforcement": "IdP metadata advertises signed AuthnRequests, but no SP connection currently enforces signature verification.",
 			"ecKeyAdvisory": "IdP encryption uses an EC key (ECDH-ES). Service Providers must support XML Encryption 1.1 (xenc11:AgreementMethod). Older SPs may not be compatible — consider using an RSA key for broader compatibility."
 		},
-		"activeSamlSessionsLabel": "Sessioni SSO attive"
+		"activeSamlSessionsLabel": "Sessioni SSO attive",
+		"schedulerSummary": "Sincronizzazione pianificata",
+		"schedulerOn": "Scheduler attivo",
+		"schedulerOff": "Scheduler disattivato",
+		"schedulerCounts": "{{enabled}} attive, {{paused}} in pausa",
+		"openSchedules": "Apri pianificazioni"
 	},
 	"apiConnections": {
 		"listTitle": "Connessioni API",
@@ -645,7 +651,71 @@
 		"backToApiConnections": "Back to API connections",
 		"loadFailed": "Failed to load sync data",
 		"loadLogFailed": "Failed to load sync log",
-		"syncFailed": "Sincronizzazione non riuscita"
+		"syncFailed": "Sincronizzazione non riuscita",
+		"schedule": {
+			"sectionTitle": "Pianificazione",
+			"enableLabel": "Abilita la sincronizzazione pianificata",
+			"pausedLabel": "Sospendi (mantieni la pianificazione, salta le esecuzioni)",
+			"dryRunLabel": "Esegui le sincronizzazioni pianificate come prova (nessuna scrittura su DB)",
+			"cronLabel": "Espressione cron",
+			"cronHint": "Cinque campi: minuto ora giorno mese giorno della settimana. Intervallo minimo {{minutes}} minuti.",
+			"presetLabel": "Preimpostazione",
+			"presetCustom": "Personalizzata…",
+			"timezoneLabel": "Fuso orario",
+			"save": "Salva pianificazione",
+			"saved": "Pianificazione salvata",
+			"saveFailed": "Impossibile salvare la pianificazione",
+			"loadFailed": "Impossibile caricare la pianificazione",
+			"invalidCron": "Espressione cron non valida",
+			"runNow": "Esegui ora",
+			"nextRuns": "Prossime esecuzioni ({{tz}})",
+			"nextRunsLocal": "Prossime esecuzioni nel tuo fuso orario ({{tz}})",
+			"noPreview": "Inserisci un’espressione cron valida per visualizzare le prossime esecuzioni.",
+			"statusTitle": "Stato",
+			"nextRunAt": "Prossima esecuzione",
+			"lastScheduledRunAt": "Ultima esecuzione pianificata",
+			"lastScheduledRunStatus": "Ultimo esito pianificato",
+			"lastError": "Ultimo errore",
+			"consecutiveFailures": "Errori consecutivi",
+			"autoPaused": "Sospesa automaticamente dopo errori ripetuti",
+			"none": "Nessuna",
+			"dryRunBadge": "Prova",
+			"stateEnabled": "Abilitata",
+			"statePaused": "In pausa",
+			"stateDisabled": "Disabilitata",
+			"sourceLabel": "Origine",
+			"sourceAll": "Tutte le esecuzioni",
+			"sourceManual": "Manuale",
+			"sourceScheduled": "Pianificata",
+			"triggerManual": "Manuale",
+			"triggerScheduled": "Pianificata",
+			"preset": {
+				"every15min": "Ogni 15 minuti",
+				"every30min": "Ogni 30 minuti",
+				"hourly": "Ogni ora",
+				"every6h": "Ogni 6 ore",
+				"daily2am": "Ogni giorno alle 02:00",
+				"weekdays6am": "Nei giorni feriali alle 06:00",
+				"weeklySun3am": "Settimanalmente, domenica alle 03:00"
+			},
+			"overview": {
+				"title": "Pianificazioni di sincronizzazione",
+				"subtitle": "Pianificazioni di sincronizzazione automatica delle identità tra le connessioni API.",
+				"schedulerEnabled": "Scheduler attivo",
+				"schedulerDisabled": "Scheduler disattivato",
+				"empty": "Nessuna pianificazione ancora configurata.",
+				"colConnection": "Connessione",
+				"colState": "Stato",
+				"colCron": "Cron",
+				"colTimezone": "Fuso orario",
+				"colNextRun": "Prossima esecuzione",
+				"colLastRun": "Ultima esecuzione pianificata",
+				"colFailures": "Errori",
+				"manualRuns": "Esecuzioni manuali",
+				"scheduledRuns": "Esecuzioni pianificate",
+				"loadFailed": "Impossibile caricare le pianificazioni"
+			}
+		}
 	},
 	"errors": {
 		"managedBySync": "This record is managed by identity sync.",

@@ -276,6 +276,45 @@ Optional env:
 | `SYNC_STALE_RUN_MINUTES` | `30`    | Stale sync recovery threshold          |
 | `SYNC_MAX_USERS_PER_RUN` | `10000` | Max users in one `GET /users` response |
 
+### Scheduled sync (v1.13.0)
+
+Automatic identity syncs can be scheduled **per API connection** with a cron expression + IANA
+timezone, configured from the admin console. Scheduling is **opt-in, off by default**.
+
+![Scheduler tick flow](./img/sync-scheduler.svg)
+
+**Architecture** — `SyncSchedulerService` follows the existing periodic-task convention
+(`AuditRetentionCleanupService` / `SamlSessionCleanupService`): a single `setInterval` started in
+`onModuleInit`, cleared in `onModuleDestroy`, interval from `SYNC_SCHEDULER_TICK_MS` (`0` disables).
+**No `@nestjs/schedule`.** Each tick reads **fresh DB state** (no per-connection in-memory timers to
+leak) and triggers due connections through the existing `SyncService.triggerSync` — so a scheduled
+sync writes through the **active identity store** (external-DB relocation is transparent). Cron is
+validated and the next fire time computed by the shared helpers in `packages/shared/schedule.ts`
+(backed by `cron-parser`, IANA-timezone + DST aware).
+
+**Per tick** — load enabled, non-paused, non-local connections whose `nextRunAt <= now`. For each:
+
+- if a real sync is already running, **skip** (audit `sync_scheduled_run_skipped`) and retry next tick — never double-run. The pre-check treats a **stale** open run as reclaimable, so a hung run never blocks future slots;
+- otherwise advance `nextRunAt` to the next future occurrence (**no catch-up** of missed slots), set `lastScheduledRunAt`, then trigger with `triggerSource='scheduled'` and **no `adminId`** (audited as a **system** actor);
+- on failure increment `scheduleConsecutiveFailures`, record `scheduleLastError`, emit `sync_scheduled_run_failed`, and invoke the no-op `ScheduledSyncNotifier` hook. A successful run clears the backoff state.
+
+**On boot** — for each enabled, non-paused schedule, recompute `nextRunAt` if missing or in the past:
+an overdue schedule runs immediately only if overdue by ≤ `SYNC_SCHEDULE_BOOT_OVERDUE_GRACE_MINUTES`,
+otherwise it advances to the next future slot **without** running (no surprise sync after a deploy).
+
+**Hardening knobs**
+
+| Variable                                    | Default | Purpose                                                                                     |
+| ------------------------------------------- | ------- | ------------------------------------------------------------------------------------------- |
+| `SYNC_SCHEDULER_TICK_MS`                    | `30000` | Tick interval; `0` disables the scheduler entirely                                          |
+| `SYNC_SCHEDULE_MIN_INTERVAL_MINUTES`        | `5`     | Reject cron schedules firing more often than this                                           |
+| `SYNC_SCHEDULE_JITTER_MAX_SECONDS`          | `30`    | Random spread added per run so same-cron connections don't hit the API at once; `0` = exact |
+| `SYNC_SCHEDULE_FAILURE_AUTOPAUSE_THRESHOLD` | `0`     | After N consecutive failures, auto-pause the schedule; `0` = never                          |
+| `SYNC_SCHEDULE_BOOT_OVERDUE_GRACE_MINUTES`  | `0`     | On boot, run an overdue schedule only if overdue ≤ N min; `0` = never                       |
+
+**Single-instance only** — the scheduler assumes one container. Multi-instance HA / leader election is
+out of scope (would double-run); set `SYNC_SCHEDULER_TICK_MS=0` on all but one replica.
+
 ### Local mock identity API (dev / CI)
 
 ```bash

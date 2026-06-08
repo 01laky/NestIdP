@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { API_CONNECTION_ROUTE_PREFIX } from '@nestidp/shared';
+import { API_CONNECTION_ROUTE_PREFIX, type SyncTriggerSource } from '@nestidp/shared';
 import {
 	AdminApiError,
 	getApiConnection,
@@ -12,9 +12,10 @@ import {
 import { AdminPageHeader } from '../components/layout/AdminPageHeader';
 import { ErrorBanner } from '../components/common/ErrorBanner';
 import { LoadingState } from '../components/common/LoadingState';
+import { ScheduleSection } from '../components/sync/ScheduleSection';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
 import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
-import { Button, Checkbox, Panel, useConfirm, useToast } from '../../ui';
+import { Badge, Button, Checkbox, Panel, Select, useConfirm, useToast } from '../../ui';
 
 export function ApiConnectionSyncPage() {
 	const { id } = useParams<{ id: string }>();
@@ -31,21 +32,35 @@ export function ApiConnectionSyncPage() {
 	const [dryRun, setDryRun] = useState(false);
 	const [syncing, setSyncing] = useState(false);
 	const [message, setMessage] = useState<string | null>(null);
+	const [logSource, setLogSource] = useState<'' | SyncTriggerSource>('');
 	const { showToast } = useToast();
 	const confirm = useConfirm();
 
-	async function reload() {
+	async function reload(source: '' | SyncTriggerSource = logSource) {
 		if (!id) {
 			return;
 		}
 		const [conn, syncStatus, syncLogs] = await Promise.all([
 			getApiConnection(id),
 			getSyncStatus(id),
-			listSyncLogs(id, 20),
+			listSyncLogs(id, 20, source || undefined),
 		]);
 		setConnectionName(conn.connection.name);
 		setStatus(syncStatus.lastSyncStatus);
 		setLogs(syncLogs.syncLogs);
+	}
+
+	async function onChangeLogSource(source: '' | SyncTriggerSource) {
+		setLogSource(source);
+		if (!id) {
+			return;
+		}
+		try {
+			const syncLogs = await listSyncLogs(id, 20, source || undefined);
+			setLogs(syncLogs.syncLogs);
+		} catch {
+			// Keep the existing list on a transient filter error.
+		}
 	}
 
 	useEffect(() => {
@@ -148,7 +163,19 @@ export function ApiConnectionSyncPage() {
 				</form>
 			</Panel>
 			{message ? <p className="evg-muted">{message}</p> : null}
-			<h3>{t('recentLogs')}</h3>
+			{id ? <ScheduleSection connectionId={id} /> : null}
+			<div className="evg-actions">
+				<h3>{t('recentLogs')}</h3>
+				<Select
+					label={t('schedule.sourceLabel')}
+					value={logSource}
+					onChange={(event) => void onChangeLogSource(event.target.value as '' | SyncTriggerSource)}
+				>
+					<option value="">{t('schedule.sourceAll')}</option>
+					<option value="manual">{t('schedule.sourceManual')}</option>
+					<option value="scheduled">{t('schedule.sourceScheduled')}</option>
+				</Select>
+			</div>
 			{logs.length === 0 ? (
 				<p className="evg-muted">{t('noSyncLogs')}</p>
 			) : (
@@ -157,7 +184,12 @@ export function ApiConnectionSyncPage() {
 						<li key={log.id}>
 							<Link to={`/admin/sync-logs/${log.id}`}>
 								{log.status} — {log.startedAt}
-							</Link>
+							</Link>{' '}
+							<Badge variant={log.triggerSource === 'scheduled' ? 'info' : 'neutral'}>
+								{log.triggerSource === 'scheduled'
+									? t('schedule.triggerScheduled')
+									: t('schedule.triggerManual')}
+							</Badge>
 						</li>
 					))}
 				</ul>

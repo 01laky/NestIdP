@@ -1,10 +1,14 @@
 import { Injectable } from '@nestjs/common';
-import type { ReadyCheckResult, ReadyExternalIdentityDb } from '@nestidp/shared';
+import { ConfigService } from '@nestjs/config';
+import type { ReadyCheckResult, ReadyExternalIdentityDb, ReadyScheduler } from '@nestidp/shared';
 import { PrismaService } from '../../prisma/services/prisma.service';
 
 @Injectable()
 export class HealthService {
-	constructor(private readonly prisma: PrismaService) {}
+	constructor(
+		private readonly prisma: PrismaService,
+		private readonly configService: ConfigService,
+	) {}
 
 	getHealth() {
 		return {
@@ -38,6 +42,7 @@ export class HealthService {
 		}
 
 		const externalIdentityDb = await this.externalIdentityDbStatus();
+		const scheduler = await this.schedulerStatus();
 		// In relocate mode the external DB is the authoritative identity store: if it is unreachable,
 		// identity is degraded and readiness reflects that.
 		const degraded =
@@ -53,8 +58,41 @@ export class HealthService {
 				database: 'connected',
 				migrations: await this.prisma.appliedMigrationCount(),
 				...(externalIdentityDb ? { externalIdentityDb } : {}),
+				...(scheduler ? { scheduler } : {}),
 			},
 		};
+	}
+
+	/** Scheduled-sync liveness (Prompt 32): tick enabled + how many connections are scheduled / due. */
+	private async schedulerStatus(): Promise<ReadyScheduler | undefined> {
+		try {
+			const now = new Date();
+			const [scheduledConnections, due] = await Promise.all([
+				this.prisma.apiConnection.count({
+					where: { scheduleEnabled: true, isLocalDirectory: false },
+				}),
+				this.prisma.apiConnection.count({
+					where: {
+						scheduleEnabled: true,
+						schedulePaused: false,
+						isLocalDirectory: false,
+						nextRunAt: { lte: now },
+					},
+				}),
+			]);
+			return { enabled: this.isSchedulerTickEnabled(), scheduledConnections, due };
+		} catch {
+			return undefined;
+		}
+	}
+
+	private isSchedulerTickEnabled(): boolean {
+		const raw = this.configService.get<number | string>('SYNC_SCHEDULER_TICK_MS');
+		if (raw === undefined || raw === null || raw === '') {
+			return true; // default tick is 30000 (enabled)
+		}
+		const parsed = Number(raw);
+		return Number.isFinite(parsed) ? parsed > 0 : true;
 	}
 
 	private async externalIdentityDbStatus(): Promise<ReadyExternalIdentityDb | undefined> {

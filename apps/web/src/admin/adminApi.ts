@@ -71,6 +71,12 @@ import type {
 	TerminateSamlSessionResponseDto,
 	TerminateSamlSessionsByUserResponseDto,
 } from '@nestidp/shared';
+import type {
+	ScheduleResponseDto,
+	SchedulesOverviewResponseDto,
+	SyncTriggerSource,
+	UpdateScheduleRequestDto,
+} from '@nestidp/shared';
 import {
 	ADMIN_CSRF_HEADER_NAME,
 	API_CONNECTIONS_API_PATH,
@@ -85,6 +91,8 @@ import {
 	SAML_SESSIONS_API_PATH,
 	SP_CONNECTIONS_API_PATH,
 	SYNC_API_PATH,
+	syncSchedulePath,
+	syncSchedulesOverviewPath,
 } from '@nestidp/shared';
 
 export class AdminApiError extends Error {
@@ -246,13 +254,39 @@ export function getSyncStatus(connectionId: string): Promise<SyncStatusResponseD
 export function listSyncLogs(
 	connectionId: string,
 	limit?: number,
+	source?: SyncTriggerSource,
 ): Promise<SyncLogListResponseDto> {
-	const query = limit != null ? `?limit=${limit}` : '';
+	const params = new URLSearchParams();
+	if (limit != null) {
+		params.set('limit', String(limit));
+	}
+	if (source) {
+		params.set('source', source);
+	}
+	const query = params.toString() ? `?${params.toString()}` : '';
 	return adminFetch<SyncLogListResponseDto>(`${SYNC_API_PATH}/${connectionId}/logs${query}`);
 }
 
 export function getSyncLog(syncLogId: string): Promise<SyncLogResponseDto> {
 	return adminFetch<SyncLogResponseDto>(`${SYNC_API_PATH}/logs/${syncLogId}`);
+}
+
+export function getSyncSchedule(connectionId: string): Promise<ScheduleResponseDto> {
+	return adminFetch<ScheduleResponseDto>(syncSchedulePath(connectionId));
+}
+
+export function updateSyncSchedule(
+	connectionId: string,
+	body: UpdateScheduleRequestDto,
+): Promise<ScheduleResponseDto> {
+	return adminFetch<ScheduleResponseDto>(syncSchedulePath(connectionId), {
+		method: 'PATCH',
+		body: JSON.stringify(body),
+	});
+}
+
+export function getSchedulesOverview(): Promise<SchedulesOverviewResponseDto> {
+	return adminFetch<SchedulesOverviewResponseDto>(syncSchedulesOverviewPath());
 }
 
 export function listSpConnections(): Promise<SpConnectionListResponseDto> {

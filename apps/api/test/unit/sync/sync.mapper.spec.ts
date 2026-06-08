@@ -5,6 +5,7 @@ import {
 	toSyncLogDto,
 	toSyncStatusResponseDto,
 } from '@api/sync/mappers/sync.mapper';
+import { SCHEDULE_FIELD_DEFAULTS } from '../../support/prisma/test-fixtures';
 
 describe('sync.mapper', () => {
 	const baseLog: SyncLog = {
@@ -17,6 +18,7 @@ describe('sync.mapper', () => {
 		groupsSynced: 1,
 		rolesSynced: 1,
 		errors: null,
+		triggerSource: null,
 	};
 
 	const baseConnection: ApiConnection = {
@@ -36,6 +38,7 @@ describe('sync.mapper', () => {
 		oauthTokenRequestParams: null,
 		lastSyncAt: new Date('2026-01-01T00:00:01.500Z'),
 		lastSyncStatus: 'SUCCESS',
+		...SCHEDULE_FIELD_DEFAULTS,
 		createdAt: new Date('2025-12-01T00:00:00.000Z'),
 		updatedAt: new Date('2026-01-01T00:00:01.500Z'),
 	};
@@ -45,6 +48,16 @@ describe('sync.mapper', () => {
 		expect(dto.durationMs).toBe(1500);
 		expect(dto.startedAt).toBe('2026-01-01T00:00:00.000Z');
 		expect(dto.finishedAt).toBe('2026-01-01T00:00:01.500Z');
+	});
+
+	it('API-SYNC-MAP-07: triggerSource null (legacy) maps to "manual"; explicit values preserved', () => {
+		expect(toSyncLogDto(baseLog).triggerSource).toBe('manual');
+		expect(toSyncLogDto({ ...baseLog, triggerSource: 'scheduled' }).triggerSource).toBe(
+			'scheduled',
+		);
+		expect(toSyncLogDto({ ...baseLog, triggerSource: 'manual' }).triggerSource).toBe('manual');
+		// An unexpected stored value also falls back to manual.
+		expect(toSyncLogDto({ ...baseLog, triggerSource: 'bogus' }).triggerSource).toBe('manual');
 	});
 
 	it('API-SYNC-MAP-02: durationMs is null when finishedAt null', () => {

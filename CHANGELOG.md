@@ -4,6 +4,49 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.13.0]
+
+### Added
+
+- **Scheduled identity sync (Prompt 32):** an operator can schedule **automatic identity syncs** per
+  API connection with a **cron expression + IANA timezone**, configured from the admin console.
+  Scheduling is **opt-in and off by default**; existing deployments are unchanged.
+  - **In-process scheduler** (`SyncSchedulerService`) following the existing periodic-task convention
+    (single `setInterval`, no `@nestjs/schedule`). One ticking timer reads fresh DB state each tick,
+    triggers due connections through the existing `SyncService.triggerSync`, persists `nextRunAt` so
+    schedules **survive restarts**, never **double-runs** (pre-checks the concurrency guard, treating a
+    stale run as reclaimable), does **not catch up** missed slots, and isolates per-connection failures.
+    Single-instance appliance only (no HA leader election).
+  - **Shared cron contract** (`packages/shared/schedule.ts`) backed by `cron-parser`: `validateCronSchedule`,
+    `nextCronRuns`/`nextCronRun`, a **minimum-interval guard** (`SYNC_SCHEDULE_MIN_INTERVAL_MINUTES`,
+    default 5), IANA timezone + DST validation, and named **presets** shared by API and UI.
+  - **`triggerSource`** (`manual` | `scheduled`) on `SyncLog` distinguishes automatic runs; scheduled
+    runs are audited as a **system** actor. Sync-log history can be **filtered by source** in the API + UI.
+  - **Admin API:** `GET`/`PATCH /api/admin/sync/:id/schedule` (enable/cron/timezone/pause/dry-run, with
+    a next-runs preview) and `GET /api/admin/sync/schedules/overview`. Schedule changes emit a
+    `sync_schedule_updated` audit event (no secrets).
+  - **Admin UI:** a **Schedule** section on the sync page (enable, preset/cron, timezone, live preview of
+    the next runs in both the schedule timezone and the operator's local timezone, pause, dry-run,
+    **Run now**, and a status row), a **Schedules overview** page, a compact dashboard summary, and
+    manual-vs-scheduled labels in sync history. Full strings in all 10 locales.
+  - **Hardening:** schedule **jitter** to spread same-cron connections (`SYNC_SCHEDULE_JITTER_MAX_SECONDS`),
+    **pause** (keep schedule, skip runs) distinct from disable, optional **dry-run** schedules,
+    **failure backoff / auto-pause** after N consecutive failures (`SYNC_SCHEDULE_FAILURE_AUTOPAUSE_THRESHOLD`),
+    configurable **on-boot overdue grace** (`SYNC_SCHEDULE_BOOT_OVERDUE_GRACE_MINUTES`), **stale-run reclaim**
+    so a hung scheduled run never blocks future slots, an extensible no-op **`ScheduledSyncNotifier`** hook
+    point for future failure delivery, and scheduler state surfaced in **`/ready`**.
+  - New env: `SYNC_SCHEDULER_TICK_MS` (default 30000, `0` disables), `SYNC_SCHEDULE_MIN_INTERVAL_MINUTES`,
+    `SYNC_SCHEDULE_JITTER_MAX_SECONDS`, `SYNC_SCHEDULE_FAILURE_AUTOPAUSE_THRESHOLD`,
+    `SYNC_SCHEDULE_BOOT_OVERDUE_GRACE_MINUTES`.
+
+### Changed
+
+- `ApiConnection` gains schedule columns (`scheduleEnabled`, `scheduleCron`, `scheduleTimezone`,
+  `schedulePaused`, `scheduleDryRun`, `nextRunAt`, `lastScheduledRunAt`, `lastScheduledRunStatus`,
+  `scheduleLastError`, `scheduleConsecutiveFailures`, `scheduleAutoPausedAt`) and `SyncLog` gains
+  `triggerSource` (migration `20260611120000_scheduled_sync`). A successful real sync now clears any
+  scheduled-failure backoff/auto-pause state for the connection.
+
 ## [1.12.0]
 
 ### Added

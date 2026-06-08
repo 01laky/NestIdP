@@ -283,6 +283,23 @@ describe('Admin forms Evergreen — extended edge cases', () => {
 				latestSyncLog: null,
 			});
 			vi.spyOn(adminApi, 'listSyncLogs').mockResolvedValue({ syncLogs: [] });
+			vi.spyOn(adminApi, 'getSyncSchedule').mockResolvedValue({
+				schedule: {
+					connectionId: 'c1',
+					scheduleEnabled: false,
+					schedulePaused: false,
+					scheduleDryRun: false,
+					scheduleCron: null,
+					scheduleTimezone: null,
+					nextRunAt: null,
+					lastScheduledRunAt: null,
+					lastScheduledRunStatus: null,
+					scheduleLastError: null,
+					scheduleConsecutiveFailures: 0,
+					scheduleAutoPausedAt: null,
+					nextRuns: [],
+				},
+			});
 			renderWithUi(
 				<MemoryRouter initialEntries={[`${API_CONNECTION_ROUTE_PREFIX}/c1/sync`]}>
 					<Routes>
@@ -298,7 +315,7 @@ describe('Admin forms Evergreen — extended edge cases', () => {
 
 		it('WEB-EVG-125: dry-run checkbox toggles label on submit button', async () => {
 			await renderSync();
-			const checkbox = screen.getByRole('checkbox', { name: /Dry run/i });
+			const checkbox = screen.getByRole('checkbox', { name: 'Dry run (no DB writes)' });
 			expect(screen.getByRole('button', { name: /Run full sync/i })).toBeDefined();
 			fireEvent.click(checkbox);
 			expect(screen.getByRole('button', { name: /Run dry sync/i })).toBeDefined();
@@ -311,7 +328,7 @@ describe('Admin forms Evergreen — extended edge cases', () => {
 
 		it('WEB-EVG-128: dry-run checkbox label mentions no DB writes', async () => {
 			await renderSync();
-			expect(screen.getByRole('checkbox', { name: /Dry run \(no DB writes\)/i })).toBeDefined();
+			expect(screen.getByRole('checkbox', { name: 'Dry run (no DB writes)' })).toBeDefined();
 		});
 
 		it('WEB-EVG-126: sync button shows Running while syncing', async () => {
@@ -342,6 +359,7 @@ describe('Admin forms Evergreen — extended edge cases', () => {
 					groupsSynced: 0,
 					rolesSynced: 0,
 					dryRun: true,
+					triggerSource: 'manual',
 					errors: null,
 				},
 				connection: apiConnectionStub(),
@@ -707,6 +725,7 @@ describe('Admin forms Evergreen — extended edge cases', () => {
 					groupsSynced: 0,
 					rolesSynced: 0,
 					dryRun: false,
+					triggerSource: 'manual',
 					errors: null,
 				},
 			});
@@ -736,6 +755,7 @@ describe('Admin forms Evergreen — extended edge cases', () => {
 					groupsSynced: 0,
 					rolesSynced: 0,
 					dryRun: false,
+					triggerSource: 'manual',
 					errors: [{ phase: 'user_limit', message: 'fail' }],
 				},
 			});
@@ -765,6 +785,7 @@ describe('Admin forms Evergreen — extended edge cases', () => {
 					groupsSynced: 0,
 					rolesSynced: 0,
 					dryRun: false,
+					triggerSource: 'manual',
 					errors: null,
 				},
 			});

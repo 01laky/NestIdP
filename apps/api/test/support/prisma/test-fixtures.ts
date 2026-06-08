@@ -26,6 +26,21 @@ export const TEST_ENCRYPTED_CREDENTIALS = 'test-encrypted-token';
 export const TEST_ENCRYPTION_KEY = 'test-encryption-key-32chars!!';
 export const TEST_PASSWORD_HASH = '$2b$12$test.hash.for.integration.tests.only';
 
+/** Default (off) scheduled-sync columns (Prompt 32) for full `ApiConnection` literals in unit tests. */
+export const SCHEDULE_FIELD_DEFAULTS = {
+	scheduleEnabled: false,
+	scheduleCron: null,
+	scheduleTimezone: null,
+	schedulePaused: false,
+	scheduleDryRun: false,
+	nextRunAt: null,
+	lastScheduledRunAt: null,
+	lastScheduledRunStatus: null,
+	scheduleLastError: null,
+	scheduleConsecutiveFailures: 0,
+	scheduleAutoPausedAt: null,
+} satisfies Partial<ApiConnection>;
+
 type ApiConnectionOverrides = Partial<
 	Omit<
 		ApiConnection,

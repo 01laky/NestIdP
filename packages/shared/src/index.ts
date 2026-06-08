@@ -10,6 +10,7 @@ export * from './admin-types.js';
 export * from './admin-auth.js';
 export * from './api-error.js';
 export * from './sync.js';
+export * from './schedule.js';
 export * from './end-user-auth.js';
 export * from './saml.js';
 export * from './saml-slo.js';

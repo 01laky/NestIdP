@@ -43,6 +43,23 @@ describe('ApiConnectionSyncPage Evergreen forms', () => {
 			latestSyncLog: null,
 		});
 		vi.spyOn(adminApi, 'listSyncLogs').mockResolvedValue({ syncLogs: [] });
+		vi.spyOn(adminApi, 'getSyncSchedule').mockResolvedValue({
+			schedule: {
+				connectionId: 'c1',
+				scheduleEnabled: false,
+				schedulePaused: false,
+				scheduleDryRun: false,
+				scheduleCron: null,
+				scheduleTimezone: null,
+				nextRunAt: null,
+				lastScheduledRunAt: null,
+				lastScheduledRunStatus: null,
+				scheduleLastError: null,
+				scheduleConsecutiveFailures: 0,
+				scheduleAutoPausedAt: null,
+				nextRuns: [],
+			},
+		});
 
 		renderWithUi(
 			<MemoryRouter initialEntries={[`${API_CONNECTION_ROUTE_PREFIX}/c1/sync`]}>
@@ -56,7 +73,7 @@ describe('ApiConnectionSyncPage Evergreen forms', () => {
 		);
 
 		await waitFor(() => {
-			expect(screen.getByRole('checkbox', { name: /Dry run/i })).toBeDefined();
+			expect(screen.getByRole('checkbox', { name: 'Dry run (no DB writes)' })).toBeDefined();
 		});
 	});
 });
