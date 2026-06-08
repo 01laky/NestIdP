@@ -5,16 +5,20 @@ import type {
 	ApiConnectionTestTokenResponseDto,
 	ApiContractConfig,
 	OAuthTokenDiagnosticsDto,
+	ProxyCheckResultDto,
 	ResolvedApiContract,
 } from '@nestidp/shared';
 import { getByPath, resolveApiContract } from '@nestidp/shared';
+import type { Dispatcher } from 'undici';
 import {
 	CREDENTIALS_ENCRYPTION,
 	type CredentialsEncryptionPort,
 } from '../../encryption/credentials-encryption.port';
-import { redactBearerToken } from '../../encryption/utils/redact-secret.util';
+import { redactBearerToken, redactSecrets } from '../../encryption/utils/redact-secret.util';
 import { PrismaService } from '../../prisma/services/prisma.service';
 import { OAuthTokenService } from '../../sync/services/oauth-token.service';
+import { ProxyDispatcherService } from '../../sync/services/proxy-dispatcher.service';
+import { annotateIfProxied, classifyProxyError } from '../../sync/utils/proxy-error.util';
 import { ApiConnectionsAuditService } from './api-connections-audit.service';
 import { normalizeBaseUrl } from '../utils/base-url.util';
 import {
@@ -23,6 +27,7 @@ import {
 } from '../../sync/validators/external-api.validator';
 
 const TEST_TIMEOUT_MS = 10_000;
+const PROXY_CHECK_TIMEOUT_MS = 8_000;
 const PREVIEW_LIMIT = 5;
 
 @Injectable()
@@ -35,6 +40,7 @@ export class ApiConnectionTestService {
 		private readonly encryption: CredentialsEncryptionPort,
 		private readonly audit: ApiConnectionsAuditService,
 		private readonly oauthTokenService: OAuthTokenService,
+		private readonly proxyDispatcher: ProxyDispatcherService,
 	) {}
 
 	/** Token-exchange-only diagnostics (POST /:id/test-token). Never returns the token. */
@@ -52,6 +58,76 @@ export class ApiConnectionTestService {
 		}
 		const { diag } = await this.oauthTokenService.fetchDiagnostics(row);
 		return diag;
+	}
+
+	/** Proxy-hop-only diagnostic (POST /:id/test-proxy). Isolates "proxy is dead/rejects auth" from
+	 * "target is down" without running the full contract fetch. Never returns/logs the proxy password. */
+	async testProxy(id: string): Promise<ProxyCheckResultDto> {
+		const row = await this.prisma.apiConnection.findUnique({ where: { id } });
+		if (!row) {
+			throw new NotFoundException('API connection not found');
+		}
+		const target = normalizeBaseUrl(row.baseUrl);
+		const proxyHost = this.proxyDispatcher.proxyHostLabel(row);
+
+		// Off or bypassed → a no-op, not a failure.
+		if (!this.proxyDispatcher.isProxied(row, target)) {
+			const result: ProxyCheckResultDto = {
+				ok: true,
+				status: 'bypassed',
+				message: row.proxyEnabled
+					? 'Target bypasses the proxy (no-proxy match) — would connect directly'
+					: 'Proxy is disabled for this connection — connects directly',
+				viaProxy: false,
+				bypassed: true,
+				proxyHost,
+			};
+			await this.persistProxyCheck(id, result.status);
+			this.audit.logProxyChecked(id, row.name, result.status, result.viaProxy, proxyHost);
+			return result;
+		}
+
+		const dispatcher = this.proxyDispatcher.resolve(row, target);
+		let result: ProxyCheckResultDto;
+		try {
+			// Any HTTP response (even 4xx/5xx from the target) means the proxy hop + tunnel succeeded.
+			const res = await fetch(target, {
+				method: 'HEAD',
+				signal: AbortSignal.timeout(PROXY_CHECK_TIMEOUT_MS),
+				...(dispatcher ? { dispatcher } : {}),
+			} as RequestInit & { dispatcher?: Dispatcher });
+			result = {
+				ok: true,
+				status: 'ok',
+				message: `Reached the target through the proxy (HTTP ${res.status})`,
+				viaProxy: true,
+				bypassed: false,
+				proxyHost,
+			};
+		} catch (error) {
+			const { status, message } = classifyProxyError(error, { proxied: true });
+			this.logger.warn(
+				`Proxy check failed for connection ${id}: ${redactSecrets(error instanceof Error ? error.message : 'unknown')}`,
+			);
+			result = {
+				ok: false,
+				status,
+				message: redactSecrets(message),
+				viaProxy: status !== 'auth_failed' && status !== 'unreachable' ? true : false,
+				bypassed: false,
+				proxyHost,
+			};
+		}
+		await this.persistProxyCheck(id, result.status);
+		this.audit.logProxyChecked(id, row.name, result.status, result.viaProxy, proxyHost);
+		return result;
+	}
+
+	private async persistProxyCheck(id: string, status: string): Promise<void> {
+		await this.prisma.apiConnection.update({
+			where: { id },
+			data: { lastProxyCheckStatus: status, lastProxyCheckAt: new Date() },
+		});
 	}
 
 	async testConnection(id: string): Promise<ApiConnectionTestResponseDto> {
@@ -94,12 +170,14 @@ export class ApiConnectionTestService {
 			(row.apiContractConfig as ApiContractConfig | null) ?? null,
 		);
 		const usersUrl = this.buildUrl(row.baseUrl, contract.endpoints.usersPath, contract, true);
+		const proxied = this.proxyDispatcher.isProxied(row, usersUrl);
+		const dispatcher = this.proxyDispatcher.resolve(row, usersUrl);
 
 		let response: Response;
 		try {
-			response = await this.fetch(usersUrl, token, contract);
+			response = await this.fetch(usersUrl, token, contract, dispatcher);
 		} catch (error) {
-			return this.unreachable(id, error);
+			return this.unreachable(id, error, proxied);
 		}
 
 		const ok = response.status >= 200 && response.status < 300;
@@ -108,8 +186,11 @@ export class ApiConnectionTestService {
 			reachable: true,
 			statusCode: response.status,
 			message: ok
-				? 'Identity API responded successfully'
+				? proxied
+					? 'Identity API responded successfully (through the proxy)'
+					: 'Identity API responded successfully'
 				: `Identity API returned HTTP ${response.status}`,
+			...(proxied ? { viaProxy: true } : {}),
 			...(tokenEndpoint ? { tokenEndpoint } : {}),
 		};
 		this.audit.logTested(id, true, response.status);
@@ -153,6 +234,7 @@ export class ApiConnectionTestService {
 				token,
 				contract,
 				firstUserId,
+				dispatcher,
 			);
 			if (membershipError) {
 				result.contractError = membershipError;
@@ -173,6 +255,7 @@ export class ApiConnectionTestService {
 		token: string,
 		contract: ResolvedApiContract,
 		firstUserId: string | undefined,
+		dispatcher?: Dispatcher,
 	): Promise<string | undefined> {
 		if (firstUserId === undefined) {
 			return undefined;
@@ -193,7 +276,7 @@ export class ApiConnectionTestService {
 		for (const probe of probes) {
 			try {
 				const url = this.buildUrl(baseUrl, probe.path, contract, false);
-				const res = await this.fetch(url, token, contract);
+				const res = await this.fetch(url, token, contract, dispatcher);
 				if (res.status < 200 || res.status >= 300) {
 					return `${probe.label} endpoint: HTTP ${res.status}`;
 				}
@@ -231,6 +314,7 @@ export class ApiConnectionTestService {
 		url: string,
 		token: string,
 		contract: ResolvedApiContract,
+		dispatcher?: Dispatcher,
 	): Promise<Response> {
 		return fetch(url, {
 			method: 'GET',
@@ -240,7 +324,8 @@ export class ApiConnectionTestService {
 				Accept: 'application/json',
 			},
 			signal: AbortSignal.timeout(TEST_TIMEOUT_MS),
-		});
+			...(dispatcher ? { dispatcher } : {}),
+		} as RequestInit & { dispatcher?: Dispatcher });
 	}
 
 	private extractArray(body: unknown, responseRoot: string): unknown[] {
@@ -255,14 +340,25 @@ export class ApiConnectionTestService {
 		return value;
 	}
 
-	private unreachable(id: string, error: unknown): ApiConnectionTestResponseDto {
+	private unreachable(id: string, error: unknown, proxied = false): ApiConnectionTestResponseDto {
 		this.logger.warn(
-			`Connectivity test failed for connection ${id}: ${error instanceof Error ? error.message : 'unknown error'}`,
+			`Connectivity test failed for connection ${id}: ${redactSecrets(error instanceof Error ? error.message : 'unknown error')}`,
 		);
 		this.audit.logTested(id, false);
+		const viaProxy = proxied ? { viaProxy: true } : {};
 		if (error instanceof Error && error.name === 'TimeoutError') {
-			return { ok: false, reachable: false, message: 'Identity API request timed out' };
+			return {
+				ok: false,
+				reachable: false,
+				message: annotateIfProxied('Identity API request timed out', error, proxied),
+				...viaProxy,
+			};
 		}
-		return { ok: false, reachable: false, message: 'Could not reach identity API' };
+		return {
+			ok: false,
+			reachable: false,
+			message: annotateIfProxied('Could not reach identity API', error, proxied),
+			...viaProxy,
+		};
 	}
 }

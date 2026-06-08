@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { getByPath, type ResolvedApiContract } from '@nestidp/shared';
+import type { Dispatcher } from 'undici';
 import { normalizeBaseUrl } from '../../api-connections/utils/base-url.util';
 import { ExternalApiValidationError } from '../validators/external-api.validator';
 import { IdentitySyncHttpError } from '../identity-sync.errors';
@@ -51,15 +52,17 @@ export class IdentitySyncClientService {
 		);
 	}
 
-	/** Paginated + envelope-extracted raw users array. */
+	/** Paginated + envelope-extracted raw users array. `dispatcher` routes through a proxy when set. */
 	async fetchUsersRaw(
 		baseUrl: string,
 		bearerToken: string,
 		contract: ResolvedApiContract,
+		dispatcher?: Dispatcher,
 	): Promise<unknown[]> {
 		return this.fetchCollectionRaw(baseUrl, bearerToken, contract.endpoints.usersPath, contract, {
 			responseRoot: contract.responseRoot.users,
 			cap: this.getMaxUsersPerRun(),
+			dispatcher,
 		});
 	}
 
@@ -68,11 +71,13 @@ export class IdentitySyncClientService {
 		bearerToken: string,
 		externalUserId: string,
 		contract: ResolvedApiContract,
+		dispatcher?: Dispatcher,
 	): Promise<unknown[]> {
 		const path = this.substituteId(contract.endpoints.userGroupsPath, externalUserId);
 		return this.fetchCollectionRaw(baseUrl, bearerToken, path, contract, {
 			responseRoot: contract.responseRoot.groups,
 			cap: this.getMaxGroupsPerUser(contract),
+			dispatcher,
 		});
 	}
 
@@ -81,11 +86,13 @@ export class IdentitySyncClientService {
 		bearerToken: string,
 		externalUserId: string,
 		contract: ResolvedApiContract,
+		dispatcher?: Dispatcher,
 	): Promise<unknown[]> {
 		const path = this.substituteId(contract.endpoints.userRolesPath, externalUserId);
 		return this.fetchCollectionRaw(baseUrl, bearerToken, path, contract, {
 			responseRoot: contract.responseRoot.roles,
 			cap: this.getMaxRolesPerUser(contract),
+			dispatcher,
 		});
 	}
 
@@ -123,6 +130,7 @@ export class IdentitySyncClientService {
 		url: string,
 		bearerToken: string,
 		headers: Record<string, string>,
+		dispatcher?: Dispatcher,
 	): Promise<unknown> {
 		try {
 			const response = await fetch(url, {
@@ -133,7 +141,8 @@ export class IdentitySyncClientService {
 					Accept: 'application/json',
 				},
 				signal: AbortSignal.timeout(this.getHttpTimeoutMs()),
-			});
+				...(dispatcher ? { dispatcher } : {}),
+			} as RequestInit & { dispatcher?: Dispatcher });
 			if (response.status < 200 || response.status >= 300) {
 				throw new IdentitySyncHttpError(`Identity API returned HTTP ${response.status}`, {
 					statusCode: response.status,
@@ -178,14 +187,14 @@ export class IdentitySyncClientService {
 		bearerToken: string,
 		path: string,
 		contract: ResolvedApiContract,
-		opts: { responseRoot: string; cap: number },
+		opts: { responseRoot: string; cap: number; dispatcher?: Dispatcher },
 	): Promise<unknown[]> {
 		const { pagination, queryParams, headers } = contract;
 
 		if (pagination.mode === 'none') {
 			const url = this.buildUrl(baseUrl, path, queryParams);
 			return this.extractArray(
-				await this.fetchJson(url, bearerToken, headers),
+				await this.fetchJson(url, bearerToken, headers, opts.dispatcher),
 				opts.responseRoot,
 				url,
 			);
@@ -211,7 +220,7 @@ export class IdentitySyncClientService {
 			}
 			const url = this.buildUrl(baseUrl, path, queryParams, extra);
 			const pageRows = this.extractArray(
-				await this.fetchJson(url, bearerToken, headers),
+				await this.fetchJson(url, bearerToken, headers, opts.dispatcher),
 				opts.responseRoot,
 				url,
 			);

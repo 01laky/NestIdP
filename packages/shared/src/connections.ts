@@ -1,6 +1,7 @@
 import type { AuthType, LastSyncStatus } from './schema-enums.js';
 import type { ApiContractConfig } from './api-contract.js';
 import type { OAuthClientAuthMethod } from './oauth.js';
+import type { ProxyCheckStatus, ProxyConnectionRequestFields } from './proxy.js';
 
 /** Admin REST API base path for API connection CRUD (not the React route). */
 export const API_CONNECTIONS_API_PATH = '/api/admin/api-connections';
@@ -30,6 +31,16 @@ export interface ApiConnectionDto {
 	hasOauthClientSecret: boolean;
 	/** Last successful token exchange (from the in-memory token cache), or null. */
 	oauthLastTokenAt: string | null;
+	// --- Outbound HTTP proxy (Prompt 33; non-secret fields only) ---
+	proxyEnabled: boolean;
+	proxyUrl: string | null;
+	proxyUsername: string | null;
+	/** True when an encrypted proxy password is stored (the password itself is never returned). */
+	hasProxyPassword: boolean;
+	noProxyHosts: string | null;
+	/** Last "Test proxy" outcome, or null when never tested. */
+	lastProxyCheckStatus: ProxyCheckStatus | null;
+	lastProxyCheckAt: string | null;
 	lastSyncAt: string | null;
 	lastSyncStatus: LastSyncStatus;
 	createdAt: string;
@@ -48,7 +59,8 @@ export interface OAuthConnectionRequestFields {
 	oauthTokenRequestParams?: Record<string, string> | null;
 }
 
-export interface CreateApiConnectionRequestDto extends OAuthConnectionRequestFields {
+export interface CreateApiConnectionRequestDto
+	extends OAuthConnectionRequestFields, ProxyConnectionRequestFields {
 	name: string;
 	baseUrl: string;
 	authType?: AuthType;
@@ -57,7 +69,8 @@ export interface CreateApiConnectionRequestDto extends OAuthConnectionRequestFie
 	apiContractConfig?: ApiContractConfig | null;
 }
 
-export interface UpdateApiConnectionRequestDto extends OAuthConnectionRequestFields {
+export interface UpdateApiConnectionRequestDto
+	extends OAuthConnectionRequestFields, ProxyConnectionRequestFields {
 	name?: string;
 	baseUrl?: string;
 	authType?: AuthType;
@@ -104,6 +117,8 @@ export interface ApiConnectionTestResponseDto {
 	previewSample?: ApiConnectionPreviewUserDto[];
 	/** OAuth token-endpoint diagnostics when authType is OAUTH2 (never includes the token). */
 	tokenEndpoint?: OAuthTokenDiagnosticsDto;
+	/** True when the target was reached through the configured outbound proxy (Prompt 33). */
+	viaProxy?: boolean;
 }
 
 /** Masked diagnostics from a token-endpoint exchange — never includes the access token or secret. */

@@ -9,6 +9,7 @@ import { ApiConnectionTestService } from './services/api-connection-test.service
 import { ApiConnectionsController } from './controllers/api-connections.controller';
 import { ApiConnectionsService } from './services/api-connections.service';
 import { OAuthCoreModule } from '../sync/oauth-core.module';
+import { ProxyCoreModule } from '../sync/proxy-core.module';
 
 @Module({
 	imports: [
@@ -17,6 +18,7 @@ import { OAuthCoreModule } from '../sync/oauth-core.module';
 		AdminAuthModule,
 		EncryptionModule,
 		OAuthCoreModule,
+		ProxyCoreModule,
 		IdentityModule,
 	],
 	controllers: [ApiConnectionsController],

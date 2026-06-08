@@ -1,5 +1,6 @@
 import { Transform } from 'class-transformer';
 import {
+	IsBoolean,
 	IsIn,
 	IsNotEmpty,
 	IsObject,
@@ -76,4 +77,33 @@ export class UpdateApiConnectionBodyDto {
 	@ValidateIf((_, value) => value !== null)
 	@IsObject()
 	oauthTokenRequestParams?: Record<string, string> | null;
+
+	// --- Outbound HTTP proxy (Prompt 33) ---
+	@IsOptional()
+	@IsBoolean()
+	proxyEnabled?: boolean;
+
+	@IsOptional()
+	@ValidateIf((_, value) => value !== null)
+	@IsString()
+	@MaxLength(2048)
+	proxyUrl?: string | null;
+
+	@IsOptional()
+	@ValidateIf((_, value) => value !== null)
+	@IsString()
+	@MaxLength(256)
+	proxyUsername?: string | null;
+
+	@IsOptional()
+	@ValidateIf((_, value) => value !== null)
+	@IsString()
+	@MaxLength(1024)
+	proxyPassword?: string | null;
+
+	@IsOptional()
+	@ValidateIf((_, value) => value !== null)
+	@IsString()
+	@MaxLength(4096)
+	noProxyHosts?: string | null;
 }

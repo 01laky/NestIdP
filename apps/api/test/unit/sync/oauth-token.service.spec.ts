@@ -2,6 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import type { ApiConnection } from '@prisma/client';
 import { OAuthTokenError, OAuthTokenService } from '@api/sync/services/oauth-token.service';
 import type { CredentialsEncryptionPort } from '@api/encryption/credentials-encryption.port';
+import { fakeProxyDispatcher } from '@test/support/proxy-dispatcher.mock';
 
 function jsonResponse(body: unknown, status = 200): Response {
 	return { status, json: async () => body } as Response;
@@ -46,7 +47,7 @@ describe('OAuthTokenService', () => {
 	beforeEach(() => {
 		jest.restoreAllMocks();
 		audit.recordSafe.mockReset();
-		service = new OAuthTokenService(config, encryption, audit as never);
+		service = new OAuthTokenService(config, encryption, audit as never, fakeProxyDispatcher());
 	});
 
 	it('OAUTH-01: client_secret_post sends grant_type/client_id/client_secret/scope/audience', async () => {
@@ -63,6 +64,35 @@ describe('OAuthTokenService', () => {
 		expect(body).toContain('client_secret=super-secret');
 		expect(body).toContain('scope=read');
 		expect(body).toContain('audience=aud-1');
+	});
+
+	it('PROXY-WIRE-02: token exchange routes through the dispatcher when proxied', async () => {
+		const marker = { __dispatcher: true };
+		const proxied = new OAuthTokenService(
+			config,
+			encryption,
+			audit as never,
+			fakeProxyDispatcher({ proxied: true, dispatcher: marker }),
+		);
+		const fetchMock = jest
+			.spyOn(global, 'fetch')
+			.mockResolvedValue(
+				jsonResponse({ access_token: 'AT', token_type: 'Bearer', expires_in: 3600 }),
+			);
+		await proxied.getAccessToken(makeConn());
+		const init = fetchMock.mock.calls[0][1] as RequestInit & { dispatcher?: unknown };
+		expect(init.dispatcher).toBe(marker);
+	});
+
+	it('PROXY-WIRE-02b: token exchange passes no dispatcher when not proxied', async () => {
+		const fetchMock = jest
+			.spyOn(global, 'fetch')
+			.mockResolvedValue(
+				jsonResponse({ access_token: 'AT', token_type: 'Bearer', expires_in: 3600 }),
+			);
+		await service.getAccessToken(makeConn());
+		const init = fetchMock.mock.calls[0][1] as RequestInit & { dispatcher?: unknown };
+		expect(init.dispatcher).toBeUndefined();
 	});
 
 	it('OAUTH-02: client_secret_basic uses Authorization Basic; secret NOT in body', async () => {
@@ -406,6 +436,7 @@ describe('OAuthTokenService', () => {
 				},
 			} as never,
 			audit as never,
+			fakeProxyDispatcher(),
 		);
 		const fetchMock = jest.spyOn(global, 'fetch');
 		await expect(failing.getAccessToken(makeConn())).rejects.toThrow(/could not be decrypted/);

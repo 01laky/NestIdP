@@ -22,6 +22,8 @@ import {
 	assertValidApiContractConfig,
 	assertValidOAuthConfig,
 	OAuthConfigValidationError,
+	ProxyConfigError,
+	validateProxyUrl,
 } from '@nestidp/shared';
 import { NodeEnv } from '../../config/env.validation';
 import {
@@ -31,6 +33,7 @@ import {
 import { PrismaService } from '../../prisma/services/prisma.service';
 import { ActiveIdentityStore } from '../../identity/store/active-identity-store';
 import { OAuthTokenService } from '../../sync/services/oauth-token.service';
+import { ProxyDispatcherService } from '../../sync/services/proxy-dispatcher.service';
 import { assertValidBaseUrl, BaseUrlValidationError } from '../utils/base-url.util';
 import { ApiConnectionsAuditService } from './api-connections-audit.service';
 import { toApiConnectionDto } from '../mappers/api-connections.mapper';
@@ -47,6 +50,7 @@ export class ApiConnectionsService {
 		private readonly audit: ApiConnectionsAuditService,
 		private readonly oauthTokenService: OAuthTokenService,
 		private readonly identityStore: ActiveIdentityStore,
+		private readonly proxyDispatcher: ProxyDispatcherService,
 	) {}
 
 	async list(): Promise<ApiConnectionListResponseDto> {
@@ -95,7 +99,12 @@ export class ApiConnectionsService {
 			data.authCredentialsEncrypted = this.encryption.encrypt(body.bearerToken);
 		}
 
+		this.applyProxyData(data, body, null);
+
 		const row = await this.prisma.apiConnection.create({ data });
+		if (this.proxyTouched(body)) {
+			this.audit.logProxyUpdated(row.id, row.name, this.proxyAuditDetail(row));
+		}
 		return { connection: this.toDto(row) };
 	}
 
@@ -112,7 +121,8 @@ export class ApiConnectionsService {
 			body.oauthScope === undefined &&
 			body.oauthAudience === undefined &&
 			body.oauthClientAuthMethod === undefined &&
-			body.oauthTokenRequestParams === undefined
+			body.oauthTokenRequestParams === undefined &&
+			!this.proxyTouched(body)
 		) {
 			throw new BadRequestException('At least one field must be provided');
 		}
@@ -175,10 +185,18 @@ export class ApiConnectionsService {
 			}
 		}
 
+		this.applyProxyData(data, body, existing);
+
 		const row = await this.prisma.apiConnection.update({
 			where: { id: existing.id },
 			data,
 		});
+
+		if (this.proxyTouched(body)) {
+			// A proxy-config change supersedes any cached ProxyAgent — close it so the next call rebuilds.
+			this.proxyDispatcher.invalidate(row.id);
+			this.audit.logProxyUpdated(row.id, row.name, this.proxyAuditDetail(row));
+		}
 
 		this.audit.logUpdated(row.id, row.name);
 		if (authTypeChanged) {
@@ -209,6 +227,7 @@ export class ApiConnectionsService {
 			}
 			throw error;
 		}
+		this.proxyDispatcher.invalidate(id);
 		this.audit.logDeleted(existing.id, existing.name);
 		return { ok: true, id };
 	}
@@ -259,6 +278,93 @@ export class ApiConnectionsService {
 			data.oauthClientSecretEncrypted = this.encryption.encrypt(body.oauthClientSecret);
 		} else if (opts.secretRequired) {
 			throw new BadRequestException('oauthClientSecret is required');
+		}
+	}
+
+	/** True when the request touches any proxy field (drives the update guard, audit, and invalidate). */
+	private proxyTouched(
+		body: CreateApiConnectionRequestDto | UpdateApiConnectionRequestDto,
+	): boolean {
+		return (
+			body.proxyEnabled !== undefined ||
+			body.proxyUrl !== undefined ||
+			body.proxyUsername !== undefined ||
+			body.proxyPassword !== undefined ||
+			body.noProxyHosts !== undefined
+		);
+	}
+
+	private proxyAuditDetail(row: ApiConnection) {
+		return {
+			enabled: row.proxyEnabled,
+			proxyHost: this.proxyDispatcher.proxyHostLabel(row),
+			hasAuth: !!row.proxyUsername,
+			hasNoProxy: !!row.noProxyHosts,
+		};
+	}
+
+	/**
+	 * Validate + apply proxy fields. `existing` is null on create. When proxy is enabled a proxy URL is
+	 * required (provided now or already stored). The password is write-only: omit keeps it, `null`
+	 * clears it, empty string is rejected; it is encrypted at rest via CREDENTIALS_ENCRYPTION.
+	 */
+	private applyProxyData(
+		data: Prisma.ApiConnectionCreateInput | Prisma.ApiConnectionUpdateInput,
+		body: CreateApiConnectionRequestDto | UpdateApiConnectionRequestDto,
+		existing: ApiConnection | null,
+	): void {
+		if (!this.proxyTouched(body)) {
+			return;
+		}
+
+		// Resolve the effective proxy URL (after this request) for the "enabled requires URL" check.
+		let effectiveUrl: string | null = existing?.proxyUrl ?? null;
+		if (body.proxyUrl !== undefined) {
+			if (body.proxyUrl === null || body.proxyUrl.trim() === '') {
+				data.proxyUrl = null;
+				effectiveUrl = null;
+			} else {
+				let normalized: string;
+				try {
+					normalized = validateProxyUrl(body.proxyUrl);
+				} catch (error) {
+					if (error instanceof ProxyConfigError) {
+						throw new BadRequestException(error.message);
+					}
+					throw error;
+				}
+				data.proxyUrl = normalized;
+				effectiveUrl = normalized;
+			}
+		}
+
+		const effectiveEnabled =
+			body.proxyEnabled !== undefined ? body.proxyEnabled : (existing?.proxyEnabled ?? false);
+		if (body.proxyEnabled !== undefined) {
+			data.proxyEnabled = body.proxyEnabled;
+		}
+		if (effectiveEnabled && !effectiveUrl) {
+			throw new BadRequestException('proxyUrl is required when the proxy is enabled');
+		}
+
+		if (body.proxyUsername !== undefined) {
+			const trimmed = body.proxyUsername === null ? null : body.proxyUsername.trim();
+			data.proxyUsername = trimmed && trimmed.length > 0 ? trimmed : null;
+		}
+
+		if (body.proxyPassword !== undefined) {
+			if (body.proxyPassword === null) {
+				data.proxyPasswordEncrypted = null;
+			} else if (body.proxyPassword.length === 0) {
+				throw new BadRequestException('proxyPassword must not be empty');
+			} else {
+				data.proxyPasswordEncrypted = this.encryption.encrypt(body.proxyPassword);
+			}
+		}
+
+		if (body.noProxyHosts !== undefined) {
+			const trimmed = body.noProxyHosts === null ? null : body.noProxyHosts.trim();
+			data.noProxyHosts = trimmed && trimmed.length > 0 ? trimmed : null;
 		}
 	}
 

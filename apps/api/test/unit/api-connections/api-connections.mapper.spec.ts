@@ -1,6 +1,6 @@
 import type { ApiConnection } from '@prisma/client';
 import { toApiConnectionDto } from '@api/api-connections/mappers/api-connections.mapper';
-import { SCHEDULE_FIELD_DEFAULTS } from '../../support/prisma/test-fixtures';
+import { PROXY_FIELD_DEFAULTS, SCHEDULE_FIELD_DEFAULTS } from '../../support/prisma/test-fixtures';
 
 describe('toApiConnectionDto', () => {
 	const baseRow: ApiConnection = {
@@ -20,6 +20,7 @@ describe('toApiConnectionDto', () => {
 		oauthTokenRequestParams: null,
 		lastSyncAt: new Date('2026-02-01T12:00:00.000Z'),
 		lastSyncStatus: 'SUCCESS',
+		...PROXY_FIELD_DEFAULTS,
 		...SCHEDULE_FIELD_DEFAULTS,
 		createdAt: new Date('2026-01-01T00:00:00.000Z'),
 		updatedAt: new Date('2026-01-02T00:00:00.000Z'),
@@ -42,6 +43,13 @@ describe('toApiConnectionDto', () => {
 			oauthTokenRequestParams: null,
 			hasOauthClientSecret: false,
 			oauthLastTokenAt: null,
+			proxyEnabled: false,
+			proxyUrl: null,
+			proxyUsername: null,
+			hasProxyPassword: false,
+			noProxyHosts: null,
+			lastProxyCheckStatus: null,
+			lastProxyCheckAt: null,
 			lastSyncAt: '2026-02-01T12:00:00.000Z',
 			lastSyncStatus: 'SUCCESS',
 			createdAt: '2026-01-01T00:00:00.000Z',

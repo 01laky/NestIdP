@@ -1,6 +1,6 @@
 {
 	"name": "@nestidp/api",
-	"version": "1.13.0",
+	"version": "1.14.0",
 	"private": true,
 	"scripts": {
 		"dev": "node scripts/run-dev.mjs",
@@ -48,6 +48,7 @@
 		"pg": "^8.21.0",
 		"reflect-metadata": "^0.2.2",
 		"rxjs": "^7.8.2",
+		"undici": "^6",
 		"xml-crypto": "^6.0.1",
 		"xmlbuilder2": "^4.0.3",
 		"xpath": "^0.0.34"

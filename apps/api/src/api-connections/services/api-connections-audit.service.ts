@@ -72,6 +72,49 @@ export class ApiConnectionsAuditService {
 		});
 	}
 
+	logProxyUpdated(
+		id: string,
+		name: string,
+		detail: { enabled: boolean; proxyHost: string | null; hasAuth: boolean; hasNoProxy: boolean },
+	): void {
+		const payload = { event: 'api_connection_proxy_updated', id, name, ...detail };
+		this.logger.log(JSON.stringify(payload));
+		this.audit.recordSafe({
+			category: 'admin_config',
+			event: 'api_connection_proxy_updated',
+			actorType: 'admin',
+			subjectType: 'ApiConnection',
+			subjectId: id,
+			metadata: { name, ...detail },
+		});
+	}
+
+	logProxyChecked(
+		id: string,
+		name: string,
+		status: string,
+		viaProxy: boolean,
+		proxyHost: string | null,
+	): void {
+		const payload = {
+			event: 'api_connection_proxy_checked',
+			id,
+			name,
+			status,
+			viaProxy,
+			proxyHost,
+		};
+		this.logger.log(JSON.stringify(payload));
+		this.audit.recordSafe({
+			category: 'admin_config',
+			event: 'api_connection_proxy_checked',
+			actorType: 'admin',
+			subjectType: 'ApiConnection',
+			subjectId: id,
+			metadata: { name, status, viaProxy, proxyHost },
+		});
+	}
+
 	logTested(id: string, reachable: boolean, statusCode?: number): void {
 		const payload = {
 			event: 'api_connection_tested',

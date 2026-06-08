@@ -63,6 +63,16 @@ model ApiConnection {
   lastSyncAt                 DateTime?
   lastSyncStatus             LastSyncStatus @default(NEVER)
 
+  // Outbound HTTP proxy (Prompt 33) — opt-in, off by default; never used for the local-directory
+  // connection. proxyPasswordEncrypted is encrypted at rest via CREDENTIALS_ENCRYPTION (libSQL only).
+  proxyEnabled           Boolean   @default(false)
+  proxyUrl               String?
+  proxyUsername          String?
+  proxyPasswordEncrypted String?
+  noProxyHosts           String?
+  lastProxyCheckStatus   String?
+  lastProxyCheckAt       DateTime?
+
   // Scheduled sync (Prompt 32) — opt-in, off by default; never set for the local-directory connection.
   scheduleEnabled             Boolean         @default(false)
   scheduleCron                String?

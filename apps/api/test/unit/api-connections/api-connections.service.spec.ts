@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { ApiConnectionsService } from '@api/api-connections/services/api-connections.service';
 import type { CredentialsEncryptionPort } from '@api/encryption/credentials-encryption.port';
+import { fakeProxyDispatcher } from '@test/support/proxy-dispatcher.mock';
 
 describe('ApiConnectionsService', () => {
 	const encryption: jest.Mocked<CredentialsEncryptionPort> = {
@@ -31,6 +32,7 @@ describe('ApiConnectionsService', () => {
 		logDeleted: jest.fn(),
 		logContractUpdated: jest.fn(),
 		logAuthTypeChanged: jest.fn(),
+		logProxyUpdated: jest.fn(),
 	};
 	const oauthTokenService = {
 		getAccessToken: jest.fn(),
@@ -42,6 +44,7 @@ describe('ApiConnectionsService', () => {
 		connectionHasIdentityRows: jest.fn().mockResolvedValue(false),
 	};
 
+	const proxyDispatcher = fakeProxyDispatcher();
 	const service = new ApiConnectionsService(
 		prisma as never,
 		encryption,
@@ -49,6 +52,7 @@ describe('ApiConnectionsService', () => {
 		audit as never,
 		oauthTokenService as never,
 		identityStore as never,
+		proxyDispatcher,
 	);
 
 	const sampleRow = {
@@ -586,5 +590,238 @@ describe('ApiConnectionsService', () => {
 		const result = await service.list();
 		expect(result.connections[0].oauthLastTokenAt).toBe('2026-06-09T10:00:00.000Z');
 		expect(oauthTokenService.getLastTokenAt).toHaveBeenCalledWith(oauthRow.id);
+	});
+
+	describe('outbound proxy config', () => {
+		const proxyRow = {
+			...sampleRow,
+			proxyEnabled: true,
+			proxyUrl: 'http://proxy.corp.example:8080',
+			proxyUsername: 'puser',
+			proxyPasswordEncrypted: 'enc:psecret',
+			noProxyHosts: '.corp.example',
+		};
+
+		it('PROXY-API-01: create persists valid proxy config; DTO exposes non-secret state, never the password', async () => {
+			prisma.apiConnection.create.mockResolvedValue(proxyRow);
+			const result = await service.create({
+				name: 'Corp API',
+				baseUrl: 'https://identity.example.com',
+				bearerToken: 'tok',
+				proxyEnabled: true,
+				proxyUrl: 'http://proxy.corp.example:8080',
+				proxyUsername: 'puser',
+				proxyPassword: 'psecret',
+				noProxyHosts: '.corp.example',
+			});
+			expect(encryption.encrypt).toHaveBeenCalledWith('psecret');
+			const data = prisma.apiConnection.create.mock.calls[0][0].data;
+			expect(data.proxyPasswordEncrypted).toBe('enc:psecret');
+			expect(data.proxyUrl).toBe('http://proxy.corp.example:8080');
+			expect(result.connection).toMatchObject({
+				proxyEnabled: true,
+				proxyUrl: 'http://proxy.corp.example:8080',
+				proxyUsername: 'puser',
+				hasProxyPassword: true,
+				noProxyHosts: '.corp.example',
+			});
+			expect(result.connection).not.toHaveProperty('proxyPassword');
+			expect(result.connection).not.toHaveProperty('proxyPasswordEncrypted');
+			expect(audit.logProxyUpdated).toHaveBeenCalled();
+		});
+
+		it('PROXY-API-02a: proxyEnabled=true without a proxyUrl → 400', async () => {
+			await expect(
+				service.create({
+					name: 'X',
+					baseUrl: 'https://identity.example.com',
+					bearerToken: 't',
+					proxyEnabled: true,
+				}),
+			).rejects.toBeInstanceOf(BadRequestException);
+		});
+
+		it('PROXY-API-02b: invalid proxy URL scheme → 400', async () => {
+			await expect(
+				service.create({
+					name: 'X',
+					baseUrl: 'https://identity.example.com',
+					bearerToken: 't',
+					proxyEnabled: true,
+					proxyUrl: 'socks5://proxy:1080',
+				}),
+			).rejects.toBeInstanceOf(BadRequestException);
+		});
+
+		it('PROXY-API-02c: empty proxyPassword → 400', async () => {
+			await expect(
+				service.create({
+					name: 'X',
+					baseUrl: 'https://identity.example.com',
+					bearerToken: 't',
+					proxyEnabled: true,
+					proxyUrl: 'http://proxy:8080',
+					proxyPassword: '',
+				}),
+			).rejects.toBeInstanceOf(BadRequestException);
+		});
+
+		it('PROXY-API-02d: update omits proxyPassword keeps stored; null clears it', async () => {
+			prisma.apiConnection.findUnique.mockResolvedValue(proxyRow);
+			prisma.apiConnection.update.mockImplementation(async ({ data }) => ({
+				...proxyRow,
+				...data,
+			}));
+
+			// omit → no password write
+			await service.update(proxyRow.id, { proxyUsername: 'newuser' });
+			let data = prisma.apiConnection.update.mock.calls[0][0].data;
+			expect(data).not.toHaveProperty('proxyPasswordEncrypted');
+
+			// null → cleared
+			await service.update(proxyRow.id, { proxyPassword: null });
+			data = prisma.apiConnection.update.mock.calls[1][0].data;
+			expect(data.proxyPasswordEncrypted).toBeNull();
+		});
+
+		it('PROXY-API-03: proxy password is encrypted at rest (stored ≠ plaintext)', async () => {
+			prisma.apiConnection.create.mockResolvedValue(proxyRow);
+			await service.create({
+				name: 'Corp API',
+				baseUrl: 'https://identity.example.com',
+				bearerToken: 'tok',
+				proxyEnabled: true,
+				proxyUrl: 'http://proxy:8080',
+				proxyPassword: 'psecret',
+			});
+			const data = prisma.apiConnection.create.mock.calls[0][0].data;
+			expect(data.proxyPasswordEncrypted).not.toBe('psecret');
+			expect(data.proxyPasswordEncrypted).toBe('enc:psecret');
+		});
+
+		it('PROXY-API-04a: a proxy-only update is accepted (not rejected by the "at least one field" guard)', async () => {
+			prisma.apiConnection.findUnique.mockResolvedValue(proxyRow);
+			prisma.apiConnection.update.mockImplementation(async ({ data }) => ({
+				...proxyRow,
+				...data,
+			}));
+			await expect(service.update(proxyRow.id, { noProxyHosts: 'a.com' })).resolves.toBeDefined();
+		});
+
+		it('PROXY-API-04b: a proxy-config change invalidates the cached dispatcher; so does delete', async () => {
+			prisma.apiConnection.findUnique.mockResolvedValue(proxyRow);
+			prisma.apiConnection.update.mockImplementation(async ({ data }) => ({
+				...proxyRow,
+				...data,
+			}));
+			await service.update(proxyRow.id, { proxyEnabled: false });
+			expect(proxyDispatcher.invalidate).toHaveBeenCalledWith(proxyRow.id);
+
+			(proxyDispatcher.invalidate as jest.Mock).mockClear();
+			prisma.apiConnection.delete.mockResolvedValue(proxyRow);
+			await service.delete(proxyRow.id);
+			expect(proxyDispatcher.invalidate).toHaveBeenCalledWith(proxyRow.id);
+		});
+	});
+
+	describe('outbound proxy config — extended', () => {
+		const proxyRow = {
+			...sampleRow,
+			proxyEnabled: true,
+			proxyUrl: 'http://proxy.corp.example:8080',
+			proxyUsername: 'puser',
+			proxyPasswordEncrypted: 'enc:psecret',
+			noProxyHosts: '.corp.example',
+		};
+
+		it('PROXY-API-EXT-01: create with proxy URL but disabled stores both, no "url required" error', async () => {
+			prisma.apiConnection.create.mockResolvedValue({ ...proxyRow, proxyEnabled: false });
+			await service.create({
+				name: 'X',
+				baseUrl: 'https://identity.example.com',
+				bearerToken: 't',
+				proxyEnabled: false,
+				proxyUrl: 'http://proxy.corp.example:8080',
+			});
+			const data = prisma.apiConnection.create.mock.calls[0][0].data;
+			expect(data.proxyEnabled).toBe(false);
+			expect(data.proxyUrl).toBe('http://proxy.corp.example:8080');
+		});
+
+		it('PROXY-API-EXT-02: enabling proxy when a URL is already stored is accepted (no 400)', async () => {
+			prisma.apiConnection.findUnique.mockResolvedValue({ ...proxyRow, proxyEnabled: false });
+			prisma.apiConnection.update.mockImplementation(async ({ data }) => ({
+				...proxyRow,
+				...data,
+			}));
+			await expect(service.update(proxyRow.id, { proxyEnabled: true })).resolves.toBeDefined();
+		});
+
+		it('PROXY-API-EXT-03: clearing proxyUrl ("") while proxy stays enabled → 400', async () => {
+			prisma.apiConnection.findUnique.mockResolvedValue(proxyRow);
+			await expect(service.update(proxyRow.id, { proxyUrl: '' })).rejects.toBeInstanceOf(
+				BadRequestException,
+			);
+		});
+
+		it('PROXY-API-EXT-04: proxyUsername null clears it; whitespace noProxyHosts → null', async () => {
+			prisma.apiConnection.findUnique.mockResolvedValue(proxyRow);
+			prisma.apiConnection.update.mockImplementation(async ({ data }) => ({
+				...proxyRow,
+				...data,
+			}));
+			await service.update(proxyRow.id, { proxyUsername: null, noProxyHosts: '   ' });
+			const data = prisma.apiConnection.update.mock.calls[0][0].data;
+			expect(data.proxyUsername).toBeNull();
+			expect(data.noProxyHosts).toBeNull();
+		});
+
+		it('PROXY-API-EXT-05: a name-only update neither invalidates the dispatcher nor audits proxy', async () => {
+			prisma.apiConnection.findUnique.mockResolvedValue(proxyRow);
+			prisma.apiConnection.findMany.mockResolvedValue([proxyRow]);
+			prisma.apiConnection.update.mockImplementation(async ({ data }) => ({
+				...proxyRow,
+				...data,
+			}));
+			await service.update(proxyRow.id, { name: 'Renamed' });
+			expect(proxyDispatcher.invalidate).not.toHaveBeenCalled();
+			expect(audit.logProxyUpdated).not.toHaveBeenCalled();
+		});
+
+		it('PROXY-API-EXT-06: the proxy audit captures host + auth flags, never credentials', async () => {
+			prisma.apiConnection.findUnique.mockResolvedValue(proxyRow);
+			prisma.apiConnection.update.mockImplementation(async ({ data }) => ({
+				...proxyRow,
+				...data,
+			}));
+			await service.update(proxyRow.id, { noProxyHosts: '.x' });
+			expect(audit.logProxyUpdated).toHaveBeenCalledWith(
+				proxyRow.id,
+				proxyRow.name,
+				expect.objectContaining({ enabled: true, hasAuth: true, hasNoProxy: true }),
+			);
+			const detailArg = (audit.logProxyUpdated as jest.Mock).mock.calls[0][2];
+			expect(JSON.stringify(detailArg)).not.toMatch(/psecret/);
+		});
+
+		it('PROXY-API-EXT-07: a normalized proxy URL is persisted (host lowercased)', async () => {
+			prisma.apiConnection.create.mockResolvedValue(proxyRow);
+			await service.create({
+				name: 'X',
+				baseUrl: 'https://identity.example.com',
+				bearerToken: 't',
+				proxyEnabled: true,
+				proxyUrl: 'http://Proxy.CORP.Example:8080',
+			});
+			const data = prisma.apiConnection.create.mock.calls[0][0].data;
+			expect(data.proxyUrl).toBe('http://proxy.corp.example:8080');
+		});
+
+		it('PROXY-API-EXT-08: enabling proxy with neither a new nor a stored URL → 400', async () => {
+			prisma.apiConnection.findUnique.mockResolvedValue({ ...sampleRow, proxyUrl: null });
+			await expect(service.update(sampleRow.id, { proxyEnabled: true })).rejects.toBeInstanceOf(
+				BadRequestException,
+			);
+		});
 	});
 });

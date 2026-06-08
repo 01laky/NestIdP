@@ -8,6 +8,8 @@ import {
 	type AuthType,
 	OAUTH_CLIENT_AUTH_METHODS,
 	type OAuthClientAuthMethod,
+	previewProxyRouting,
+	type ProxyCheckStatus,
 } from '@nestidp/shared';
 import {
 	AdminApiError,
@@ -15,6 +17,7 @@ import {
 	deleteApiConnection,
 	getApiConnection,
 	testApiConnection,
+	testApiConnectionProxy,
 	testApiConnectionToken,
 	updateApiConnection,
 } from '../adminApi';
@@ -26,6 +29,7 @@ import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messag
 import {
 	Button,
 	Callout,
+	Checkbox,
 	Panel,
 	Select,
 	TextArea,
@@ -58,6 +62,14 @@ export function ApiConnectionFormPage() {
 	const [oauthClientAuthMethod, setOauthClientAuthMethod] =
 		useState<OAuthClientAuthMethod>('client_secret_post');
 	const [oauthTokenParamsJson, setOauthTokenParamsJson] = useState('');
+	// Proxy fields (Prompt 33)
+	const [proxyEnabled, setProxyEnabled] = useState(false);
+	const [proxyUrl, setProxyUrl] = useState('');
+	const [proxyUsername, setProxyUsername] = useState('');
+	const [proxyPassword, setProxyPassword] = useState('');
+	const [noProxyHosts, setNoProxyHosts] = useState('');
+	const [lastProxyCheckStatus, setLastProxyCheckStatus] = useState<ProxyCheckStatus | null>(null);
+	const [lastProxyCheckAt, setLastProxyCheckAt] = useState<string | null>(null);
 	const [testMessage, setTestMessage] = useState<string | null>(null);
 	const [contractJson, setContractJson] = useState('');
 	const [contractTouched, setContractTouched] = useState(false);
@@ -102,6 +114,12 @@ export function ApiConnectionFormPage() {
 						c.oauthTokenRequestParams ? JSON.stringify(c.oauthTokenRequestParams, null, 2) : '',
 					);
 					setContractJson(c.apiContractConfig ? JSON.stringify(c.apiContractConfig, null, 2) : '');
+					setProxyEnabled(c.proxyEnabled);
+					setProxyUrl(c.proxyUrl ?? '');
+					setProxyUsername(c.proxyUsername ?? '');
+					setNoProxyHosts(c.noProxyHosts ?? '');
+					setLastProxyCheckStatus(c.lastProxyCheckStatus);
+					setLastProxyCheckAt(c.lastProxyCheckAt);
 				}
 			} catch (err) {
 				if (!cancelled) {
@@ -161,6 +179,15 @@ export function ApiConnectionFormPage() {
 					}
 				: {};
 
+		const proxyFields = {
+			proxyEnabled,
+			proxyUrl: proxyUrl.trim() ? proxyUrl.trim() : null,
+			proxyUsername: proxyUsername.trim() ? proxyUsername.trim() : null,
+			noProxyHosts: noProxyHosts.trim() ? noProxyHosts.trim() : null,
+			// Write-only: only send a password when the operator typed one (blank keeps the stored one).
+			...(proxyPassword ? { proxyPassword } : {}),
+		};
+
 		try {
 			if (isNew) {
 				const created = await createApiConnection({
@@ -169,6 +196,7 @@ export function ApiConnectionFormPage() {
 					authType,
 					...(authType === 'BEARER' ? { bearerToken } : {}),
 					...oauthFields,
+					...proxyFields,
 					...(apiContractConfig ? { apiContractConfig } : {}),
 				});
 				showToast(t('toastSaved'));
@@ -180,6 +208,7 @@ export function ApiConnectionFormPage() {
 					authType,
 					...(authType === 'BEARER' && bearerToken ? { bearerToken } : {}),
 					...oauthFields,
+					...proxyFields,
 					...(contractTouched ? { apiContractConfig } : {}),
 				});
 				showToast(t('toastSaved'));
@@ -260,6 +289,30 @@ export function ApiConnectionFormPage() {
 		}
 	}
 
+	async function handleTestProxy() {
+		if (!id) {
+			return;
+		}
+		setTestMessage(null);
+		try {
+			const result = await testApiConnectionProxy(id);
+			setLastProxyCheckStatus(result.status);
+			setLastProxyCheckAt(new Date().toISOString());
+			setTestMessage(`${t('proxyCheckTitle')}: ${result.message}`);
+		} catch (err) {
+			setTestMessage(
+				err instanceof AdminApiError
+					? formatAdminApiError(
+							err.statusCode,
+							err.message,
+							resolveI18nKey,
+							'apiConnections.testFailed',
+						)
+					: t('testFailed'),
+			);
+		}
+	}
+
 	async function handleDelete() {
 		if (!id) {
 			return;
@@ -295,6 +348,11 @@ export function ApiConnectionFormPage() {
 	}
 
 	const isOauth = authType === 'OAUTH2_CLIENT_CREDENTIALS';
+
+	const routingPreview = previewProxyRouting(proxyEnabled, noProxyHosts, [
+		{ label: 'baseUrl', url: baseUrl },
+		...(isOauth ? [{ label: 'oauthTokenUrl', url: oauthTokenUrl }] : []),
+	]);
 
 	return (
 		<section>
@@ -467,6 +525,69 @@ export function ApiConnectionFormPage() {
 								</Button>
 							</div>
 						</details>
+
+						<details className="evg-filters-panel evg-filters-panel--collapsible">
+							<summary>{t('proxySection')}</summary>
+							<div className="evg-stack">
+								<Callout variant="info">{t('proxySectionHint')}</Callout>
+								<Checkbox
+									label={t('proxyEnabled')}
+									checked={proxyEnabled}
+									onChange={setProxyEnabled}
+								/>
+								<TextInput
+									label={t('proxyUrl')}
+									name="proxyUrl"
+									value={proxyUrl}
+									placeholder="http://proxy.corp.example:8080"
+									hint={t('proxyUrlHint')}
+									onChange={(e) => setProxyUrl(e.target.value)}
+									required={proxyEnabled}
+								/>
+								<TextInput
+									label={t('proxyUsername')}
+									name="proxyUsername"
+									value={proxyUsername}
+									onChange={(e) => setProxyUsername(e.target.value)}
+								/>
+								<TextInput
+									label={isNew ? t('proxyPassword') : t('proxyPasswordKeep')}
+									name="proxyPassword"
+									type="password"
+									value={proxyPassword}
+									onChange={(e) => setProxyPassword(e.target.value)}
+								/>
+								<TextInput
+									label={t('noProxyHosts')}
+									name="noProxyHosts"
+									value={noProxyHosts}
+									placeholder=".corp.example, 10.0.0.0/8"
+									hint={t('noProxyHostsHint')}
+									onChange={(e) => setNoProxyHosts(e.target.value)}
+								/>
+								{routingPreview.length > 0 ? (
+									<div className="evg-stack">
+										<span className="evg-muted">{t('proxyRoutingPreview')}</span>
+										<ul className="evg-list">
+											{routingPreview.map((r) => (
+												<li key={r.label}>
+													<code>{r.host ?? r.label}</code>{' '}
+													<span
+														className={`evg-badge ${
+															r.routedThrough === 'proxy' ? 'evg-badge--info' : 'evg-badge--neutral'
+														}`}
+													>
+														{r.routedThrough === 'proxy'
+															? t('proxyRoutedProxy')
+															: t('proxyRoutedDirect')}
+													</span>
+												</li>
+											))}
+										</ul>
+									</div>
+								) : null}
+							</div>
+						</details>
 						<Button type="submit" variant="primary" disabled={saving}>
 							{saving ? tCommon('saving') : tCommon('save')}
 						</Button>
@@ -493,6 +614,16 @@ export function ApiConnectionFormPage() {
 							{t('testToken')}
 						</Button>
 					) : null}
+					{proxyEnabled ? (
+						<Button
+							type="button"
+							variant="secondary"
+							disabled={saving}
+							onClick={() => void handleTestProxy()}
+						>
+							{t('testProxy')}
+						</Button>
+					) : null}
 					<Button
 						type="button"
 						variant="danger"
@@ -501,6 +632,18 @@ export function ApiConnectionFormPage() {
 					>
 						{tCommon('delete')}
 					</Button>
+					{lastProxyCheckStatus ? (
+						<span
+							className={`evg-badge ${
+								lastProxyCheckStatus === 'ok' || lastProxyCheckStatus === 'bypassed'
+									? 'evg-badge--success'
+									: 'evg-badge--danger'
+							}`}
+							title={lastProxyCheckAt ?? undefined}
+						>
+							{t('proxyHealth')}: {t(`proxyStatus_${lastProxyCheckStatus}` as const)}
+						</span>
+					) : null}
 					{testMessage ? <span className="evg-muted"> — {testMessage}</span> : null}
 				</div>
 			) : null}

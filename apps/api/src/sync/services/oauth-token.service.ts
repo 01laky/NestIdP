@@ -7,12 +7,15 @@ import {
 	type OAuthClientAuthMethod,
 	type OAuthTokenDiagnosticsDto,
 } from '@nestidp/shared';
+import type { Dispatcher } from 'undici';
 import {
 	CREDENTIALS_ENCRYPTION,
 	type CredentialsEncryptionPort,
 } from '../../encryption/credentials-encryption.port';
 import { redactSecrets } from '../../encryption/utils/redact-secret.util';
 import { AuditPersistenceService } from '../../audit/services/audit-persistence.service';
+import { ProxyDispatcherService } from './proxy-dispatcher.service';
+import { annotateIfProxied } from '../utils/proxy-error.util';
 
 export const DEFAULT_OAUTH_TOKEN_HTTP_TIMEOUT_MS = 30_000;
 export const DEFAULT_OAUTH_TOKEN_REFRESH_SKEW_SECONDS = 30;
@@ -80,6 +83,7 @@ export class OAuthTokenService {
 		@Inject(CREDENTIALS_ENCRYPTION)
 		private readonly encryption: CredentialsEncryptionPort,
 		private readonly audit: AuditPersistenceService,
+		private readonly proxyDispatcher: ProxyDispatcherService,
 	) {}
 
 	getLastTokenAt(connectionId: string): string | null {
@@ -155,7 +159,14 @@ export class OAuthTokenService {
 	): Promise<ExchangeResult> {
 		let result: ExchangeResult;
 		try {
-			result = await this.exchange(cfg);
+			// Route the token exchange through the proxy when configured for this connection. The
+			// no-proxy list is evaluated against the token URL (which may differ from baseUrl's host).
+			const dispatcher = this.proxyDispatcher.resolve(connection, cfg.tokenUrl);
+			result = await this.exchange(
+				cfg,
+				dispatcher,
+				this.proxyDispatcher.isProxied(connection, cfg.tokenUrl),
+			);
 		} catch (error) {
 			this.auditFailure(connection.id, error);
 			throw error;
@@ -168,7 +179,11 @@ export class OAuthTokenService {
 		return result;
 	}
 
-	private async exchange(cfg: ResolvedOAuthConfig): Promise<ExchangeResult> {
+	private async exchange(
+		cfg: ResolvedOAuthConfig,
+		dispatcher?: Dispatcher,
+		proxied = false,
+	): Promise<ExchangeResult> {
 		const form = new URLSearchParams();
 		form.set('grant_type', 'client_credentials');
 		if (cfg.authMethod === 'client_secret_post') {
@@ -200,9 +215,10 @@ export class OAuthTokenService {
 				headers,
 				body: form,
 				signal: AbortSignal.timeout(this.httpTimeoutMs()),
-			});
+				...(dispatcher ? { dispatcher } : {}),
+			} as RequestInit & { dispatcher?: Dispatcher });
 		} catch (error) {
-			throw this.networkError(error);
+			throw this.networkError(error, proxied);
 		}
 
 		let json: Record<string, unknown> | null = null;
@@ -250,9 +266,12 @@ export class OAuthTokenService {
 		};
 	}
 
-	private networkError(error: unknown): OAuthTokenError {
+	private networkError(error: unknown, proxied = false): OAuthTokenError {
 		if (error instanceof Error && error.name === 'TimeoutError') {
-			return new OAuthTokenError('token endpoint: request timed out', { reachable: false });
+			return new OAuthTokenError(
+				annotateIfProxied('token endpoint: request timed out', error, proxied),
+				{ reachable: false },
+			);
 		}
 		const code = this.extractErrorCode(error);
 		if (code && TLS_ERROR_CODES.has(code)) {
@@ -261,7 +280,10 @@ export class OAuthTokenService {
 				tlsError: true,
 			});
 		}
-		return new OAuthTokenError('token endpoint: could not be reached', { reachable: false });
+		return new OAuthTokenError(
+			annotateIfProxied('token endpoint: could not be reached', error, proxied),
+			{ reachable: false },
+		);
 	}
 
 	private extractErrorCode(error: unknown): string | undefined {

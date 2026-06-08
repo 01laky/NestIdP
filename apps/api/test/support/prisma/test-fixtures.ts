@@ -41,6 +41,17 @@ export const SCHEDULE_FIELD_DEFAULTS = {
 	scheduleAutoPausedAt: null,
 } satisfies Partial<ApiConnection>;
 
+/** Default (proxy-off) values for the Prompt 33 proxy columns — spread into ApiConnection literals. */
+export const PROXY_FIELD_DEFAULTS = {
+	proxyEnabled: false,
+	proxyUrl: null,
+	proxyUsername: null,
+	proxyPasswordEncrypted: null,
+	noProxyHosts: null,
+	lastProxyCheckStatus: null,
+	lastProxyCheckAt: null,
+} satisfies Partial<ApiConnection>;
+
 type ApiConnectionOverrides = Partial<
 	Omit<
 		ApiConnection,

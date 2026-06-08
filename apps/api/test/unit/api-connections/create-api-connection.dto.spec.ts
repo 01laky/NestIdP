@@ -65,4 +65,21 @@ describe('UpdateApiConnectionBodyDto validation', () => {
 		const errors = await validate(dto);
 		expect(errors.some((e) => e.property === 'bearerToken')).toBe(true);
 	});
+
+	it('API-DTO-08: proxy fields accept valid values + null clear', async () => {
+		const dto = plainToInstance(UpdateApiConnectionBodyDto, {
+			proxyEnabled: true,
+			proxyUrl: 'http://proxy:8080',
+			proxyUsername: 'u',
+			proxyPassword: null,
+			noProxyHosts: '.corp.example',
+		});
+		expect(await validate(dto)).toHaveLength(0);
+	});
+
+	it('API-DTO-09: proxyEnabled must be a boolean', async () => {
+		const dto = plainToInstance(UpdateApiConnectionBodyDto, { proxyEnabled: 'yes' });
+		const errors = await validate(dto);
+		expect(errors.some((e) => e.property === 'proxyEnabled')).toBe(true);
+	});
 });

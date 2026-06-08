@@ -60,6 +60,13 @@ function apiConnectionStub(overrides: Partial<ApiConnectionDto> = {}): ApiConnec
 		oauthTokenRequestParams: null,
 		hasOauthClientSecret: false,
 		oauthLastTokenAt: null,
+		proxyEnabled: false,
+		proxyUrl: null,
+		proxyUsername: null,
+		hasProxyPassword: false,
+		noProxyHosts: null,
+		lastProxyCheckStatus: null,
+		lastProxyCheckAt: null,
 		apiContractConfig: null,
 		lastSyncAt: null,
 		lastSyncStatus: 'NEVER',
@@ -112,7 +119,7 @@ describe('Evergreen toast integration — mutation flows', () => {
 			</MemoryRouter>,
 		);
 
-		fireEvent.change(screen.getByLabelText(/Name/i), { target: { value: 'HR' } });
+		fireEvent.change(screen.getByLabelText(/^Name/i), { target: { value: 'HR' } });
 		fireEvent.change(screen.getByLabelText(/Base URL/i), {
 			target: { value: 'https://api.example.com' },
 		});

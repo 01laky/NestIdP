@@ -38,9 +38,11 @@ import {
 	mapExternalUserRow,
 } from '../validators/external-api.validator';
 import type { ExternalGroupDto, ExternalRoleDto } from '../external-api.types';
+import type { Dispatcher } from 'undici';
 import { IdentitySyncClientService } from './identity-sync-client.service';
 import { IdentitySyncHttpError } from '../identity-sync.errors';
 import { OAuthTokenError, OAuthTokenService } from './oauth-token.service';
+import { ProxyDispatcherService } from './proxy-dispatcher.service';
 import { AuditPersistenceService } from '../../audit/services/audit-persistence.service';
 import { SyncLogService } from './sync-log.service';
 import {
@@ -78,6 +80,7 @@ export class SyncService {
 		private readonly encryption: CredentialsEncryptionPort,
 		private readonly audit: AuditPersistenceService,
 		private readonly oauthTokenService: OAuthTokenService,
+		private readonly proxyDispatcher: ProxyDispatcherService,
 	) {}
 
 	async triggerSync(
@@ -102,6 +105,9 @@ export class SyncService {
 		const contract = resolveApiContract(
 			(connection.apiContractConfig as ApiContractConfig | null) ?? null,
 		);
+		// Resolve the outbound proxy dispatcher once per run (sync targets share the baseUrl host).
+		// `undefined` ⇒ direct connection. Same dispatcher is used for users + membership fetches.
+		const dispatcher = this.proxyDispatcher.resolve(connection, connection.baseUrl);
 
 		if (!dryRun) {
 			await this.assertRealSyncNotInProgress(connectionId, connection);
@@ -151,6 +157,7 @@ export class SyncService {
 						connection.baseUrl,
 						bearerToken,
 						contract,
+						dispatcher,
 					);
 				} catch (error) {
 					// OAuth: a 401 may mean a stale cached token — refresh once and retry.
@@ -166,6 +173,7 @@ export class SyncService {
 							connection.baseUrl,
 							bearerToken,
 							contract,
+							dispatcher,
 						);
 					} else {
 						throw error;
@@ -255,6 +263,7 @@ export class SyncService {
 				bearerToken,
 				contract,
 				processed,
+				dispatcher,
 			);
 
 			// --- Phase 3: map + upsert memberships (sequential, original order) ---
@@ -365,6 +374,7 @@ export class SyncService {
 		bearerToken: string,
 		contract: ResolvedApiContract,
 		processed: ProcessedUser[],
+		dispatcher?: Dispatcher,
 	): Promise<Map<string, MembershipRaw>> {
 		const result = new Map<string, MembershipRaw>();
 		const groupsEmbedded = contract.membershipSource.groups.mode === 'embedded';
@@ -386,6 +396,7 @@ export class SyncService {
 						bearerToken,
 						p.externalUserId,
 						contract,
+						dispatcher,
 					);
 				} catch (error) {
 					entry.groupsError = error;
@@ -405,6 +416,7 @@ export class SyncService {
 						bearerToken,
 						p.externalUserId,
 						contract,
+						dispatcher,
 					);
 				} catch (error) {
 					entry.rolesError = error;

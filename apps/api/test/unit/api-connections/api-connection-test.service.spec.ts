@@ -1,6 +1,7 @@
 import { Logger, NotFoundException } from '@nestjs/common';
 import { ApiConnectionTestService } from '@api/api-connections/services/api-connection-test.service';
 import type { CredentialsEncryptionPort } from '@api/encryption/credentials-encryption.port';
+import { fakeProxyDispatcher } from '@test/support/proxy-dispatcher.mock';
 
 describe('ApiConnectionTestService', () => {
 	const encryption: jest.Mocked<CredentialsEncryptionPort> = {
@@ -11,10 +12,11 @@ describe('ApiConnectionTestService', () => {
 	const prisma = {
 		apiConnection: {
 			findUnique: jest.fn(),
+			update: jest.fn(),
 		},
 	};
 
-	const audit = { logTested: jest.fn() };
+	const audit = { logTested: jest.fn(), logProxyChecked: jest.fn() };
 	const oauthTokenService = {
 		getAccessToken: jest.fn(),
 		getLastTokenAt: jest.fn().mockReturnValue(null),
@@ -25,6 +27,7 @@ describe('ApiConnectionTestService', () => {
 		encryption,
 		audit as never,
 		oauthTokenService as never,
+		fakeProxyDispatcher(),
 	);
 
 	const connection = {
@@ -374,5 +377,131 @@ describe('ApiConnectionTestService', () => {
 		expect(result.message).toMatch(/TLS error/);
 		expect(result.tokenEndpoint?.tlsError).toBe(true);
 		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	describe('proxy wiring + test-proxy', () => {
+		const marker = { __dispatcher: true };
+		function proxiedService() {
+			return new ApiConnectionTestService(
+				prisma as never,
+				encryption,
+				audit as never,
+				oauthTokenService as never,
+				fakeProxyDispatcher({ proxied: true, dispatcher: marker }),
+			);
+		}
+
+		it('PROXY-WIRE-03a: testConnection routes through the dispatcher + reports viaProxy', async () => {
+			const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({ status: 200 } as Response);
+			const result = await proxiedService().testConnection(connection.id);
+			const init = fetchMock.mock.calls[0][1] as RequestInit & { dispatcher?: unknown };
+			expect(init.dispatcher).toBe(marker);
+			expect(result.viaProxy).toBe(true);
+			expect(result.message).toMatch(/through the proxy/i);
+		});
+
+		it('PROXY-WIRE-03b: a proxied failure reads distinctly from a direct failure', async () => {
+			jest.spyOn(global, 'fetch').mockRejectedValue(
+				Object.assign(new TypeError('fetch failed'), {
+					cause: Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' }),
+				}),
+			);
+			const result = await proxiedService().testConnection(connection.id);
+			expect(result.ok).toBe(false);
+			expect(result.viaProxy).toBe(true);
+			expect(result.message).toMatch(/proxy/i);
+		});
+
+		it('PROXY-TEST-01: test-proxy probes the proxy hop, persists status, never returns the password', async () => {
+			const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({ status: 405 } as Response);
+			const result = await proxiedService().testProxy(connection.id);
+			const init = fetchMock.mock.calls[0][1] as RequestInit & { dispatcher?: unknown };
+			expect(init.dispatcher).toBe(marker);
+			expect(result).toMatchObject({ ok: true, status: 'ok', viaProxy: true, bypassed: false });
+			expect(prisma.apiConnection.update).toHaveBeenCalledWith(
+				expect.objectContaining({ data: expect.objectContaining({ lastProxyCheckStatus: 'ok' }) }),
+			);
+			expect(audit.logProxyChecked).toHaveBeenCalled();
+			expect(JSON.stringify(result)).not.toMatch(/password/i);
+		});
+
+		it('PROXY-TEST-01b: test-proxy classifies a 407 as auth_failed', async () => {
+			jest.spyOn(global, 'fetch').mockRejectedValue(
+				Object.assign(new TypeError('fetch failed'), {
+					cause: Object.assign(new Error('aborted'), {
+						name: 'AbortError',
+						code: 'UND_ERR_ABORTED',
+						message: 'Proxy response (407) !== 200 when HTTP Tunneling',
+					}),
+				}),
+			);
+			const result = await proxiedService().testProxy(connection.id);
+			expect(result).toMatchObject({ ok: false, status: 'auth_failed' });
+		});
+
+		it('PROXY-TEST-02: test-proxy is a no-op (bypassed) when proxy is off', async () => {
+			const fetchMock = jest.spyOn(global, 'fetch');
+			// default service uses a non-proxied dispatcher (isProxied=false)
+			const result = await service.testProxy(connection.id);
+			expect(result).toMatchObject({
+				ok: true,
+				status: 'bypassed',
+				viaProxy: false,
+				bypassed: true,
+			});
+			expect(fetchMock).not.toHaveBeenCalled();
+		});
+
+		it('PROXY-TEST-03: a target that responds non-2xx through the proxy still means the proxy hop is OK', async () => {
+			jest.spyOn(global, 'fetch').mockResolvedValue({ status: 503 } as Response);
+			const result = await proxiedService().testProxy(connection.id);
+			expect(result).toMatchObject({ ok: true, status: 'ok', viaProxy: true });
+			expect(result.message).toMatch(/503/);
+		});
+
+		it('PROXY-TEST-04: a TLS failure through the proxy → tls_error', async () => {
+			jest.spyOn(global, 'fetch').mockRejectedValue(
+				Object.assign(new TypeError('fetch failed'), {
+					cause: Object.assign(new Error('cert'), { code: 'CERT_HAS_EXPIRED' }),
+				}),
+			);
+			const result = await proxiedService().testProxy(connection.id);
+			expect(result).toMatchObject({ ok: false, status: 'tls_error' });
+		});
+
+		it('PROXY-TEST-05: a tunnel rejection (CONNECT 502) → tunnel_failed', async () => {
+			jest.spyOn(global, 'fetch').mockRejectedValue(
+				Object.assign(new TypeError('fetch failed'), {
+					cause: Object.assign(new Error('aborted'), {
+						name: 'AbortError',
+						code: 'UND_ERR_ABORTED',
+						message: 'Proxy response (502) !== 200 when HTTP Tunneling',
+					}),
+				}),
+			);
+			const result = await proxiedService().testProxy(connection.id);
+			expect(result).toMatchObject({ ok: false, status: 'tunnel_failed' });
+		});
+
+		it('PROXY-TEST-06: a not-found connection → 404 NotFoundException', async () => {
+			prisma.apiConnection.findUnique.mockResolvedValueOnce(null);
+			await expect(proxiedService().testProxy('missing')).rejects.toBeInstanceOf(NotFoundException);
+		});
+
+		it('PROXY-WIRE-03c: a non-2xx target through the proxy keeps viaProxy + statusCode on testConnection', async () => {
+			jest.spyOn(global, 'fetch').mockResolvedValue({ status: 502 } as Response);
+			const result = await proxiedService().testConnection(connection.id);
+			expect(result).toMatchObject({ ok: false, reachable: true, statusCode: 502, viaProxy: true });
+		});
+
+		it('PROXY-SEC-PROXYCHECK: a proxy error message never leaks credentials (redacted)', async () => {
+			jest
+				.spyOn(global, 'fetch')
+				.mockRejectedValue(
+					new Error('connect failed for http://puser:psecret@proxy.corp.example:8080'),
+				);
+			const result = await proxiedService().testProxy(connection.id);
+			expect(JSON.stringify(result)).not.toMatch(/psecret/);
+		});
 	});
 });
