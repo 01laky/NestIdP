@@ -116,6 +116,71 @@ export class EnvironmentVariables {
 	@Min(1)
 	SYNC_MAX_USERS_PER_RUN?: number;
 
+	/** Scheduled-sync tick interval (ms). `0` disables the in-process scheduler entirely. */
+	@IsOptional()
+	@Transform(({ value }) => {
+		if (value === undefined || value === null || value === '') {
+			return undefined;
+		}
+		const parsed = Number.parseInt(String(value), 10);
+		return Number.isFinite(parsed) ? parsed : value;
+	})
+	@IsInt()
+	@Min(0)
+	SYNC_SCHEDULER_TICK_MS?: number;
+
+	/** Minimum allowed cron frequency (minutes); a schedule firing more often is rejected. */
+	@IsOptional()
+	@Transform(({ value }) => {
+		if (value === undefined || value === null || value === '') {
+			return undefined;
+		}
+		const parsed = Number.parseInt(String(value), 10);
+		return Number.isFinite(parsed) ? parsed : value;
+	})
+	@IsInt()
+	@Min(1)
+	SYNC_SCHEDULE_MIN_INTERVAL_MINUTES?: number;
+
+	/** Max random spread (seconds) added to each computed run; `0` = exact (no jitter). */
+	@IsOptional()
+	@Transform(({ value }) => {
+		if (value === undefined || value === null || value === '') {
+			return undefined;
+		}
+		const parsed = Number.parseInt(String(value), 10);
+		return Number.isFinite(parsed) ? parsed : value;
+	})
+	@IsInt()
+	@Min(0)
+	SYNC_SCHEDULE_JITTER_MAX_SECONDS?: number;
+
+	/** N consecutive failed scheduled runs auto-pause the schedule; `0` = never auto-pause. */
+	@IsOptional()
+	@Transform(({ value }) => {
+		if (value === undefined || value === null || value === '') {
+			return undefined;
+		}
+		const parsed = Number.parseInt(String(value), 10);
+		return Number.isFinite(parsed) ? parsed : value;
+	})
+	@IsInt()
+	@Min(0)
+	SYNC_SCHEDULE_FAILURE_AUTOPAUSE_THRESHOLD?: number;
+
+	/** On boot, an overdue schedule runs immediately only if overdue by ≤ this many minutes (`0` = never). */
+	@IsOptional()
+	@Transform(({ value }) => {
+		if (value === undefined || value === null || value === '') {
+			return undefined;
+		}
+		const parsed = Number.parseInt(String(value), 10);
+		return Number.isFinite(parsed) ? parsed : value;
+	})
+	@IsInt()
+	@Min(0)
+	SYNC_SCHEDULE_BOOT_OVERDUE_GRACE_MINUTES?: number;
+
 	@IsOptional()
 	@Transform(({ value }) => {
 		if (value === undefined || value === null || value === '') {

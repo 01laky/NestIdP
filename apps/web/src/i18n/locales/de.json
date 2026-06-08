@@ -112,7 +112,8 @@
 		"auditLog": "Audit-Protokoll",
 		"samlLogin": "SAML-Anmeldung",
 		"samlSessions": "Aktive Sitzungen",
-		"externalDb": "Externe Datenbank"
+		"externalDb": "Externe Datenbank",
+		"schedules": "Zeitpläne"
 	},
 	"adminAuth": {
 		"title": "Admin Login",
@@ -182,7 +183,12 @@
 			"idpAdvertisesWithoutEnforcement": "IdP metadata advertises signed AuthnRequests, but no SP connection currently enforces signature verification.",
 			"ecKeyAdvisory": "IdP encryption uses an EC key (ECDH-ES). Service Providers must support XML Encryption 1.1 (xenc11:AgreementMethod). Older SPs may not be compatible — consider using an RSA key for broader compatibility."
 		},
-		"activeSamlSessionsLabel": "Aktive SSO-Sitzungen"
+		"activeSamlSessionsLabel": "Aktive SSO-Sitzungen",
+		"schedulerSummary": "Geplante Synchronisierung",
+		"schedulerOn": "Scheduler aktiviert",
+		"schedulerOff": "Scheduler deaktiviert",
+		"schedulerCounts": "{{enabled}} aktiv, {{paused}} pausiert",
+		"openSchedules": "Zeitpläne öffnen"
 	},
 	"apiConnections": {
 		"listTitle": "API-Verbindungen",
@@ -645,7 +651,71 @@
 		"backToApiConnections": "Back to API connections",
 		"loadFailed": "Failed to load sync data",
 		"loadLogFailed": "Failed to load sync log",
-		"syncFailed": "Synchronisation fehlgeschlagen"
+		"syncFailed": "Synchronisation fehlgeschlagen",
+		"schedule": {
+			"sectionTitle": "Zeitplan",
+			"enableLabel": "Geplante Synchronisierung aktivieren",
+			"pausedLabel": "Pausieren (Zeitplan behalten, Läufe überspringen)",
+			"dryRunLabel": "Geplante Synchronisierungen als Probelauf ausführen (keine DB-Schreibvorgänge)",
+			"cronLabel": "Cron-Ausdruck",
+			"cronHint": "Fünf Felder: Minute Stunde Tag Monat Wochentag. Mindestintervall {{minutes}} Minuten.",
+			"presetLabel": "Vorlage",
+			"presetCustom": "Benutzerdefiniert…",
+			"timezoneLabel": "Zeitzone",
+			"save": "Zeitplan speichern",
+			"saved": "Zeitplan gespeichert",
+			"saveFailed": "Zeitplan konnte nicht gespeichert werden",
+			"loadFailed": "Zeitplan konnte nicht geladen werden",
+			"invalidCron": "Ungültiger Cron-Ausdruck",
+			"runNow": "Jetzt ausführen",
+			"nextRuns": "Nächste Läufe ({{tz}})",
+			"nextRunsLocal": "Nächste Läufe in Ihrer Zeitzone ({{tz}})",
+			"noPreview": "Geben Sie einen gültigen Cron-Ausdruck ein, um die nächsten Läufe anzuzeigen.",
+			"statusTitle": "Status",
+			"nextRunAt": "Nächster Lauf",
+			"lastScheduledRunAt": "Letzter geplanter Lauf",
+			"lastScheduledRunStatus": "Letztes geplantes Ergebnis",
+			"lastError": "Letzter Fehler",
+			"consecutiveFailures": "Aufeinanderfolgende Fehler",
+			"autoPaused": "Nach wiederholten Fehlern automatisch pausiert",
+			"none": "Keine",
+			"dryRunBadge": "Probelauf",
+			"stateEnabled": "Aktiviert",
+			"statePaused": "Pausiert",
+			"stateDisabled": "Deaktiviert",
+			"sourceLabel": "Quelle",
+			"sourceAll": "Alle Läufe",
+			"sourceManual": "Manuell",
+			"sourceScheduled": "Geplant",
+			"triggerManual": "Manuell",
+			"triggerScheduled": "Geplant",
+			"preset": {
+				"every15min": "Alle 15 Minuten",
+				"every30min": "Alle 30 Minuten",
+				"hourly": "Stündlich",
+				"every6h": "Alle 6 Stunden",
+				"daily2am": "Täglich um 02:00",
+				"weekdays6am": "Werktags um 06:00",
+				"weeklySun3am": "Wöchentlich, Sonntag um 03:00"
+			},
+			"overview": {
+				"title": "Synchronisierungspläne",
+				"subtitle": "Automatische Identitäts-Synchronisierungspläne über API-Verbindungen hinweg.",
+				"schedulerEnabled": "Scheduler aktiviert",
+				"schedulerDisabled": "Scheduler deaktiviert",
+				"empty": "Noch keine Zeitpläne konfiguriert.",
+				"colConnection": "Verbindung",
+				"colState": "Status",
+				"colCron": "Cron",
+				"colTimezone": "Zeitzone",
+				"colNextRun": "Nächster Lauf",
+				"colLastRun": "Letzter geplanter Lauf",
+				"colFailures": "Fehler",
+				"manualRuns": "Manuelle Läufe",
+				"scheduledRuns": "Geplante Läufe",
+				"loadFailed": "Zeitpläne konnten nicht geladen werden"
+			}
+		}
 	},
 	"errors": {
 		"managedBySync": "This record is managed by identity sync.",

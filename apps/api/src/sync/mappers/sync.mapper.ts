@@ -1,5 +1,11 @@
 import { SyncLog } from '@prisma/client';
-import type { SyncLogDto, SyncLogErrorEntryDto, SyncStatusResponseDto } from '@nestidp/shared';
+import type {
+	SyncLogDto,
+	SyncLogErrorEntryDto,
+	SyncStatusResponseDto,
+	SyncTriggerSource,
+} from '@nestidp/shared';
+import { isSyncTriggerSource } from '@nestidp/shared';
 import type { ApiConnection } from '@prisma/client';
 
 export const DRY_RUN_SUMMARY_PHASE = 'dry_run_summary' as const;
@@ -37,8 +43,14 @@ export function toSyncLogDto(row: SyncLog): SyncLogDto {
 		groupsSynced: row.groupsSynced,
 		rolesSynced: row.rolesSynced,
 		dryRun: isDryRunLog(errors),
+		triggerSource: normalizeTriggerSource(row.triggerSource),
 		errors,
 	};
+}
+
+/** Legacy rows (null) and any unexpected value are treated as 'manual'. */
+function normalizeTriggerSource(value: string | null): SyncTriggerSource {
+	return value != null && isSyncTriggerSource(value) ? value : 'manual';
 }
 
 export function toSyncStatusResponseDto(

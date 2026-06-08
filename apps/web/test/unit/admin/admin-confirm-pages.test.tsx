@@ -47,6 +47,7 @@ function syncLogStub(overrides: Partial<SyncLogDto> = {}): SyncLogDto {
 		groupsSynced: 0,
 		rolesSynced: 0,
 		dryRun: true,
+		triggerSource: 'manual',
 		errors: null,
 		...overrides,
 	};
@@ -206,6 +207,23 @@ describe('admin confirm page flows', () => {
 			latestSyncLog: null,
 		});
 		vi.spyOn(adminApi, 'listSyncLogs').mockResolvedValue({ syncLogs: [] });
+		vi.spyOn(adminApi, 'getSyncSchedule').mockResolvedValue({
+			schedule: {
+				connectionId: 'c1',
+				scheduleEnabled: false,
+				schedulePaused: false,
+				scheduleDryRun: false,
+				scheduleCron: null,
+				scheduleTimezone: null,
+				nextRunAt: null,
+				lastScheduledRunAt: null,
+				lastScheduledRunStatus: null,
+				scheduleLastError: null,
+				scheduleConsecutiveFailures: 0,
+				scheduleAutoPausedAt: null,
+				nextRuns: [],
+			},
+		});
 		const syncSpy = vi.spyOn(adminApi, 'triggerIdentitySync').mockResolvedValue({
 			syncLog: syncLogStub({ dryRun: true }),
 			connection: apiConnectionStub(),
@@ -222,13 +240,13 @@ describe('admin confirm page flows', () => {
 			</MemoryRouter>,
 		);
 		await waitFor(() => screen.getByRole('button', { name: 'Run full sync' }));
-		fireEvent.click(screen.getByLabelText(/Dry run/i));
+		fireEvent.click(screen.getByLabelText('Dry run (no DB writes)'));
 		fireEvent.click(screen.getByRole('button', { name: 'Run dry sync' }));
 		await waitFor(() => expect(syncSpy).toHaveBeenCalled());
 		expect(screen.queryByRole('dialog')).toBeNull();
 
 		syncSpy.mockClear();
-		fireEvent.click(screen.getByLabelText(/Dry run/i));
+		fireEvent.click(screen.getByLabelText('Dry run (no DB writes)'));
 		fireEvent.click(screen.getByRole('button', { name: 'Run full sync' }));
 		await screen.findByRole('dialog');
 		expect(screen.getByText(/overwrites local users/i)).toBeDefined();

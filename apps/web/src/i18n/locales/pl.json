@@ -112,7 +112,8 @@
 		"auditLog": "Dziennik audytu",
 		"samlLogin": "Logowanie SAML",
 		"samlSessions": "Aktywne sesje",
-		"externalDb": "Baza zewnętrzna"
+		"externalDb": "Baza zewnętrzna",
+		"schedules": "Harmonogramy"
 	},
 	"adminAuth": {
 		"title": "Admin Login",
@@ -182,7 +183,12 @@
 			"idpAdvertisesWithoutEnforcement": "IdP metadata advertises signed AuthnRequests, but no SP connection currently enforces signature verification.",
 			"ecKeyAdvisory": "IdP encryption uses an EC key (ECDH-ES). Service Providers must support XML Encryption 1.1 (xenc11:AgreementMethod). Older SPs may not be compatible — consider using an RSA key for broader compatibility."
 		},
-		"activeSamlSessionsLabel": "Aktywne sesje SSO"
+		"activeSamlSessionsLabel": "Aktywne sesje SSO",
+		"schedulerSummary": "Zaplanowana synchronizacja",
+		"schedulerOn": "Harmonogram włączony",
+		"schedulerOff": "Harmonogram wyłączony",
+		"schedulerCounts": "{{enabled}} aktywnych, {{paused}} wstrzymanych",
+		"openSchedules": "Otwórz harmonogramy"
 	},
 	"apiConnections": {
 		"listTitle": "Połączenia API",
@@ -645,7 +651,71 @@
 		"backToApiConnections": "Back to API connections",
 		"loadFailed": "Failed to load sync data",
 		"loadLogFailed": "Failed to load sync log",
-		"syncFailed": "Synchronizacja nie powiodła się"
+		"syncFailed": "Synchronizacja nie powiodła się",
+		"schedule": {
+			"sectionTitle": "Harmonogram",
+			"enableLabel": "Włącz zaplanowaną synchronizację",
+			"pausedLabel": "Wstrzymaj (zachowaj harmonogram, pomiń uruchomienia)",
+			"dryRunLabel": "Uruchamiaj zaplanowane synchronizacje na próbę (bez zapisu do bazy)",
+			"cronLabel": "Wyrażenie cron",
+			"cronHint": "Pięć pól: minuta godzina dzień miesiąc dzień tygodnia. Minimalny odstęp {{minutes}} minut.",
+			"presetLabel": "Ustawienie",
+			"presetCustom": "Niestandardowe…",
+			"timezoneLabel": "Strefa czasowa",
+			"save": "Zapisz harmonogram",
+			"saved": "Harmonogram zapisany",
+			"saveFailed": "Nie udało się zapisać harmonogramu",
+			"loadFailed": "Nie udało się wczytać harmonogramu",
+			"invalidCron": "Nieprawidłowe wyrażenie cron",
+			"runNow": "Uruchom teraz",
+			"nextRuns": "Najbliższe uruchomienia ({{tz}})",
+			"nextRunsLocal": "Najbliższe uruchomienia w Twojej strefie czasowej ({{tz}})",
+			"noPreview": "Wprowadź prawidłowe wyrażenie cron, aby zobaczyć podgląd najbliższych uruchomień.",
+			"statusTitle": "Stan",
+			"nextRunAt": "Następne uruchomienie",
+			"lastScheduledRunAt": "Ostatnie zaplanowane uruchomienie",
+			"lastScheduledRunStatus": "Ostatni zaplanowany wynik",
+			"lastError": "Ostatni błąd",
+			"consecutiveFailures": "Kolejne niepowodzenia",
+			"autoPaused": "Automatycznie wstrzymano po powtarzających się niepowodzeniach",
+			"none": "Brak",
+			"dryRunBadge": "Na próbę",
+			"stateEnabled": "Włączony",
+			"statePaused": "Wstrzymany",
+			"stateDisabled": "Wyłączony",
+			"sourceLabel": "Źródło",
+			"sourceAll": "Wszystkie uruchomienia",
+			"sourceManual": "Ręczne",
+			"sourceScheduled": "Zaplanowane",
+			"triggerManual": "Ręczne",
+			"triggerScheduled": "Zaplanowane",
+			"preset": {
+				"every15min": "Co 15 minut",
+				"every30min": "Co 30 minut",
+				"hourly": "Co godzinę",
+				"every6h": "Co 6 godzin",
+				"daily2am": "Codziennie o 02:00",
+				"weekdays6am": "W dni robocze o 06:00",
+				"weeklySun3am": "Co tydzień, niedziela o 03:00"
+			},
+			"overview": {
+				"title": "Harmonogramy synchronizacji",
+				"subtitle": "Automatyczne harmonogramy synchronizacji tożsamości w połączeniach API.",
+				"schedulerEnabled": "Harmonogram włączony",
+				"schedulerDisabled": "Harmonogram wyłączony",
+				"empty": "Nie skonfigurowano jeszcze żadnych harmonogramów.",
+				"colConnection": "Połączenie",
+				"colState": "Stan",
+				"colCron": "Cron",
+				"colTimezone": "Strefa czasowa",
+				"colNextRun": "Następne uruchomienie",
+				"colLastRun": "Ostatnie zaplanowane uruchomienie",
+				"colFailures": "Niepowodzenia",
+				"manualRuns": "Uruchomienia ręczne",
+				"scheduledRuns": "Uruchomienia zaplanowane",
+				"loadFailed": "Nie udało się wczytać harmonogramów"
+			}
+		}
 	},
 	"errors": {
 		"managedBySync": "This record is managed by identity sync.",

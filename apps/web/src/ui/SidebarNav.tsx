@@ -55,6 +55,15 @@ export function SidebarNav({
 						{t('apiConnections')}
 					</NavLink>
 				) : null}
+				{SHOW_API_CONNECTIONS_NAV ? (
+					<NavLink
+						to="/admin/sync-schedules"
+						className={({ isActive }) => `evg-nav__link${isActive ? ' evg-nav__link--active' : ''}`}
+						onClick={onNavigate}
+					>
+						{t('schedules')}
+					</NavLink>
+				) : null}
 				<NavLink
 					to={SP_CONNECTION_ROUTE_PREFIX}
 					className={({ isActive }) => `evg-nav__link${isActive ? ' evg-nav__link--active' : ''}`}

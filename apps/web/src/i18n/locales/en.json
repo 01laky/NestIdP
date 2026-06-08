@@ -112,7 +112,8 @@
 		"auditLog": "Audit log",
 		"samlLogin": "SAML login",
 		"samlSessions": "Active sessions",
-		"externalDb": "External database"
+		"externalDb": "External database",
+		"schedules": "Schedules"
 	},
 	"adminAuth": {
 		"title": "Admin Login",
@@ -182,7 +183,12 @@
 			"idpAdvertisesWithoutEnforcement": "IdP metadata advertises signed AuthnRequests, but no SP connection currently enforces signature verification.",
 			"ecKeyAdvisory": "IdP encryption uses an EC key (ECDH-ES). Service Providers must support XML Encryption 1.1 (xenc11:AgreementMethod). Older SPs may not be compatible — consider using an RSA key for broader compatibility."
 		},
-		"activeSamlSessionsLabel": "Active SSO sessions"
+		"activeSamlSessionsLabel": "Active SSO sessions",
+		"schedulerSummary": "Scheduled sync",
+		"schedulerOn": "Scheduler enabled",
+		"schedulerOff": "Scheduler disabled",
+		"schedulerCounts": "{{enabled}} active, {{paused}} paused",
+		"openSchedules": "Open schedules"
 	},
 	"apiConnections": {
 		"listTitle": "API connections",
@@ -645,7 +651,71 @@
 		"backToApiConnections": "Back to API connections",
 		"loadFailed": "Failed to load sync data",
 		"loadLogFailed": "Failed to load sync log",
-		"syncFailed": "Sync failed"
+		"syncFailed": "Sync failed",
+		"schedule": {
+			"sectionTitle": "Schedule",
+			"enableLabel": "Enable scheduled sync",
+			"pausedLabel": "Pause (keep the schedule, skip runs)",
+			"dryRunLabel": "Run scheduled syncs as a dry run (no DB writes)",
+			"cronLabel": "Cron expression",
+			"cronHint": "Five fields: minute hour day month weekday. Minimum interval {{minutes}} minutes.",
+			"presetLabel": "Preset",
+			"presetCustom": "Custom…",
+			"timezoneLabel": "Timezone",
+			"save": "Save schedule",
+			"saved": "Schedule saved",
+			"saveFailed": "Failed to save the schedule",
+			"loadFailed": "Failed to load the schedule",
+			"invalidCron": "Invalid cron expression",
+			"runNow": "Run now",
+			"nextRuns": "Next runs ({{tz}})",
+			"nextRunsLocal": "Next runs in your timezone ({{tz}})",
+			"noPreview": "Enter a valid cron expression to preview the next runs.",
+			"statusTitle": "Status",
+			"nextRunAt": "Next run",
+			"lastScheduledRunAt": "Last scheduled run",
+			"lastScheduledRunStatus": "Last scheduled result",
+			"lastError": "Last error",
+			"consecutiveFailures": "Consecutive failures",
+			"autoPaused": "Auto-paused after repeated failures",
+			"none": "None",
+			"dryRunBadge": "Dry run",
+			"stateEnabled": "Enabled",
+			"statePaused": "Paused",
+			"stateDisabled": "Disabled",
+			"sourceLabel": "Source",
+			"sourceAll": "All runs",
+			"sourceManual": "Manual",
+			"sourceScheduled": "Scheduled",
+			"triggerManual": "Manual",
+			"triggerScheduled": "Scheduled",
+			"preset": {
+				"every15min": "Every 15 minutes",
+				"every30min": "Every 30 minutes",
+				"hourly": "Hourly",
+				"every6h": "Every 6 hours",
+				"daily2am": "Daily at 02:00",
+				"weekdays6am": "Weekdays at 06:00",
+				"weeklySun3am": "Weekly, Sunday at 03:00"
+			},
+			"overview": {
+				"title": "Sync schedules",
+				"subtitle": "Automatic identity sync schedules across API connections.",
+				"schedulerEnabled": "Scheduler enabled",
+				"schedulerDisabled": "Scheduler disabled",
+				"empty": "No schedules configured yet.",
+				"colConnection": "Connection",
+				"colState": "State",
+				"colCron": "Cron",
+				"colTimezone": "Timezone",
+				"colNextRun": "Next run",
+				"colLastRun": "Last scheduled run",
+				"colFailures": "Failures",
+				"manualRuns": "Manual runs",
+				"scheduledRuns": "Scheduled runs",
+				"loadFailed": "Failed to load schedules"
+			}
+		}
 	},
 	"errors": {
 		"managedBySync": "This record is managed by identity sync.",

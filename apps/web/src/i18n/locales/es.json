@@ -112,7 +112,8 @@
 		"auditLog": "Registro de auditoría",
 		"samlLogin": "Inicio de sesión SAML",
 		"samlSessions": "Sesiones activas",
-		"externalDb": "Base de datos externa"
+		"externalDb": "Base de datos externa",
+		"schedules": "Programaciones"
 	},
 	"adminAuth": {
 		"title": "Admin Login",
@@ -182,7 +183,12 @@
 			"idpAdvertisesWithoutEnforcement": "IdP metadata advertises signed AuthnRequests, but no SP connection currently enforces signature verification.",
 			"ecKeyAdvisory": "IdP encryption uses an EC key (ECDH-ES). Service Providers must support XML Encryption 1.1 (xenc11:AgreementMethod). Older SPs may not be compatible — consider using an RSA key for broader compatibility."
 		},
-		"activeSamlSessionsLabel": "Sesiones SSO activas"
+		"activeSamlSessionsLabel": "Sesiones SSO activas",
+		"schedulerSummary": "Sincronización programada",
+		"schedulerOn": "Programador activado",
+		"schedulerOff": "Programador desactivado",
+		"schedulerCounts": "{{enabled}} activas, {{paused}} en pausa",
+		"openSchedules": "Abrir programaciones"
 	},
 	"apiConnections": {
 		"listTitle": "Conexiones API",
@@ -645,7 +651,71 @@
 		"backToApiConnections": "Back to API connections",
 		"loadFailed": "Failed to load sync data",
 		"loadLogFailed": "Failed to load sync log",
-		"syncFailed": "Error de sincronización"
+		"syncFailed": "Error de sincronización",
+		"schedule": {
+			"sectionTitle": "Programación",
+			"enableLabel": "Activar la sincronización programada",
+			"pausedLabel": "Pausar (mantener la programación, omitir ejecuciones)",
+			"dryRunLabel": "Ejecutar las sincronizaciones programadas en seco (sin escrituras en BD)",
+			"cronLabel": "Expresión cron",
+			"cronHint": "Cinco campos: minuto hora día mes día de la semana. Intervalo mínimo {{minutes}} minutos.",
+			"presetLabel": "Preajuste",
+			"presetCustom": "Personalizado…",
+			"timezoneLabel": "Zona horaria",
+			"save": "Guardar programación",
+			"saved": "Programación guardada",
+			"saveFailed": "No se pudo guardar la programación",
+			"loadFailed": "No se pudo cargar la programación",
+			"invalidCron": "Expresión cron no válida",
+			"runNow": "Ejecutar ahora",
+			"nextRuns": "Próximas ejecuciones ({{tz}})",
+			"nextRunsLocal": "Próximas ejecuciones en tu zona horaria ({{tz}})",
+			"noPreview": "Introduce una expresión cron válida para previsualizar las próximas ejecuciones.",
+			"statusTitle": "Estado",
+			"nextRunAt": "Próxima ejecución",
+			"lastScheduledRunAt": "Última ejecución programada",
+			"lastScheduledRunStatus": "Último resultado programado",
+			"lastError": "Último error",
+			"consecutiveFailures": "Fallos consecutivos",
+			"autoPaused": "Pausado automáticamente tras fallos repetidos",
+			"none": "Ninguna",
+			"dryRunBadge": "En seco",
+			"stateEnabled": "Activada",
+			"statePaused": "En pausa",
+			"stateDisabled": "Desactivada",
+			"sourceLabel": "Origen",
+			"sourceAll": "Todas las ejecuciones",
+			"sourceManual": "Manual",
+			"sourceScheduled": "Programada",
+			"triggerManual": "Manual",
+			"triggerScheduled": "Programada",
+			"preset": {
+				"every15min": "Cada 15 minutos",
+				"every30min": "Cada 30 minutos",
+				"hourly": "Cada hora",
+				"every6h": "Cada 6 horas",
+				"daily2am": "Diariamente a las 02:00",
+				"weekdays6am": "Días laborables a las 06:00",
+				"weeklySun3am": "Semanalmente, domingo a las 03:00"
+			},
+			"overview": {
+				"title": "Programaciones de sincronización",
+				"subtitle": "Programaciones de sincronización automática de identidades en las conexiones de API.",
+				"schedulerEnabled": "Programador activado",
+				"schedulerDisabled": "Programador desactivado",
+				"empty": "Aún no hay programaciones configuradas.",
+				"colConnection": "Conexión",
+				"colState": "Estado",
+				"colCron": "Cron",
+				"colTimezone": "Zona horaria",
+				"colNextRun": "Próxima ejecución",
+				"colLastRun": "Última ejecución programada",
+				"colFailures": "Fallos",
+				"manualRuns": "Ejecuciones manuales",
+				"scheduledRuns": "Ejecuciones programadas",
+				"loadFailed": "No se pudieron cargar las programaciones"
+			}
+		}
 	},
 	"errors": {
 		"managedBySync": "This record is managed by identity sync.",

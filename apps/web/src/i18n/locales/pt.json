@@ -112,7 +112,8 @@
 		"auditLog": "Registo de auditoria",
 		"samlLogin": "Início de sessão SAML",
 		"samlSessions": "Sessões ativas",
-		"externalDb": "Base de dados externa"
+		"externalDb": "Base de dados externa",
+		"schedules": "Agendamentos"
 	},
 	"adminAuth": {
 		"title": "Admin Login",
@@ -182,7 +183,12 @@
 			"idpAdvertisesWithoutEnforcement": "IdP metadata advertises signed AuthnRequests, but no SP connection currently enforces signature verification.",
 			"ecKeyAdvisory": "IdP encryption uses an EC key (ECDH-ES). Service Providers must support XML Encryption 1.1 (xenc11:AgreementMethod). Older SPs may not be compatible — consider using an RSA key for broader compatibility."
 		},
-		"activeSamlSessionsLabel": "Sessões SSO ativas"
+		"activeSamlSessionsLabel": "Sessões SSO ativas",
+		"schedulerSummary": "Sincronização agendada",
+		"schedulerOn": "Agendador ativado",
+		"schedulerOff": "Agendador desativado",
+		"schedulerCounts": "{{enabled}} ativos, {{paused}} pausados",
+		"openSchedules": "Abrir agendamentos"
 	},
 	"apiConnections": {
 		"listTitle": "Ligações API",
@@ -645,7 +651,71 @@
 		"backToApiConnections": "Back to API connections",
 		"loadFailed": "Failed to load sync data",
 		"loadLogFailed": "Failed to load sync log",
-		"syncFailed": "Falha na sincronização"
+		"syncFailed": "Falha na sincronização",
+		"schedule": {
+			"sectionTitle": "Agendamento",
+			"enableLabel": "Ativar a sincronização agendada",
+			"pausedLabel": "Pausar (manter o agendamento, ignorar execuções)",
+			"dryRunLabel": "Executar as sincronizações agendadas como simulação (sem gravações na BD)",
+			"cronLabel": "Expressão cron",
+			"cronHint": "Cinco campos: minuto hora dia mês dia da semana. Intervalo mínimo {{minutes}} minutos.",
+			"presetLabel": "Predefinição",
+			"presetCustom": "Personalizado…",
+			"timezoneLabel": "Fuso horário",
+			"save": "Guardar agendamento",
+			"saved": "Agendamento guardado",
+			"saveFailed": "Não foi possível guardar o agendamento",
+			"loadFailed": "Não foi possível carregar o agendamento",
+			"invalidCron": "Expressão cron inválida",
+			"runNow": "Executar agora",
+			"nextRuns": "Próximas execuções ({{tz}})",
+			"nextRunsLocal": "Próximas execuções no seu fuso horário ({{tz}})",
+			"noPreview": "Introduza uma expressão cron válida para pré-visualizar as próximas execuções.",
+			"statusTitle": "Estado",
+			"nextRunAt": "Próxima execução",
+			"lastScheduledRunAt": "Última execução agendada",
+			"lastScheduledRunStatus": "Último resultado agendado",
+			"lastError": "Último erro",
+			"consecutiveFailures": "Falhas consecutivas",
+			"autoPaused": "Pausado automaticamente após falhas repetidas",
+			"none": "Nenhuma",
+			"dryRunBadge": "Simulação",
+			"stateEnabled": "Ativado",
+			"statePaused": "Pausado",
+			"stateDisabled": "Desativado",
+			"sourceLabel": "Origem",
+			"sourceAll": "Todas as execuções",
+			"sourceManual": "Manual",
+			"sourceScheduled": "Agendada",
+			"triggerManual": "Manual",
+			"triggerScheduled": "Agendada",
+			"preset": {
+				"every15min": "A cada 15 minutos",
+				"every30min": "A cada 30 minutos",
+				"hourly": "A cada hora",
+				"every6h": "A cada 6 horas",
+				"daily2am": "Diariamente às 02:00",
+				"weekdays6am": "Em dias úteis às 06:00",
+				"weeklySun3am": "Semanalmente, domingo às 03:00"
+			},
+			"overview": {
+				"title": "Agendamentos de sincronização",
+				"subtitle": "Agendamentos de sincronização automática de identidades nas conexões de API.",
+				"schedulerEnabled": "Agendador ativado",
+				"schedulerDisabled": "Agendador desativado",
+				"empty": "Ainda não há agendamentos configurados.",
+				"colConnection": "Conexão",
+				"colState": "Estado",
+				"colCron": "Cron",
+				"colTimezone": "Fuso horário",
+				"colNextRun": "Próxima execução",
+				"colLastRun": "Última execução agendada",
+				"colFailures": "Falhas",
+				"manualRuns": "Execuções manuais",
+				"scheduledRuns": "Execuções agendadas",
+				"loadFailed": "Não foi possível carregar os agendamentos"
+			}
+		}
 	},
 	"errors": {
 		"managedBySync": "This record is managed by identity sync.",

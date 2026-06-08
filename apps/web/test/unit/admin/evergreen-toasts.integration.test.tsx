@@ -81,6 +81,7 @@ function syncLogStub(overrides: Partial<SyncLogDto> = {}): SyncLogDto {
 		groupsSynced: 0,
 		rolesSynced: 0,
 		dryRun: true,
+		triggerSource: 'manual',
 		errors: null,
 		...overrides,
 	};

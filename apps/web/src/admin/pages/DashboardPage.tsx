@@ -6,7 +6,8 @@ import {
 	IDENTITY_ROUTE_PREFIX,
 	SP_CONNECTION_ROUTE_PREFIX,
 } from '@nestidp/shared';
-import { AdminApiError, getAdminDashboard } from '../adminApi';
+import type { SchedulesOverviewResponseDto } from '@nestidp/shared';
+import { AdminApiError, getAdminDashboard, getSchedulesOverview } from '../adminApi';
 import { AdminPageHeader } from '../components/layout/AdminPageHeader';
 import { ErrorBanner } from '../components/common/ErrorBanner';
 import { LoadingState } from '../components/common/LoadingState';
@@ -31,6 +32,24 @@ export function DashboardPage() {
 	const [dashboard, setDashboard] = useState<Awaited<ReturnType<typeof getAdminDashboard>> | null>(
 		null,
 	);
+	const [schedules, setSchedules] = useState<SchedulesOverviewResponseDto | null>(null);
+
+	useEffect(() => {
+		let cancelled = false;
+		void (async () => {
+			try {
+				const overview = await getSchedulesOverview();
+				if (!cancelled) {
+					setSchedules(overview);
+				}
+			} catch {
+				// Scheduler summary is best-effort; the dashboard renders without it.
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, []);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -122,6 +141,27 @@ export function DashboardPage() {
 					.
 				</p>
 			)}
+			{schedules && (schedules.schedules.length > 0 || !schedules.schedulerEnabled) ? (
+				<Panel title={t('schedulerSummary')}>
+					<p>
+						<Badge variant={schedules.schedulerEnabled ? 'success' : 'neutral'}>
+							{schedules.schedulerEnabled ? t('schedulerOn') : t('schedulerOff')}
+						</Badge>{' '}
+						<span className="evg-muted">
+							{t('schedulerCounts', {
+								enabled: schedules.schedules.filter((s) => s.scheduleEnabled && !s.schedulePaused)
+									.length,
+								paused: schedules.schedules.filter((s) => s.schedulePaused).length,
+							})}
+						</span>
+					</p>
+					<p>
+						<Link className="evg-btn evg-btn--link" to="/admin/sync-schedules">
+							{t('openSchedules')}
+						</Link>
+					</p>
+				</Panel>
+			) : null}
 			<Panel title={t('idpConfiguration')}>
 				<p>
 					<Badge variant={certStatusToBadge(dashboard.idp.certStatus)}>

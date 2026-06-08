@@ -112,7 +112,8 @@
 		"auditLog": "Audit log",
 		"samlLogin": "SAML přihlášení",
 		"samlSessions": "Aktivní relace",
-		"externalDb": "Externí databáze"
+		"externalDb": "Externí databáze",
+		"schedules": "Plány"
 	},
 	"adminAuth": {
 		"title": "Admin přihlášení",
@@ -182,7 +183,12 @@
 			"idpAdvertisesWithoutEnforcement": "IdP metadata advertises signed AuthnRequests, but no SP connection currently enforces signature verification.",
 			"ecKeyAdvisory": "IdP encryption uses an EC key (ECDH-ES). Service Providers must support XML Encryption 1.1 (xenc11:AgreementMethod). Older SPs may not be compatible — consider using an RSA key for broader compatibility."
 		},
-		"activeSamlSessionsLabel": "Aktivní relace SSO"
+		"activeSamlSessionsLabel": "Aktivní relace SSO",
+		"schedulerSummary": "Plánovaná synchronizace",
+		"schedulerOn": "Plánovač zapnut",
+		"schedulerOff": "Plánovač vypnut",
+		"schedulerCounts": "{{enabled}} aktivních, {{paused}} pozastavených",
+		"openSchedules": "Otevřít plány"
 	},
 	"apiConnections": {
 		"listTitle": "API připojení",
@@ -645,7 +651,71 @@
 		"backToApiConnections": "Zpět na API připojení",
 		"loadFailed": "Nepodařilo se načíst sync data",
 		"loadLogFailed": "Nepodařilo se načíst sync log",
-		"syncFailed": "Synchronizace se nezdařila"
+		"syncFailed": "Synchronizace se nezdařila",
+		"schedule": {
+			"sectionTitle": "Plán",
+			"enableLabel": "Zapnout plánovanou synchronizaci",
+			"pausedLabel": "Pozastavit (ponechat plán, přeskočit běhy)",
+			"dryRunLabel": "Spouštět plánované synchronizace nanečisto (bez zápisu do DB)",
+			"cronLabel": "Výraz cron",
+			"cronHint": "Pět polí: minuta hodina den měsíc den v týdnu. Minimální interval {{minutes}} minut.",
+			"presetLabel": "Předvolba",
+			"presetCustom": "Vlastní…",
+			"timezoneLabel": "Časové pásmo",
+			"save": "Uložit plán",
+			"saved": "Plán uložen",
+			"saveFailed": "Plán se nepodařilo uložit",
+			"loadFailed": "Plán se nepodařilo načíst",
+			"invalidCron": "Neplatný výraz cron",
+			"runNow": "Spustit nyní",
+			"nextRuns": "Příští běhy ({{tz}})",
+			"nextRunsLocal": "Příští běhy ve vašem časovém pásmu ({{tz}})",
+			"noPreview": "Zadejte platný výraz cron pro náhled příštích běhů.",
+			"statusTitle": "Stav",
+			"nextRunAt": "Příští běh",
+			"lastScheduledRunAt": "Poslední plánovaný běh",
+			"lastScheduledRunStatus": "Poslední plánovaný výsledek",
+			"lastError": "Poslední chyba",
+			"consecutiveFailures": "Po sobě jdoucí selhání",
+			"autoPaused": "Automaticky pozastaveno po opakovaných selháních",
+			"none": "Žádný",
+			"dryRunBadge": "Nanečisto",
+			"stateEnabled": "Zapnuto",
+			"statePaused": "Pozastaveno",
+			"stateDisabled": "Vypnuto",
+			"sourceLabel": "Zdroj",
+			"sourceAll": "Všechny běhy",
+			"sourceManual": "Ruční",
+			"sourceScheduled": "Plánované",
+			"triggerManual": "Ruční",
+			"triggerScheduled": "Plánované",
+			"preset": {
+				"every15min": "Každých 15 minut",
+				"every30min": "Každých 30 minut",
+				"hourly": "Každou hodinu",
+				"every6h": "Každých 6 hodin",
+				"daily2am": "Denně ve 02:00",
+				"weekdays6am": "Ve všední dny v 06:00",
+				"weeklySun3am": "Týdně, neděle ve 03:00"
+			},
+			"overview": {
+				"title": "Plány synchronizace",
+				"subtitle": "Automatické plány synchronizace identit napříč API připojeními.",
+				"schedulerEnabled": "Plánovač zapnut",
+				"schedulerDisabled": "Plánovač vypnut",
+				"empty": "Zatím nejsou nakonfigurovány žádné plány.",
+				"colConnection": "Připojení",
+				"colState": "Stav",
+				"colCron": "Cron",
+				"colTimezone": "Časové pásmo",
+				"colNextRun": "Příští běh",
+				"colLastRun": "Poslední plánovaný běh",
+				"colFailures": "Selhání",
+				"manualRuns": "Ruční běhy",
+				"scheduledRuns": "Plánované běhy",
+				"loadFailed": "Plány se nepodařilo načíst"
+			}
+		}
 	},
 	"errors": {
 		"managedBySync": "Tento záznam je spravován synchronizací identit.",

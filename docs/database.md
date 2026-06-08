@@ -61,6 +61,16 @@ Migration: `20260604120000_identity_manual_crud` (single history under `prisma/m
 - Phases include `dry_run_summary`, `user_limit`, `fetch_users`, `upsert_user`, etc.
 - **`durationMs`** appears on API `SyncLogDto` only (computed from timestamps, not persisted)
 
+### Scheduled sync (v1.13.0)
+
+- **`SyncLog.triggerSource`** — `"manual"` | `"scheduled"`; **null on legacy rows is treated as `manual`**. Indexed for source-filtered history.
+- **`ApiConnection` schedule columns** (opt-in, off by default; never set for the local-directory row):
+  - `scheduleEnabled` / `schedulePaused` / `scheduleDryRun` — enable, pause (keep schedule, skip runs), and dry-run-only flags
+  - `scheduleCron` / `scheduleTimezone` — five-field cron + IANA timezone (default `UTC`)
+  - `nextRunAt` — next computed fire instant; persisted so schedules **survive restarts**; cleared on disable/clear-cron
+  - `lastScheduledRunAt` / `lastScheduledRunStatus` — last **scheduled** run time + result, distinct from `lastSyncAt` / `lastSyncStatus` which any run updates
+  - `scheduleLastError` / `scheduleConsecutiveFailures` / `scheduleAutoPausedAt` — failure backoff state; a successful real sync clears these (and lifts an auto-pause)
+
 ### End-user sessions (v0.6.0)
 
 - **`AdminUser`** and **`User`** are separate tables — same username string may exist in both without conflict

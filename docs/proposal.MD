@@ -706,7 +706,7 @@ _Phase 1 complete in **v1.0.0** (Prompt 10 — Docker, persistent audit, admin a
 
 - [x] **Configurable API contract** — endpoint paths, JSON field mapping, envelope, headers, pagination, embedded memberships per API connection (v1.9.0)
 - [ ] **Outbound HTTP proxy** — optional proxy URL and auth per API connection for sync requests
-- [ ] Scheduled sync (cron)
+- [x] **Scheduled sync (cron)** — per-connection cron schedule with IANA timezone, in-process scheduler, pause / dry-run / jitter / failure auto-pause, survives restarts, no catch-up (v1.13.0)
 - [ ] Certificate rotation (dual-cert in metadata)
 - [ ] Rate limiting and brute-force protection
 - [ ] Sync error reporting in admin UI

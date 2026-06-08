@@ -1,5 +1,5 @@
 import type { ApiConnectionDto } from './connections.js';
-import type { LastSyncStatus, SyncLogStatus } from './schema-enums.js';
+import type { LastSyncStatus, SyncLogStatus, SyncTriggerSource } from './schema-enums.js';
 
 /** Admin REST API base path for identity sync (not the React route). */
 export const SYNC_API_PATH = '/api/admin/sync';
@@ -18,6 +18,8 @@ export interface SyncLogDto {
 	rolesSynced: number;
 	/** True when run was POST with dryRun — detected via dry_run_summary error entry. */
 	dryRun: boolean;
+	/** How the run was started; null on legacy rows is treated as 'manual'. */
+	triggerSource: SyncTriggerSource;
 	errors: SyncLogErrorEntryDto[] | null;
 }
 

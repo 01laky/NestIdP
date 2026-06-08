@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import { HealthService } from '@api/health/services/health.service';
 import { PrismaService } from '@api/prisma/services/prisma.service';
 
@@ -8,16 +9,25 @@ describe('HealthService', () => {
 		pingDatabase: jest.Mock;
 		appliedMigrationCount: jest.Mock;
 		externalIdentityDatabase: { findUnique: jest.Mock };
+		apiConnection: { count: jest.Mock };
 	};
+	let configValues: Record<string, string | undefined>;
 
 	beforeEach(async () => {
+		configValues = {};
 		prisma = {
 			pingDatabase: jest.fn(),
 			appliedMigrationCount: jest.fn().mockResolvedValue(7),
 			externalIdentityDatabase: { findUnique: jest.fn().mockResolvedValue(null) },
+			apiConnection: { count: jest.fn().mockResolvedValue(0) },
 		};
+		const configService = { get: jest.fn((key: string) => configValues[key]) };
 		const module: TestingModule = await Test.createTestingModule({
-			providers: [HealthService, { provide: PrismaService, useValue: prisma }],
+			providers: [
+				HealthService,
+				{ provide: PrismaService, useValue: prisma },
+				{ provide: ConfigService, useValue: configService },
+			],
 		}).compile();
 		service = module.get(HealthService);
 	});
@@ -96,6 +106,27 @@ describe('HealthService', () => {
 			expect(result.httpStatus).toBe(503);
 			expect(result.body.status).toBe('unavailable');
 			expect(result.body.externalIdentityDb?.reachable).toBe(false);
+		});
+
+		it('HARD-OVERVIEW-01: /ready reflects scheduler enabled + scheduled/due counts', async () => {
+			prisma.pingDatabase.mockResolvedValue(true);
+			prisma.apiConnection.count
+				.mockResolvedValueOnce(3) // scheduledConnections
+				.mockResolvedValueOnce(1); // due
+			const result = await service.getReady('file:../data/nestidp.db');
+			expect(result.httpStatus).toBe(200);
+			expect(result.body.scheduler).toEqual({
+				enabled: true,
+				scheduledConnections: 3,
+				due: 1,
+			});
+		});
+
+		it('HARD-OVERVIEW-02: /ready reports scheduler disabled when SYNC_SCHEDULER_TICK_MS=0', async () => {
+			prisma.pingDatabase.mockResolvedValue(true);
+			configValues.SYNC_SCHEDULER_TICK_MS = '0';
+			const result = await service.getReady('file:../data/nestidp.db');
+			expect(result.body.scheduler?.enabled).toBe(false);
 		});
 
 		it('EXTDB-READY-03: an unreachable MIRROR external DB does not degrade readiness (local authoritative)', async () => {

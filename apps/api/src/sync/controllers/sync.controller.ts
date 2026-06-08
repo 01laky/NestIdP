@@ -16,9 +16,11 @@ import {
 import { AdminAuthenticatedRequest } from '../../admin-auth/admin-auth.types';
 import {
 	SYNC_API_PATH,
+	isSyncTriggerSource,
 	type SyncLogListResponseDto,
 	type SyncLogResponseDto,
 	type SyncStatusResponseDto,
+	type SyncTriggerSource,
 	type TriggerSyncResponseDto,
 } from '@nestidp/shared';
 import { AdminAuthGuard } from '../../admin-auth/guards/admin-auth.guard';
@@ -48,9 +50,12 @@ export class SyncController {
 	listLogs(
 		@Param('connectionId', ParseCuidPipe) connectionId: string,
 		@Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+		@Query('source') source?: string,
 	): Promise<SyncLogListResponseDto> {
 		const safeLimit = Math.min(Math.max(limit, 1), 100);
-		return this.syncService.listSyncLogs(connectionId, safeLimit);
+		const triggerSource: SyncTriggerSource | undefined =
+			source !== undefined && isSyncTriggerSource(source) ? source : undefined;
+		return this.syncService.listSyncLogs(connectionId, safeLimit, triggerSource);
 	}
 
 	@Post(':connectionId')

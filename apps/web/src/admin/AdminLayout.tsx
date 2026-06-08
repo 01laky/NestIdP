@@ -25,6 +25,7 @@ const ApiConnectionsListPage = lazyPage(
 	'ApiConnectionsListPage',
 );
 const DashboardPage = lazyPage(() => import('./pages/DashboardPage'), 'DashboardPage');
+const SyncSchedulesPage = lazyPage(() => import('./pages/SyncSchedulesPage'), 'SyncSchedulesPage');
 const IdentityGroupDetailPage = lazyPage(
 	() => import('./pages/IdentityGroupDetailPage'),
 	'IdentityGroupDetailPage',
@@ -148,6 +149,7 @@ export function AdminLayout() {
 							<Route path="api-connections/new" element={<ApiConnectionFormPage />} />
 							<Route path="api-connections/:id" element={<ApiConnectionFormPage />} />
 							<Route path="api-connections/:id/sync" element={<ApiConnectionSyncPage />} />
+							<Route path="sync-schedules" element={<SyncSchedulesPage />} />
 							<Route path="sync-logs/:syncLogId" element={<SyncLogDetailPage />} />
 							<Route path="sp-connections" element={<SpConnectionsListPage />} />
 							<Route path="sp-connections/new" element={<SpConnectionFormPage />} />

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { SyncLogErrorEntryDto } from '@nestidp/shared';
+import type { SyncLogErrorEntryDto, SyncTriggerSource } from '@nestidp/shared';
 import { Prisma, SyncLog, SyncLogStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/services/prisma.service';
 import { toSyncLogDto } from '../mappers/sync.mapper';
@@ -10,11 +10,15 @@ const MAX_SYNC_ERRORS = 100;
 export class SyncLogService {
 	constructor(private readonly prisma: PrismaService) {}
 
-	createRunningLog(apiConnectionId: string): Promise<SyncLog> {
+	createRunningLog(
+		apiConnectionId: string,
+		triggerSource: SyncTriggerSource = 'manual',
+	): Promise<SyncLog> {
 		return this.prisma.syncLog.create({
 			data: {
 				apiConnectionId,
 				status: 'RUNNING',
+				triggerSource,
 			},
 		});
 	}
@@ -42,9 +46,13 @@ export class SyncLogService {
 		});
 	}
 
-	async listLogsForConnection(connectionId: string, limit: number): Promise<SyncLog[]> {
+	async listLogsForConnection(
+		connectionId: string,
+		limit: number,
+		triggerSource?: SyncTriggerSource,
+	): Promise<SyncLog[]> {
 		return this.prisma.syncLog.findMany({
-			where: { apiConnectionId: connectionId },
+			where: { apiConnectionId: connectionId, ...triggerSourceFilter(triggerSource) },
 			orderBy: { startedAt: 'desc' },
 			take: limit,
 		});
@@ -75,6 +83,19 @@ export class SyncLogService {
 	toDto(row: SyncLog) {
 		return toSyncLogDto(row);
 	}
+}
+
+/** Build the triggerSource where-clause. 'manual' also matches legacy null rows. */
+function triggerSourceFilter(
+	triggerSource: SyncTriggerSource | undefined,
+): Prisma.SyncLogWhereInput {
+	if (triggerSource === 'manual') {
+		return { OR: [{ triggerSource: 'manual' }, { triggerSource: null }] };
+	}
+	if (triggerSource === 'scheduled') {
+		return { triggerSource: 'scheduled' };
+	}
+	return {};
 }
 
 export function capSyncErrors(
