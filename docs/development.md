@@ -205,6 +205,32 @@ Private keys encrypted at rest (`EncryptionService`); admin JSON exposes fingerp
 
 `IdpSettings.nameIdFormat` affects **metadata only**; assertion NameID still comes from each **`SpConnection.nameIdFormat`**.
 
+#### Automatic certificate rotation (v1.15.0)
+
+Opt-in per cert (off by default), the **automatic** lifecycle drives the same manual primitives without
+an operator. `CertRotationSchedulerService` mirrors `SyncSchedulerService`: one `setInterval`
+(`CERT_ROTATION_SCHEDULER_TICK_MS`, `0` disables), re-entrancy-guarded (key generation shells out to
+openssl), fresh-DB read per tick, single instance only. Each tick calls
+`IdpSettingsService.runAutoRotationCheck` (also exposed on-demand via
+`POST /api/admin/idp/settings/cert-rotation/run-check`), which evaluates signing + encryption
+independently:
+
+- **Phase A — auto-start:** active cert within `CERT_ROTATION_LEAD_DAYS` and no rotation → generate a
+  pending cert mirroring the active crypto (validity `CERT_ROTATION_VALIDITY_DAYS`); the existing
+  dual-cert metadata overlap publishes both. Signs with the **active** key throughout.
+- **Phase B — auto-complete:** a rotation whose `rotationStartedAt` is older than the (expiry-clamped)
+  `CERT_ROTATION_OVERLAP_DAYS` → promote pending → primary. Also finalizes a manually-started rotation
+  while the toggle is on.
+- **Due-soon:** within `CERT_ROTATION_NOTIFY_LEAD_DAYS` but before the start window → fire the
+  `CertRotationNotifier` hook (no-op default).
+
+Auto transitions are audited as a **system** actor (`idp_*_rotation_auto_started/_completed`,
+`_auto_rotation_failed/_due_soon/_autodisabled`). Per-cert failure backoff increments a counter and
+auto-disables after `CERT_ROTATION_FAILURE_AUTODISABLE_THRESHOLD`; `CERT_ROTATION_DRY_RUN` evaluates +
+audits without mutating; `CERT_ROTATION_BOOT_GRACE_HOURS` / `CERT_ROTATION_JITTER_MAX_SECONDS` avoid
+surprise/boundary rotations. A failure never crashes a tick or blocks boot; the scheduler is
+single-instance (multi-replica would double-drive).
+
 ### Admin REST API (v1.0.0)
 
 Full operator surface:

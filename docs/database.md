@@ -89,19 +89,22 @@ Migration: `20260604120000_identity_manual_crud` (single history under `prisma/m
 
 Singleton row `id = default`. Bootstrap creates **`entityId`** only (from `IDP_BASE_URL`); signing certs are operator-managed or lazy-generated on first SSO/metadata (dev fallback).
 
-| Column                                                                                                      | Purpose                                                                   |
-| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `signingCertPem` / `signingKeyEncrypted`                                                                    | Primary signing material (assertions + metadata)                          |
-| `pendingSigningCertPem` / `pendingSigningKeyEncrypted`                                                      | Next cert during rotation (metadata only until complete)                  |
-| `rotationStartedAt`                                                                                         | UI / audit timestamp when signing rotation started                        |
-| `signingKeyFamily`, `signingSignatureAlgorithmId`, …                                                        | Crypto metadata for primary/pending signing certs (v1.4.7)                |
-| `encryptionCertPem` / `encryptionKeyEncrypted`                                                              | Optional IdP encryption material (metadata `use="encryption"`)            |
-| `pendingEncryptionCertPem` / `pendingEncryptionKeyEncrypted`                                                | Next encryption cert during encryption rotation                           |
-| `encryptionRotationStartedAt`                                                                               | Timestamp when **encryption** rotation started (independent from signing) |
-| `encryptionKeyFamily`, `encryptionKeyTransportAlgorithmId`, `encryptionRsaModulusBits`, `encryptionEcCurve` | Primary encryption crypto metadata (v1.5.0)                               |
-| `pendingEncryption*` columns                                                                                | Pending encryption crypto during rotation                                 |
+| Column                                                                                                      | Purpose                                                                    |
+| ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `signingCertPem` / `signingKeyEncrypted`                                                                    | Primary signing material (assertions + metadata)                           |
+| `pendingSigningCertPem` / `pendingSigningKeyEncrypted`                                                      | Next cert during rotation (metadata only until complete)                   |
+| `rotationStartedAt`                                                                                         | UI / audit timestamp when signing rotation started                         |
+| `signingKeyFamily`, `signingSignatureAlgorithmId`, …                                                        | Crypto metadata for primary/pending signing certs (v1.4.7)                 |
+| `encryptionCertPem` / `encryptionKeyEncrypted`                                                              | Optional IdP encryption material (metadata `use="encryption"`)             |
+| `pendingEncryptionCertPem` / `pendingEncryptionKeyEncrypted`                                                | Next encryption cert during encryption rotation                            |
+| `encryptionRotationStartedAt`                                                                               | Timestamp when **encryption** rotation started (independent from signing)  |
+| `encryptionKeyFamily`, `encryptionKeyTransportAlgorithmId`, `encryptionRsaModulusBits`, `encryptionEcCurve` | Primary encryption crypto metadata (v1.5.0)                                |
+| `pendingEncryption*` columns                                                                                | Pending encryption crypto during rotation                                  |
+| `autoRotate{Signing,Encryption}Enabled`                                                                     | **Automatic rotation (v1.15.0)** opt-in per cert; off by default           |
+| `lastAutoRotationCheckAt` / `lastAutoRotationActionAt`                                                      | Last scheduler tick that evaluated / acted (observability)                 |
+| `{signing,encryption}AutoRotationConsecutiveFailures` / `…LastError` / `…DisabledAt`                        | Per-cert failure backoff: counter, last redacted reason, auto-disable mark |
 
-**Invariants:** for each rotation kind (signing vs encryption), pending cert and key must both be set or both null; `complete` promotes pending → primary including crypto columns; `cancel` clears pending fields. Signing and encryption rotations may be active **at the same time**. Encryption cert is **never** lazy-generated on SSO. Private keys encrypted with `EncryptionService` (`v1:` prefix).
+**Invariants:** for each rotation kind (signing vs encryption), pending cert and key must both be set or both null; `complete` promotes pending → primary including crypto columns; `cancel` clears pending fields. Signing and encryption rotations may be active **at the same time**. Encryption cert is **never** lazy-generated on SSO. Private keys encrypted with `EncryptionService` (`v1:` prefix). **Automatic rotation (v1.15.0)** is an opt-in scheduler that drives these same primitives (generate pending → overlap → promote) before expiry; disabling a toggle returns the cert to manual control.
 
 **SpConnection (v1.5.0+):** `wantAssertionsEncrypted` defaults `false`; API rejects enabling without `spCertificate` PEM. When true (v1.7.0), SSO encrypts signed assertions to the SP cert (AES-256-CBC).
 

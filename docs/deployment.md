@@ -173,27 +173,36 @@ docker compose exec nestidp pnpm db:rekey -- "$NEW_KEY"
 
 ## Environment reference (compose / production)
 
-| Variable                                    | Default        | Purpose                                                                                               |
-| ------------------------------------------- | -------------- | ----------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`                              | set in compose | `file:` path to the libSQL DB file                                                                    |
-| `DATABASE_ENCRYPTION_KEY`                   | —              | At-rest DB encryption key (required in prod)                                                          |
-| `DATABASE_ENCRYPTION_KEY_FILE`              | —              | Alt: read the DB key from a secret file                                                               |
-| `SESSION_SECRET`                            | —              | Admin + end-user cookie signing                                                                       |
-| `ENCRYPTION_KEY`                            | —              | API tokens and IdP private keys at rest                                                               |
-| `IDP_BASE_URL`                              | —              | Public IdP base URL                                                                                   |
-| `ADMIN_USERNAME` / `ADMIN_PASSWORD`         | —              | First admin when table empty                                                                          |
-| `TRUST_PROXY`                               | `false`        | `true` behind load balancer                                                                           |
-| `AUDIT_RETENTION_DAYS`                      | `90`           | Delete `AuditEvent` rows older than N days                                                            |
-| `AUDIT_CLEANUP_INTERVAL_MS`                 | `86400000`     | Cleanup interval; `0` = once on startup                                                               |
-| `ADMIN_USER_CREATE_RATE_LIMIT_MAX`          | `5`            | Max admin creates per window                                                                          |
-| `ADMIN_USER_CREATE_RATE_LIMIT_WINDOW_MS`    | `900000`       | Admin create rate window (15 min)                                                                     |
-| `MIGRATE_ONLY`                              | `0`            | `1` = migrate and exit                                                                                |
-| `SYNC_SCHEDULER_TICK_MS`                    | `30000`        | Scheduled-sync tick interval; `0` disables the scheduler                                              |
-| `SYNC_SCHEDULE_MIN_INTERVAL_MINUTES`        | `5`            | Reject cron schedules firing more often than this                                                     |
-| `SYNC_SCHEDULE_JITTER_MAX_SECONDS`          | `30`           | Spread same-cron connections; `0` = exact run times                                                   |
-| `SYNC_SCHEDULE_FAILURE_AUTOPAUSE_THRESHOLD` | `0`            | Auto-pause after N consecutive failures; `0` = never                                                  |
-| `SYNC_SCHEDULE_BOOT_OVERDUE_GRACE_MINUTES`  | `0`            | On boot, run an overdue schedule only if overdue ≤ N min; `0` = never                                 |
-| `PROXY_CONNECT_TIMEOUT_MS`                  | `5000`         | Per-connection outbound `ProxyAgent` connect timeout (fast-fail a dead proxy); bounded `[100, 60000]` |
+| Variable                                      | Default        | Purpose                                                                                                          |
+| --------------------------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                | set in compose | `file:` path to the libSQL DB file                                                                               |
+| `DATABASE_ENCRYPTION_KEY`                     | —              | At-rest DB encryption key (required in prod)                                                                     |
+| `DATABASE_ENCRYPTION_KEY_FILE`                | —              | Alt: read the DB key from a secret file                                                                          |
+| `SESSION_SECRET`                              | —              | Admin + end-user cookie signing                                                                                  |
+| `ENCRYPTION_KEY`                              | —              | API tokens and IdP private keys at rest                                                                          |
+| `IDP_BASE_URL`                                | —              | Public IdP base URL                                                                                              |
+| `ADMIN_USERNAME` / `ADMIN_PASSWORD`           | —              | First admin when table empty                                                                                     |
+| `TRUST_PROXY`                                 | `false`        | `true` behind load balancer                                                                                      |
+| `AUDIT_RETENTION_DAYS`                        | `90`           | Delete `AuditEvent` rows older than N days                                                                       |
+| `AUDIT_CLEANUP_INTERVAL_MS`                   | `86400000`     | Cleanup interval; `0` = once on startup                                                                          |
+| `ADMIN_USER_CREATE_RATE_LIMIT_MAX`            | `5`            | Max admin creates per window                                                                                     |
+| `ADMIN_USER_CREATE_RATE_LIMIT_WINDOW_MS`      | `900000`       | Admin create rate window (15 min)                                                                                |
+| `MIGRATE_ONLY`                                | `0`            | `1` = migrate and exit                                                                                           |
+| `SYNC_SCHEDULER_TICK_MS`                      | `30000`        | Scheduled-sync tick interval; `0` disables the scheduler                                                         |
+| `SYNC_SCHEDULE_MIN_INTERVAL_MINUTES`          | `5`            | Reject cron schedules firing more often than this                                                                |
+| `SYNC_SCHEDULE_JITTER_MAX_SECONDS`            | `30`           | Spread same-cron connections; `0` = exact run times                                                              |
+| `SYNC_SCHEDULE_FAILURE_AUTOPAUSE_THRESHOLD`   | `0`            | Auto-pause after N consecutive failures; `0` = never                                                             |
+| `SYNC_SCHEDULE_BOOT_OVERDUE_GRACE_MINUTES`    | `0`            | On boot, run an overdue schedule only if overdue ≤ N min; `0` = never                                            |
+| `PROXY_CONNECT_TIMEOUT_MS`                    | `5000`         | Per-connection outbound `ProxyAgent` connect timeout (fast-fail a dead proxy); bounded `[100, 60000]`            |
+| `CERT_ROTATION_SCHEDULER_TICK_MS`             | `3600000`      | Automatic cert-rotation tick interval; `0` disables the scheduler (manual rotation only)                         |
+| `CERT_ROTATION_LEAD_DAYS`                     | `30`           | Auto-start a rotation when the active cert expires within N days (per-cert `…_SIGNING_/…_ENCRYPTION_` overrides) |
+| `CERT_ROTATION_OVERLAP_DAYS`                  | `7`            | Auto-complete only after the pending cert has been published N days (clamped to fit before expiry)               |
+| `CERT_ROTATION_VALIDITY_DAYS`                 | `365`          | Validity of auto-generated rotation certs                                                                        |
+| `CERT_ROTATION_NOTIFY_LEAD_DAYS`              | `45`           | Fire the "due soon" notifier this far ahead of the auto-start window                                             |
+| `CERT_ROTATION_JITTER_MAX_SECONDS`            | `0`            | Random spread before an auto-start; `0` = exact                                                                  |
+| `CERT_ROTATION_BOOT_GRACE_HOURS`              | `0`            | On boot, auto-start immediately only if the cert expires within N hours; else wait a tick                        |
+| `CERT_ROTATION_FAILURE_AUTODISABLE_THRESHOLD` | `5`            | Auto-disable a cert's auto-rotation after N consecutive failures; `0` = never                                    |
+| `CERT_ROTATION_DRY_RUN`                       | `false`        | Evaluate + audit/notify what would happen without mutating                                                       |
 
 > **Single-instance scheduling.** The scheduled-sync scheduler is **in-process** and assumes a single
 > NestIdP container. Running multiple replicas would **double-run** schedules (no HA leader election).

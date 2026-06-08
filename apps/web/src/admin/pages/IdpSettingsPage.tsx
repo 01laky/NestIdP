@@ -26,6 +26,7 @@ import {
 	getIdpEncryptionCertPublicPem,
 	getIdpMetadataPreview,
 	getIdpSettings,
+	runCertRotationCheck,
 	startIdpCertRotation,
 	startIdpEncryptionCertRotation,
 	updateIdpSettings,
@@ -229,6 +230,26 @@ export function IdpSettingsPage() {
 			await reload();
 			setSuccess(t('successWantAuthnRequestsSignedUpdated'));
 			showToast(t('toastWantAuthnRequestsSignedUpdated'));
+		});
+	}
+
+	async function handleToggleAutoRotation(kind: 'signing' | 'encryption', enabled: boolean) {
+		await runMutation(async () => {
+			await updateIdpSettings(
+				kind === 'signing'
+					? { autoRotateSigningEnabled: enabled }
+					: { autoRotateEncryptionEnabled: enabled },
+			);
+			await reload();
+			showToast(t('autoRotation.toastUpdated'));
+		});
+	}
+
+	async function handleRunRotationCheck() {
+		await runMutation(async () => {
+			await runCertRotationCheck();
+			await reload();
+			showToast(t('autoRotation.toastChecked'));
 		});
 	}
 
@@ -506,6 +527,18 @@ export function IdpSettingsPage() {
 		return <ErrorBanner message={error ?? t('unavailable')} />;
 	}
 
+	// The real DTO always carries `auto`; fall back defensively so partial test stubs never crash.
+	const emptyAuto = {
+		enabled: false,
+		disabledAt: null,
+		consecutiveFailures: 0,
+		lastError: null,
+		willAutoStartBy: null,
+		willAutoCompleteAt: null,
+	};
+	const signingAuto = settings.rotation.auto ?? emptyAuto;
+	const encryptionAuto = settings.encryptionRotation.auto ?? emptyAuto;
+
 	return (
 		<section>
 			<AdminBreadcrumbs
@@ -631,6 +664,70 @@ export function IdpSettingsPage() {
 						</Button>
 					</fieldset>
 				</form>
+			</Panel>
+
+			<Panel title={t('autoRotation.title')}>
+				<Callout variant="info">{t('autoRotation.callout')}</Callout>
+				<fieldset className="evg-stack" disabled={busy}>
+					<Checkbox
+						label={t('autoRotation.enableSigning')}
+						hint={t('autoRotation.enableHint')}
+						checked={signingAuto.enabled}
+						onChange={(v) => void handleToggleAutoRotation('signing', v)}
+					/>
+					{signingAuto.disabledAt ? (
+						<Callout variant="warning">{t('autoRotation.backoffDisabled')}</Callout>
+					) : null}
+					{signingAuto.lastError ? (
+						<p className="evg-muted">
+							{t('autoRotation.lastError', { error: signingAuto.lastError })}
+						</p>
+					) : null}
+					{signingAuto.willAutoStartBy ? (
+						<p className="evg-muted">
+							{t('autoRotation.willStartBy', { date: signingAuto.willAutoStartBy })}
+						</p>
+					) : null}
+					{signingAuto.willAutoCompleteAt ? (
+						<p className="evg-muted">
+							{t('autoRotation.willCompleteAt', {
+								date: signingAuto.willAutoCompleteAt,
+							})}
+						</p>
+					) : null}
+
+					{settings.hasEncryptionCertificate ? (
+						<>
+							<Checkbox
+								label={t('autoRotation.enableEncryption')}
+								hint={t('autoRotation.enableHint')}
+								checked={encryptionAuto.enabled}
+								onChange={(v) => void handleToggleAutoRotation('encryption', v)}
+							/>
+							{encryptionAuto.disabledAt ? (
+								<Callout variant="warning">{t('autoRotation.backoffDisabled')}</Callout>
+							) : null}
+						</>
+					) : null}
+
+					<p className="evg-muted">
+						{t('autoRotation.lastCheck', {
+							date: settings.lastAutoRotationCheckAt ?? tCommon('emDash'),
+						})}
+						{' · '}
+						{t('autoRotation.lastAction', {
+							date: settings.lastAutoRotationActionAt ?? tCommon('emDash'),
+						})}
+					</p>
+					<Button
+						type="button"
+						variant="secondary"
+						disabled={busy}
+						onClick={() => void handleRunRotationCheck()}
+					>
+						{t('autoRotation.runCheck')}
+					</Button>
+				</fieldset>
 			</Panel>
 
 			<Panel title={t('signingCertificate')}>

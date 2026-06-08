@@ -528,6 +528,22 @@
 					"rsa-1_5": "RSA-1_5"
 				}
 			}
+		},
+		"autoRotation": {
+			"title": "Automatische rotatie",
+			"callout": "Laat de IdP een certificaat automatisch roteren tegen het verlopen: start een overlap met twee certificaten en promoot daarna de nieuwe sleutel na het overlapvenster. Optioneel per certificaat, standaard uit.",
+			"enableSigning": "Ondertekeningscertificaat automatisch roteren",
+			"enableEncryption": "Versleutelingscertificaat automatisch roteren",
+			"enableHint": "De planner start de rotatie vóór het verlopen en voltooit deze na het overlapvenster.",
+			"backoffDisabled": "Automatische rotatie is uitgeschakeld na herhaalde fouten. Schakel de wisselknop weer in om te hervatten.",
+			"lastError": "Laatste fout: {{error}}",
+			"willStartBy": "Automatische start vóór {{date}}",
+			"willCompleteAt": "Automatische voltooiing op {{date}}",
+			"lastCheck": "Laatste controle: {{date}}",
+			"lastAction": "Laatste actie: {{date}}",
+			"runCheck": "Rotatiecontrole nu uitvoeren",
+			"toastUpdated": "Automatische rotatie bijgewerkt",
+			"toastChecked": "Rotatiecontrole voltooid"
 		}
 	},
 	"identity": {

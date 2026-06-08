@@ -185,4 +185,106 @@ export class IdpSettingsAuditService {
 			subjectId: 'default',
 		});
 	}
+
+	// --- Automatic rotation (Prompt 34) — auto transitions are a `system` actor; setting/check are `admin`.
+
+	logAutoRotationStarted(
+		kind: 'signing' | 'encryption',
+		dryRun: boolean,
+		meta?: Record<string, unknown>,
+	): void {
+		const event = `idp_${kind}_rotation_auto_started`;
+		const metadata = { dryRun, ...meta };
+		this.logger.log(JSON.stringify({ event, ...metadata }));
+		this.audit.recordSafe({
+			category: 'admin_config',
+			event,
+			actorType: 'system',
+			subjectType: 'IdpSettings',
+			subjectId: 'default',
+			metadata,
+		});
+	}
+
+	logAutoRotationCompleted(kind: 'signing' | 'encryption', dryRun: boolean): void {
+		const event = `idp_${kind}_rotation_auto_completed`;
+		this.logger.log(JSON.stringify({ event, dryRun }));
+		this.audit.recordSafe({
+			category: 'admin_config',
+			event,
+			actorType: 'system',
+			subjectType: 'IdpSettings',
+			subjectId: 'default',
+			metadata: { dryRun },
+		});
+	}
+
+	logAutoRotationDueSoon(kind: 'signing' | 'encryption', notAfter: string | null): void {
+		const event = `idp_${kind}_auto_rotation_due_soon`;
+		this.logger.log(JSON.stringify({ event, notAfter }));
+		this.audit.recordSafe({
+			category: 'admin_config',
+			event,
+			actorType: 'system',
+			subjectType: 'IdpSettings',
+			subjectId: 'default',
+			metadata: { notAfter },
+		});
+	}
+
+	logAutoRotationFailed(
+		kind: 'signing' | 'encryption',
+		reason: string,
+		consecutiveFailures: number,
+	): void {
+		const event = `idp_${kind}_auto_rotation_failed`;
+		this.logger.warn(JSON.stringify({ event, reason, consecutiveFailures }));
+		this.audit.recordSafe({
+			category: 'admin_config',
+			event,
+			actorType: 'system',
+			subjectType: 'IdpSettings',
+			subjectId: 'default',
+			metadata: { reason, consecutiveFailures },
+		});
+	}
+
+	logAutoRotationAutodisabled(kind: 'signing' | 'encryption', consecutiveFailures: number): void {
+		const event = `idp_${kind}_auto_rotation_autodisabled`;
+		this.logger.warn(JSON.stringify({ event, consecutiveFailures }));
+		this.audit.recordSafe({
+			category: 'admin_config',
+			event,
+			actorType: 'system',
+			subjectType: 'IdpSettings',
+			subjectId: 'default',
+			metadata: { consecutiveFailures },
+		});
+	}
+
+	logAutoRotationSettingChanged(fields: string[]): void {
+		const payload = { event: 'idp_auto_rotation_setting_changed', fields };
+		this.logger.log(JSON.stringify(payload));
+		this.audit.recordSafe({
+			category: 'admin_config',
+			event: 'idp_auto_rotation_setting_changed',
+			actorType: 'admin',
+			subjectType: 'IdpSettings',
+			subjectId: 'default',
+			metadata: { fields },
+		});
+	}
+
+	logAutoRotationCheckRun(dryRun: boolean): void {
+		const payload = { event: 'idp_auto_rotation_check_run', dryRun };
+		this.logger.log(JSON.stringify(payload));
+		this.audit.recordSafe({
+			category: 'admin_config',
+			event: 'idp_auto_rotation_check_run',
+			actorType: 'admin',
+			subjectType: 'IdpSettings',
+			subjectId: 'default',
+			metadata: { dryRun },
+		});
+	}
 }

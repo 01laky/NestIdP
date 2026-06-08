@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { IdpSigningCryptoValidationError } from '@nestidp/shared';
 import { IdpEncryptionCryptoValidationError } from '@nestidp/shared';
 import { IdpSettingsService } from '@api/idp-settings/services/idp-settings.service';
+import { CertRotationConfig } from '@api/idp-settings/cert-rotation.config';
+import { NoopCertRotationNotifier } from '@api/idp-settings/cert-rotation-notifier';
 import { generateTestRsaEncryptionCert } from '@api/idp-settings/utils/idp-encryption-cert.util';
 import { getTestSigningMaterial } from '@test/support/prisma/test-fixtures';
 
@@ -62,6 +64,13 @@ describe('IdpSettingsService', () => {
 		logEncryptionRotationStarted: jest.fn(),
 		logEncryptionRotationCompleted: jest.fn(),
 		logEncryptionRotationCancelled: jest.fn(),
+		logAutoRotationStarted: jest.fn(),
+		logAutoRotationCompleted: jest.fn(),
+		logAutoRotationDueSoon: jest.fn(),
+		logAutoRotationFailed: jest.fn(),
+		logAutoRotationAutodisabled: jest.fn(),
+		logAutoRotationSettingChanged: jest.fn(),
+		logAutoRotationCheckRun: jest.fn(),
 	};
 
 	const service = new IdpSettingsService(
@@ -72,6 +81,8 @@ describe('IdpSettingsService', () => {
 		idpEncryptionService as never,
 		samlMetadataService as never,
 		audit as never,
+		new CertRotationConfig(configService),
+		new NoopCertRotationNotifier(),
 	);
 
 	let baseSettings: {
@@ -148,6 +159,57 @@ describe('IdpSettingsService', () => {
 	it('API-IDP-SVC-05: updateSettings invalid entityId → BadRequestException', async () => {
 		await expect(service.updateSettings({ entityId: 'bad-scheme://x' })).rejects.toThrow(
 			BadRequestException,
+		);
+	});
+
+	it('CERT-ROT-API-01: enabling signing auto-rotate persists the toggle and is audited', async () => {
+		await service.updateSettings({ autoRotateSigningEnabled: true });
+		expect(prisma.idpSettings.update).toHaveBeenCalledWith(
+			expect.objectContaining({
+				data: expect.objectContaining({ autoRotateSigningEnabled: true }),
+			}),
+		);
+		expect(audit.logAutoRotationSettingChanged).toHaveBeenCalledWith(['autoRotateSigningEnabled']);
+	});
+
+	it('CERT-ROT-API-01b: enabling auto-rotate clears the failure backoff (counter, disabled marker, last error)', async () => {
+		await service.updateSettings({ autoRotateSigningEnabled: true });
+		expect(prisma.idpSettings.update).toHaveBeenCalledWith(
+			expect.objectContaining({
+				data: expect.objectContaining({
+					signingAutoRotationConsecutiveFailures: 0,
+					signingAutoRotationDisabledAt: null,
+					signingAutoRotationLastError: null,
+				}),
+			}),
+		);
+	});
+
+	it('CERT-ROT-API-01c: disabling auto-rotate persists but does NOT touch the failure backoff', async () => {
+		await service.updateSettings({ autoRotateSigningEnabled: false });
+		const data = prisma.idpSettings.update.mock.calls.at(-1)![0].data;
+		expect(data.autoRotateSigningEnabled).toBe(false);
+		expect(data.signingAutoRotationConsecutiveFailures).toBeUndefined();
+		expect(data.signingAutoRotationDisabledAt).toBeUndefined();
+		expect(data.signingAutoRotationLastError).toBeUndefined();
+	});
+
+	it('CERT-ROT-API-01d: both toggles change together and are audited once with both fields', async () => {
+		await service.updateSettings({
+			autoRotateSigningEnabled: true,
+			autoRotateEncryptionEnabled: true,
+		});
+		expect(audit.logAutoRotationSettingChanged).toHaveBeenCalledWith([
+			'autoRotateSigningEnabled',
+			'autoRotateEncryptionEnabled',
+		]);
+		expect(prisma.idpSettings.update).toHaveBeenCalledWith(
+			expect.objectContaining({
+				data: expect.objectContaining({
+					autoRotateEncryptionEnabled: true,
+					encryptionAutoRotationDisabledAt: null,
+				}),
+			}),
 		);
 	});
 

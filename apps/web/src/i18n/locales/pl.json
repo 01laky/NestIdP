@@ -528,6 +528,22 @@
 					"rsa-1_5": "RSA-1_5"
 				}
 			}
+		},
+		"autoRotation": {
+			"title": "Automatyczna rotacja",
+			"callout": "Pozwól IdP automatycznie rotować certyfikat przed wygaśnięciem: rozpoczyna nakładanie dwóch certyfikatów, a po oknie nakładania promuje nowy klucz. Opcjonalne dla każdego certyfikatu, domyślnie wyłączone.",
+			"enableSigning": "Automatycznie rotuj certyfikat podpisujący",
+			"enableEncryption": "Automatycznie rotuj certyfikat szyfrujący",
+			"enableHint": "Harmonogram rozpoczyna rotację przed wygaśnięciem i kończy ją po oknie nakładania.",
+			"backoffDisabled": "Automatyczna rotacja została wyłączona po powtarzających się błędach. Włącz przełącznik ponownie, aby wznowić.",
+			"lastError": "Ostatni błąd: {{error}}",
+			"willStartBy": "Automatyczny start do {{date}}",
+			"willCompleteAt": "Automatyczne zakończenie {{date}}",
+			"lastCheck": "Ostatnie sprawdzenie: {{date}}",
+			"lastAction": "Ostatnia akcja: {{date}}",
+			"runCheck": "Uruchom sprawdzenie rotacji teraz",
+			"toastUpdated": "Automatyczna rotacja zaktualizowana",
+			"toastChecked": "Sprawdzenie rotacji zakończone"
 		}
 	},
 	"identity": {

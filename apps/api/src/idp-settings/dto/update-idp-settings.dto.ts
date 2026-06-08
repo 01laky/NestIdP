@@ -12,4 +12,12 @@ export class UpdateIdpSettingsBodyDto {
 	@IsOptional()
 	@IsBoolean()
 	wantAuthnRequestsSigned?: boolean;
+
+	@IsOptional()
+	@IsBoolean()
+	autoRotateSigningEnabled?: boolean;
+
+	@IsOptional()
+	@IsBoolean()
+	autoRotateEncryptionEnabled?: boolean;
 }

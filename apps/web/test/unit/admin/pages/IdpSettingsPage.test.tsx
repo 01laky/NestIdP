@@ -16,6 +16,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as adminApi from '@/admin/adminApi';
 import { IdpSettingsPage } from '@/admin/pages/IdpSettingsPage';
 
+const AUTO_OFF = {
+	enabled: false,
+	disabledAt: null,
+	consecutiveFailures: 0,
+	lastError: null,
+	willAutoStartBy: null,
+	willAutoCompleteAt: null,
+} as const;
+
 function inactiveRotation(): IdpSigningRotationStatusDto {
 	return {
 		active: false,
@@ -27,6 +36,7 @@ function inactiveRotation(): IdpSigningRotationStatusDto {
 		pendingSigningRsaModulusBits: null,
 		pendingSigningEcCurve: null,
 		pendingSigningCertNotAfter: null,
+		auto: { ...AUTO_OFF },
 	};
 }
 
@@ -41,6 +51,7 @@ function inactiveEncryptionRotation(): IdpEncryptionRotationStatusDto {
 		pendingEncryptionRsaModulusBits: null,
 		pendingEncryptionEcCurve: null,
 		pendingEncryptionCertNotAfter: null,
+		auto: { ...AUTO_OFF },
 	};
 }
 
@@ -57,6 +68,7 @@ function activeRotation(
 		pendingSigningRsaModulusBits: null,
 		pendingSigningEcCurve: null,
 		pendingSigningCertNotAfter: null,
+		auto: { ...AUTO_OFF },
 		...overrides,
 	};
 }
@@ -85,6 +97,8 @@ function baseSettings(overrides: Partial<IdpSettingsPublicDto> = {}): IdpSetting
 		encryptionRsaModulusBits: null,
 		encryptionEcCurve: null,
 		encryptionRotation: inactiveEncryptionRotation(),
+		lastAutoRotationCheckAt: null,
+		lastAutoRotationActionAt: null,
 		updatedAt: '2026-01-01T00:00:00.000Z',
 		...overrides,
 	};
@@ -805,6 +819,7 @@ describe('IdpSettingsPage encryption certificate', () => {
 			pendingEncryptionRsaModulusBits: 3072,
 			pendingEncryptionEcCurve: null,
 			pendingEncryptionCertNotAfter: '2031-01-01T00:00:00.000Z',
+			auto: { ...AUTO_OFF },
 			...overrides,
 		};
 	}
@@ -928,5 +943,43 @@ describe('IdpSettingsPage encryption certificate', () => {
 		await waitFor(() => {
 			expect(createObjectURL).toHaveBeenCalled();
 		});
+	});
+});
+
+describe('IdpSettingsPage — automatic rotation (Prompt 34)', () => {
+	it('WEB-CERT-ROT-01: signing auto-rotate toggle persists via PATCH', async () => {
+		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(baseSettings());
+		const updateSpy = vi.spyOn(adminApi, 'updateIdpSettings').mockResolvedValue(baseSettings());
+		renderPage();
+		await waitFor(() =>
+			screen.getByRole('checkbox', { name: /Auto-rotate the signing certificate/i }),
+		);
+		fireEvent.click(screen.getByRole('checkbox', { name: /Auto-rotate the signing certificate/i }));
+		await waitFor(() => expect(updateSpy).toHaveBeenCalledWith({ autoRotateSigningEnabled: true }));
+	});
+
+	it('WEB-CERT-ROT-02: run-check button calls the API; backoff banner shows when disabled', async () => {
+		const disabled = baseSettings({
+			rotation: activeRotation({
+				active: false,
+				hasPendingCertificate: false,
+				auto: {
+					enabled: true,
+					disabledAt: '2026-03-01T00:00:00.000Z',
+					consecutiveFailures: 5,
+					lastError: 'openssl boom',
+					willAutoStartBy: null,
+					willAutoCompleteAt: null,
+				},
+			}),
+		});
+		vi.spyOn(adminApi, 'getIdpSettings').mockResolvedValue(disabled);
+		const checkSpy = vi.spyOn(adminApi, 'runCertRotationCheck').mockResolvedValue(disabled);
+		renderPage();
+		await waitFor(() => screen.getByRole('button', { name: /Run rotation check now/i }));
+		expect(screen.getByText(/disabled after repeated failures/i)).toBeTruthy();
+		expect(screen.getByText(/openssl boom/i)).toBeTruthy();
+		fireEvent.click(screen.getByRole('button', { name: /Run rotation check now/i }));
+		await waitFor(() => expect(checkSpy).toHaveBeenCalled());
 	});
 });

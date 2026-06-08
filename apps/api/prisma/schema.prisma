@@ -331,6 +331,20 @@ model IdpSettings {
   pendingEncryptionRsaModulusBits          Int?
   pendingEncryptionEcCurve                 String?
   encryptionRotationStartedAt              DateTime?
+
+  // Automatic certificate rotation (Prompt 34) — opt-in per cert, off by default. The scheduler drives
+  // the existing manual rotation primitives (generate pending → overlap → promote) without an operator.
+  autoRotateSigningEnabled                       Boolean   @default(false)
+  autoRotateEncryptionEnabled                    Boolean   @default(false)
+  lastAutoRotationCheckAt                        DateTime?
+  lastAutoRotationActionAt                       DateTime?
+  signingAutoRotationLastError                   String?
+  encryptionAutoRotationLastError                String?
+  signingAutoRotationConsecutiveFailures         Int       @default(0)
+  encryptionAutoRotationConsecutiveFailures      Int       @default(0)
+  signingAutoRotationDisabledAt                  DateTime?
+  encryptionAutoRotationDisabledAt               DateTime?
+
   nameIdFormat                             String    @default("urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress")
   wantAuthnRequestsSigned                  Boolean   @default(false)
   createdAt                                DateTime  @default(now())

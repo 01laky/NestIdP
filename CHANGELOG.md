@@ -4,6 +4,46 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.15.0]
+
+### Added
+
+- **Automatic certificate rotation (Prompt 34):** an operator can opt a signing and/or encryption
+  certificate into a **hands-off rotation lifecycle**. An in-process scheduler starts a rotation when
+  the active cert nears expiry (publishing the existing **dual-cert overlap** in IdP metadata so SPs can
+  pre-trust the new key) and **auto-completes** it after a configurable overlap window. Signing and
+  encryption rotate **independently**; opt-in, **off by default**, single-instance, and state survives
+  restarts. Existing deployments keep rotating manually, unchanged.
+- **On-demand check** `POST /api/admin/idp/settings/cert-rotation/run-check` forces one evaluation
+  (honours dry-run), and a **"due soon" pre-notification** fires ahead of the auto-start window via a
+  `CertRotationNotifier` hook (no-op by default, wireable to alerting).
+- **Operator safety:** per-cert failure backoff that auto-disables after N consecutive failures,
+  a **dry-run** mode that audits/notifies without mutating, **boot-grace** to avoid surprise rotations
+  right after a deploy, **jitter**, an **overlap-fits-before-expiry** clamp, per-cert lead/overlap
+  overrides, and `lastAutoRotationCheckAt` / `lastAutoRotationActionAt` observability.
+- Admin UI: an **Automatic rotation** panel on IdP settings (per-cert toggles, computed
+  will-start/will-complete hints, backoff banner, dry-run indicator, "Run rotation check now"); full
+  strings in all 10 locales.
+- Audit events `idp_{signing,encryption}_rotation_auto_started` / `_auto_completed`,
+  `_auto_rotation_failed` / `_due_soon` / `_autodisabled` (system actor), plus
+  `idp_auto_rotation_setting_changed` / `idp_auto_rotation_check_run` (admin actor) — no key material.
+
+### Changed
+
+- `IdpSettings` gains `autoRotate{Signing,Encryption}Enabled`, `lastAutoRotationCheckAt` /
+  `lastAutoRotationActionAt`, and per-cert auto-rotation failure-backoff columns (migration
+  `20260613120000_automatic_certificate_rotation`; existing rows default to auto-rotation off).
+- New bounded env knobs: `CERT_ROTATION_SCHEDULER_TICK_MS` (`0` disables), `CERT_ROTATION_LEAD_DAYS`,
+  `CERT_ROTATION_OVERLAP_DAYS` (+ per-cert overrides), `CERT_ROTATION_VALIDITY_DAYS`,
+  `CERT_ROTATION_NOTIFY_LEAD_DAYS`, `CERT_ROTATION_JITTER_MAX_SECONDS`, `CERT_ROTATION_BOOT_GRACE_HOURS`,
+  `CERT_ROTATION_FAILURE_AUTODISABLE_THRESHOLD`, `CERT_ROTATION_DRY_RUN`.
+
+### Security
+
+- Auto-rotation reuses the existing encrypted-at-rest key path; private keys are never serialized to the
+  frontend or logged, and failure reasons are redacted. The scheduler is single-instance (documented);
+  a misconfigured/unparseable cert never crashes a tick or blocks boot.
+
 ## [1.14.0]
 
 ### Added
