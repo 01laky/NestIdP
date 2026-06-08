@@ -23,6 +23,7 @@ import type {
 	ApiConnectionTestResponseDto,
 	ApiConnectionTestTokenResponseDto,
 	ApiErrorResponseDto,
+	ProxyCheckResultDto,
 	CreateApiConnectionRequestDto,
 	CreateSpConnectionRequestDto,
 	DeleteApiConnectionResponseDto,
@@ -235,6 +236,12 @@ export function testApiConnectionToken(id: string): Promise<ApiConnectionTestTok
 			method: 'POST',
 		},
 	);
+}
+
+export function testApiConnectionProxy(id: string): Promise<ProxyCheckResultDto> {
+	return adminFetch<ProxyCheckResultDto>(`${API_CONNECTIONS_API_PATH}/${id}/test-proxy`, {
+		method: 'POST',
+	});
 }
 
 export function triggerIdentitySync(

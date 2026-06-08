@@ -18,6 +18,7 @@ import {
 	type ApiConnectionTestResponseDto,
 	type ApiConnectionTestTokenResponseDto,
 	type DeleteApiConnectionResponseDto,
+	type ProxyCheckResultDto,
 } from '@nestidp/shared';
 import { AdminAuthGuard } from '../../admin-auth/guards/admin-auth.guard';
 import { AdminCsrfGuard } from '../../admin-auth/guards/admin-csrf.guard';
@@ -83,5 +84,12 @@ export class ApiConnectionsController {
 	@UseGuards(AdminCsrfGuard)
 	testToken(@Param('id', ParseCuidPipe) id: string): Promise<ApiConnectionTestTokenResponseDto> {
 		return this.apiConnectionTestService.testToken(id);
+	}
+
+	@Post(':id/test-proxy')
+	@HttpCode(HttpStatus.OK)
+	@UseGuards(AdminCsrfGuard)
+	testProxy(@Param('id', ParseCuidPipe) id: string): Promise<ProxyCheckResultDto> {
+		return this.apiConnectionTestService.testProxy(id);
 	}
 }

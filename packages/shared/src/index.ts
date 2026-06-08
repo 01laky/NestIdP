@@ -1,5 +1,6 @@
 export * from './health.js';
 export * from './connections.js';
+export * from './proxy.js';
 export * from './api-contract.js';
 export * from './oauth.js';
 export * from './database.js';

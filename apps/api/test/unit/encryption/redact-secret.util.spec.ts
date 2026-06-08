@@ -50,4 +50,22 @@ describe('redactSecrets', () => {
 		expect(redactSecrets('client_secret=hunter2')).toContain('client_secret=');
 		expect(redactSecrets('client_secret=hunter2')).toContain('[redacted]');
 	});
+
+	it('PROXY-SEC-02a: redacts a Proxy-Authorization Basic header value', () => {
+		const out = redactSecrets('Proxy-Authorization: Basic dXNlcjpwYXNz');
+		expect(out).not.toContain('dXNlcjpwYXNz');
+		expect(out).toContain('[redacted]');
+	});
+
+	it('PROXY-SEC-02b: redacts inline credentials embedded in a proxy URL', () => {
+		const out = redactSecrets('connect failed for http://puser:psecret@proxy.corp.example:8080');
+		expect(out).not.toContain('psecret');
+		expect(out).not.toContain('puser');
+		expect(out).toContain('http://[redacted]@proxy.corp.example:8080');
+	});
+
+	it('PROXY-SEC-02c: redacts a proxyPassword key/value', () => {
+		expect(redactSecrets('proxyPassword=hunter2')).not.toContain('hunter2');
+		expect(redactSecrets('{"proxyPassword":"hunter2"}')).not.toContain('hunter2');
+	});
 });

@@ -14,6 +14,7 @@ import { SyncScheduleService } from './services/sync-schedule.service';
 import { SyncScheduleConfigService } from './services/sync-schedule-config.service';
 import { NoopScheduledSyncNotifier, SCHEDULED_SYNC_NOTIFIER } from './scheduled-sync-notifier';
 import { OAuthCoreModule } from './oauth-core.module';
+import { ProxyCoreModule } from './proxy-core.module';
 
 @Module({
 	imports: [
@@ -23,6 +24,7 @@ import { OAuthCoreModule } from './oauth-core.module';
 		IdentityModule,
 		AdminAuthModule,
 		OAuthCoreModule,
+		ProxyCoreModule,
 	],
 	controllers: [SyncController, SyncScheduleController],
 	providers: [

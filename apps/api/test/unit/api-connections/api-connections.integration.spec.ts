@@ -674,4 +674,196 @@ describe('api-connections integration (SQLite)', () => {
 
 		expect(updated.body.connection.baseUrl).toBe('https://api.example.com/v1');
 	});
+
+	// --- Outbound proxy (Prompt 33) end-to-end ----------------------------------------------------
+
+	it('PROXY-INT-01: create with proxy → DTO exposes non-secret state, password never returned', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginAgent(agent);
+		const created = await createConnection(agent, csrf, {
+			proxyEnabled: true,
+			proxyUrl: 'http://proxy.corp.example:8080',
+			proxyUsername: 'puser',
+			proxyPassword: 'psecret',
+			noProxyHosts: '.corp.example, 10.0.0.0/8',
+		} as never).expect(201);
+
+		const c = created.body.connection;
+		expect(c).toMatchObject({
+			proxyEnabled: true,
+			proxyUrl: 'http://proxy.corp.example:8080',
+			proxyUsername: 'puser',
+			hasProxyPassword: true,
+			noProxyHosts: '.corp.example, 10.0.0.0/8',
+			lastProxyCheckStatus: null,
+		});
+		expect(c).not.toHaveProperty('proxyPassword');
+		expect(c).not.toHaveProperty('proxyPasswordEncrypted');
+		expect(JSON.stringify(c)).not.toContain('psecret');
+	});
+
+	it('PROXY-INT-02: proxy password is encrypted at rest in the DB (≠ plaintext, v1: prefix)', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginAgent(agent);
+		const created = await createConnection(agent, csrf, {
+			proxyEnabled: true,
+			proxyUrl: 'http://proxy.corp.example:8080',
+			proxyUsername: 'puser',
+			proxyPassword: 'plain-proxy-secret',
+		} as never).expect(201);
+
+		const row = await prisma.apiConnection.findUnique({
+			where: { id: created.body.connection.id },
+		});
+		expect(row!.proxyPasswordEncrypted).not.toBeNull();
+		expect(row!.proxyPasswordEncrypted).not.toBe('plain-proxy-secret');
+		expect(row!.proxyPasswordEncrypted!.startsWith('v1:')).toBe(true);
+	});
+
+	it('PROXY-INT-03: proxyEnabled=true without proxyUrl → 400', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginAgent(agent);
+		await createConnection(agent, csrf, { proxyEnabled: true } as never).expect(400);
+	});
+
+	it('PROXY-INT-04: invalid proxy URL scheme → 400', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginAgent(agent);
+		await createConnection(agent, csrf, {
+			proxyEnabled: true,
+			proxyUrl: 'socks5://proxy:1080',
+		} as never).expect(400);
+	});
+
+	it('PROXY-INT-05: inline credentials in proxy URL → 400', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginAgent(agent);
+		await createConnection(agent, csrf, {
+			proxyEnabled: true,
+			proxyUrl: 'http://user:pass@proxy:8080',
+		} as never).expect(400);
+	});
+
+	it('PROXY-INT-06: PATCH omits proxyPassword keeps stored; explicit null clears it', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginAgent(agent);
+		const created = await createConnection(agent, csrf, {
+			proxyEnabled: true,
+			proxyUrl: 'http://proxy.corp.example:8080',
+			proxyUsername: 'puser',
+			proxyPassword: 'psecret',
+		} as never).expect(201);
+		const id = created.body.connection.id;
+
+		// omit password → kept
+		const renamed = await agent
+			.patch(`${API_CONNECTIONS_API_PATH}/${id}`)
+			.set(csrfHeader(csrf))
+			.send({ proxyUsername: 'puser2' })
+			.expect(200);
+		expect(renamed.body.connection.hasProxyPassword).toBe(true);
+		expect(renamed.body.connection.proxyUsername).toBe('puser2');
+
+		// explicit null → cleared
+		const cleared = await agent
+			.patch(`${API_CONNECTIONS_API_PATH}/${id}`)
+			.set(csrfHeader(csrf))
+			.send({ proxyPassword: null })
+			.expect(200);
+		expect(cleared.body.connection.hasProxyPassword).toBe(false);
+		const row = await prisma.apiConnection.findUnique({ where: { id } });
+		expect(row!.proxyPasswordEncrypted).toBeNull();
+	});
+
+	it('PROXY-INT-07: a proxy-only PATCH is accepted (not "at least one field")', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginAgent(agent);
+		const created = await createConnection(agent, csrf).expect(201);
+
+		const updated = await agent
+			.patch(`${API_CONNECTIONS_API_PATH}/${created.body.connection.id}`)
+			.set(csrfHeader(csrf))
+			.send({ noProxyHosts: '.internal' })
+			.expect(200);
+		expect(updated.body.connection.noProxyHosts).toBe('.internal');
+	});
+
+	it('PROXY-INT-08: empty proxyPassword string → 400', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginAgent(agent);
+		await createConnection(agent, csrf, {
+			proxyEnabled: true,
+			proxyUrl: 'http://proxy:8080',
+			proxyPassword: '',
+		} as never).expect(400);
+	});
+
+	it('PROXY-INT-09: POST /:id/test-proxy is a no-op (bypassed) when proxy is off', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginAgent(agent);
+		const created = await createConnection(agent, csrf).expect(201);
+
+		const res = await agent
+			.post(`${API_CONNECTIONS_API_PATH}/${created.body.connection.id}/test-proxy`)
+			.set(csrfHeader(csrf))
+			.expect(200);
+		expect(res.body).toMatchObject({
+			ok: true,
+			status: 'bypassed',
+			bypassed: true,
+			viaProxy: false,
+		});
+	});
+
+	it('PROXY-INT-10: test-proxy reports ok via a mocked proxied fetch + persists lastProxyCheckStatus', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginAgent(agent);
+		const created = await createConnection(agent, csrf, {
+			proxyEnabled: true,
+			proxyUrl: 'http://proxy.corp.example:8080',
+		} as never).expect(201);
+		const id = created.body.connection.id;
+
+		jest.spyOn(global, 'fetch').mockResolvedValue({ status: 200 } as Response);
+		const res = await agent
+			.post(`${API_CONNECTIONS_API_PATH}/${id}/test-proxy`)
+			.set(csrfHeader(csrf))
+			.expect(200);
+		expect(res.body).toMatchObject({ ok: true, status: 'ok', viaProxy: true });
+		expect(JSON.stringify(res.body)).not.toMatch(/psecret|proxyPasswordEncrypted/);
+
+		const row = await prisma.apiConnection.findUnique({ where: { id } });
+		expect(row!.lastProxyCheckStatus).toBe('ok');
+		expect(row!.lastProxyCheckAt).not.toBeNull();
+	});
+
+	it('PROXY-INT-11: extra unknown proxy field → 400 forbidNonWhitelisted', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginAgent(agent);
+		await createConnection(agent, csrf, { proxyBogus: 'x' } as never).expect(400);
+	});
+
+	it('PROXY-INT-12: GET by id round-trips the stored proxy config (no secret)', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginAgent(agent);
+		const created = await createConnection(agent, csrf, {
+			proxyEnabled: true,
+			proxyUrl: 'http://proxy.corp.example:8080',
+			proxyUsername: 'puser',
+			proxyPassword: 'psecret',
+			noProxyHosts: '.corp.example',
+		} as never).expect(201);
+
+		const fetched = await agent
+			.get(`${API_CONNECTIONS_API_PATH}/${created.body.connection.id}`)
+			.expect(200);
+		expect(fetched.body.connection).toMatchObject({
+			proxyEnabled: true,
+			proxyUrl: 'http://proxy.corp.example:8080',
+			proxyUsername: 'puser',
+			hasProxyPassword: true,
+			noProxyHosts: '.corp.example',
+		});
+		expect(JSON.stringify(fetched.body)).not.toContain('psecret');
+	});
 });

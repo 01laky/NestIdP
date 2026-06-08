@@ -6,9 +6,11 @@ export function redactBearerToken(value: string | undefined | null): string {
 }
 
 /**
- * Scrub OAuth/Bearer secrets from an arbitrary string before logging or surfacing it.
- * Removes `client_secret`/`access_token` values (form, JSON, query) and `Authorization` header
- * values (Bearer + Basic). Intentionally aggressive — never leak a credential through an error.
+ * Scrub OAuth/Bearer/proxy secrets from an arbitrary string before logging or surfacing it.
+ * Removes `client_secret`/`access_token`/`password` values (form, JSON, query), `Authorization` and
+ * `Proxy-Authorization` header values (Bearer + Basic), and inline credentials embedded in a URL
+ * (`http://user:pass@host` → `http://[redacted]@host`). Intentionally aggressive — never leak a
+ * credential through an error or diagnostic.
  */
 export function redactSecrets(input: string | undefined | null): string {
 	if (input == null) {
@@ -23,12 +25,18 @@ export function redactSecrets(input: string | undefined | null): string {
 		'id_token',
 		'assertion',
 		'password',
+		'proxypassword',
 	];
 	for (const key of sensitiveKeys) {
 		out = out.replace(new RegExp(`(${key})(=)([^&\\s"']+)`, 'gi'), '$1$2[redacted]');
 		out = out.replace(new RegExp(`("${key}"\\s*:\\s*")([^"]*)(")`, 'gi'), '$1[redacted]$3');
 	}
-	// Authorization headers (Bearer / Basic)
-	out = out.replace(/(authorization\s*[:=]\s*)(bearer|basic)\s+[^\s"',}]+/gi, '$1$2 [redacted]');
+	// Authorization / Proxy-Authorization header values (Bearer / Basic)
+	out = out.replace(
+		/((?:proxy-)?authorization\s*[:=]\s*)(bearer|basic)\s+[^\s"',}]+/gi,
+		'$1$2 [redacted]',
+	);
+	// Inline credentials in a URL: http://user:pass@host → http://[redacted]@host
+	out = out.replace(/(\b[a-z][a-z0-9+.-]*:\/\/)[^/\s:@]+:[^/\s@]+@/gi, '$1[redacted]@');
 	return out;
 }

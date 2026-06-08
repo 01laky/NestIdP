@@ -47,7 +47,7 @@ NestIdP addresses the gap between a minimal SAML configuration tool and an enter
 | Multi-tenant SaaS | Single deployment instance per environment in v1. |
 | Social login, MFA | Deferred to future phases. |
 | Configurable API contract mapping | v1 uses a fixed REST contract; endpoint/field mapping deferred to v2. |
-| Outbound HTTP proxy for sync | v1 direct connection only; per API connection proxy settings in v2. |
+| Outbound HTTP proxy for sync | Implemented (v1.14.0) — opt-in per API connection, off by default; routes sync/OAuth/test traffic with a `noProxyHosts` bypass. |
 | Multiple identity APIs for sync | v1 and v2: one API connection per sync; merge from multiple sources in v3. |
 | SCIM / LDAP connectors | Deferred; v1 uses REST only. |
 | Microservices architecture | Unnecessary complexity for initial scope. |
@@ -387,20 +387,20 @@ unchanged):
 
 The canonical internal model and validation (bcrypt password hash, supported algorithms) are unchanged.
 
-### 7.4 Outbound Proxy (v2 — planned)
+### 7.4 Outbound Proxy (implemented — Prompt 33, v1.14.0)
 
-Deferred to Phase 2. Some deployments require identity APIs to be reached through a corporate HTTP/HTTPS proxy. Admin configures this **per API connection** (not globally):
+Some deployments require identity APIs to be reached through a corporate HTTP/HTTPS proxy. Admin configures this **per API connection** (not globally). It is opt-in and off by default; existing deployments connect directly with no change. When enabled, **all** outbound calls for that connection — sync fetches, the OAuth token exchange, and the Test connection / Test token / Test proxy diagnostics — traverse the proxy.
 
-| Setting | Description |
+| Field | Description |
 |---------|-------------|
-| `proxyEnabled` | Toggle proxy for this connection's sync requests |
-| `proxyUrl` | Proxy URL (e.g. `http://proxy.corp.example:8080`) |
-| `proxyUsername` / `proxyPassword` | Optional proxy authentication (encrypted at rest) |
-| `noProxyHosts` | Optional comma-separated host patterns to bypass proxy |
+| `proxyEnabled` | Toggle the proxy for this connection (off by default) |
+| `proxyUrl` | Absolute `http://`/`https://` proxy URL (e.g. `http://proxy.corp.example:8080`); no inline credentials |
+| `proxyUsername` | Optional Basic proxy auth username |
+| `proxyPasswordEncrypted` | Optional Basic proxy auth password — **encrypted at rest** in the libSQL DB, write-only, never returned/logged |
+| `noProxyHosts` | Comma-separated bypass patterns: exact host, `host:port`, leading-dot suffix, `*`, IPv4/IPv6 CIDR; `localhost`/`127.0.0.1`/`::1` always bypass |
+| `lastProxyCheckStatus` / `lastProxyCheckAt` | Last "Test proxy" outcome + timestamp (proxy-health badge) |
 
-v1 sync always connects directly to `baseUrl`. Proxy credentials follow the same encryption rules as API connection tokens.
-
-Until v2 ships, all external APIs must conform to the fixed v1 contract in Section 7.2 and be reachable without a configured proxy.
+Implemented with Node 20's global `fetch` + an `undici` `ProxyAgent` dispatcher (one cached agent per connection, closed on config change/delete/shutdown). `AbortSignal.timeout` still bounds every request; a separate `connectTimeout` fast-fails a dead proxy. Proxy credentials follow the same encryption rules as API connection tokens. SOCKS/PAC and NTLM/Kerberos proxy auth remain out of scope (Basic only).
 
 ### 7.6 Multiple API Sources (v3 — planned)
 
@@ -491,7 +491,7 @@ ApiConnection
   id, name, baseUrl, authType, authCredentials (encrypted),
   lastSyncAt, lastSyncStatus, createdAt, updatedAt
   -- v2 adds: endpointMapping (JSON), fieldMapping (JSON), syncSchedule,
-  --          proxyEnabled, proxyUrl, proxyCredentials (encrypted), noProxyHosts
+  --          proxyEnabled, proxyUrl, proxyUsername, proxyPasswordEncrypted, noProxyHosts
 
 User
   id, externalId, apiConnectionId, username, email, displayName,
@@ -705,7 +705,7 @@ _Phase 1 complete in **v1.0.0** (Prompt 10 — Docker, persistent audit, admin a
 ### Phase 2 — Hardening and Configurable API Contract
 
 - [x] **Configurable API contract** — endpoint paths, JSON field mapping, envelope, headers, pagination, embedded memberships per API connection (v1.9.0)
-- [ ] **Outbound HTTP proxy** — optional proxy URL and auth per API connection for sync requests
+- [x] **Outbound HTTP proxy** — optional proxy URL + Basic auth + `noProxyHosts` (incl. CIDR) per API connection; routes sync, OAuth, and test traffic; password encrypted at rest; per-connection `ProxyAgent` dispatcher (v1.14.0)
 - [x] **Scheduled sync (cron)** — per-connection cron schedule with IANA timezone, in-process scheduler, pause / dry-run / jitter / failure auto-pause, survives restarts, no catch-up (v1.13.0)
 - [ ] Certificate rotation (dual-cert in metadata)
 - [ ] Rate limiting and brute-force protection

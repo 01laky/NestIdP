@@ -152,10 +152,48 @@ Create an API connection with `baseUrl` `http://localhost:4001` and the same bea
 
 ---
 
+## Outbound HTTP proxy (per connection, v1.14.0)
+
+Some deployments must reach the identity API through a corporate **HTTP/HTTPS proxy**. This is
+configured **per API connection** from the admin console (API connections → edit → _Outbound proxy_),
+opt-in and **off by default**. When enabled, **every** outbound call for that connection traverses the
+proxy: the sync fetches (`/users`, `/users/:id/groups`, `/users/:id/roles`), the OAuth token exchange,
+and the _Test connection_ / _Test token_ / _Test proxy_ diagnostics.
+
+| Field               | Notes                                                                                                                                                                                                                                                                                             |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Enable proxy        | Off by default; disabling keeps the stored values but connects directly                                                                                                                                                                                                                           |
+| Proxy URL           | Absolute `http://`/`https://` URL (e.g. `http://proxy.corp.example:8080`). **No inline credentials** — use the username/password fields so the password is encrypted                                                                                                                              |
+| Username / Password | Optional **Basic** proxy auth. The password is **encrypted at rest** in the local libSQL DB (same `CREDENTIALS_ENCRYPTION` as bearer tokens), **never** returned to the browser, **never** logged. Leave the password blank on edit to keep the stored one; send an explicit empty value to clear |
+| No-proxy hosts      | Comma-separated patterns that **bypass** the proxy                                                                                                                                                                                                                                                |
+
+**No-proxy matching** (case-insensitive): exact host (`api.corp.example`), `host:port`, leading-dot
+domain suffix (`.corp.example` matches `api.corp.example`), `*` (bypass everything), and IPv4/IPv6
+**CIDR** ranges (`10.0.0.0/8`, `192.168.0.0/16`, `fd00::/8`). `localhost`, `127.0.0.1`, and `::1`
+always bypass. A DNS-name target never matches a CIDR token.
+
+Only Basic proxy auth over `http://`/`https://` is supported. SOCKS, PAC files, and NTLM/Kerberos are
+out of scope. TLS verification to both proxy and target stays on (no skip option).
+
+### Validating the proxy
+
+Use **Test proxy** to exercise _only_ the proxy hop (a probe to the target host through the proxy,
+without running the user fetch). The result is classified so you can tell the proxy apart from the
+target:
+
+| Status          | Likely cause                                                        | What to do                                                                         |
+| --------------- | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `ok`            | Reached the target through the proxy                                | Proxy is working                                                                   |
+| `auth_failed`   | Proxy returned **HTTP 407**                                         | Fix the proxy username/password                                                    |
+| `unreachable`   | DNS failure / connection refused / connect timeout **to the proxy** | Check the proxy host:port and that it is reachable from the NestIdP host/container |
+| `tunnel_failed` | Proxy reachable but refused the `CONNECT` tunnel to the target      | Check the proxy's allow-list / the target host:port                                |
+| `tls_error`     | Certificate verification failed                                     | Fix the certificate chain (proxy or target)                                        |
+| `target_error`  | Proxy + tunnel fine, target returned non-2xx / timed out            | Investigate the upstream identity API                                              |
+| `bypassed`      | Proxy off or target matched `noProxyHosts`                          | Informational — the call would go direct                                           |
+
 ## v1 limits (not in this contract)
 
 - One API connection per deployment (second `POST` → **409**)
-- No outbound HTTP proxy (Phase 2)
 - No custom paths or JSON field mapping (Phase 2)
 - No OAuth client credentials (Phase 2)
 - Argon2 / PBKDF2 hashes (Phase 3+)

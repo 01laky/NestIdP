@@ -2,7 +2,7 @@
 
 **A deployable SAML Identity Provider you run yourself** — one Docker image, one admin console, identity from your REST API, SAML assertions to your apps.
 
-[![Version](https://img.shields.io/badge/version-1.13.0-blue)](package.json)
+[![Version](https://img.shields.io/badge/version-1.14.0-blue)](package.json)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-green)](package.json)
 [![pnpm](https://img.shields.io/badge/pnpm-%3E%3D9-orange)](package.json)
 
@@ -93,7 +93,9 @@ Entity ID, **signing** and **encryption** certificates (separate panels), metada
 
 ### API connection and sync
 
-Point at your identity REST API, test connectivity, run full sync (optional dry run).
+Point at your identity REST API, test connectivity, run full sync (optional dry run). Optionally
+schedule automatic syncs (cron) or route a connection's outbound traffic through a corporate HTTP/HTTPS
+proxy (per connection, off by default).
 
 ![Edit API connection](docs/img/api-connection-edit.png)
 

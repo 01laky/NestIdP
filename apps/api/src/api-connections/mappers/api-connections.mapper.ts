@@ -1,5 +1,11 @@
 import { ApiConnection } from '@prisma/client';
-import type { ApiConnectionDto, ApiContractConfig, OAuthClientAuthMethod } from '@nestidp/shared';
+import type {
+	ApiConnectionDto,
+	ApiContractConfig,
+	OAuthClientAuthMethod,
+	ProxyCheckStatus,
+} from '@nestidp/shared';
+import { isProxyCheckStatus } from '@nestidp/shared';
 
 export function toApiConnectionDto(
 	row: ApiConnection,
@@ -20,6 +26,16 @@ export function toApiConnectionDto(
 		oauthTokenRequestParams: (row.oauthTokenRequestParams ?? null) as Record<string, string> | null,
 		hasOauthClientSecret: (row.oauthClientSecretEncrypted ?? '').length > 0,
 		oauthLastTokenAt: extra?.oauthLastTokenAt ?? null,
+		proxyEnabled: row.proxyEnabled,
+		proxyUrl: row.proxyUrl ?? null,
+		proxyUsername: row.proxyUsername ?? null,
+		hasProxyPassword: (row.proxyPasswordEncrypted ?? '').length > 0,
+		noProxyHosts: row.noProxyHosts ?? null,
+		lastProxyCheckStatus:
+			row.lastProxyCheckStatus && isProxyCheckStatus(row.lastProxyCheckStatus)
+				? (row.lastProxyCheckStatus as ProxyCheckStatus)
+				: null,
+		lastProxyCheckAt: row.lastProxyCheckAt?.toISOString() ?? null,
 		lastSyncAt: row.lastSyncAt?.toISOString() ?? null,
 		lastSyncStatus: row.lastSyncStatus,
 		createdAt: row.createdAt.toISOString(),

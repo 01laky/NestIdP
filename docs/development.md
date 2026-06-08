@@ -312,6 +312,40 @@ otherwise it advances to the next future slot **without** running (no surprise s
 | `SYNC_SCHEDULE_FAILURE_AUTOPAUSE_THRESHOLD` | `0`     | After N consecutive failures, auto-pause the schedule; `0` = never                          |
 | `SYNC_SCHEDULE_BOOT_OVERDUE_GRACE_MINUTES`  | `0`     | On boot, run an overdue schedule only if overdue ≤ N min; `0` = never                       |
 
+### Outbound HTTP proxy (v1.14.0)
+
+A single API connection's outbound traffic can be routed through a corporate HTTP/HTTPS proxy, **per
+connection**, opt-in and off by default. Built on Node 20's global `fetch` (undici), which accepts a
+`dispatcher` option — a per-connection `undici` `ProxyAgent` is threaded into each `fetch(...)`.
+
+**Architecture** — `ProxyDispatcherService` (provided by the `@Global` `ProxyCoreModule`, mirroring
+`OAuthCoreModule`) is the single source of dispatchers. `resolve(connection, targetUrl)` returns a
+cached `ProxyAgent` or `undefined` (direct) when proxy is off, no URL is set, or the target matches
+`noProxyHosts`. One agent is cached per connection keyed by a hash of its proxy config; a config change
+rebuilds and `close()`s the superseded one, `invalidate(id)` is called from the connection update/delete
+paths, and all agents close on `onModuleDestroy`. Agents are built **lazily** on first use — never at
+module init — so a bad stored `proxyUrl` can never block boot or `/health`. A bounded `connectTimeout`
+fast-fails a dead proxy independently of the per-request `AbortSignal.timeout`.
+
+**Threaded into the three `fetch` sites:**
+
+- `IdentitySyncClientService.fetchJson(...)` — `SyncService` resolves the dispatcher once per run (from
+  `baseUrl`) and passes it through `fetchUsersRaw` / `fetchGroupsRawForUser` / `fetchRolesRawForUser`.
+  The scheduler-triggered path inherits this automatically (it goes through `SyncService`).
+- `OAuthTokenService.exchange(...)` — resolves from the connection + the **token URL** (no-proxy is
+  evaluated per target host, which may differ from `baseUrl`).
+- `ApiConnectionTestService` — Test connection / Test token route through the dispatcher; a dedicated
+  **Test proxy** (`POST /api/admin/api-connections/:id/test-proxy`) probes only the proxy hop and
+  classifies the failure (`proxy-error.util.ts`: `auth_failed` / `unreachable` / `tunnel_failed` /
+  `tls_error` / `target_error` / `bypassed`).
+
+The proxy password is encrypted at rest (`CREDENTIALS_ENCRYPTION`), never serialized to the frontend,
+and redacted from logs/errors (`redact-secret.util.ts` covers `Proxy-Authorization` + URL userinfo).
+
+| Variable                   | Default | Purpose                                                                       |
+| -------------------------- | ------- | ----------------------------------------------------------------------------- |
+| `PROXY_CONNECT_TIMEOUT_MS` | `5000`  | `ProxyAgent` connect timeout (fast-fail a dead proxy); bounded `[100, 60000]` |
+
 **Single-instance only** — the scheduler assumes one container. Multi-instance HA / leader election is
 out of scope (would double-run); set `SYNC_SCHEDULER_TICK_MS=0` on all but one replica.
 

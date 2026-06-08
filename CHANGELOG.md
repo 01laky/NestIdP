@@ -4,6 +4,51 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.14.0]
+
+### Added
+
+- **Outbound HTTP proxy per API connection (Prompt 33):** an operator can route a single API
+  connection's outbound sync traffic through a corporate **HTTP/HTTPS proxy**, configured per
+  connection from the admin console. When enabled, **all** outbound calls for that connection — the
+  identity sync fetches (users/groups/roles), the OAuth token-endpoint exchange, and the
+  "Test connection" / "Test token" diagnostics — traverse the proxy. Proxy is **per connection, off by
+  default**; existing deployments connect directly with no change.
+- **`noProxyHosts` bypass list** supporting exact host, `host:port`, leading-dot domain suffix, `*`
+  (everything), **IPv4/IPv6 CIDR ranges** (`10.0.0.0/8`, `fd00::/8`, dependency-free), and always
+  `localhost`/`127.0.0.1`/`::1` (case-insensitive).
+- **Dedicated "Test proxy" diagnostic** (`POST /api/admin/api-connections/:id/test-proxy`) that probes
+  **only the proxy hop**, so an operator can tell "proxy is dead / rejects auth" apart from "target is
+  down". Persists a proxy-health status (`lastProxyCheckStatus`/`lastProxyCheckAt`) surfaced as a badge.
+- **Proxy error taxonomy** — failures are classified into `auth_failed` (HTTP 407), `unreachable`,
+  `tunnel_failed`, `tls_error`, `target_error`, and `bypassed`, so a proxy is never blamed for a target
+  outage (or vice versa).
+- **Effective-routing preview** in the admin form: a live, client-side `direct` / `via proxy` summary
+  per known target (sync base URL + OAuth token URL) to validate the bypass list before saving.
+- New audit events `api_connection_proxy_updated` and `api_connection_proxy_checked` (no secrets —
+  enabled/disabled, proxy host, whether auth is set, no-proxy presence, check status).
+- Full proxy UI strings in all 10 locales (`en, cs, sk, de, fr, es, pl, it, pt, nl`).
+
+### Changed
+
+- Added `undici` (v6, pure-JS, Node 20 / `node:20-slim`-compatible) to `apps/api`; a per-connection
+  `undici` `ProxyAgent` is threaded into each `fetch(...)` as the dispatcher. `AbortSignal.timeout`
+  still bounds every request; a separate bounded `connectTimeout` fast-fails a dead proxy.
+- `ApiConnection` gains `proxyEnabled`, `proxyUrl`, `proxyUsername`, `proxyPasswordEncrypted`,
+  `noProxyHosts`, `lastProxyCheckStatus`, `lastProxyCheckAt` (migration
+  `20260612120000_outbound_http_proxy`; existing rows default to proxy-off).
+
+### Security
+
+- The proxy password is stored **only** in the encrypted libSQL database, **encrypted at rest** via the
+  existing `CREDENTIALS_ENCRYPTION` port, **never** returned to the frontend (`hasProxyPassword`
+  boolean + write-only `proxyPassword` input), and **never** logged.
+- Secret redaction extended to cover the `Proxy-Authorization` header and inline credentials embedded in
+  a proxy URL (`http://user:pass@host` → `http://[redacted]@host`).
+- The existing off-origin SSRF guard runs **before** dispatcher selection — a proxy cannot reach a
+  target the direct path would reject. `ProxyAgent` pools are cached per connection and closed cleanly
+  on config change, delete, and shutdown (no leaks).
+
 ## [1.13.0]
 
 ### Added

@@ -5,6 +5,9 @@
 		"rootDir": "./src",
 		"module": "NodeNext",
 		"moduleResolution": "NodeNext",
+		// WHATWG URL is a runtime global in both the browser (web) and Node (api) — add DOM so the
+		// isomorphic proxy helpers type-check here (the global is not in the ES2022 lib).
+		"lib": ["ES2022", "DOM"],
 		"baseUrl": ".",
 		"paths": {
 			"@shared/*": ["src/*"]

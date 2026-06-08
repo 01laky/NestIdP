@@ -173,26 +173,27 @@ docker compose exec nestidp pnpm db:rekey -- "$NEW_KEY"
 
 ## Environment reference (compose / production)
 
-| Variable                                    | Default        | Purpose                                                               |
-| ------------------------------------------- | -------------- | --------------------------------------------------------------------- |
-| `DATABASE_URL`                              | set in compose | `file:` path to the libSQL DB file                                    |
-| `DATABASE_ENCRYPTION_KEY`                   | —              | At-rest DB encryption key (required in prod)                          |
-| `DATABASE_ENCRYPTION_KEY_FILE`              | —              | Alt: read the DB key from a secret file                               |
-| `SESSION_SECRET`                            | —              | Admin + end-user cookie signing                                       |
-| `ENCRYPTION_KEY`                            | —              | API tokens and IdP private keys at rest                               |
-| `IDP_BASE_URL`                              | —              | Public IdP base URL                                                   |
-| `ADMIN_USERNAME` / `ADMIN_PASSWORD`         | —              | First admin when table empty                                          |
-| `TRUST_PROXY`                               | `false`        | `true` behind load balancer                                           |
-| `AUDIT_RETENTION_DAYS`                      | `90`           | Delete `AuditEvent` rows older than N days                            |
-| `AUDIT_CLEANUP_INTERVAL_MS`                 | `86400000`     | Cleanup interval; `0` = once on startup                               |
-| `ADMIN_USER_CREATE_RATE_LIMIT_MAX`          | `5`            | Max admin creates per window                                          |
-| `ADMIN_USER_CREATE_RATE_LIMIT_WINDOW_MS`    | `900000`       | Admin create rate window (15 min)                                     |
-| `MIGRATE_ONLY`                              | `0`            | `1` = migrate and exit                                                |
-| `SYNC_SCHEDULER_TICK_MS`                    | `30000`        | Scheduled-sync tick interval; `0` disables the scheduler              |
-| `SYNC_SCHEDULE_MIN_INTERVAL_MINUTES`        | `5`            | Reject cron schedules firing more often than this                     |
-| `SYNC_SCHEDULE_JITTER_MAX_SECONDS`          | `30`           | Spread same-cron connections; `0` = exact run times                   |
-| `SYNC_SCHEDULE_FAILURE_AUTOPAUSE_THRESHOLD` | `0`            | Auto-pause after N consecutive failures; `0` = never                  |
-| `SYNC_SCHEDULE_BOOT_OVERDUE_GRACE_MINUTES`  | `0`            | On boot, run an overdue schedule only if overdue ≤ N min; `0` = never |
+| Variable                                    | Default        | Purpose                                                                                               |
+| ------------------------------------------- | -------------- | ----------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                              | set in compose | `file:` path to the libSQL DB file                                                                    |
+| `DATABASE_ENCRYPTION_KEY`                   | —              | At-rest DB encryption key (required in prod)                                                          |
+| `DATABASE_ENCRYPTION_KEY_FILE`              | —              | Alt: read the DB key from a secret file                                                               |
+| `SESSION_SECRET`                            | —              | Admin + end-user cookie signing                                                                       |
+| `ENCRYPTION_KEY`                            | —              | API tokens and IdP private keys at rest                                                               |
+| `IDP_BASE_URL`                              | —              | Public IdP base URL                                                                                   |
+| `ADMIN_USERNAME` / `ADMIN_PASSWORD`         | —              | First admin when table empty                                                                          |
+| `TRUST_PROXY`                               | `false`        | `true` behind load balancer                                                                           |
+| `AUDIT_RETENTION_DAYS`                      | `90`           | Delete `AuditEvent` rows older than N days                                                            |
+| `AUDIT_CLEANUP_INTERVAL_MS`                 | `86400000`     | Cleanup interval; `0` = once on startup                                                               |
+| `ADMIN_USER_CREATE_RATE_LIMIT_MAX`          | `5`            | Max admin creates per window                                                                          |
+| `ADMIN_USER_CREATE_RATE_LIMIT_WINDOW_MS`    | `900000`       | Admin create rate window (15 min)                                                                     |
+| `MIGRATE_ONLY`                              | `0`            | `1` = migrate and exit                                                                                |
+| `SYNC_SCHEDULER_TICK_MS`                    | `30000`        | Scheduled-sync tick interval; `0` disables the scheduler                                              |
+| `SYNC_SCHEDULE_MIN_INTERVAL_MINUTES`        | `5`            | Reject cron schedules firing more often than this                                                     |
+| `SYNC_SCHEDULE_JITTER_MAX_SECONDS`          | `30`           | Spread same-cron connections; `0` = exact run times                                                   |
+| `SYNC_SCHEDULE_FAILURE_AUTOPAUSE_THRESHOLD` | `0`            | Auto-pause after N consecutive failures; `0` = never                                                  |
+| `SYNC_SCHEDULE_BOOT_OVERDUE_GRACE_MINUTES`  | `0`            | On boot, run an overdue schedule only if overdue ≤ N min; `0` = never                                 |
+| `PROXY_CONNECT_TIMEOUT_MS`                  | `5000`         | Per-connection outbound `ProxyAgent` connect timeout (fast-fail a dead proxy); bounded `[100, 60000]` |
 
 > **Single-instance scheduling.** The scheduled-sync scheduler is **in-process** and assumes a single
 > NestIdP container. Running multiple replicas would **double-run** schedules (no HA leader election).

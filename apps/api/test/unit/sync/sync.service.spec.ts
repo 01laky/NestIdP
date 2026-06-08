@@ -13,6 +13,7 @@ import { IdentitySyncHttpError } from '@api/sync/identity-sync.errors';
 import { DRY_RUN_SUMMARY_PHASE, DRY_RUN_SUMMARY_MESSAGE } from '@api/sync/mappers/sync.mapper';
 import { SyncLogService, capSyncErrors } from '@api/sync/services/sync-log.service';
 import { SyncService } from '@api/sync/services/sync.service';
+import { fakeProxyDispatcher } from '@test/support/proxy-dispatcher.mock';
 
 const TEST_PASSWORD_HASH = '$2b$12$test.hash.for.integration.tests.only';
 const CONNECTION_ID = 'c1234567890123456789012345';
@@ -91,6 +92,7 @@ describe('SyncService', () => {
 		encryption,
 		audit as never,
 		oauthTokenService as never,
+		fakeProxyDispatcher(),
 	);
 
 	const baseConnection = {
@@ -905,6 +907,7 @@ describe('SyncService', () => {
 			oauthConnection.baseUrl,
 			'access-token-1',
 			expect.anything(),
+			undefined,
 		);
 	});
 
@@ -1044,6 +1047,60 @@ describe('SyncService', () => {
 		it('returns false when the connection no longer exists', async () => {
 			prisma.apiConnection.findUnique.mockResolvedValue(null);
 			await expect(service.isSyncInProgress(CONNECTION_ID)).resolves.toBe(false);
+		});
+	});
+
+	describe('outbound proxy wiring', () => {
+		const marker = { __dispatcher: true };
+		const proxiedService = new SyncService(
+			prisma as never,
+			identityRepository as unknown as ActiveIdentityStore,
+			syncLogService as unknown as SyncLogService,
+			identitySyncClient as unknown as IdentitySyncClientService,
+			encryption,
+			audit as never,
+			oauthTokenService as never,
+			fakeProxyDispatcher({ proxied: true, dispatcher: marker }),
+		);
+
+		it('PROXY-WIRE-01: a proxied sync passes a dispatcher to the users + membership fetches', async () => {
+			setupHappyPathMocks();
+			await proxiedService.triggerSync(CONNECTION_ID);
+			expect(identitySyncClient.fetchUsersRaw).toHaveBeenCalledWith(
+				baseConnection.baseUrl,
+				BEARER_TOKEN,
+				expect.anything(),
+				marker,
+			);
+			expect(identitySyncClient.fetchGroupsRawForUser).toHaveBeenCalledWith(
+				baseConnection.baseUrl,
+				BEARER_TOKEN,
+				expect.anything(),
+				expect.anything(),
+				marker,
+			);
+		});
+
+		it('PROXY-WIRE-01b: a non-proxied sync passes no dispatcher', async () => {
+			setupHappyPathMocks();
+			await service.triggerSync(CONNECTION_ID);
+			expect(identitySyncClient.fetchUsersRaw).toHaveBeenCalledWith(
+				baseConnection.baseUrl,
+				BEARER_TOKEN,
+				expect.anything(),
+				undefined,
+			);
+		});
+
+		it('PROXY-WIRE-05: a scheduler-triggered sync also routes through the dispatcher', async () => {
+			setupHappyPathMocks();
+			await proxiedService.triggerSync(CONNECTION_ID, { triggerSource: 'scheduled' });
+			expect(identitySyncClient.fetchUsersRaw).toHaveBeenCalledWith(
+				baseConnection.baseUrl,
+				BEARER_TOKEN,
+				expect.anything(),
+				marker,
+			);
 		});
 	});
 });

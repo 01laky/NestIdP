@@ -70,6 +70,13 @@ Migration: `20260604120000_identity_manual_crud` (single history under `prisma/m
   - `nextRunAt` — next computed fire instant; persisted so schedules **survive restarts**; cleared on disable/clear-cron
   - `lastScheduledRunAt` / `lastScheduledRunStatus` — last **scheduled** run time + result, distinct from `lastSyncAt` / `lastSyncStatus` which any run updates
   - `scheduleLastError` / `scheduleConsecutiveFailures` / `scheduleAutoPausedAt` — failure backoff state; a successful real sync clears these (and lifts an auto-pause)
+- **`ApiConnection` outbound-proxy columns (v1.14.0, Prompt 33)** (opt-in, off by default; never used for the local-directory row):
+  - `proxyEnabled` — route this connection's outbound sync/OAuth/test calls through the proxy
+  - `proxyUrl` — absolute `http://`/`https://` proxy URL (no inline credentials)
+  - `proxyUsername` — Basic proxy auth username (optional)
+  - `proxyPasswordEncrypted` — Basic proxy auth password, **encrypted at rest** via `CREDENTIALS_ENCRYPTION` (same as bearer tokens / OAuth client secret); never returned to the frontend, never logged
+  - `noProxyHosts` — comma-separated bypass patterns (exact host, `host:port`, leading-dot suffix, `*`, IPv4/IPv6 CIDR; `localhost`/`127.0.0.1`/`::1` always bypass)
+  - `lastProxyCheckStatus` / `lastProxyCheckAt` — last "Test proxy" outcome (`ok`/`auth_failed`/`unreachable`/`tunnel_failed`/`tls_error`/`target_error`/`bypassed`) + timestamp
 
 ### End-user sessions (v0.6.0)
 
