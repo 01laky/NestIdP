@@ -9,13 +9,14 @@ import {
 	deleteAdminUser,
 	getAdminMe,
 	listAdminUsers,
+	unlockAdminUser,
 } from '../adminApi';
 import { AdminPageHeader } from '../components/layout/AdminPageHeader';
 import { ErrorBanner } from '../components/common/ErrorBanner';
 import { LoadingState } from '../components/common/LoadingState';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
 import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
-import { Button, Panel, Table, TextInput, useConfirmAction, useToast } from '../../ui';
+import { Badge, Button, Panel, Table, TextInput, useConfirmAction, useToast } from '../../ui';
 
 export function AdminUsersPage() {
 	const { t } = useTranslation('adminUsers');
@@ -150,6 +151,7 @@ export function AdminUsersPage() {
 							<thead>
 								<tr>
 									<th>{tCommon('username')}</th>
+									<th>{tCommon('status')}</th>
 									<th>{tCommon('created')}</th>
 									<th>{tCommon('actions')}</th>
 								</tr>
@@ -158,8 +160,34 @@ export function AdminUsersPage() {
 								{admins.map((admin) => (
 									<tr key={admin.id}>
 										<td>{admin.username}</td>
-										<td className="evg-muted">{new Date(admin.createdAt).toLocaleString()}</td>
 										<td>
+											{admin.lockout?.locked ? (
+												<Badge variant="danger">{t('lockedBadge')}</Badge>
+											) : null}
+										</td>
+										<td className="evg-muted">{new Date(admin.createdAt).toLocaleString()}</td>
+										<td className="evg-table-actions">
+											{admin.lockout?.locked ? (
+												<Button
+													type="button"
+													size="sm"
+													variant="secondary"
+													onClick={() => {
+														void confirmAction({
+															title: t('unlockConfirmTitle'),
+															description: t('unlockConfirmBody', { username: admin.username }),
+															confirmLabel: t('unlock'),
+															onConfirm: async () => {
+																await unlockAdminUser(admin.id);
+																showToast(t('unlockSuccess'));
+																await reload();
+															},
+														});
+													}}
+												>
+													{t('unlock')}
+												</Button>
+											) : null}
 											{admin.id !== meId && admins.length > 1 ? (
 												<Button
 													type="button"
@@ -183,9 +211,9 @@ export function AdminUsersPage() {
 												>
 													{tCommon('delete')}
 												</Button>
-											) : (
+											) : !admin.lockout?.locked ? (
 												<span className="evg-muted">{tCommon('emDash')}</span>
-											)}
+											) : null}
 										</td>
 									</tr>
 								))}

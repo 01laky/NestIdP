@@ -19,8 +19,14 @@ import type {
 	UpdateManualIdentityGroupDto,
 	UpdateManualIdentityRoleDto,
 	UpdateManualIdentityUserDto,
+	UnlockAccountResponseDto,
 } from '@nestidp/shared';
 import { LOCAL_DIRECTORY_CONNECTION_NAME, apiConnectionAdminRoute } from '@nestidp/shared';
+import {
+	AccountLockoutService,
+	toAccountLockoutStatusDto,
+} from '../../auth-protection/account-lockout.service';
+import { AuthProtectionAuditService } from '../../auth-protection/auth-protection-audit.service';
 import { IdentityOrigin } from '@prisma/client';
 import { hashPassword } from '../../admin-auth/utils/password.util';
 import {
@@ -52,6 +58,8 @@ export class IdentityAdminService {
 		private readonly encryption: CredentialsEncryptionPort,
 		private readonly audit: IdentityAdminAuditService,
 		private readonly ssoSessions: SamlSsoSessionService,
+		private readonly accountLockout: AccountLockoutService,
+		private readonly protectionAudit: AuthProtectionAuditService,
 	) {}
 
 	async listUsers(
@@ -68,7 +76,47 @@ export class IdentityAdminService {
 			search,
 			origin: this.parseOrigin(originFilter),
 		});
-		return { items: items.map((row) => this.toUserListItem(row)), total };
+		const mapped = items.map((row) => this.toUserListItem(row));
+		const statuses = await this.accountLockout.getStatusMany(
+			'end_user',
+			mapped.map((u) => u.username.trim()),
+		);
+		return {
+			items: mapped.map((u) => ({
+				...u,
+				lockout: toAccountLockoutStatusDto(
+					statuses.get(u.username.trim()) ?? {
+						locked: false,
+						lockedUntil: null,
+						failedCount: 0,
+						lastFailedAt: null,
+					},
+				),
+			})),
+			total,
+		};
+	}
+
+	/** Operator unlock of a brute-force-locked end-user account. */
+	async unlockUser(
+		id: string,
+		actor: { id: string; username: string },
+		clientIp: string,
+	): Promise<UnlockAccountResponseDto> {
+		const detail = await this.store.getUserWithMemberships(id);
+		if (!detail) {
+			throw new NotFoundException('User not found');
+		}
+		const usernameKey = detail.user.username.trim();
+		await this.accountLockout.unlock('end_user', usernameKey);
+		this.protectionAudit.logAccountUnlocked(
+			'end_user',
+			usernameKey,
+			actor.id,
+			actor.username,
+			clientIp,
+		);
+		return { ok: true, id };
 	}
 
 	async getUserById(id: string, auditLimitRaw?: number): Promise<IdentityUserDetailResponseDto> {
@@ -81,9 +129,16 @@ export class IdentityAdminService {
 		const recentAudit =
 			auditLimit > 0 ? await this.loadRecentAudit('user', id, auditLimit) : undefined;
 		const source = await this.buildUserSource(detail.user.apiConnectionId);
+		const lockoutStatus = await this.accountLockout.getStatus(
+			'end_user',
+			detail.user.username.trim(),
+		);
 
 		return {
-			user: this.toUserListItem(detail.user),
+			user: {
+				...this.toUserListItem(detail.user),
+				lockout: toAccountLockoutStatusDto(lockoutStatus),
+			},
 			groups: detail.groups
 				.map((g) => ({ id: g.id, name: g.name, origin: toOriginLiteral(g.origin) }))
 				.sort((a, b) => a.name.localeCompare(b.name)),

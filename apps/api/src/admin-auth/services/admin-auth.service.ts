@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import type { AdminMeDto } from '@nestidp/shared';
 import { assertStrongAdminPassword } from '@nestidp/shared';
 import { PrismaService } from '../../prisma/services/prisma.service';
+import { AccountLockoutService } from '../../auth-protection/account-lockout.service';
 import { AdminAuthAuditService } from './admin-auth-audit.service';
 import { PasswordService } from './password.service';
 
@@ -13,6 +14,7 @@ export class AdminAuthService {
 		private readonly passwordService: PasswordService,
 		private readonly configService: ConfigService,
 		private readonly audit: AdminAuthAuditService,
+		private readonly accountLockout: AccountLockoutService,
 	) {}
 
 	async login(
@@ -72,6 +74,8 @@ export class AdminAuthService {
 			where: { id: adminUserId },
 			data: { passwordHash },
 		});
+		// Credential rotated by the legitimate owner — clear any brute-force lockout for this account.
+		await this.accountLockout.recordSuccess('admin', admin.username.trim());
 		this.audit.logPasswordChanged(admin.id, admin.username, clientIp);
 	}
 

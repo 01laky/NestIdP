@@ -16,6 +16,7 @@ import { toApiConnectionDto } from '../../api-connections/mappers/api-connection
 import { IdpSettingsService } from '../../idp-settings/services/idp-settings.service';
 import { PrismaService } from '../../prisma/services/prisma.service';
 import { buildIdpUrls } from '../../idp-settings/mappers/idp-settings.mapper';
+import { AccountLockoutService } from '../../auth-protection/account-lockout.service';
 import { AdminStatsService } from './admin-stats.service';
 
 @Injectable()
@@ -25,10 +26,15 @@ export class AdminDashboardService {
 		private readonly prisma: PrismaService,
 		private readonly configService: ConfigService,
 		private readonly idpSettingsService: IdpSettingsService,
+		private readonly accountLockout: AccountLockoutService,
 	) {}
 
 	async getDashboard(): Promise<AdminDashboardResponseDto> {
 		const counts = await this.adminStatsService.getCounts();
+		const lockouts = {
+			lockedAdminAccounts: await this.accountLockout.countLocked('admin'),
+			lockedUserAccounts: await this.accountLockout.countLocked('end_user'),
+		};
 		const base = (this.configService.get<string>('IDP_BASE_URL') ?? '').replace(/\/+$/, '');
 		const settings = await this.prisma.idpSettings.findUnique({ where: { id: 'default' } });
 		const connectionRow = await this.prisma.apiConnection.findFirst({
@@ -66,6 +72,7 @@ export class AdminDashboardService {
 
 		return {
 			counts,
+			lockouts,
 			apiConnectionsRoute: API_CONNECTION_ROUTE_PREFIX,
 			spConnectionsRoute: SP_CONNECTION_ROUTE_PREFIX,
 			identityUsersRoute: `${IDENTITY_ROUTE_PREFIX}/users`,

@@ -11,10 +11,16 @@ import type {
 	DeleteAdminUserResponseDto,
 	UpdateAdminUserRequestDto,
 } from '@nestidp/shared';
+import type { UnlockAccountResponseDto } from '@nestidp/shared';
 import { assertStrongAdminPassword } from '@nestidp/shared';
 import { PrismaService } from '../../prisma/services/prisma.service';
 import { PasswordService } from '../../admin-auth/services/password.service';
 import { AuditPersistenceService } from '../../audit/services/audit-persistence.service';
+import {
+	AccountLockoutService,
+	toAccountLockoutStatusDto,
+} from '../../auth-protection/account-lockout.service';
+import { AuthProtectionAuditService } from '../../auth-protection/auth-protection-audit.service';
 import { toAdminUserPublicDto } from '../mappers/admin-users.mapper';
 
 @Injectable()
@@ -24,11 +30,48 @@ export class AdminUsersService {
 		private readonly passwordService: PasswordService,
 		private readonly configService: ConfigService,
 		private readonly audit: AuditPersistenceService,
+		private readonly accountLockout: AccountLockoutService,
+		private readonly protectionAudit: AuthProtectionAuditService,
 	) {}
 
 	async list(): Promise<AdminUserPublicDto[]> {
 		const rows = await this.prisma.adminUser.findMany({ orderBy: { username: 'asc' } });
-		return rows.map(toAdminUserPublicDto);
+		const statuses = await this.accountLockout.getStatusMany(
+			'admin',
+			rows.map((r) => r.username.trim()),
+		);
+		return rows.map((row) => ({
+			...toAdminUserPublicDto(row),
+			lockout: toAccountLockoutStatusDto(
+				statuses.get(row.username.trim()) ?? {
+					locked: false,
+					lockedUntil: null,
+					failedCount: 0,
+					lastFailedAt: null,
+				},
+			),
+		}));
+	}
+
+	/** Operator unlock of a brute-force-locked admin account. */
+	async unlock(
+		id: string,
+		actor: { id: string; username: string },
+		clientIp: string,
+	): Promise<UnlockAccountResponseDto> {
+		const existing = await this.prisma.adminUser.findUnique({ where: { id } });
+		if (!existing) {
+			throw new NotFoundException('Admin user not found');
+		}
+		await this.accountLockout.unlock('admin', existing.username.trim());
+		this.protectionAudit.logAccountUnlocked(
+			'admin',
+			existing.username.trim(),
+			actor.id,
+			actor.username,
+			clientIp,
+		);
+		return { ok: true, id };
 	}
 
 	async create(

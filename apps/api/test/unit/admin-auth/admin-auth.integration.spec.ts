@@ -11,7 +11,7 @@ import { App } from 'supertest/types';
 import { ADMIN_CSRF_HEADER_NAME, ADMIN_SESSION_COOKIE_NAME } from '@nestidp/shared';
 import { AdminModule } from '@api/admin/admin.module';
 import { AdminAuthModule } from '@api/admin-auth/admin-auth.module';
-import { LoginRateLimiterService } from '@api/admin-auth/services/login-rate-limiter.service';
+import { LoginProtectionService } from '@api/auth-protection/login-protection.service';
 import { AdminSessionService } from '@api/admin-auth/services/admin-session.service';
 import { IdentityModule } from '@api/identity/identity.module';
 import { PrismaModule } from '@api/prisma/prisma.module';
@@ -94,7 +94,7 @@ describe('admin-auth integration (SQLite)', () => {
 	});
 
 	beforeEach(async () => {
-		app.get(LoginRateLimiterService).clear();
+		app.get(LoginProtectionService).clear();
 		await prisma.user.deleteMany();
 		await prisma.apiConnection.deleteMany();
 	});
@@ -293,8 +293,9 @@ describe('admin-auth integration (SQLite)', () => {
 			.expect(401);
 	});
 
-	it('API-AUTH-INT-19: 429 after 11 failed login attempts from same IP', async () => {
-		for (let i = 0; i < 10; i += 1) {
+	it('API-AUTH-INT-19: 429 after the per-username throttle is exceeded (admin)', async () => {
+		// Admin login is now throttled per-username (default max 5) as well as per-IP (Prompt 35).
+		for (let i = 0; i < 5; i += 1) {
 			await request(app.getHttpServer() as App)
 				.post('/api/admin/auth/login')
 				.send({ username: 'admin', password: 'wrong' })
@@ -308,7 +309,7 @@ describe('admin-auth integration (SQLite)', () => {
 	});
 
 	it('API-AUTH-INT-20: successful login resets rate limit counter', async () => {
-		for (let i = 0; i < 9; i += 1) {
+		for (let i = 0; i < 4; i += 1) {
 			await request(app.getHttpServer() as App)
 				.post('/api/admin/auth/login')
 				.send({ username: 'admin', password: 'wrong' })
@@ -319,7 +320,7 @@ describe('admin-auth integration (SQLite)', () => {
 			.send({ username: 'admin', password: adminPassword })
 			.expect(200);
 
-		for (let i = 0; i < 10; i += 1) {
+		for (let i = 0; i < 5; i += 1) {
 			await request(app.getHttpServer() as App)
 				.post('/api/admin/auth/login')
 				.send({ username: 'admin', password: 'wrong' })

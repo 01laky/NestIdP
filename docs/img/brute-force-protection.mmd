@@ -1,0 +1,17 @@
+flowchart TD
+	Req[Login / SSO request] --> Trusted{Trusted CIDR?}
+	Trusted -- yes --> Lockout
+	Trusted -- no --> Ban{IP banned?}
+	Ban -- yes --> Block429[Block: 429 + Retry-After<br/>or opaque 401]
+	Ban -- no --> Throttle{IP or username<br/>throttle exceeded?}
+	Throttle -- yes --> Trip[Record IP trip] --> Block429
+	Throttle -- no --> Lockout{Account locked?<br/>lockedUntil > now}
+	Lockout -- yes --> Block429
+	Lockout -- no --> Verify[Verify password]
+	Verify -- success --> Reset[Clear throttle + lockout row] --> OK[Authenticated]
+	Verify -- failure --> Record[throttle.record + LoginLockout.failedCount++]
+	Record --> Threshold{failedCount >= threshold?}
+	Threshold -- yes --> Lock[Set lockedUntil = now + base x 2^n<br/>clamp to max; audit + notify] --> Trip2[Record IP trip] --> Fail401[401 invalid credentials]
+	Threshold -- no --> Tarpit[Optional tarpit delay] --> Fail401
+	Lock -.->|time-based expiry| Recover[Auto-recovery: next attempt proceeds]
+	Block429 -.->|operator| Unlock[Admin unlock / credential change<br/>clears LoginLockout row]

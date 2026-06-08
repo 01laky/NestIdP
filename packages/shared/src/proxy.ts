@@ -218,6 +218,32 @@ function ipInCidr(host: string, token: string): boolean {
 	return false;
 }
 
+/**
+ * True when `ip` matches any token in a CIDR/IP allowlist (e.g. `RATE_LIMIT_TRUSTED_CIDRS`). A token may
+ * be a plain literal IP (exact match) or a CIDR range (`10.0.0.0/8`, `fd00::/8`). Reuses the same
+ * dependency-free CIDR matcher as the proxy no-proxy logic. Bracketed IPv6 (`[::1]`) is tolerated.
+ */
+export function ipMatchesCidrList(
+	ip: string,
+	tokens: string | string[] | null | undefined,
+): boolean {
+	if (!ip) {
+		return false;
+	}
+	const host = unbracket(ip.trim()).toLowerCase();
+	const list = Array.isArray(tokens) ? tokens : parseNoProxyHosts(tokens);
+	for (const token of list) {
+		if (token.includes('/')) {
+			if (ipInCidr(host, token)) {
+				return true;
+			}
+		} else if (unbracket(token) === host) {
+			return true;
+		}
+	}
+	return false;
+}
+
 // --- Effective-routing preview (UI) ------------------------------------------------------------
 
 export interface ProxyRoutingTarget {

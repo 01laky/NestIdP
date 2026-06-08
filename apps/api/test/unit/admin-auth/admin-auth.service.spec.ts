@@ -6,10 +6,12 @@ describe('AdminAuthService', () => {
 	const prisma = {
 		adminUser: {
 			findUnique: jest.fn(),
+			update: jest.fn(),
 		},
 	};
 	const passwordService = {
 		verifyTimingSafe: jest.fn(),
+		hash: jest.fn().mockResolvedValue('new-hash'),
 	};
 	const configService = {
 		get: jest.fn(() => 'development'),
@@ -17,12 +19,17 @@ describe('AdminAuthService', () => {
 	const audit = {
 		logLoginSuccess: jest.fn(),
 		logLoginFailure: jest.fn(),
+		logPasswordChanged: jest.fn(),
+	};
+	const accountLockout = {
+		recordSuccess: jest.fn().mockResolvedValue(undefined),
 	};
 	const service = new AdminAuthService(
 		prisma as never,
 		passwordService as unknown as PasswordService,
 		configService as never,
 		audit as never,
+		accountLockout as never,
 	);
 	const clientIp = '127.0.0.1';
 
@@ -85,6 +92,18 @@ describe('AdminAuthService', () => {
 
 		await expect(service.login('ghost', 'secret', clientIp)).rejects.toThrow(UnauthorizedException);
 		expect(passwordService.verifyTimingSafe).toHaveBeenCalledWith('secret', null);
+	});
+
+	it('LOCK-12: changePassword clears the brute-force lockout for the account', async () => {
+		prisma.adminUser.findUnique.mockResolvedValue({
+			id: 'a1',
+			username: 'admin',
+			passwordHash: 'old-hash',
+		});
+		passwordService.verifyTimingSafe.mockResolvedValue(true);
+		await service.changePassword('a1', 'OldPassw0rd!!', 'NewPassw0rd!!', clientIp);
+		expect(prisma.adminUser.update).toHaveBeenCalled();
+		expect(accountLockout.recordSuccess).toHaveBeenCalledWith('admin', 'admin');
 	});
 
 	it('API-AUT-06: resolveAuthenticatedAdmin returns admin dto', async () => {

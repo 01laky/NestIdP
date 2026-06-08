@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ApiConnectionsModule } from '../api-connections/api-connections.module';
 import { AdminAuthModule } from '../admin-auth/admin-auth.module';
+import { AuthProtectionModule } from '../auth-protection/auth-protection.module';
 import { IdentityAdminModule } from '../identity-admin/identity-admin.module';
 import { IdentityModule } from '../identity/identity.module';
 import { IdpSettingsModule } from '../idp-settings/idp-settings.module';
@@ -18,6 +19,7 @@ import { AuditModule } from '../audit/audit.module';
 	imports: [
 		AuditModule,
 		PrismaModule,
+		AuthProtectionModule,
 		IdentityModule,
 		IdentityAdminModule,
 		AdminAuthModule,

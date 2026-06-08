@@ -11,7 +11,7 @@ import { App } from 'supertest/types';
 import { ADMIN_CSRF_HEADER_NAME, ADMIN_SESSION_COOKIE_NAME } from '@nestidp/shared';
 import { AdminModule } from '@api/admin/admin.module';
 import { AdminAuthModule } from '@api/admin-auth/admin-auth.module';
-import { LoginRateLimiterService } from '@api/admin-auth/services/login-rate-limiter.service';
+import { LoginProtectionService } from '@api/auth-protection/login-protection.service';
 import { PasswordService } from '@api/admin-auth/services/password.service';
 import { PrismaModule } from '@api/prisma/prisma.module';
 import { PrismaService } from '@api/prisma/services/prisma.service';
@@ -116,7 +116,7 @@ describe('admin change-password integration (SQLite)', () => {
 	});
 
 	beforeEach(async () => {
-		app.get(LoginRateLimiterService).clear();
+		app.get(LoginProtectionService).clear();
 		await prisma.auditEvent.deleteMany();
 		const admin = await prisma.adminUser.findUnique({ where: { username: 'admin' } });
 		const passwordHash = await app.get(PasswordService).hash(adminPassword);

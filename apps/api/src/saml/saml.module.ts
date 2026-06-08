@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AuditCoreModule } from '../audit/audit-core.module';
+import { AuthProtectionModule } from '../auth-protection/auth-protection.module';
 import { IdentityModule } from '../identity/identity.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { EncryptionModule } from '../encryption/encryption.module';
@@ -25,6 +26,7 @@ import { SamlSloRateLimiterService } from './services/saml-slo-rate-limiter.serv
 	imports: [
 		PrismaModule,
 		AuditCoreModule,
+		AuthProtectionModule,
 		IdentityModule,
 		ConfigModule,
 		EncryptionModule,

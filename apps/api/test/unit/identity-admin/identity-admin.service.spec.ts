@@ -68,10 +68,26 @@ describe('IdentityAdminService', () => {
 		logRoleDeleted: jest.fn(),
 	} as unknown as IdentityAdminAuditService;
 	const ssoSessions = { terminateAllForUser: jest.fn().mockResolvedValue(0) };
+	const accountLockout = {
+		getStatus: jest
+			.fn()
+			.mockResolvedValue({ locked: false, lockedUntil: null, failedCount: 0, lastFailedAt: null }),
+		getStatusMany: jest.fn().mockResolvedValue(new Map()),
+		unlock: jest.fn().mockResolvedValue(true),
+	};
+	const protectionAudit = { logAccountUnlocked: jest.fn() };
 	let service: IdentityAdminService;
 
 	beforeEach(() => {
 		jest.clearAllMocks();
+		accountLockout.getStatus.mockResolvedValue({
+			locked: false,
+			lockedUntil: null,
+			failedCount: 0,
+			lastFailedAt: null,
+		});
+		accountLockout.getStatusMany.mockResolvedValue(new Map());
+		accountLockout.unlock.mockResolvedValue(true);
 		store = makeStoreMock();
 		service = new IdentityAdminService(
 			prisma as never,
@@ -79,7 +95,34 @@ describe('IdentityAdminService', () => {
 			encryption,
 			audit,
 			ssoSessions as never,
+			accountLockout as never,
+			protectionAudit as never,
 		);
+	});
+
+	it('UNLOCK-svc-idn: unlockUser clears the lockout and audits the operator action', async () => {
+		store.getUserWithMemberships.mockResolvedValue({
+			user: { ...baseUser },
+			groups: [],
+			roles: [],
+		});
+		const result = await service.unlockUser('u1', { id: 'op1', username: 'operator' }, '127.0.0.1');
+		expect(result).toEqual({ ok: true, id: 'u1' });
+		expect(accountLockout.unlock).toHaveBeenCalledWith('end_user', 'alice');
+		expect(protectionAudit.logAccountUnlocked).toHaveBeenCalledWith(
+			'end_user',
+			'alice',
+			'op1',
+			'operator',
+			'127.0.0.1',
+		);
+	});
+
+	it('UNLOCK-svc-idn-404: unlockUser throws NotFound for an unknown user', async () => {
+		store.getUserWithMemberships.mockResolvedValue(null);
+		await expect(
+			service.unlockUser('nope', { id: 'op1', username: 'operator' }, '127.0.0.1'),
+		).rejects.toThrow(NotFoundException);
 	});
 
 	it('H4: deleteUser terminates the user’s SSO sessions before delete', async () => {

@@ -291,6 +291,25 @@ export function DashboardPage() {
 					<Callout variant="info">{t('spSecurity.ecKeyAdvisory')}</Callout>
 				) : null}
 			</Panel>
+			{dashboard.lockouts ? (
+				<Panel title={t('securityLockoutsTitle')}>
+					{dashboard.lockouts.lockedAdminAccounts + dashboard.lockouts.lockedUserAccounts > 0 ? (
+						<Callout variant="warning" role="alert">
+							{t('lockedAdmins')}: {dashboard.lockouts.lockedAdminAccounts} · {t('lockedUsers')}:{' '}
+							{dashboard.lockouts.lockedUserAccounts}
+						</Callout>
+					) : (
+						<>
+							<p className="evg-muted">
+								{t('lockedAdmins')}: {dashboard.lockouts.lockedAdminAccounts}
+							</p>
+							<p className="evg-muted">
+								{t('lockedUsers')}: {dashboard.lockouts.lockedUserAccounts}
+							</p>
+						</>
+					)}
+				</Panel>
+			) : null}
 			<p className="evg-muted">
 				<Link className="evg-btn evg-btn--link" to={`${IDENTITY_ROUTE_PREFIX}/users`}>
 					{t('browseUsers')}

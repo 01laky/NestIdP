@@ -9,6 +9,7 @@ vi.mock('@/auth/authApi', () => ({
 		constructor(
 			public readonly statusCode: number,
 			message: string,
+			public readonly retryAfterSeconds?: number,
 		) {
 			super(message);
 			this.name = 'AuthApiError';
@@ -162,7 +163,7 @@ describe('LoginPage', () => {
 		});
 	});
 
-	it('WEB-AUTH-08: shows 429 rate limit message from API', async () => {
+	it('WEB-AUTH-08: shows a localized rate-limit message on 429', async () => {
 		vi.mocked(authApi.loginEndUser).mockRejectedValue(
 			new authApi.AuthApiError(429, 'Too many login attempts'),
 		);
@@ -174,7 +175,23 @@ describe('LoginPage', () => {
 		fireEvent.click(screen.getByRole('button', { name: /Sign in/i }));
 
 		await waitFor(() => {
-			expect(screen.getByRole('alert').textContent).toContain('Too many login attempts');
+			expect(screen.getByRole('alert').textContent).toContain('Too many attempts');
+		});
+	});
+
+	it('WEB-AUTH-08b: shows a countdown when the API returns Retry-After', async () => {
+		vi.mocked(authApi.loginEndUser).mockRejectedValue(
+			new authApi.AuthApiError(429, 'Too many login attempts', 30),
+		);
+
+		renderLogin();
+		await waitForLoginForm();
+		fireEvent.change(screen.getByLabelText(/Username/i), { target: { value: 'alice' } });
+		fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: 'secret' } });
+		fireEvent.click(screen.getByRole('button', { name: /Sign in/i }));
+
+		await waitFor(() => {
+			expect(screen.getByRole('alert').textContent).toContain('30');
 		});
 	});
 

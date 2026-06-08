@@ -29,7 +29,7 @@ import { SamlSsoSessionService } from '../../saml-sessions/services/saml-sso-ses
 import { EndUserAuthAuditService } from '../services/end-user-auth-audit.service';
 import { EndUserAuthService } from '../services/end-user-auth.service';
 import { EndUserSessionService } from '../services/end-user-session.service';
-import { EndUserLoginRateLimiterService } from '../services/end-user-login-rate-limiter.service';
+import { LoginProtectionService } from '../../auth-protection/login-protection.service';
 import { EndUserLoginBodyDto } from '../dto/end-user-login-body.dto';
 import { CompleteSsoBodyDto } from '../dto/complete-sso-body.dto';
 
@@ -40,7 +40,7 @@ export class AuthController {
 	constructor(
 		private readonly endUserAuthService: EndUserAuthService,
 		private readonly endUserSessionService: EndUserSessionService,
-		private readonly rateLimiter: EndUserLoginRateLimiterService,
+		private readonly loginProtection: LoginProtectionService,
 		private readonly samlSsoService: SamlSsoService,
 		private readonly ssoSessions: SamlSsoSessionService,
 		private readonly endUserAuthAudit: EndUserAuthAuditService,
@@ -56,12 +56,11 @@ export class AuthController {
 	): Promise<EndUserLoginResponseDto> {
 		const clientIp = req.ip ?? 'unknown';
 		const username = body.username;
+		const usernameKey = username.trim();
 
-		if (
-			this.rateLimiter.isLimitedByIp(clientIp) ||
-			this.rateLimiter.isLimitedByUsername(username)
-		) {
-			throw new HttpException('Too many login attempts', HttpStatus.TOO_MANY_REQUESTS);
+		const pre = await this.loginProtection.precheckLogin('end_user', usernameKey, clientIp);
+		if (!pre.allowed) {
+			this.loginProtection.enforceBlock(pre, res);
 		}
 
 		try {
@@ -82,13 +81,15 @@ export class AuthController {
 				ssoSession.id,
 			);
 			this.endUserSessionService.setCookie(res, payload);
-			this.rateLimiter.reset(clientIp, username);
+			await this.loginProtection.recordLoginSuccess('end_user', usernameKey, clientIp);
 			return result;
 		} catch (error) {
-			if (error instanceof UnauthorizedException) {
-				this.rateLimiter.recordFailure(clientIp, username);
-			} else if (!(error instanceof HttpException) || error.getStatus() < 500) {
-				this.rateLimiter.recordFailure(clientIp, username);
+			if (
+				error instanceof UnauthorizedException ||
+				!(error instanceof HttpException) ||
+				error.getStatus() < 500
+			) {
+				await this.loginProtection.recordLoginFailure('end_user', usernameKey, clientIp);
 			}
 			throw error;
 		}
@@ -151,6 +152,10 @@ export class AuthController {
 		}
 
 		const clientIp = req.ip ?? 'unknown';
+		const pre = this.loginProtection.precheckSso(clientIp);
+		if (!pre.allowed) {
+			this.loginProtection.enforceBlock(pre, res);
+		}
 		try {
 			const html = await this.samlSsoService.completeSso(
 				body.samlSessionId,

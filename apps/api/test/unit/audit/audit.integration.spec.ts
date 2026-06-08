@@ -11,7 +11,7 @@ import { App } from 'supertest/types';
 import { AUDIT_EVENTS_API_PATH, AUDIT_EXPORT_MAX_ROWS } from '@nestidp/shared';
 import { AdminModule } from '@api/admin/admin.module';
 import { AdminAuthModule } from '@api/admin-auth/admin-auth.module';
-import { LoginRateLimiterService } from '@api/admin-auth/services/login-rate-limiter.service';
+import { LoginProtectionService } from '@api/auth-protection/login-protection.service';
 import { PrismaModule } from '@api/prisma/prisma.module';
 import { PrismaService } from '@api/prisma/services/prisma.service';
 import { createTestAdminUserWithPassword } from '@test/support/prisma/test-fixtures';
@@ -97,7 +97,7 @@ describe('audit integration (SQLite)', () => {
 	});
 
 	beforeEach(async () => {
-		app.get(LoginRateLimiterService).clear();
+		app.get(LoginProtectionService).clear();
 		await prisma.auditEvent.deleteMany();
 	});
 

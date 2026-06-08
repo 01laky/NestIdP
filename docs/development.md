@@ -402,6 +402,28 @@ Vite dev server proxies `/api` to Nest; admin fetches must use **`credentials: '
 
 First boot: set `ADMIN_USERNAME` / `ADMIN_PASSWORD` in `.env` — bootstrap creates the first admin when the table is empty. Change default password after deploy. Additional operators: `/admin/settings/admins` or `POST /api/admin/admin-users`.
 
+### Rate limiting & brute-force protection (v1.16.0)
+
+A single layer (`apps/api/src/auth-protection/`) guards the admin login, end-user login (incl.
+`complete-sso`), and the public `/saml/sso` endpoint, in **three dimensions**:
+
+1. **Throttle** — a shared in-memory sliding-window core (`common/rate-limit/sliding-window-rate-limiter.ts`)
+   keyed per-IP and per-username. Cheap first line; per-replica.
+2. **Account lockout** — `AccountLockoutService` over the persistent `LoginLockout` table. After
+   `LOGIN_LOCKOUT_THRESHOLD` consecutive failures an account locks for `base × 2^n` (clamped to
+   `LOGIN_LOCKOUT_MAX_MS`). Checked **before** password verification; cleared on success, on credential
+   change (admin password change / end-user re-sync with a new hash), or on operator unlock. Lockout is
+   **always time-bounded** — there is no permanent-lock state, so the last admin can always recover.
+3. **IP escalation/ban** — `IpBanService` counts an IP's lockouts + throttle rejections across all three
+   surfaces and bans it wholesale for a bounded window once `LOGIN_IP_BAN_THRESHOLD` is crossed.
+
+`LoginProtectionService` orchestrates the three, applies the **trusted-CIDR bypass** (throttle + ban only,
+never lockout), the optional **tarpit**, and the **response mode** (`retry_after` 429 vs `opaque` 401 —
+both leak no account existence). Every lock/limit/ban is audited (system actor) and emitted as a structured
+log line; a no-op `BruteForceNotifier` is the wire-in point for alerting. **Single-instance:** throttle +
+ban state is per-replica; lockout is shared via the DB and survives restarts. Disable per layer with
+`LOGIN_LOCKOUT_THRESHOLD=0` / `LOGIN_IP_BAN_THRESHOLD=0`.
+
 Optional production / ops env:
 
 | Variable                                 | Default    | Purpose                                                 |

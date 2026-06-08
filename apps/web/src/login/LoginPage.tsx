@@ -24,7 +24,18 @@ export function LoginPage() {
 	const [sessionBanner, setSessionBanner] = useState<string | null>(null);
 	const [samlSessionBound, setSamlSessionBound] = useState(false);
 	const [readyToComplete, setReadyToComplete] = useState(false);
+	const [retryAfter, setRetryAfter] = useState<number | null>(null);
 	const autoCompleteAttempted = useRef(false);
+
+	useEffect(() => {
+		if (retryAfter === null || retryAfter <= 0) {
+			return;
+		}
+		const id = setInterval(() => {
+			setRetryAfter((s) => (s !== null && s > 1 ? s - 1 : null));
+		}, 1000);
+		return () => clearInterval(id);
+	}, [retryAfter]);
 
 	const submitSsoHtml = useCallback((html: string) => {
 		document.open();
@@ -112,11 +123,20 @@ export function LoginPage() {
 				setSuccess(t('signedInAs', { username: result.user.username }));
 			}
 		} catch (err) {
-			const message =
-				err instanceof AuthApiError
-					? formatAuthApiError(err.message, resolveI18nKey)
-					: t('signInFailed');
-			setError(message);
+			if (err instanceof AuthApiError && err.statusCode === 429) {
+				if (err.retryAfterSeconds) {
+					setRetryAfter(err.retryAfterSeconds);
+					setError(null);
+				} else {
+					setError(t('tooManyAttemptsGeneric'));
+				}
+			} else {
+				const message =
+					err instanceof AuthApiError
+						? formatAuthApiError(err.message, resolveI18nKey)
+						: t('signInFailed');
+				setError(message);
+			}
 		} finally {
 			setLoading(false);
 		}
@@ -161,10 +181,20 @@ export function LoginPage() {
 						required
 						requiredMark
 					/>
-					<Button type="submit" variant="primary" block disabled={loading || ssoRedirecting}>
+					<Button
+						type="submit"
+						variant="primary"
+						block
+						disabled={loading || ssoRedirecting || retryAfter !== null}
+					>
 						{loading ? t('signingIn') : t('signIn')}
 					</Button>
 				</form>
+				{retryAfter !== null ? (
+					<Callout variant="warning" role="alert">
+						{t('tooManyAttempts', { seconds: retryAfter })}
+					</Callout>
+				) : null}
 				{error ? <Callout variant="danger">{error}</Callout> : null}
 				{success ? <Callout variant="success">{success}</Callout> : null}
 				{(samlSessionBound || readyToComplete) && samlSessionId ? (

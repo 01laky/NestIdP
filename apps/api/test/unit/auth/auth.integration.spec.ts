@@ -15,7 +15,7 @@ import {
 } from '@nestidp/shared';
 import { AdminAuthModule } from '@api/admin-auth/admin-auth.module';
 import { EncryptionModule } from '@api/encryption/encryption.module';
-import { EndUserLoginRateLimiterService } from '@api/auth/services/end-user-login-rate-limiter.service';
+import { LoginProtectionService } from '@api/auth-protection/login-protection.service';
 import { AuthModule } from '@api/auth/auth.module';
 import { PrismaModule } from '@api/prisma/prisma.module';
 import { PrismaService } from '@api/prisma/services/prisma.service';
@@ -90,7 +90,7 @@ describe('end-user auth integration (SQLite)', () => {
 	});
 
 	beforeEach(async () => {
-		app.get(EndUserLoginRateLimiterService).clear();
+		app.get(LoginProtectionService).clear();
 		await prisma.samlSession.deleteMany();
 	});
 

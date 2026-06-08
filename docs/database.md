@@ -27,6 +27,7 @@ The database file is opened through the **`@prisma/adapter-libsql`** driver adap
 | `UserGroup`, `UserRole` | Membership join tables                                               |
 | `SpConnection`          | SAML Service Provider config                                         |
 | `AdminUser`             | Operator accounts (separate from `User`)                             |
+| `LoginLockout`          | Brute-force lockout state, keyed `(scope, usernameKey)` (v1.16.0)    |
 | `SyncLog`               | Sync run history (detailed sync errors)                              |
 | `AuditEvent`            | Persistent security/config audit trail                               |
 | `SamlSession`           | In-flight SP-initiated SSO state                                     |
@@ -77,6 +78,19 @@ Migration: `20260604120000_identity_manual_crud` (single history under `prisma/m
   - `proxyPasswordEncrypted` — Basic proxy auth password, **encrypted at rest** via `CREDENTIALS_ENCRYPTION` (same as bearer tokens / OAuth client secret); never returned to the frontend, never logged
   - `noProxyHosts` — comma-separated bypass patterns (exact host, `host:port`, leading-dot suffix, `*`, IPv4/IPv6 CIDR; `localhost`/`127.0.0.1`/`::1` always bypass)
   - `lastProxyCheckStatus` / `lastProxyCheckAt` — last "Test proxy" outcome (`ok`/`auth_failed`/`unreachable`/`tunnel_failed`/`tls_error`/`target_error`/`bypassed`) + timestamp
+
+### Brute-force lockout (v1.16.0)
+
+- **`LoginLockout`** — persistent per-account brute-force lockout state, intentionally **decoupled** from
+  the identity rows (`User`/`AdminUser`) so it works the same whether end-user identities live locally or
+  in an external store, and is never churned by sync. Unique on `(scope, usernameKey)`:
+  - `scope` — `"admin"` | `"end_user"`
+  - `usernameKey` — the trimmed login identifier (not proof the account exists; no enumeration)
+  - `failedCount` — consecutive failures; reset to 0 on a successful login / credential change / unlock
+  - `lockedUntil` — when the lock lifts (always finite; indexed for the dashboard "locked accounts" count)
+  - `lastFailedAt` / `lastLockedAt` — observability timestamps
+- The per-IP / per-username **throttle** and per-IP **ban** keep their state **in memory** (per replica);
+  only this lockout table is persisted. Stale rows are pruned periodically.
 
 ### End-user sessions (v0.6.0)
 

@@ -1,4 +1,5 @@
 import { API_CONNECTION_ROUTE_PREFIX } from './connections.js';
+import type { AccountLockoutStatusDto } from './admin-users.js';
 
 /** Default page size for admin identity browse lists (users, groups, roles). */
 export const IDENTITY_LIST_PAGE_SIZE = 10 as const;
@@ -50,6 +51,8 @@ export interface IdentityUserListItemDto {
 	externalId: string;
 	apiConnectionId: string;
 	origin: IdentityOriginLiteral;
+	/** Brute-force lockout status for this end-user account (Prompt 35); present on list/detail. */
+	lockout?: AccountLockoutStatusDto;
 }
 
 export interface IdentityUserListResponseDto {

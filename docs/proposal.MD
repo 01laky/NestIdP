@@ -708,7 +708,7 @@ _Phase 1 complete in **v1.0.0** (Prompt 10 — Docker, persistent audit, admin a
 - [x] **Outbound HTTP proxy** — optional proxy URL + Basic auth + `noProxyHosts` (incl. CIDR) per API connection; routes sync, OAuth, and test traffic; password encrypted at rest; per-connection `ProxyAgent` dispatcher (v1.14.0)
 - [x] **Scheduled sync (cron)** — per-connection cron schedule with IANA timezone, in-process scheduler, pause / dry-run / jitter / failure auto-pause, survives restarts, no catch-up (v1.13.0)
 - [x] **Certificate rotation (dual-cert in metadata)** — manual generate/upload/start/complete/cancel for signing + encryption certs with a dual-cert metadata overlap and expiry/stale monitoring; plus **automatic** opt-in rotation (in-process scheduler starts before expiry and auto-completes after the overlap; backoff, dry-run, notifier hook) (v1.15.0)
-- [ ] Rate limiting and brute-force protection
+- [x] **Rate limiting and brute-force protection** — unified sliding-window throttle (per-IP + per-username, admin now configurable), persistent per-account lockout with exponential backoff and guaranteed time-based recovery, cross-endpoint per-IP escalation/ban, `/saml/sso` throttle, trusted-CIDR bypass, configurable response mode, tarpit, audit + structured logs + admin unlock (v1.16.0)
 - [ ] Sync error reporting in admin UI
 - [x] **OAuth 2.0 Client Credentials for API connections** — token-endpoint exchange, caching, 401 refresh, per-connection config (v1.10.0)
 - [ ] IdP-initiated SSO

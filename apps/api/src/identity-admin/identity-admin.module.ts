@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AdminAuthModule } from '../admin-auth/admin-auth.module';
+import { AuthProtectionModule } from '../auth-protection/auth-protection.module';
 import { EncryptionModule } from '../encryption/encryption.module';
 import { IdentityModule } from '../identity/identity.module';
 import { PrismaModule } from '../prisma/prisma.module';
@@ -12,6 +13,7 @@ import { IdentityAdminService } from './services/identity-admin.service';
 	imports: [
 		PrismaModule,
 		AdminAuthModule,
+		AuthProtectionModule,
 		EncryptionModule,
 		IdentityModule,
 		SamlSessionRegistryModule,

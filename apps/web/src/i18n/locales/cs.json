@@ -128,7 +128,9 @@
 		"staySignedIn": "Stay signed in",
 		"staySignedInHint": "Keeps your admin session active longer (up to {{days}} days).",
 		"sharedComputerWarning": "Do not enable on shared or public computers. Anyone with access to this browser may open the admin console.",
-		"sessionExpired": "Your admin session has expired. Sign in again."
+		"sessionExpired": "Your admin session has expired. Sign in again.",
+		"tooManyAttempts": "Příliš mnoho pokusů. Zkuste to znovu za {{seconds}} s.",
+		"tooManyAttemptsGeneric": "Příliš mnoho pokusů. Zkuste to později."
 	},
 	"login": {
 		"title": "SAML přihlášení",
@@ -144,7 +146,9 @@
 		"continueToApplication": "Pokračovat do aplikace",
 		"backToAdmin": "Zpět do administrace",
 		"signInFailed": "Přihlášení se nezdařilo. Zkuste to znovu.",
-		"couldNotContinueSso": "Nelze pokračovat v SSO."
+		"couldNotContinueSso": "Nelze pokračovat v SSO.",
+		"tooManyAttempts": "Příliš mnoho pokusů. Zkuste to znovu za {{seconds}} s.",
+		"tooManyAttemptsGeneric": "Příliš mnoho pokusů. Zkuste to později."
 	},
 	"dashboard": {
 		"title": "Přehled",
@@ -188,7 +192,10 @@
 		"schedulerOn": "Plánovač zapnut",
 		"schedulerOff": "Plánovač vypnut",
 		"schedulerCounts": "{{enabled}} aktivních, {{paused}} pozastavených",
-		"openSchedules": "Otevřít plány"
+		"openSchedules": "Otevřít plány",
+		"securityLockoutsTitle": "Uzamčené účty",
+		"lockedAdmins": "Uzamčené admin účty",
+		"lockedUsers": "Uzamčené uživatelské účty"
 	},
 	"apiConnections": {
 		"listTitle": "API připojení",
@@ -639,7 +646,12 @@
 		"sectionNavAria": "Sekce identity",
 		"managedBySyncUser": "Tento uživatel je spravován synchronizací identit a zde ho nelze upravovat.",
 		"managedBySyncGroup": "Tato skupina je spravována synchronizací identit.",
-		"managedBySyncRole": "Tato role je spravována synchronizací identit."
+		"managedBySyncRole": "Tato role je spravována synchronizací identit.",
+		"lockedBadge": "Uzamčeno",
+		"unlock": "Odemknout",
+		"unlockConfirmTitle": "Odemknout účet?",
+		"unlockConfirmBody": "Zrušit uzamčení pro {{username}}?",
+		"unlockSuccess": "Účet odemčen"
 	},
 	"audit": {
 		"title": "Audit log",
@@ -666,7 +678,12 @@
 		"toastPasswordChanged": "Heslo změněno",
 		"loadFailed": "Nepodařilo se načíst adminy",
 		"createFailed": "Vytvoření se nezdařilo",
-		"passwordChangeFailed": "Změna hesla se nezdařila"
+		"passwordChangeFailed": "Změna hesla se nezdařila",
+		"lockedBadge": "Uzamčeno",
+		"unlock": "Odemknout",
+		"unlockConfirmTitle": "Odemknout účet?",
+		"unlockConfirmBody": "Zrušit uzamčení pro {{username}}?",
+		"unlockSuccess": "Účet odemčen"
 	},
 	"sync": {
 		"title": "Synchronizace — {{name}}",

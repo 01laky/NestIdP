@@ -23,11 +23,16 @@ describe('AdminDashboardService', () => {
 		get: jest.fn(() => 'http://localhost:3000'),
 	} as unknown as ConfigService;
 
+	const accountLockout = {
+		countLocked: jest.fn().mockResolvedValue(0),
+	};
+
 	const service = new AdminDashboardService(
 		adminStatsService,
 		prisma as never,
 		configService,
 		idpSettingsService as never,
+		accountLockout as never,
 	);
 
 	beforeEach(() => {
@@ -167,5 +172,17 @@ describe('AdminDashboardService', () => {
 			encryptionEcCurve: null,
 			encryptionCertStatus: 'not_configured',
 		});
+	});
+
+	it('API-ADM-DASH-SVC-06: includes the brute-force lockout summary (Prompt 35)', async () => {
+		prisma.idpSettings.findUnique.mockResolvedValue(null);
+		accountLockout.countLocked = jest
+			.fn()
+			.mockResolvedValueOnce(2) // admin
+			.mockResolvedValueOnce(3); // end_user
+
+		const result = await service.getDashboard();
+
+		expect(result.lockouts).toEqual({ lockedAdminAccounts: 2, lockedUserAccounts: 3 });
 	});
 });

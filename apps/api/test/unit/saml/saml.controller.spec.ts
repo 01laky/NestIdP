@@ -4,6 +4,7 @@ import { SamlController } from '@api/saml/controllers/saml.controller';
 import { SamlSsoService } from '@api/saml/services/saml-sso.service';
 import { SamlLogoutService } from '@api/saml/services/saml-logout.service';
 import { SamlSloRateLimiterService } from '@api/saml/services/saml-slo-rate-limiter.service';
+import { LoginProtectionService } from '@api/auth-protection/login-protection.service';
 
 describe('SamlController', () => {
 	let controller: SamlController;
@@ -20,6 +21,10 @@ describe('SamlController', () => {
 			.mockResolvedValue({ delivery: { type: 'logged-out' }, clearEndUserCookie: true }),
 	};
 	const sloRateLimiter = { hitAndCheck: jest.fn().mockReturnValue(false) };
+	const loginProtection = {
+		precheckSso: jest.fn().mockReturnValue({ allowed: true, retryAfterMs: 0 }),
+		enforceBlock: jest.fn(),
+	};
 	const configService = { get: jest.fn().mockReturnValue('test') };
 
 	beforeEach(async () => {
@@ -29,6 +34,7 @@ describe('SamlController', () => {
 				{ provide: SamlSsoService, useValue: samlSsoService },
 				{ provide: SamlLogoutService, useValue: samlLogoutService },
 				{ provide: SamlSloRateLimiterService, useValue: sloRateLimiter },
+				{ provide: LoginProtectionService, useValue: loginProtection },
 				{ provide: ConfigService, useValue: configService },
 			],
 		}).compile();

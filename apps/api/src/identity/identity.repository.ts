@@ -3,6 +3,7 @@ import { IdentityOrigin, Prisma } from '@prisma/client';
 import { normalizeSyncedEmail } from './utils/normalize-synced-email.util';
 import { manualExternalId } from './utils/local-directory.util';
 import { PrismaService } from '../prisma/services/prisma.service';
+import { AccountLockoutService } from '../auth-protection/account-lockout.service';
 import type {
 	CreateManualUserInput,
 	IdentitySnapshot,
@@ -68,7 +69,12 @@ export class RoleNameCollisionError extends Error {
 /** Local (libSQL/Prisma) implementation of {@link IdentityStore}. */
 @Injectable()
 export class IdentityRepository implements IdentityStore {
-	constructor(private readonly prisma: PrismaService) {}
+	constructor(
+		private readonly prisma: PrismaService,
+		// Optional so unit tests can `new IdentityRepository(prisma)`; Nest injects it in production via
+		// AuthProtectionModule. Used only to clear a stale lockout when an upstream credential rotates.
+		private readonly accountLockout?: AccountLockoutService,
+	) {}
 
 	countUsers(): Promise<number> {
 		return this.prisma.user.count();
@@ -150,7 +156,7 @@ export class IdentityRepository implements IdentityStore {
 			throw new UsernameCollisionError(user.externalId, user.username);
 		}
 
-		return this.prisma.user.upsert({
+		const row = await this.prisma.user.upsert({
 			where: {
 				apiConnectionId_externalId: {
 					apiConnectionId: connectionId,
@@ -177,6 +183,13 @@ export class IdentityRepository implements IdentityStore {
 				active: user.active,
 			},
 		});
+		// Credential rotated upstream (new hash) → clear any brute-force lockout for this account so the
+		// legitimate user is not stuck behind a stale lock (Prompt 35). `existingByUsername` is the prior
+		// row for this same identity; comparing its hash is free (already fetched above).
+		if (existingByUsername && existingByUsername.passwordHash !== user.passwordHash) {
+			await this.accountLockout?.recordSuccess('end_user', user.username.trim());
+		}
+		return row;
 	}
 
 	async replaceUserGroups(userId: string, groupIds: string[]): Promise<void> {

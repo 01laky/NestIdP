@@ -128,7 +128,9 @@
 		"staySignedIn": "Stay signed in",
 		"staySignedInHint": "Keeps your admin session active longer (up to {{days}} days).",
 		"sharedComputerWarning": "Do not enable on shared or public computers. Anyone with access to this browser may open the admin console.",
-		"sessionExpired": "Your admin session has expired. Sign in again."
+		"sessionExpired": "Your admin session has expired. Sign in again.",
+		"tooManyAttempts": "Zu viele Versuche. Versuchen Sie es in {{seconds}} s erneut.",
+		"tooManyAttemptsGeneric": "Zu viele Versuche. Versuchen Sie es später erneut."
 	},
 	"login": {
 		"title": "SAML Login",
@@ -144,7 +146,9 @@
 		"continueToApplication": "Continue to application",
 		"backToAdmin": "Back to admin",
 		"signInFailed": "Sign in failed. Please try again.",
-		"couldNotContinueSso": "Could not continue SSO."
+		"couldNotContinueSso": "Could not continue SSO.",
+		"tooManyAttempts": "Zu viele Versuche. Versuchen Sie es in {{seconds}} s erneut.",
+		"tooManyAttemptsGeneric": "Zu viele Versuche. Versuchen Sie es später erneut."
 	},
 	"dashboard": {
 		"title": "Dashboard",
@@ -188,7 +192,10 @@
 		"schedulerOn": "Scheduler aktiviert",
 		"schedulerOff": "Scheduler deaktiviert",
 		"schedulerCounts": "{{enabled}} aktiv, {{paused}} pausiert",
-		"openSchedules": "Zeitpläne öffnen"
+		"openSchedules": "Zeitpläne öffnen",
+		"securityLockoutsTitle": "Kontosperren",
+		"lockedAdmins": "Gesperrte Admin-Konten",
+		"lockedUsers": "Gesperrte Benutzerkonten"
 	},
 	"apiConnections": {
 		"listTitle": "API-Verbindungen",
@@ -639,7 +646,12 @@
 		"sectionNavAria": "Identity sections",
 		"managedBySyncUser": "This user is managed by identity sync and cannot be edited here.",
 		"managedBySyncGroup": "This group is managed by identity sync.",
-		"managedBySyncRole": "This role is managed by identity sync."
+		"managedBySyncRole": "This role is managed by identity sync.",
+		"lockedBadge": "Gesperrt",
+		"unlock": "Entsperren",
+		"unlockConfirmTitle": "Konto entsperren?",
+		"unlockConfirmBody": "Sperre für {{username}} aufheben?",
+		"unlockSuccess": "Konto entsperrt"
 	},
 	"audit": {
 		"title": "Audit-Protokoll",
@@ -666,7 +678,12 @@
 		"toastPasswordChanged": "Passwort geändert",
 		"loadFailed": "Failed to load admins",
 		"createFailed": "Erstellen fehlgeschlagen",
-		"passwordChangeFailed": "Password change failed"
+		"passwordChangeFailed": "Password change failed",
+		"lockedBadge": "Gesperrt",
+		"unlock": "Entsperren",
+		"unlockConfirmTitle": "Konto entsperren?",
+		"unlockConfirmBody": "Sperre für {{username}} aufheben?",
+		"unlockSuccess": "Konto entsperrt"
 	},
 	"sync": {
 		"title": "Sync — {{name}}",

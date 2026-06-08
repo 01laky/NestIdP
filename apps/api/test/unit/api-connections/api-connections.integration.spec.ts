@@ -11,7 +11,7 @@ import { App } from 'supertest/types';
 import { ADMIN_CSRF_HEADER_NAME, API_CONNECTIONS_API_PATH } from '@nestidp/shared';
 import { AdminModule } from '@api/admin/admin.module';
 import { AdminAuthModule } from '@api/admin-auth/admin-auth.module';
-import { LoginRateLimiterService } from '@api/admin-auth/services/login-rate-limiter.service';
+import { LoginProtectionService } from '@api/auth-protection/login-protection.service';
 import { IdentityModule } from '@api/identity/identity.module';
 import { EncryptionModule } from '@api/encryption/encryption.module';
 import { PrismaModule } from '@api/prisma/prisma.module';
@@ -105,7 +105,7 @@ describe('api-connections integration (SQLite)', () => {
 	});
 
 	beforeEach(async () => {
-		app.get(LoginRateLimiterService).clear();
+		app.get(LoginProtectionService).clear();
 		await prisma.user.deleteMany();
 		await prisma.syncLog.deleteMany();
 		await prisma.group.deleteMany();

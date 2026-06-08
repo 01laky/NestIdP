@@ -26,6 +26,17 @@ export function AdminLoginPage() {
 	const [error, setError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [checkingSession, setCheckingSession] = useState(true);
+	const [retryAfter, setRetryAfter] = useState<number | null>(null);
+
+	useEffect(() => {
+		if (retryAfter === null || retryAfter <= 0) {
+			return;
+		}
+		const id = setInterval(() => {
+			setRetryAfter((s) => (s !== null && s > 1 ? s - 1 : null));
+		}, 1000);
+		return () => clearInterval(id);
+	}, [retryAfter]);
 
 	const sessionExpired = searchParams.get('reason') === 'session_expired';
 	const showSharedWarning = rememberUsername || staySignedIn;
@@ -80,7 +91,14 @@ export function AdminLoginPage() {
 			}
 			navigate('/admin');
 		} catch (err) {
-			if (err instanceof AdminApiError) {
+			if (err instanceof AdminApiError && err.statusCode === 429) {
+				if (err.retryAfterSeconds) {
+					setRetryAfter(err.retryAfterSeconds);
+					setError(null);
+				} else {
+					setError(t('tooManyAttemptsGeneric'));
+				}
+			} else if (err instanceof AdminApiError) {
 				setError(formatAuthApiError(err.message, resolveI18nKey));
 			} else {
 				setError(t('loginFailed'));
@@ -145,8 +163,13 @@ export function AdminLoginPage() {
 						onChange={setStaySignedIn}
 						disabled={loading}
 					/>
+					{retryAfter !== null ? (
+						<Callout variant="warning" role="alert">
+							{t('tooManyAttempts', { seconds: retryAfter })}
+						</Callout>
+					) : null}
 					{error ? <Callout variant="danger">{error}</Callout> : null}
-					<Button type="submit" variant="primary" block disabled={loading}>
+					<Button type="submit" variant="primary" block disabled={loading || retryAfter !== null}>
 						{loading ? t('signingIn') : t('signIn')}
 					</Button>
 				</form>

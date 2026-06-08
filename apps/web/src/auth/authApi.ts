@@ -11,10 +11,21 @@ export class AuthApiError extends Error {
 	constructor(
 		public readonly statusCode: number,
 		message: string,
+		/** Seconds from the `Retry-After` header on a 429 throttle/lockout response (Prompt 35). */
+		public readonly retryAfterSeconds?: number,
 	) {
 		super(message);
 		this.name = 'AuthApiError';
 	}
+}
+
+function parseRetryAfter(response: Response): number | undefined {
+	const raw = response.headers?.get?.('Retry-After');
+	if (!raw) {
+		return undefined;
+	}
+	const seconds = Number.parseInt(raw, 10);
+	return Number.isFinite(seconds) && seconds > 0 ? seconds : undefined;
 }
 
 async function parseErrorResponse(
@@ -43,7 +54,7 @@ async function authFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 	if (!response.ok) {
 		const error = await parseErrorResponse(response);
-		throw new AuthApiError(error.statusCode, error.message);
+		throw new AuthApiError(error.statusCode, error.message, parseRetryAfter(response));
 	}
 
 	return (await response.json()) as T;

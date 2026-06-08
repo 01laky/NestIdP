@@ -4,6 +4,45 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.16.0]
+
+### Added
+
+- **Rate limiting & brute-force protection (Prompt 35):** a unified, three-dimension protection layer for
+  the login surfaces. A shared sliding-window core backs the per-IP / per-username **throttle**; a new
+  persistent, per-account **lockout** (DB-backed `LoginLockout` table) locks an account after N consecutive
+  failures with exponential backoff and **guaranteed time-based recovery** (never permanent — the last
+  admin can always get back in); and a cross-endpoint per-IP **escalation/ban** catches distributed
+  attacks that stay under any single window. Applies to admin login, end-user login (incl.
+  `complete-sso`), and — closing a gap — the public `GET`/`POST /saml/sso` endpoint.
+- **Operator controls & safety:** a configurable **response mode** (`retry_after` default with
+  `Retry-After`, or `opaque` 401 with zero lockout disclosure — both no-enumeration), a **trusted-CIDR
+  bypass** for internal/monitoring IPs (throttle + ban only, never account lockout), an optional in-process
+  **tarpit** delay, automatic **lockout clear on credential change** (admin password change + end-user
+  re-sync with a new hash), and a periodic **prune** of stale lockout rows.
+- **Observability & integration:** every lock / throttle / ban / unlock is audited (`*_login_locked`,
+  `*_login_rate_limited`, `saml_sso_rate_limited`, `login_ip_banned` as **system** actor;
+  `*_account_unlocked` as **admin**) **and** emits a structured JSON log line for SIEM; a no-op
+  `BruteForceNotifier` hook ships for wiring alerting later.
+
+### Changed
+
+- The admin login limiter is now **configurable and per-username** (parity with the end-user limiter),
+  and the four bespoke in-memory limiters are unified behind one tested sliding-window core.
+- New `LoginLockout` table (migration `20260614120000_rate_limit_brute_force`; existing rows unaffected —
+  the table starts empty).
+- New bounded env knobs: `LOGIN_LOCKOUT_THRESHOLD` (+ per-scope `ADMIN_`/`END_USER_` overrides),
+  `LOGIN_LOCKOUT_BASE_MS`, `LOGIN_LOCKOUT_MAX_MS`, `LOGIN_LOCKOUT_RESPONSE_MODE`,
+  `LOGIN_LOCKOUT_PRUNE_INTERVAL_MS`, `ADMIN_LOGIN_RATE_LIMIT_MAX` / `_WINDOW_MS` / `_USERNAME_MAX` /
+  `_USERNAME_WINDOW_MS`, `SAML_SSO_RATE_IP_MAX` / `_WINDOW_MS`, `LOGIN_IP_BAN_THRESHOLD` / `_WINDOW_MS` /
+  `_MS`, `RATE_LIMIT_TRUSTED_CIDRS`, `LOGIN_TARPIT_BASE_MS`.
+
+### Security
+
+- Brute-force lockout is opt-out (on by default with conservative thresholds), persists across restarts,
+  and surfaces locked accounts in the admin console with a manual unlock action. No secrets or account
+  enumeration in HTTP responses; lock/ban specifics live only in the audit log and structured logs.
+
 ## [1.15.0]
 
 ### Added

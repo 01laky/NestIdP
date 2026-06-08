@@ -1,10 +1,10 @@
-import { HttpException, UnauthorizedException } from '@nestjs/common';
+import { HttpException, HttpStatus, UnauthorizedException } from '@nestjs/common';
 import type { Response } from 'express';
 import { AdminAuthController } from '@api/admin-auth/controllers/admin-auth.controller';
 import { AdminAuthService } from '@api/admin-auth/services/admin-auth.service';
 import { AdminAuthenticatedRequest } from '@api/admin-auth/admin-auth.types';
 import { AdminSessionService } from '@api/admin-auth/services/admin-session.service';
-import { LoginRateLimiterService } from '@api/admin-auth/services/login-rate-limiter.service';
+import { LoginProtectionService } from '@api/auth-protection/login-protection.service';
 
 describe('AdminAuthController', () => {
 	const adminAuthService = {
@@ -17,26 +17,34 @@ describe('AdminAuthController', () => {
 		clearCookie: jest.fn(),
 		verify: jest.fn(),
 	};
-	const loginRateLimiter = {
-		isLimited: jest.fn(),
-		recordFailure: jest.fn(),
-		reset: jest.fn(),
+	const loginProtection = {
+		precheckLogin: jest.fn(),
+		enforceBlock: jest.fn(),
+		recordLoginSuccess: jest.fn(),
+		recordLoginFailure: jest.fn(),
 	};
 	const adminAuthAudit = {
 		logLogout: jest.fn(),
 	};
-	const res = { cookie: jest.fn(), clearCookie: jest.fn() } as unknown as Response;
+	const res = {
+		cookie: jest.fn(),
+		clearCookie: jest.fn(),
+		setHeader: jest.fn(),
+	} as unknown as Response;
 
 	const controller = new AdminAuthController(
 		adminAuthService as unknown as AdminAuthService,
 		adminSessionService as unknown as AdminSessionService,
-		loginRateLimiter as unknown as LoginRateLimiterService,
+		loginProtection as unknown as LoginProtectionService,
 		adminAuthAudit as never,
 	);
 
 	beforeEach(() => {
 		jest.clearAllMocks();
-		loginRateLimiter.isLimited.mockReturnValue(false);
+		loginProtection.precheckLogin.mockResolvedValue({ allowed: true, retryAfterMs: 0 });
+		loginProtection.enforceBlock.mockImplementation(() => {
+			throw new HttpException('Too many login attempts', HttpStatus.TOO_MANY_REQUESTS);
+		});
 		adminSessionService.getSessionTtlSeconds.mockReturnValue(28_800);
 	});
 
@@ -64,7 +72,7 @@ describe('AdminAuthController', () => {
 		expect(result.admin).not.toHaveProperty('passwordHash');
 	});
 
-	it('API-CTL-02: login sets session cookie on success', async () => {
+	it('API-CTL-02: login sets session cookie and records success', async () => {
 		const payload = {
 			adminUserId: 'a1',
 			username: 'admin',
@@ -84,7 +92,7 @@ describe('AdminAuthController', () => {
 		expect(adminSessionService.setCookie).toHaveBeenCalledWith(res, payload, {
 			persistent: false,
 		});
-		expect(loginRateLimiter.reset).toHaveBeenCalledWith('127.0.0.1');
+		expect(loginProtection.recordLoginSuccess).toHaveBeenCalledWith('admin', 'admin', '127.0.0.1');
 	});
 
 	it('API-CTL-10: rememberMe true uses long TTL and persistent cookie', async () => {
@@ -164,7 +172,7 @@ describe('AdminAuthController', () => {
 		});
 	});
 
-	it('API-CTL-03: login records rate limit failure on unauthorized', async () => {
+	it('API-CTL-03: login records protection failure on unauthorized', async () => {
 		adminAuthService.login.mockRejectedValue(new UnauthorizedException('Invalid credentials'));
 
 		await expect(
@@ -175,12 +183,12 @@ describe('AdminAuthController', () => {
 			),
 		).rejects.toThrow(UnauthorizedException);
 
-		expect(loginRateLimiter.recordFailure).toHaveBeenCalledWith('10.0.0.1');
-		expect(loginRateLimiter.reset).not.toHaveBeenCalled();
+		expect(loginProtection.recordLoginFailure).toHaveBeenCalledWith('admin', 'admin', '10.0.0.1');
+		expect(loginProtection.recordLoginSuccess).not.toHaveBeenCalled();
 	});
 
-	it('API-CTL-04: rate limited login throws 429', async () => {
-		loginRateLimiter.isLimited.mockReturnValue(true);
+	it('API-CTL-04: blocked login throws 429 before hitting the auth service', async () => {
+		loginProtection.precheckLogin.mockResolvedValue({ allowed: false, retryAfterMs: 1000 });
 
 		await expect(
 			controller.login(
@@ -235,11 +243,11 @@ describe('AdminAuthController', () => {
 			res,
 		);
 
-		expect(loginRateLimiter.reset).toHaveBeenCalledWith('unknown');
+		expect(loginProtection.recordLoginSuccess).toHaveBeenCalledWith('admin', 'admin', 'unknown');
 	});
 
-	it('API-CTL-08: rate limit 429 uses HttpException with message', async () => {
-		loginRateLimiter.isLimited.mockReturnValue(true);
+	it('API-CTL-08: blocked login 429 uses HttpException with message', async () => {
+		loginProtection.precheckLogin.mockResolvedValue({ allowed: false, retryAfterMs: 1000 });
 
 		try {
 			await controller.login(

@@ -16,7 +16,7 @@ import {
 } from '@nestidp/shared';
 import { AdminModule } from '@api/admin/admin.module';
 import { AdminAuthModule } from '@api/admin-auth/admin-auth.module';
-import { LoginRateLimiterService } from '@api/admin-auth/services/login-rate-limiter.service';
+import { LoginProtectionService } from '@api/auth-protection/login-protection.service';
 import { EncryptionModule } from '@api/encryption/encryption.module';
 import { IdentityModule } from '@api/identity/identity.module';
 import { PrismaModule } from '@api/prisma/prisma.module';
@@ -27,7 +27,6 @@ import {
 	TEST_PASSWORD_HASH,
 } from '@test/support/prisma/test-fixtures';
 import { runMigrationsOnTestDb } from '@test/support/prisma/test-db.helper';
-import { EndUserLoginRateLimiterService } from '@api/auth/services/end-user-login-rate-limiter.service';
 import { AuthModule } from '@api/auth/auth.module';
 import { hashPassword } from '@api/admin-auth/utils/password.util';
 
@@ -121,8 +120,8 @@ describe('end-user auth after sync integration (SQLite)', () => {
 	});
 
 	beforeEach(async () => {
-		app.get(LoginRateLimiterService).clear();
-		app.get(EndUserLoginRateLimiterService).clear();
+		app.get(LoginProtectionService).clear();
+		app.get(LoginProtectionService).clear();
 		jest.restoreAllMocks();
 		await prisma.user.deleteMany();
 		await prisma.syncLog.deleteMany();

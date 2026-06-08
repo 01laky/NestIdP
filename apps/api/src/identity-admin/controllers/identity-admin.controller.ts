@@ -9,6 +9,7 @@ import {
 	Patch,
 	Post,
 	Query,
+	Req,
 	UseGuards,
 	ValidationPipe,
 } from '@nestjs/common';
@@ -19,9 +20,11 @@ import type {
 	IdentityRoleListResponseDto,
 	IdentityUserDetailResponseDto,
 	IdentityUserListResponseDto,
+	UnlockAccountResponseDto,
 } from '@nestidp/shared';
 import { AdminAuthGuard } from '../../admin-auth/guards/admin-auth.guard';
 import { AdminCsrfGuard } from '../../admin-auth/guards/admin-csrf.guard';
+import { AdminAuthenticatedRequest } from '../../admin-auth/admin-auth.types';
 import { ParseCuidPipe } from '../../common/pipes/parse-cuid.pipe';
 import { CreateManualIdentityUserBodyDto } from '../dto/create-manual-user.dto';
 import { ManualNameBodyDto } from '../dto/manual-name.dto';
@@ -84,6 +87,17 @@ export class IdentityAdminController {
 	@UseGuards(AdminCsrfGuard)
 	async deleteUser(@Param('id', ParseCuidPipe) id: string): Promise<void> {
 		await this.identityAdminService.deleteUser(id);
+	}
+
+	@Post('users/:id/unlock')
+	@HttpCode(HttpStatus.OK)
+	@UseGuards(AdminCsrfGuard)
+	unlockUser(
+		@Param('id', ParseCuidPipe) id: string,
+		@Req() req: AdminAuthenticatedRequest,
+	): Promise<UnlockAccountResponseDto> {
+		const actor = req.adminUser ?? { id: 'unknown', username: 'unknown' };
+		return this.identityAdminService.unlockUser(id, actor, req.ip ?? 'unknown');
 	}
 
 	@Get('groups')

@@ -181,7 +181,7 @@ describe('AdminLoginPage', () => {
 		fireEvent.click(screen.getByRole('button', { name: /Sign in/i }));
 
 		await waitFor(() => {
-			expect(screen.getByText('Too many login attempts')).toBeDefined();
+			expect(screen.getByText(/Too many attempts/i)).toBeDefined();
 		});
 	});
 

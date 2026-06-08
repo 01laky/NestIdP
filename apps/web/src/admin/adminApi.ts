@@ -17,6 +17,7 @@ import type {
 	AuditEventListResponseDto,
 	CreateAdminUserRequestDto,
 	DeleteAdminUserResponseDto,
+	UnlockAccountResponseDto,
 	UpdateAdminUserRequestDto,
 	ApiConnectionListResponseDto,
 	ApiConnectionResponseDto,
@@ -100,10 +101,21 @@ export class AdminApiError extends Error {
 	constructor(
 		public readonly statusCode: number,
 		message: string,
+		/** Seconds from the `Retry-After` header on a 429 throttle/lockout response (Prompt 35). */
+		public readonly retryAfterSeconds?: number,
 	) {
 		super(message);
 		this.name = 'AdminApiError';
 	}
+}
+
+function parseRetryAfterSeconds(response: Response): number | undefined {
+	const raw = response.headers?.get?.('Retry-After');
+	if (!raw) {
+		return undefined;
+	}
+	const seconds = Number.parseInt(raw, 10);
+	return Number.isFinite(seconds) && seconds > 0 ? seconds : undefined;
 }
 
 let csrfToken: string | null = null;
@@ -155,7 +167,7 @@ export async function adminFetch<T>(path: string, init: RequestInit = {}): Promi
 
 	if (!response.ok) {
 		const error = await parseErrorResponse(response);
-		throw new AdminApiError(error.statusCode, error.message);
+		throw new AdminApiError(error.statusCode, error.message, parseRetryAfterSeconds(response));
 	}
 
 	if (response.status === 204) {
@@ -689,6 +701,18 @@ export function updateAdminUser(
 export function deleteAdminUser(id: string): Promise<DeleteAdminUserResponseDto> {
 	return adminFetch<DeleteAdminUserResponseDto>(`${ADMIN_USERS_API_PATH}/${id}`, {
 		method: 'DELETE',
+	});
+}
+
+export function unlockAdminUser(id: string): Promise<UnlockAccountResponseDto> {
+	return adminFetch<UnlockAccountResponseDto>(`${ADMIN_USERS_API_PATH}/${id}/unlock`, {
+		method: 'POST',
+	});
+}
+
+export function unlockIdentityUser(id: string): Promise<UnlockAccountResponseDto> {
+	return adminFetch<UnlockAccountResponseDto>(`${IDENTITY_USERS_API_PATH}/${id}/unlock`, {
+		method: 'POST',
 	});
 }
 

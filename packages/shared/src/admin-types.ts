@@ -44,8 +44,16 @@ export interface AdminDashboardSpSecuritySummaryDto {
 	activeSamlSessions: number;
 }
 
+/** Brute-force lockout summary for the dashboard security signal (Prompt 35). */
+export interface AdminDashboardLockoutSummaryDto {
+	lockedAdminAccounts: number;
+	lockedUserAccounts: number;
+}
+
 export interface AdminDashboardResponseDto {
 	counts: AdminStatsDto;
+	/** Currently-locked account counts; present from v1.16.0. */
+	lockouts?: AdminDashboardLockoutSummaryDto;
 	apiConnectionsRoute: string;
 	spConnectionsRoute: string;
 	identityUsersRoute: string;

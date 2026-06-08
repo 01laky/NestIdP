@@ -2,7 +2,12 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AUDIT_ROUTE_PREFIX, IDENTITY_ROUTE_PREFIX, identityUserEditRoute } from '@nestidp/shared';
-import { AdminApiError, deleteIdentityUser, getIdentityUser } from '../adminApi';
+import {
+	AdminApiError,
+	deleteIdentityUser,
+	getIdentityUser,
+	unlockIdentityUser,
+} from '../adminApi';
 import { AdminPageHeader } from '../components/layout/AdminPageHeader';
 import { ErrorBanner } from '../components/common/ErrorBanner';
 import { LoadingState } from '../components/common/LoadingState';
@@ -115,22 +120,51 @@ export function IdentityUserDetailPage() {
 					{ label: user.username },
 				]}
 				actions={
-					isManual ? (
-						<>
-							<ButtonLink variant="secondary" to={identityUserEditRoute(user.id)}>
-								{tCommon('edit')}
-							</ButtonLink>
-							<Button type="button" variant="danger" onClick={() => void handleDelete()}>
-								{tCommon('delete')}
+					<>
+						{user.lockout?.locked ? (
+							<Button
+								type="button"
+								variant="secondary"
+								onClick={() => {
+									void confirmAction({
+										title: t('unlockConfirmTitle'),
+										description: t('unlockConfirmBody', { username: user.username }),
+										confirmLabel: t('unlock'),
+										onConfirm: async () => {
+											await unlockIdentityUser(user.id);
+											showToast(t('unlockSuccess'));
+											const data = await getIdentityUser(user.id, { auditLimit: 5 });
+											setDetail(data);
+										},
+									});
+								}}
+							>
+								{t('unlock')}
 							</Button>
-						</>
-					) : null
+						) : null}
+						{isManual ? (
+							<>
+								<ButtonLink variant="secondary" to={identityUserEditRoute(user.id)}>
+									{tCommon('edit')}
+								</ButtonLink>
+								<Button type="button" variant="danger" onClick={() => void handleDelete()}>
+									{tCommon('delete')}
+								</Button>
+							</>
+						) : null}
+					</>
 				}
 			/>
 			<p>
 				<Badge variant={identityOriginToBadge(user.origin)}>
 					{identityOriginLabel(user.origin)}
 				</Badge>
+				{user.lockout?.locked ? (
+					<>
+						{' '}
+						<Badge variant="danger">{t('lockedBadge')}</Badge>
+					</>
+				) : null}
 			</p>
 			<Panel title={t('sourcePanel')}>
 				{source.kind === 'local_directory' ? (

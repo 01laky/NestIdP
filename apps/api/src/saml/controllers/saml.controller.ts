@@ -23,6 +23,7 @@ import { NodeEnv } from '../../config/env.validation';
 import { SamlSsoService } from '../services/saml-sso.service';
 import { SamlLogoutService, type SamlLogoutResult } from '../services/saml-logout.service';
 import { SamlSloRateLimiterService } from '../services/saml-slo-rate-limiter.service';
+import { LoginProtectionService } from '../../auth-protection/login-protection.service';
 import {
 	extractRawQueryStringFromRequestUrl,
 	parseRawSamlRedirectQuery,
@@ -34,6 +35,7 @@ export class SamlController {
 		private readonly samlSsoService: SamlSsoService,
 		private readonly samlLogoutService: SamlLogoutService,
 		private readonly sloRateLimiter: SamlSloRateLimiterService,
+		private readonly loginProtection: LoginProtectionService,
 		private readonly configService: ConfigService,
 	) {}
 
@@ -52,6 +54,10 @@ export class SamlController {
 		@Res() res: Response,
 	): Promise<void> {
 		const clientIp = req.ip ?? 'unknown';
+		const pre = this.loginProtection.precheckSso(clientIp);
+		if (!pre.allowed) {
+			this.loginProtection.enforceBlock(pre, res);
+		}
 		const rawQuery = extractRawQueryStringFromRequestUrl(req.url ?? '');
 		const raw = parseRawSamlRedirectQuery(rawQuery);
 		const { redirectUrl } = await this.samlSsoService.handleRedirectSso({
@@ -79,6 +85,10 @@ export class SamlController {
 			throw new BadRequestException('Missing SAMLRequest');
 		}
 		const clientIp = req.ip ?? 'unknown';
+		const pre = this.loginProtection.precheckSso(clientIp);
+		if (!pre.allowed) {
+			this.loginProtection.enforceBlock(pre, res);
+		}
 		const { redirectUrl } = await this.samlSsoService.handlePostSso({
 			samlRequest,
 			relayState,

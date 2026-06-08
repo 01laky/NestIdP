@@ -19,9 +19,8 @@ import {
 } from '@nestidp/shared';
 import { IdentityOrigin } from '@prisma/client';
 import { AdminModule } from '@api/admin/admin.module';
-import { LoginRateLimiterService } from '@api/admin-auth/services/login-rate-limiter.service';
+import { LoginProtectionService } from '@api/auth-protection/login-protection.service';
 import { AuthModule } from '@api/auth/auth.module';
-import { EndUserLoginRateLimiterService } from '@api/auth/services/end-user-login-rate-limiter.service';
 import { encrypt } from '@api/encryption/utils/encryption.util';
 import { ensureLocalDirectoryConnection } from '@api/identity/utils/local-directory.util';
 import { PrismaModule } from '@api/prisma/prisma.module';
@@ -124,8 +123,8 @@ describe('Identity manual CRUD (SQLite)', () => {
 	});
 
 	beforeEach(() => {
-		app.get(LoginRateLimiterService).clear();
-		app.get(EndUserLoginRateLimiterService).clear();
+		app.get(LoginProtectionService).clear();
+		app.get(LoginProtectionService).clear();
 	});
 
 	afterAll(async () => {

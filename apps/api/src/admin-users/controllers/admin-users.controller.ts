@@ -17,6 +17,7 @@ import {
 	ADMIN_USERS_API_PATH,
 	type AdminUserPublicDto,
 	type DeleteAdminUserResponseDto,
+	type UnlockAccountResponseDto,
 } from '@nestidp/shared';
 import { AdminAuthGuard } from '../../admin-auth/guards/admin-auth.guard';
 import { AdminCsrfGuard } from '../../admin-auth/guards/admin-csrf.guard';
@@ -99,5 +100,19 @@ export class AdminUsersController {
 			throw new HttpException('Unauthorized', HttpStatus.UNAUTHORIZED);
 		}
 		return this.adminUsersService.delete(id, admin);
+	}
+
+	@Post(':id/unlock')
+	@HttpCode(HttpStatus.OK)
+	@UseGuards(AdminCsrfGuard)
+	unlock(
+		@Param('id', ParseCuidPipe) id: string,
+		@Req() req: AdminAuthenticatedRequest,
+	): Promise<UnlockAccountResponseDto> {
+		const admin = req.adminUser;
+		if (!admin) {
+			throw new HttpException('Unauthorized', HttpStatus.UNAUTHORIZED);
+		}
+		return this.adminUsersService.unlock(id, admin, req.ip ?? 'unknown');
 	}
 }

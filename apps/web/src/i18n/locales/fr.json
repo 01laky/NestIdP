@@ -128,7 +128,9 @@
 		"staySignedIn": "Stay signed in",
 		"staySignedInHint": "Keeps your admin session active longer (up to {{days}} days).",
 		"sharedComputerWarning": "Do not enable on shared or public computers. Anyone with access to this browser may open the admin console.",
-		"sessionExpired": "Your admin session has expired. Sign in again."
+		"sessionExpired": "Your admin session has expired. Sign in again.",
+		"tooManyAttempts": "Trop de tentatives. Réessayez dans {{seconds}} s.",
+		"tooManyAttemptsGeneric": "Trop de tentatives. Réessayez plus tard."
 	},
 	"login": {
 		"title": "SAML Login",
@@ -144,7 +146,9 @@
 		"continueToApplication": "Continue to application",
 		"backToAdmin": "Back to admin",
 		"signInFailed": "Sign in failed. Please try again.",
-		"couldNotContinueSso": "Could not continue SSO."
+		"couldNotContinueSso": "Could not continue SSO.",
+		"tooManyAttempts": "Trop de tentatives. Réessayez dans {{seconds}} s.",
+		"tooManyAttemptsGeneric": "Trop de tentatives. Réessayez plus tard."
 	},
 	"dashboard": {
 		"title": "Tableau de bord",
@@ -188,7 +192,10 @@
 		"schedulerOn": "Planificateur activé",
 		"schedulerOff": "Planificateur désactivé",
 		"schedulerCounts": "{{enabled}} actives, {{paused}} en pause",
-		"openSchedules": "Ouvrir les planifications"
+		"openSchedules": "Ouvrir les planifications",
+		"securityLockoutsTitle": "Comptes verrouillés",
+		"lockedAdmins": "Comptes admin verrouillés",
+		"lockedUsers": "Comptes utilisateur verrouillés"
 	},
 	"apiConnections": {
 		"listTitle": "Connexions API",
@@ -639,7 +646,12 @@
 		"sectionNavAria": "Identity sections",
 		"managedBySyncUser": "This user is managed by identity sync and cannot be edited here.",
 		"managedBySyncGroup": "This group is managed by identity sync.",
-		"managedBySyncRole": "This role is managed by identity sync."
+		"managedBySyncRole": "This role is managed by identity sync.",
+		"lockedBadge": "Verrouillé",
+		"unlock": "Déverrouiller",
+		"unlockConfirmTitle": "Déverrouiller le compte ?",
+		"unlockConfirmBody": "Lever le verrouillage pour {{username}} ?",
+		"unlockSuccess": "Compte déverrouillé"
 	},
 	"audit": {
 		"title": "Journal d’audit",
@@ -666,7 +678,12 @@
 		"toastPasswordChanged": "Mot de passe modifié",
 		"loadFailed": "Failed to load admins",
 		"createFailed": "Échec de la création",
-		"passwordChangeFailed": "Password change failed"
+		"passwordChangeFailed": "Password change failed",
+		"lockedBadge": "Verrouillé",
+		"unlock": "Déverrouiller",
+		"unlockConfirmTitle": "Déverrouiller le compte ?",
+		"unlockConfirmBody": "Lever le verrouillage pour {{username}} ?",
+		"unlockSuccess": "Compte déverrouillé"
 	},
 	"sync": {
 		"title": "Sync — {{name}}",

@@ -50,6 +50,8 @@ import {
 	createAdminUser,
 	updateAdminUser,
 	deleteAdminUser,
+	unlockAdminUser,
+	unlockIdentityUser,
 	changeAdminPassword,
 	listAuditEvents,
 	probeSpConnectionSigning,
@@ -81,6 +83,42 @@ describe('adminApi', () => {
 				method: 'POST',
 				credentials: 'include',
 			}),
+		);
+	});
+
+	it('WEB-ADM-UNLOCK-01: unlockAdminUser POSTs to the unlock path with CSRF', async () => {
+		setCsrfToken('csrf-1');
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ ok: true, id: 'a1' }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		await expect(unlockAdminUser('a1')).resolves.toEqual({ ok: true, id: 'a1' });
+		expect(fetchMock).toHaveBeenCalledWith(
+			'/api/admin/admin-users/a1/unlock',
+			expect.objectContaining({
+				method: 'POST',
+				credentials: 'include',
+				headers: expect.objectContaining({ [ADMIN_CSRF_HEADER_NAME]: 'csrf-1' }),
+			}),
+		);
+	});
+
+	it('WEB-ADM-UNLOCK-02: unlockIdentityUser POSTs to the identity unlock path', async () => {
+		setCsrfToken('csrf-2');
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ ok: true, id: 'u1' }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		await expect(unlockIdentityUser('u1')).resolves.toEqual({ ok: true, id: 'u1' });
+		expect(fetchMock).toHaveBeenCalledWith(
+			'/api/admin/identity/users/u1/unlock',
+			expect.objectContaining({ method: 'POST', credentials: 'include' }),
 		);
 	});
 

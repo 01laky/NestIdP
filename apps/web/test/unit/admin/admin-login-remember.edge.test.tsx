@@ -238,7 +238,7 @@ describe('Admin login remember — edge (WEB-ADM-RM)', () => {
 		fireEvent.change(passwordField(), { target: { value: 'secret' } });
 		fireEvent.click(screen.getByRole('checkbox', { name: /Remember username/i }));
 		fireEvent.click(screen.getByRole('button', { name: /Sign in/i }));
-		await waitFor(() => expect(screen.getByText('Too many login attempts')).toBeDefined());
+		await waitFor(() => expect(screen.getByText(/Too many attempts/i)).toBeDefined());
 		expect(remember.writeRememberedAdminUsername).not.toHaveBeenCalled();
 		expect(remember.clearRememberedAdminUsername).not.toHaveBeenCalled();
 	});

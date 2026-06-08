@@ -82,6 +82,13 @@ describe('Routing (e2e)', () => {
 			count: jest.fn().mockResolvedValue(0),
 			create: jest.fn(),
 		},
+		loginLockout: {
+			findUnique: jest.fn().mockResolvedValue(null),
+			findMany: jest.fn().mockResolvedValue([]),
+			upsert: jest.fn().mockResolvedValue({}),
+			deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+			count: jest.fn().mockResolvedValue(0),
+		},
 	};
 
 	beforeAll(async () => {

@@ -201,6 +201,24 @@ model AdminUser {
   updatedAt    DateTime @updatedAt
 }
 
+// Persistent brute-force lockout state (Prompt 35). Decoupled from the identity rows so it works the
+// same whether end-user identities live in the local DB or an external store, and is never churned by
+// sync. Keyed by (scope, usernameKey): scope is "admin" | "end_user", usernameKey is the trimmed login
+// identifier. Lockout is always time-bounded (lockedUntil), guaranteeing recovery.
+model LoginLockout {
+  id           String    @id @default(cuid())
+  scope        String
+  usernameKey  String
+  failedCount  Int       @default(0)
+  lockedUntil  DateTime?
+  lastFailedAt DateTime?
+  lastLockedAt DateTime?
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([scope, usernameKey])
+  @@index([lockedUntil])
+}
+
 model SyncLog {
   id              String        @id @default(cuid())
   apiConnectionId String

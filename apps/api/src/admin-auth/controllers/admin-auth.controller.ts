@@ -4,7 +4,6 @@ import {
 	ForbiddenException,
 	Get,
 	HttpCode,
-	HttpException,
 	HttpStatus,
 	Post,
 	Req,
@@ -29,14 +28,14 @@ import { AdminChangePasswordBodyDto } from '../dto/admin-change-password.dto';
 import { AdminLoginBodyDto } from '../dto/admin-login-body.dto';
 import { AdminAuthAuditService } from '../services/admin-auth-audit.service';
 import { AdminSessionService } from '../services/admin-session.service';
-import { LoginRateLimiterService } from '../services/login-rate-limiter.service';
+import { LoginProtectionService } from '../../auth-protection/login-protection.service';
 
 @Controller('api/admin/auth')
 export class AdminAuthController {
 	constructor(
 		private readonly adminAuthService: AdminAuthService,
 		private readonly adminSessionService: AdminSessionService,
-		private readonly loginRateLimiter: LoginRateLimiterService,
+		private readonly loginProtection: LoginProtectionService,
 		private readonly adminAuthAudit: AdminAuthAuditService,
 	) {}
 
@@ -49,9 +48,11 @@ export class AdminAuthController {
 		@Res({ passthrough: true }) res: Response,
 	): Promise<AdminLoginResponseDto> {
 		const clientIp = req.ip ?? 'unknown';
+		const usernameKey = body.username.trim();
 
-		if (this.loginRateLimiter.isLimited(clientIp)) {
-			throw new HttpException('Too many login attempts', HttpStatus.TOO_MANY_REQUESTS);
+		const pre = await this.loginProtection.precheckLogin('admin', usernameKey, clientIp);
+		if (!pre.allowed) {
+			this.loginProtection.enforceBlock(pre, res);
 		}
 
 		try {
@@ -70,11 +71,11 @@ export class AdminAuthController {
 				ttl,
 			);
 			this.adminSessionService.setCookie(res, payload, { persistent });
-			this.loginRateLimiter.reset(clientIp);
+			await this.loginProtection.recordLoginSuccess('admin', usernameKey, clientIp);
 			return { ok: true, admin, csrfToken: payload.csrfToken };
 		} catch (error) {
 			if (error instanceof UnauthorizedException) {
-				this.loginRateLimiter.recordFailure(clientIp);
+				await this.loginProtection.recordLoginFailure('admin', usernameKey, clientIp);
 			}
 			throw error;
 		}

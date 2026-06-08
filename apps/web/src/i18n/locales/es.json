@@ -128,7 +128,9 @@
 		"staySignedIn": "Stay signed in",
 		"staySignedInHint": "Keeps your admin session active longer (up to {{days}} days).",
 		"sharedComputerWarning": "Do not enable on shared or public computers. Anyone with access to this browser may open the admin console.",
-		"sessionExpired": "Your admin session has expired. Sign in again."
+		"sessionExpired": "Your admin session has expired. Sign in again.",
+		"tooManyAttempts": "Demasiados intentos. Inténtelo de nuevo en {{seconds}} s.",
+		"tooManyAttemptsGeneric": "Demasiados intentos. Inténtelo más tarde."
 	},
 	"login": {
 		"title": "SAML Login",
@@ -144,7 +146,9 @@
 		"continueToApplication": "Continue to application",
 		"backToAdmin": "Back to admin",
 		"signInFailed": "Sign in failed. Please try again.",
-		"couldNotContinueSso": "Could not continue SSO."
+		"couldNotContinueSso": "Could not continue SSO.",
+		"tooManyAttempts": "Demasiados intentos. Inténtelo de nuevo en {{seconds}} s.",
+		"tooManyAttemptsGeneric": "Demasiados intentos. Inténtelo más tarde."
 	},
 	"dashboard": {
 		"title": "Panel",
@@ -188,7 +192,10 @@
 		"schedulerOn": "Programador activado",
 		"schedulerOff": "Programador desactivado",
 		"schedulerCounts": "{{enabled}} activas, {{paused}} en pausa",
-		"openSchedules": "Abrir programaciones"
+		"openSchedules": "Abrir programaciones",
+		"securityLockoutsTitle": "Cuentas bloqueadas",
+		"lockedAdmins": "Cuentas de administrador bloqueadas",
+		"lockedUsers": "Cuentas de usuario bloqueadas"
 	},
 	"apiConnections": {
 		"listTitle": "Conexiones API",
@@ -639,7 +646,12 @@
 		"sectionNavAria": "Identity sections",
 		"managedBySyncUser": "This user is managed by identity sync and cannot be edited here.",
 		"managedBySyncGroup": "This group is managed by identity sync.",
-		"managedBySyncRole": "This role is managed by identity sync."
+		"managedBySyncRole": "This role is managed by identity sync.",
+		"lockedBadge": "Bloqueado",
+		"unlock": "Desbloquear",
+		"unlockConfirmTitle": "¿Desbloquear la cuenta?",
+		"unlockConfirmBody": "¿Quitar el bloqueo de {{username}}?",
+		"unlockSuccess": "Cuenta desbloqueada"
 	},
 	"audit": {
 		"title": "Registro de auditoría",
@@ -666,7 +678,12 @@
 		"toastPasswordChanged": "Contraseña cambiada",
 		"loadFailed": "Failed to load admins",
 		"createFailed": "Error al crear",
-		"passwordChangeFailed": "Password change failed"
+		"passwordChangeFailed": "Password change failed",
+		"lockedBadge": "Bloqueado",
+		"unlock": "Desbloquear",
+		"unlockConfirmTitle": "¿Desbloquear la cuenta?",
+		"unlockConfirmBody": "¿Quitar el bloqueo de {{username}}?",
+		"unlockSuccess": "Cuenta desbloqueada"
 	},
 	"sync": {
 		"title": "Sync — {{name}}",
