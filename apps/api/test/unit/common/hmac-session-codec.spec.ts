@@ -48,4 +48,45 @@ describe('HmacSessionCodec (§6.5)', () => {
 		secret = 'rotated-secret-16-chars';
 		expect(lazy.verify(token)).toBeNull();
 	});
+
+	it('HMAC-CODEC-07: expiry boundary — exp === now is rejected, exp strictly in the future is accepted', () => {
+		const now = Math.floor(Date.now() / 1000);
+		// exp === now: `exp <= now` holds now and only more so as the clock advances → always rejected.
+		expect(codec.verify(codec.sign({ userId: 'u1', exp: now }))).toBeNull();
+		// well into the future → accepted.
+		expect(codec.verify(codec.sign({ userId: 'u1', exp: now + 3600 }))).not.toBeNull();
+	});
+
+	it('HMAC-CODEC-08: tampering with the PAYLOAD (re-encoded, old signature) is rejected', () => {
+		const token = codec.sign({ userId: 'u1', exp: futureExp() });
+		const sigPart = token.slice(token.indexOf('.') + 1);
+		// Forge a privilege escalation: swap the payload but keep the original signature.
+		const forgedPayload = Buffer.from(
+			JSON.stringify({ userId: 'admin', exp: futureExp() }),
+			'utf8',
+		).toString('base64url');
+		expect(codec.verify(`${forgedPayload}.${sigPart}`)).toBeNull();
+	});
+
+	it('HMAC-CODEC-09: a wrong-length signature is rejected (length-mismatch branch, no timing leak)', () => {
+		const token = codec.sign({ userId: 'u1', exp: futureExp() });
+		const payloadPart = token.slice(0, token.indexOf('.'));
+		expect(codec.verify(`${payloadPart}.`)).toBeNull(); // empty signature (0 bytes vs 32)
+		expect(codec.verify(`${payloadPart}.AAAA`)).toBeNull(); // 3 bytes vs 32
+	});
+
+	it('HMAC-CODEC-10: only the FIRST dot splits payload/signature — extra dots stay in the signature part', () => {
+		const token = codec.sign({ userId: 'u1', exp: futureExp() });
+		const payloadPart = token.slice(0, token.indexOf('.'));
+		// `payload.a.b` → signaturePart = "a.b", which cannot match the real signature.
+		expect(codec.verify(`${payloadPart}.a.b`)).toBeNull();
+	});
+
+	it('HMAC-CODEC-11: round-trips all payload fields verbatim (no field dropped or coerced)', () => {
+		const rich = { userId: 'u-42', exp: futureExp(), role: 'operator', n: 7 } as TestPayload & {
+			role: string;
+			n: number;
+		};
+		expect(codec.verify(codec.sign(rich))).toEqual(rich);
+	});
 });
