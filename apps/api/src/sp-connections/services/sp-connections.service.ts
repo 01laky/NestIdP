@@ -16,7 +16,7 @@ import type {
 	SpConnectionResponseDto,
 	UpdateSpConnectionRequestDto,
 } from '@nestidp/shared';
-import { SAML_NAME_ID_FORMATS } from '@nestidp/shared';
+import { DEFAULT_SAML_NAME_ID_FORMAT, SAML_NAME_ID_FORMATS } from '@nestidp/shared';
 import { extractSloUrlFromSpMetadata } from '../../saml/utils/sp-metadata-slo.util';
 import { assertValidAcsUrl, AcsUrlValidationError } from '../../common/utils/acs-url.util';
 import { PrismaService } from '../../prisma/services/prisma.service';
@@ -291,7 +291,7 @@ export class SpConnectionsService {
 
 	private resolveNameIdFormat(format: string | undefined): string {
 		if (!format || format.trim().length === 0) {
-			return 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress';
+			return DEFAULT_SAML_NAME_ID_FORMAT;
 		}
 		const trimmed = format.trim();
 		if ((SAML_NAME_ID_FORMATS as readonly string[]).includes(trimmed)) {

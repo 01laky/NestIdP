@@ -1,3 +1,5 @@
+import type { BackchannelLogoutStatus } from './saml-slo.js';
+
 /** Public SAML HTTP paths (Nest controllers use these segments). */
 export const SAML_METADATA_PATH = '/saml/metadata';
 export const SAML_SSO_PATH = '/saml/sso';
@@ -125,7 +127,7 @@ export interface SpConnectionPublicDto {
 	wantAuthnRequestsSigned: boolean;
 	wantLogoutRequestsSigned: boolean;
 	/** Last back-channel LogoutRequest delivery outcome (Prompt 36), for the degraded indicator. */
-	lastBackchannelLogoutStatus?: string | null;
+	lastBackchannelLogoutStatus?: BackchannelLogoutStatus | null;
 	lastBackchannelLogoutAt?: string | null;
 	createdAt: string;
 	updatedAt: string;
@@ -223,3 +225,12 @@ export const SAML_NAME_ID_FORMATS = [
 	'urn:oasis:names:tc:SAML:2.0:nameid-format:persistent',
 	'urn:oasis:names:tc:SAML:2.0:nameid-format:transient',
 ] as const;
+export type SamlNameIdFormat = (typeof SAML_NAME_ID_FORMATS)[number];
+
+/** Fallback NameID format when an SP connection does not pin one (legacy default since v1.0). */
+export const DEFAULT_SAML_NAME_ID_FORMAT: SamlNameIdFormat =
+	'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress';
+
+export function isSamlNameIdFormat(value: string): value is SamlNameIdFormat {
+	return (SAML_NAME_ID_FORMATS as readonly string[]).includes(value);
+}

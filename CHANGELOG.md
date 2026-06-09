@@ -12,6 +12,16 @@ frontend de-duplication) and remaining items land in subsequent commits under th
 
 ### Changed
 
+- **Shared literal-union types for the SAML/IdP status families** (§6.4 / §A14): added the missing
+  `BACKCHANNEL_LOGOUT_STATUSES` const tuple (with `BackchannelLogoutStatus` now derived from it and an
+  `isBackchannelLogoutStatus` guard) and the missing `SamlNameIdFormat` union, `isSamlNameIdFormat` guard
+  and `DEFAULT_SAML_NAME_ID_FORMAT` constant derived from the existing `SAML_NAME_ID_FORMATS` tuple. The
+  IdP-controlled DTO fields are now typed against these instead of bare `string`:
+  `SpConnectionPublicDto.lastBackchannelLogoutStatus` (narrowed at the mapper boundary via the new guard)
+  and `AdminDashboardIdpStatusDto.signingKeyFamily`/`signingEcCurve` (reusing `IdpCertKeyFamily`/
+  `IdpCertEcCurve` rather than re-declaring the literals). The hand-typed `emailAddress` default in
+  `sp-connections.service` now uses `DEFAULT_SAML_NAME_ID_FORMAT`. Behaviour-preserving; the lax-validated
+  request DTOs keep `string` until validation is tightened (§6.3/§A12).
 - **Shared config parsing helpers** (§6.1): one `boundedInt` (env → bounded number, falling back on
   absent/empty/out-of-range) and one `parseBoolEnv` (truthy-env), replacing the duplicated inline copies.
   The shared `boundedInt` fixes a foot-gun the copies shared — an empty env var parsed as `0` (via

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+	DEFAULT_SAML_NAME_ID_FORMAT,
+	isSamlNameIdFormat,
 	RELAY_STATE_POST_FIELD,
 	RELAY_STATE_QUERY_PARAM,
 	SIGNATURE_QUERY_PARAM,
@@ -45,6 +47,23 @@ describe('saml shared', () => {
 	it('SH-SAML-04: SAML_NAME_ID_FORMATS is non-empty readonly list', () => {
 		expect(SAML_NAME_ID_FORMATS.length).toBeGreaterThan(0);
 		expect(SAML_NAME_ID_FORMATS[0]).toMatch(/^urn:/);
+	});
+
+	it('SH-SAML-08: DEFAULT_SAML_NAME_ID_FORMAT is a member of the list', () => {
+		expect(DEFAULT_SAML_NAME_ID_FORMAT).toBe(
+			'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
+		);
+		expect((SAML_NAME_ID_FORMATS as readonly string[]).includes(DEFAULT_SAML_NAME_ID_FORMAT)).toBe(
+			true,
+		);
+	});
+
+	it('SH-SAML-09: isSamlNameIdFormat narrows known formats and rejects others', () => {
+		for (const format of SAML_NAME_ID_FORMATS) {
+			expect(isSamlNameIdFormat(format)).toBe(true);
+		}
+		expect(isSamlNameIdFormat('urn:custom:nameid')).toBe(false);
+		expect(isSamlNameIdFormat('')).toBe(false);
 	});
 
 	it('SH-SAML-05: CreateSpConnectionRequestDto minimal body', () => {

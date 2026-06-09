@@ -37,14 +37,20 @@ export interface SamlSpParticipationPublicDto {
 }
 
 /** Back-channel (SOAP) LogoutRequest delivery status to one SP (Prompt 36). */
-export type BackchannelLogoutStatus =
-	| 'pending'
-	| 'in_flight'
-	| 'succeeded'
-	| 'partial'
-	| 'failed'
-	| 'given_up'
-	| 'skipped_no_endpoint';
+export const BACKCHANNEL_LOGOUT_STATUSES = [
+	'pending',
+	'in_flight',
+	'succeeded',
+	'partial',
+	'failed',
+	'given_up',
+	'skipped_no_endpoint',
+] as const;
+export type BackchannelLogoutStatus = (typeof BACKCHANNEL_LOGOUT_STATUSES)[number];
+
+export function isBackchannelLogoutStatus(value: string): value is BackchannelLogoutStatus {
+	return (BACKCHANNEL_LOGOUT_STATUSES as readonly string[]).includes(value);
+}
 
 export interface SamlBackchannelLogoutPublicDto {
 	spConnectionId: string;

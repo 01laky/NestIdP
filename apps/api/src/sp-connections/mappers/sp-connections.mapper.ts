@@ -1,3 +1,4 @@
+import { isBackchannelLogoutStatus } from '@nestidp/shared';
 import type { SpAttributeMappingConfig, SpConnectionPublicDto } from '@nestidp/shared';
 import type { SpConnection } from '@prisma/client';
 
@@ -16,7 +17,10 @@ export function toSpConnectionPublicDto(row: SpConnection): SpConnectionPublicDt
 		wantAssertionsEncrypted: row.wantAssertionsEncrypted,
 		wantAuthnRequestsSigned: row.wantAuthnRequestsSigned,
 		wantLogoutRequestsSigned: row.wantLogoutRequestsSigned,
-		lastBackchannelLogoutStatus: row.lastBackchannelLogoutStatus ?? null,
+		lastBackchannelLogoutStatus:
+			row.lastBackchannelLogoutStatus && isBackchannelLogoutStatus(row.lastBackchannelLogoutStatus)
+				? row.lastBackchannelLogoutStatus
+				: null,
 		lastBackchannelLogoutAt: row.lastBackchannelLogoutAt?.toISOString() ?? null,
 		createdAt: row.createdAt.toISOString(),
 		updatedAt: row.updatedAt.toISOString(),

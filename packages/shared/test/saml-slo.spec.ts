@@ -9,6 +9,9 @@ import {
 	SAML_STATUS_REQUEST_DENIED,
 	SAML_STATUS_RESPONDER,
 	SAML_STATUS_SUCCESS,
+	BACKCHANNEL_LOGOUT_STATUSES,
+	isBackchannelLogoutStatus,
+	type BackchannelLogoutStatus,
 	type SamlSsoSessionListResponseDto,
 	type SamlSsoSessionPublicDto,
 	type TerminateSamlSessionResponseDto,
@@ -57,5 +60,28 @@ describe('SAML SLO shared contracts', () => {
 		expect(list.items[0].status).toBe('active');
 		expect(term.alreadyTerminated).toBe(false);
 		expect(byUser.terminatedCount).toBe(2);
+	});
+
+	it('SH-SLO-04: BACKCHANNEL_LOGOUT_STATUSES enumerates every status and the union derives from it', () => {
+		expect(BACKCHANNEL_LOGOUT_STATUSES).toEqual([
+			'pending',
+			'in_flight',
+			'succeeded',
+			'partial',
+			'failed',
+			'given_up',
+			'skipped_no_endpoint',
+		]);
+		// Compile-time: each tuple member is assignable to the derived union.
+		const statuses: BackchannelLogoutStatus[] = [...BACKCHANNEL_LOGOUT_STATUSES];
+		expect(statuses).toHaveLength(7);
+	});
+
+	it('SH-SLO-05: isBackchannelLogoutStatus narrows known statuses and rejects others', () => {
+		for (const status of BACKCHANNEL_LOGOUT_STATUSES) {
+			expect(isBackchannelLogoutStatus(status)).toBe(true);
+		}
+		expect(isBackchannelLogoutStatus('done')).toBe(false);
+		expect(isBackchannelLogoutStatus('')).toBe(false);
 	});
 });

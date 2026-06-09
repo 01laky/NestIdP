@@ -1,4 +1,5 @@
 import type { ApiConnectionDto } from './connections.js';
+import type { IdpCertEcCurve, IdpCertKeyFamily } from './idp-cert-common.js';
 import type { LastSyncStatus } from './schema-enums.js';
 import type {
 	AdminDashboardEncryptionCertStatus,
@@ -20,10 +21,10 @@ export interface AdminDashboardIdpStatusDto {
 	hasSigningCertificate: boolean;
 	rotationActive: boolean;
 	signingCertNotAfter: string | null;
-	signingKeyFamily: 'rsa' | 'ec' | null;
+	signingKeyFamily: IdpCertKeyFamily | null;
 	signingSignatureAlgorithmId: string | null;
 	signingRsaModulusBits: number | null;
-	signingEcCurve: string | null;
+	signingEcCurve: IdpCertEcCurve | null;
 	certStatus: AdminDashboardIdpCertStatus;
 	hasEncryptionCertificate: boolean;
 	encryptionRotationActive: boolean;
