@@ -1,4 +1,4 @@
-import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { CookieOptions, Response } from 'express';
@@ -8,6 +8,7 @@ import {
 	DEFAULT_ADMIN_SESSION_TTL_SECONDS,
 	MAX_ADMIN_SESSION_REMEMBER_TTL_SECONDS,
 } from '@nestidp/shared';
+import { HmacSessionCodec } from '../../common/session/hmac-session-codec';
 import { NodeEnv } from '../../config/env.validation';
 
 export interface AdminSessionPayload {
@@ -20,7 +21,12 @@ export interface AdminSessionPayload {
 
 @Injectable()
 export class AdminSessionService {
-	constructor(private readonly configService: ConfigService) {}
+	// §6.5: HMAC sign/verify is shared with the end-user session service.
+	private readonly codec: HmacSessionCodec<AdminSessionPayload>;
+
+	constructor(private readonly configService: ConfigService) {
+		this.codec = new HmacSessionCodec(() => this.configService.get<string>('SESSION_SECRET') ?? '');
+	}
 
 	getSessionTtlSeconds(remember = false): number {
 		if (remember) {
@@ -47,52 +53,11 @@ export class AdminSessionService {
 	}
 
 	sign(payload: AdminSessionPayload): string {
-		const payloadJson = JSON.stringify(payload);
-		const payloadPart = Buffer.from(payloadJson, 'utf8').toString('base64url');
-		const signature = this.signPayloadJson(payloadJson);
-		return `${payloadPart}.${signature}`;
+		return this.codec.sign(payload);
 	}
 
 	verify(token: string | undefined): AdminSessionPayload | null {
-		if (!token) {
-			return null;
-		}
-
-		const dotIndex = token.indexOf('.');
-		if (dotIndex <= 0) {
-			return null;
-		}
-
-		const payloadPart = token.slice(0, dotIndex);
-		const signaturePart = token.slice(dotIndex + 1);
-
-		let payloadJson: string;
-		try {
-			payloadJson = Buffer.from(payloadPart, 'base64url').toString('utf8');
-		} catch {
-			return null;
-		}
-
-		const expectedSignature = this.signPayloadJson(payloadJson);
-		const sigA = Buffer.from(signaturePart, 'base64url');
-		const sigB = Buffer.from(expectedSignature, 'base64url');
-		if (sigA.length !== sigB.length || !timingSafeEqual(sigA, sigB)) {
-			return null;
-		}
-
-		let payload: AdminSessionPayload;
-		try {
-			payload = JSON.parse(payloadJson) as AdminSessionPayload;
-		} catch {
-			return null;
-		}
-
-		const now = Math.floor(Date.now() / 1000);
-		if (payload.exp <= now) {
-			return null;
-		}
-
-		return payload;
+		return this.codec.verify(token);
 	}
 
 	createPayload(
@@ -137,10 +102,5 @@ export class AdminSessionService {
 			sameSite: 'lax',
 			path: '/',
 		});
-	}
-
-	private signPayloadJson(payloadJson: string): string {
-		const secret = this.configService.get<string>('SESSION_SECRET') ?? '';
-		return createHmac('sha256', secret).update(payloadJson, 'utf8').digest('base64url');
 	}
 }
