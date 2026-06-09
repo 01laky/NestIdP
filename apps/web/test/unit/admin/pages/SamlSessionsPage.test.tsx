@@ -175,6 +175,43 @@ describe('SamlSessionsPage', () => {
 		await waitFor(() => expect(bulk).toHaveBeenCalledWith(['sso1']));
 	});
 
+	it('WEB-MAS-SESS-01: renders the Source column value and filter options', async () => {
+		const fixture = sessionFixture();
+		fixture.items[0].sourceLabel = 'Corp HR';
+		vi.spyOn(adminApi, 'listSamlSessions').mockResolvedValue(fixture);
+		vi.spyOn(adminApi, 'listSpConnections').mockResolvedValue({ items: [] });
+		vi.spyOn(adminApi, 'listIdentitySources').mockResolvedValue({
+			sources: [
+				{ apiConnectionId: 'api1', label: 'Corp HR', isLocalDirectory: false },
+				{ apiConnectionId: 'api2', label: 'Partner LDAP', isLocalDirectory: false },
+			],
+		});
+		renderPage();
+		await waitFor(() => expect(screen.getByText('alice')).toBeDefined());
+		// Source badge cell value + filter option both surface the label
+		expect(screen.getAllByText('Corp HR').length).toBeGreaterThanOrEqual(1);
+		// Source filter exists with both options
+		const sourceSelect = screen.getByLabelText('Source') as HTMLSelectElement;
+		expect(sourceSelect).toBeDefined();
+		expect(screen.getByRole('option', { name: 'Partner LDAP' })).toBeDefined();
+	});
+
+	it('WEB-MAS-SESS-02: changing the Source filter re-queries with apiConnectionId', async () => {
+		const list = vi.spyOn(adminApi, 'listSamlSessions').mockResolvedValue(sessionFixture());
+		vi.spyOn(adminApi, 'listSpConnections').mockResolvedValue({ items: [] });
+		vi.spyOn(adminApi, 'listIdentitySources').mockResolvedValue({
+			sources: [{ apiConnectionId: 'api1', label: 'Corp HR', isLocalDirectory: false }],
+		});
+		renderPage();
+		await waitFor(() => expect(screen.getByText('alice')).toBeDefined());
+		await waitFor(() => expect(screen.getByRole('option', { name: 'Corp HR' })).toBeDefined());
+
+		fireEvent.change(screen.getByLabelText('Source'), { target: { value: 'api1' } });
+		await waitFor(() =>
+			expect(list).toHaveBeenCalledWith(expect.objectContaining({ apiConnectionId: 'api1' })),
+		);
+	});
+
 	it('WEB-BC-01c: "Resend" on a failed delivery calls the resend endpoint', async () => {
 		vi.spyOn(adminApi, 'listSamlSessions').mockResolvedValue(backchannelFixture());
 		vi.spyOn(adminApi, 'listSpConnections').mockResolvedValue({ items: [] });

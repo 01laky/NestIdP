@@ -1,10 +1,10 @@
-import { FormEvent, Suspense, useCallback, useMemo, useState } from 'react';
+import { FormEvent, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { ColumnDef } from '@tanstack/react-table';
-import type { IdentityGroupListItemDto } from '@nestidp/shared';
+import type { IdentityGroupListItemDto, IdentitySourceOptionDto } from '@nestidp/shared';
 import { IDENTITY_GROUP_NEW_ROUTE, identityGroupDetailRoute } from '@nestidp/shared';
-import { AdminApiError, listIdentityGroups } from '../adminApi';
+import { AdminApiError, listIdentityGroups, listIdentitySources } from '../adminApi';
 import { AdminPageHeader } from '../components/layout/AdminPageHeader';
 import { IdentitySectionNav } from '../components/identity/IdentitySectionNav';
 import { createLazyIdentityListTable } from '../components/identity/identityListTableLazy';
@@ -26,6 +26,18 @@ export function IdentityGroupsPage() {
 	const { t: tCommon } = useTranslation('common');
 	useAdminDocumentTitle(t('groupsTitle'));
 	const [origin, setOrigin] = useState('');
+	const [source, setSource] = useState('');
+	const [sources, setSources] = useState<IdentitySourceOptionDto[]>([]);
+
+	useEffect(() => {
+		void listIdentitySources()
+			.then((res) => setSources(res.sources))
+			.catch(() => setSources([]));
+	}, []);
+	const sourceLabel = useMemo(() => {
+		const map = new Map(sources.map((s) => [s.apiConnectionId, s.label]));
+		return (id: string) => map.get(id) ?? id;
+	}, [sources]);
 
 	const mapError = useCallback(
 		(err: unknown) =>
@@ -54,6 +66,7 @@ export function IdentityGroupsPage() {
 				offset,
 				limit,
 				origin: filters.origin,
+				apiConnectionId: filters.source,
 			});
 			return { items: data.items, total: data.total };
 		},
@@ -63,7 +76,7 @@ export function IdentityGroupsPage() {
 	const { pageIndex, total, items, error, initialLoading, refetching, applyFilters, goToPage } =
 		useIdentityListQuery<IdentityGroupListItemDto>({
 			fetchPage,
-			initialFilters: { origin: undefined },
+			initialFilters: { origin: undefined, source: undefined },
 			mapError,
 		});
 
@@ -86,17 +99,24 @@ export function IdentityGroupsPage() {
 				),
 			},
 			{
+				id: 'source',
+				header: () => t('colSource'),
+				cell: ({ row }) => (
+					<span className="evg-muted">{sourceLabel(row.original.apiConnectionId)}</span>
+				),
+			},
+			{
 				id: 'members',
 				header: () => tCommon('members'),
 				cell: ({ row }) => row.original.memberCount ?? tCommon('emDash'),
 			},
 		],
-		[tCommon],
+		[t, tCommon, sourceLabel],
 	);
 
 	function handleFilter(event: FormEvent) {
 		event.preventDefault();
-		applyFilters({ origin: origin || undefined });
+		applyFilters({ origin: origin || undefined, source: source || undefined });
 	}
 
 	const filterDisabled = refetching;
@@ -135,6 +155,20 @@ export function IdentityGroupsPage() {
 					<option value="">{identityOriginFilterLabel('', resolveI18nKey)}</option>
 					<option value="manual">{identityOriginFilterLabel('manual', resolveI18nKey)}</option>
 					<option value="synced">{identityOriginFilterLabel('synced', resolveI18nKey)}</option>
+				</Select>
+				<Select
+					label={t('sourceFilter')}
+					fieldClassName="evg-field--fixed"
+					value={source}
+					onChange={(e) => setSource(e.target.value)}
+					disabled={filterDisabled}
+				>
+					<option value="">{t('sourceAll')}</option>
+					{sources.map((s) => (
+						<option key={s.apiConnectionId} value={s.apiConnectionId}>
+							{s.label}
+						</option>
+					))}
 				</Select>
 				<Button type="submit" variant="secondary" disabled={filterDisabled}>
 					{tCommon('apply')}

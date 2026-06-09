@@ -10,12 +10,16 @@ import {
 	type OAuthClientAuthMethod,
 	previewProxyRouting,
 	type ProxyCheckStatus,
+	type RemoveSourceIdentitiesMode,
+	USERNAME_COLLISION_POLICIES,
+	type UsernameCollisionPolicy,
 } from '@nestidp/shared';
 import {
 	AdminApiError,
 	createApiConnection,
 	deleteApiConnection,
 	getApiConnection,
+	removeSourceIdentities,
 	testApiConnection,
 	testApiConnectionProxy,
 	testApiConnectionToken,
@@ -73,6 +77,14 @@ export function ApiConnectionFormPage() {
 	const [testMessage, setTestMessage] = useState<string | null>(null);
 	const [contractJson, setContractJson] = useState('');
 	const [contractTouched, setContractTouched] = useState(false);
+	// Multi-source sync settings (Prompt 37)
+	const [includeInSyncAll, setIncludeInSyncAll] = useState(true);
+	const [usernameCollisionPolicy, setUsernameCollisionPolicy] = useState<
+		UsernameCollisionPolicy | ''
+	>('');
+	const [originalBaseUrl, setOriginalBaseUrl] = useState('');
+	const [isLocalDirectory, setIsLocalDirectory] = useState(false);
+	const [hasSyncedIdentities, setHasSyncedIdentities] = useState(false);
 	const [saving, setSaving] = useState(false);
 	const { showToast } = useToast();
 
@@ -114,6 +126,13 @@ export function ApiConnectionFormPage() {
 						c.oauthTokenRequestParams ? JSON.stringify(c.oauthTokenRequestParams, null, 2) : '',
 					);
 					setContractJson(c.apiContractConfig ? JSON.stringify(c.apiContractConfig, null, 2) : '');
+					setOriginalBaseUrl(c.baseUrl);
+					setIncludeInSyncAll(c.includeInSyncAll ?? true);
+					setUsernameCollisionPolicy(c.usernameCollisionPolicy ?? '');
+					setIsLocalDirectory(c.isLocalDirectory ?? false);
+					setHasSyncedIdentities(
+						(c.syncedUserCount ?? 0) + (c.syncedGroupCount ?? 0) + (c.syncedRoleCount ?? 0) > 0,
+					);
 					setProxyEnabled(c.proxyEnabled);
 					setProxyUrl(c.proxyUrl ?? '');
 					setProxyUsername(c.proxyUsername ?? '');
@@ -147,14 +166,12 @@ export function ApiConnectionFormPage() {
 
 	async function handleSubmit(event: FormEvent) {
 		event.preventDefault();
-		setSaving(true);
 		setError(null);
 		let apiContractConfig: ApiContractConfig | null;
 		try {
 			apiContractConfig = parseContract();
 		} catch {
 			setError(t('contractJsonInvalid'));
-			setSaving(false);
 			return;
 		}
 		let oauthTokenRequestParams: Record<string, string> | null;
@@ -162,7 +179,6 @@ export function ApiConnectionFormPage() {
 			oauthTokenRequestParams = parseTokenParams();
 		} catch {
 			setError(t('oauthTokenParamsInvalid'));
-			setSaving(false);
 			return;
 		}
 
@@ -188,45 +204,75 @@ export function ApiConnectionFormPage() {
 			...(proxyPassword ? { proxyPassword } : {}),
 		};
 
-		try {
-			if (isNew) {
-				const created = await createApiConnection({
-					name,
-					baseUrl,
-					authType,
-					...(authType === 'BEARER' ? { bearerToken } : {}),
-					...oauthFields,
-					...proxyFields,
-					...(apiContractConfig ? { apiContractConfig } : {}),
-				});
-				showToast(t('toastSaved'));
-				navigate(`${API_CONNECTION_ROUTE_PREFIX}/${created.connection.id}`);
-			} else if (id) {
-				await updateApiConnection(id, {
-					name,
-					baseUrl,
-					authType,
-					...(authType === 'BEARER' && bearerToken ? { bearerToken } : {}),
-					...oauthFields,
-					...proxyFields,
-					...(contractTouched ? { apiContractConfig } : {}),
-				});
-				showToast(t('toastSaved'));
+		const syncFields = {
+			includeInSyncAll,
+			usernameCollisionPolicy: usernameCollisionPolicy || null,
+		};
+
+		const persist = async (acknowledgeRebind: boolean) => {
+			setSaving(true);
+			try {
+				if (isNew) {
+					const created = await createApiConnection({
+						name,
+						baseUrl,
+						authType,
+						...(authType === 'BEARER' ? { bearerToken } : {}),
+						...oauthFields,
+						...proxyFields,
+						...syncFields,
+						...(apiContractConfig ? { apiContractConfig } : {}),
+					});
+					showToast(t('toastSaved'));
+					navigate(`${API_CONNECTION_ROUTE_PREFIX}/${created.connection.id}`);
+				} else if (id) {
+					await updateApiConnection(id, {
+						name,
+						baseUrl,
+						authType,
+						...(authType === 'BEARER' && bearerToken ? { bearerToken } : {}),
+						...oauthFields,
+						...proxyFields,
+						...syncFields,
+						...(contractTouched ? { apiContractConfig } : {}),
+						...(acknowledgeRebind ? { acknowledgeRebind: true } : {}),
+					});
+					showToast(t('toastSaved'));
+				}
+			} catch (err) {
+				setError(
+					err instanceof AdminApiError
+						? formatAdminApiError(
+								err.statusCode,
+								err.message,
+								resolveI18nKey,
+								'apiConnections.saveFailed',
+							)
+						: t('saveFailed'),
+				);
+			} finally {
+				setSaving(false);
 			}
-		} catch (err) {
-			setError(
-				err instanceof AdminApiError
-					? formatAdminApiError(
-							err.statusCode,
-							err.message,
-							resolveI18nKey,
-							'apiConnections.saveFailed',
-						)
-					: t('saveFailed'),
-			);
-		} finally {
-			setSaving(false);
+		};
+
+		// Re-bind guard (Prompt 37): re-pointing a connection (baseUrl / contract) that already has synced
+		// identities can remap externalIds — confirm before sending the acknowledged update.
+		const rebinding =
+			!isNew &&
+			!isLocalDirectory &&
+			hasSyncedIdentities &&
+			(baseUrl.trim() !== originalBaseUrl || contractTouched);
+		if (rebinding) {
+			await confirmAction({
+				title: tCommon('confirmTitle'),
+				description: t('rebindWarning'),
+				tone: 'danger',
+				confirmLabel: tCommon('confirm'),
+				onConfirm: () => persist(true),
+			});
+			return;
 		}
+		await persist(false);
 	}
 
 	async function handleTest() {
@@ -311,6 +357,45 @@ export function ApiConnectionFormPage() {
 					: t('testFailed'),
 			);
 		}
+	}
+
+	async function handleRemoveIdentities(mode: RemoveSourceIdentitiesMode) {
+		if (!id) {
+			return;
+		}
+		await confirmAction({
+			title: t('removeIdentities'),
+			description: t('removeIdentitiesConfirm'),
+			tone: 'danger',
+			showAuditNote: true,
+			confirmLabel:
+				mode === 'delete' ? t('removeIdentitiesDelete') : t('removeIdentitiesDeactivate'),
+			onConfirm: async () => {
+				try {
+					const result = await removeSourceIdentities(id, mode);
+					setHasSyncedIdentities(false);
+					showToast(
+						t('removeIdentitiesResult', {
+							users: result.usersRemoved,
+							groups: result.groupsRemoved,
+							roles: result.rolesRemoved,
+							sessions: result.sessionsTerminated,
+						}),
+					);
+				} catch (err) {
+					setError(
+						err instanceof AdminApiError
+							? formatAdminApiError(
+									err.statusCode,
+									err.message,
+									resolveI18nKey,
+									'apiConnections.saveFailed',
+								)
+							: t('saveFailed'),
+					);
+				}
+			},
+		});
 	}
 
 	async function handleDelete() {
@@ -473,6 +558,32 @@ export function ApiConnectionFormPage() {
 							</div>
 						)}
 
+						{!isLocalDirectory ? (
+							<div className="evg-stack">
+								<Checkbox
+									label={t('includeInSyncAll')}
+									checked={includeInSyncAll}
+									onChange={setIncludeInSyncAll}
+									hint={t('includeInSyncAllHint')}
+								/>
+								<Select
+									label={t('usernameCollisionPolicy')}
+									name="usernameCollisionPolicy"
+									value={usernameCollisionPolicy}
+									onChange={(e) =>
+										setUsernameCollisionPolicy(e.target.value as UsernameCollisionPolicy | '')
+									}
+								>
+									<option value="">{t('collisionInherit')}</option>
+									{USERNAME_COLLISION_POLICIES.map((p) => (
+										<option key={p} value={p}>
+											{p === 'skip' ? t('collisionSkip') : t('collisionFailRun')}
+										</option>
+									))}
+								</Select>
+							</div>
+						) : null}
+
 						<details className="evg-filters-panel evg-filters-panel--collapsible">
 							<summary>{t('contractAdvanced')}</summary>
 							<div className="evg-stack">
@@ -623,6 +734,26 @@ export function ApiConnectionFormPage() {
 						>
 							{t('testProxy')}
 						</Button>
+					) : null}
+					{!isLocalDirectory && hasSyncedIdentities ? (
+						<>
+							<Button
+								type="button"
+								variant="secondary"
+								disabled={saving}
+								onClick={() => void handleRemoveIdentities('deactivate')}
+							>
+								{t('removeIdentitiesDeactivate')}
+							</Button>
+							<Button
+								type="button"
+								variant="secondary"
+								disabled={saving}
+								onClick={() => void handleRemoveIdentities('delete')}
+							>
+								{t('removeIdentitiesDelete')}
+							</Button>
+						</>
 					) : null}
 					<Button
 						type="button"

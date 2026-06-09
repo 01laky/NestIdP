@@ -517,7 +517,13 @@ function identityQuery(params: Record<string, string | number | undefined>): str
 }
 
 export function listIdentityUsers(
-	params: { limit?: number; offset?: number; search?: string; origin?: string } = {},
+	params: {
+		limit?: number;
+		offset?: number;
+		search?: string;
+		origin?: string;
+		apiConnectionId?: string;
+	} = {},
 ): Promise<IdentityUserListResponseDto> {
 	return adminFetch<IdentityUserListResponseDto>(
 		`${IDENTITY_USERS_API_PATH}${identityQuery({
@@ -525,6 +531,7 @@ export function listIdentityUsers(
 			offset: params.offset,
 			search: params.search,
 			origin: params.origin,
+			apiConnectionId: params.apiConnectionId,
 		})}`,
 	);
 }
@@ -562,13 +569,14 @@ export function deleteIdentityUser(id: string): Promise<void> {
 }
 
 export function listIdentityGroups(
-	params: { limit?: number; offset?: number; origin?: string } = {},
+	params: { limit?: number; offset?: number; origin?: string; apiConnectionId?: string } = {},
 ): Promise<IdentityGroupListResponseDto> {
 	return adminFetch<IdentityGroupListResponseDto>(
 		`${IDENTITY_GROUPS_API_PATH}${identityQuery({
 			limit: params.limit ?? IDENTITY_LIST_PAGE_SIZE,
 			offset: params.offset,
 			origin: params.origin,
+			apiConnectionId: params.apiConnectionId,
 		})}`,
 	);
 }
@@ -601,13 +609,14 @@ export function deleteIdentityGroup(id: string): Promise<void> {
 }
 
 export function listIdentityRoles(
-	params: { limit?: number; offset?: number; origin?: string } = {},
+	params: { limit?: number; offset?: number; origin?: string; apiConnectionId?: string } = {},
 ): Promise<IdentityRoleListResponseDto> {
 	return adminFetch<IdentityRoleListResponseDto>(
 		`${IDENTITY_ROLES_API_PATH}${identityQuery({
 			limit: params.limit ?? IDENTITY_LIST_PAGE_SIZE,
 			offset: params.offset,
 			origin: params.origin,
+			apiConnectionId: params.apiConnectionId,
 		})}`,
 	);
 }

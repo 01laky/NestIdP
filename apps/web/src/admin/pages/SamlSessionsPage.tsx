@@ -12,6 +12,7 @@ import {
 import {
 	AdminApiError,
 	getBackchannelQueueHealth,
+	listIdentitySources,
 	listSamlSessions,
 	listSpConnections,
 	processBackchannelQueue,
@@ -68,6 +69,7 @@ export function SamlSessionsPage() {
 	const { t } = useTranslation('samlSessions');
 	const { t: tNav } = useTranslation('nav');
 	const { t: tCommon } = useTranslation('common');
+	const { t: tIdentity } = useTranslation('identity');
 	useAdminDocumentTitle(t('title'));
 	const confirm = useConfirm();
 	const { showToast } = useToast();
@@ -76,6 +78,8 @@ export function SamlSessionsPage() {
 	const [error, setError] = useState<string | null>(null);
 	const [status, setStatus] = useState<SamlSsoSessionStatusFilter>('active');
 	const [spConnectionId, setSpConnectionId] = useState('');
+	const [apiConnectionId, setApiConnectionId] = useState('');
+	const [sources, setSources] = useState<{ apiConnectionId: string; label: string }[]>([]);
 	const [q, setQ] = useState('');
 	const [page, setPage] = useState(1);
 	const [data, setData] = useState<SamlSsoSessionListResponseDto | null>(null);
@@ -99,6 +103,7 @@ export function SamlSessionsPage() {
 			const result = await listSamlSessions({
 				status,
 				spConnectionId: spConnectionId || undefined,
+				apiConnectionId: apiConnectionId || undefined,
 				q: q.trim() || undefined,
 				page,
 				pageSize: SAML_SESSIONS_LIST_PAGE_SIZE,
@@ -119,7 +124,7 @@ export function SamlSessionsPage() {
 		} finally {
 			setLoading(false);
 		}
-	}, [status, spConnectionId, q, page, t]);
+	}, [status, spConnectionId, apiConnectionId, q, page, t]);
 
 	useEffect(() => {
 		void load();
@@ -133,6 +138,12 @@ export function SamlSessionsPage() {
 		void listSpConnections()
 			.then((res) => setSpOptions(res.items.map((s) => ({ id: s.id, name: s.name }))))
 			.catch(() => setSpOptions([]));
+	}, []);
+
+	useEffect(() => {
+		void listIdentitySources()
+			.then((res) => setSources(res.sources))
+			.catch(() => setSources([]));
 	}, []);
 
 	const activeIds = useMemo(
@@ -341,6 +352,21 @@ export function SamlSessionsPage() {
 							</option>
 						))}
 					</Select>
+					<Select
+						label={tIdentity('sourceFilter')}
+						value={apiConnectionId}
+						onChange={(e) => {
+							setApiConnectionId(e.target.value);
+							setPage(1);
+						}}
+					>
+						<option value="">{tIdentity('sourceAll')}</option>
+						{sources.map((s) => (
+							<option key={s.apiConnectionId} value={s.apiConnectionId}>
+								{s.label}
+							</option>
+						))}
+					</Select>
 					<TextInput
 						label={t('search')}
 						value={q}
@@ -395,6 +421,7 @@ export function SamlSessionsPage() {
 											) : null}
 										</th>
 										<th>{t('colUser')}</th>
+										<th>{tIdentity('colSource')}</th>
 										<th>{t('colServiceProviders')}</th>
 										<th>{t('colPropagation')}</th>
 										<th>{t('colLoginIp')}</th>
@@ -419,6 +446,7 @@ export function SamlSessionsPage() {
 												)}
 											</td>
 											<td>{session.username}</td>
+											<td className="evg-muted">{session.sourceLabel ?? tCommon('emDash')}</td>
 											<td>
 												{session.participations.length === 0
 													? tCommon('emDash')
