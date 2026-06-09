@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { escapeXmlAttr, escapeXmlText } from '../utils/saml-xml.util';
 
 export interface BuildLogoutRequestInput {
 	/** Stable per-delivery request ID, reused on retry (idempotent + InResponseTo match). */
@@ -42,12 +43,4 @@ export class SamlLogoutRequestBuilderService {
 
 		return { xml, requestId: input.requestId };
 	}
-}
-
-function escapeXmlText(value: string): string {
-	return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
-}
-
-function escapeXmlAttr(value: string): string {
-	return escapeXmlText(value).replaceAll('"', '&quot;');
 }

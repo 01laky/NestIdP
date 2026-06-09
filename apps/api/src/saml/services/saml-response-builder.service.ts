@@ -4,6 +4,7 @@ import { create } from 'xmlbuilder2';
 import type { EndUserPublicDto, ParsedAuthnRequestDto } from '@nestidp/shared';
 import type { SpConnection } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
+import { escapeXmlAttr, escapeXmlText } from '../utils/saml-xml.util';
 import { SamlAttributeMapperService } from './saml-attribute-mapper.service';
 import { IdpSigningService } from './idp-signing.service';
 import type { SpAttributeMappingConfig } from '@nestidp/shared';
@@ -181,12 +182,4 @@ export class SamlResponseBuilderService {
 		const parsed = Number.parseInt(String(raw), 10);
 		return Number.isFinite(parsed) && parsed > 0 ? parsed : 120;
 	}
-}
-
-function escapeXmlText(value: string): string {
-	return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
-}
-
-function escapeXmlAttr(value: string): string {
-	return escapeXmlText(value).replaceAll('"', '&quot;');
 }

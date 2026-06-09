@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
+import { escapeXmlAttr, escapeXmlText } from '../utils/saml-xml.util';
 import {
 	SAML_STATUS_REQUEST_DENIED,
 	SAML_STATUS_RESPONDER,
@@ -34,12 +35,4 @@ export class SamlLogoutResponseBuilderService {
 
 		return { xml, responseId };
 	}
-}
-
-function escapeXmlText(value: string): string {
-	return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
-}
-
-function escapeXmlAttr(value: string): string {
-	return escapeXmlText(value).replaceAll('"', '&quot;');
 }
