@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nest
 import { ConfigService } from '@nestjs/config';
 import type { SyncLogErrorEntryDto } from '@nestidp/shared';
 import { CronScheduleError, SYNC_SCHEDULE_DEFAULT_TIMEZONE } from '@nestidp/shared';
+import { parseBoolEnv } from '../../common/config/parse-bool-env.util';
 import { ApiConnection } from '@prisma/client';
 import { PrismaService } from '../../prisma/services/prisma.service';
 import { AuditPersistenceService } from '../../audit/services/audit-persistence.service';
@@ -282,8 +283,8 @@ export class SyncSchedulerService implements OnModuleInit, OnModuleDestroy {
 	}
 
 	private isMigrateOnly(): boolean {
-		const raw = (this.configService.get<string>('MIGRATE_ONLY') ?? '').toLowerCase();
-		return ['1', 'true', 'yes'].includes(raw);
+		// §6.1: shared truthy-env parsing.
+		return parseBoolEnv(this.configService.get<string>('MIGRATE_ONLY'));
 	}
 }
 

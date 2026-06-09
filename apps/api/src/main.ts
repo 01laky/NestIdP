@@ -5,6 +5,7 @@ import { NestFactory } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
 import express from 'express';
 import { AppModule } from './app.module';
+import { parseBoolEnv } from './common/config/parse-bool-env.util';
 import { applyHttpSecurity } from './common/utils/http-security';
 import { databaseEncryptionMode } from './prisma/libsql';
 import { runMigrations } from './prisma/db-migrator';
@@ -24,7 +25,7 @@ async function bootstrap() {
 	await prepareDatabase();
 
 	// MIGRATE_ONLY: run migrations and exit (Docker init / CI step), without starting the server.
-	if (['1', 'true', 'yes'].includes((process.env.MIGRATE_ONLY ?? '').toLowerCase())) {
+	if (parseBoolEnv(process.env.MIGRATE_ONLY)) {
 		Logger.log('MIGRATE_ONLY set — migrations applied, exiting.', 'Bootstrap');
 		return;
 	}

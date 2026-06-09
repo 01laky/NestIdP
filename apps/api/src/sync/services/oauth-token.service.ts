@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash } from 'node:crypto';
+import { boundedInt as boundedIntFromRaw } from '../../common/config/bounded-int.util';
 import type { ApiConnection } from '@prisma/client';
 import {
 	OAUTH_DEFAULT_CLIENT_AUTH_METHOD,
@@ -457,10 +458,7 @@ export class OAuthTokenService {
 	}
 
 	private boundedInt(key: string, fallback: number, min: number, max: number): number {
-		const parsed = Number(this.configService.get<number | string>(key));
-		if (Number.isFinite(parsed) && parsed >= min && parsed <= max) {
-			return parsed;
-		}
-		return fallback;
+		// §6.1: delegate to the shared helper (adds correct empty-string handling).
+		return boundedIntFromRaw(this.configService.get<number | string>(key), fallback, min, max);
 	}
 }

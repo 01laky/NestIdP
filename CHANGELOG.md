@@ -6,9 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [1.18.1]
 
-Refactor + hardening pass (Prompt 38) — **first increment: security & correctness fixes**. This release is
-in progress; the broad refactors (shared helpers, identity-store parity, cert-lifecycle unification,
+Refactor + hardening pass (Prompt 38) — **security & correctness fixes + the first refactor increment**.
+This release is in progress; the broader refactors (identity-store parity, cert-lifecycle unification,
 frontend de-duplication) and remaining items land in subsequent commits under this same version.
+
+### Changed
+
+- **Shared config parsing helpers** (§6.1): one `boundedInt` (env → bounded number, falling back on
+  absent/empty/out-of-range) and one `parseBoolEnv` (truthy-env), replacing the duplicated inline copies.
+  The shared `boundedInt` fixes a foot-gun the copies shared — an empty env var parsed as `0` (via
+  `Number('')`), which for a `min: 0` knob (scheduler tick, jitter, grace) silently disabled the feature
+  instead of using its default. Adopted in the back-channel/sync-schedule/multi-source/rate-limit/
+  cert-rotation configs + the OAuth/identity-sync clients, and the `MIGRATE_ONLY` checks across `main.ts`
+  and the three schedulers.
 
 ### Security
 

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SYNC_SCHEDULE_DEFAULT_MIN_INTERVAL_MINUTES } from '@nestidp/shared';
+import { boundedInt as boundedIntFromRaw } from '../../common/config/bounded-int.util';
 
 export const DEFAULT_SYNC_SCHEDULER_TICK_MS = 30_000;
 export const DEFAULT_SYNC_SCHEDULE_JITTER_MAX_SECONDS = 30;
@@ -67,11 +68,7 @@ export class SyncScheduleConfigService {
 	}
 
 	private boundedInt(key: string, fallback: number, min: number, max: number): number {
-		const raw = this.configService.get<number | string>(key);
-		const parsed = Number(raw);
-		if (Number.isFinite(parsed) && parsed >= min && parsed <= max) {
-			return parsed;
-		}
-		return fallback;
+		// §6.1: delegate to the shared helper (adds correct empty-string handling).
+		return boundedIntFromRaw(this.configService.get<number | string>(key), fallback, min, max);
 	}
 }

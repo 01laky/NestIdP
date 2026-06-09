@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { parseNoProxyHosts } from '@nestidp/shared';
+import { boundedInt as boundedIntFromRaw } from '../common/config/bounded-int.util';
 import type { LoginScope } from './brute-force-notifier';
 
 export type LoginLockoutResponseMode = 'retry_after' | 'opaque';
@@ -149,11 +150,8 @@ export class RateLimitConfig {
 	}
 
 	private boundedInt(key: string, fallback: number, min: number, max: number): number {
-		const parsed = Number(this.configService.get<number | string>(key));
-		if (Number.isFinite(parsed) && parsed >= min && parsed <= max) {
-			return parsed;
-		}
-		return fallback;
+		// §6.1: delegate to the shared helper (adds correct empty-string handling).
+		return boundedIntFromRaw(this.configService.get<number | string>(key), fallback, min, max);
 	}
 
 	private optionalInt(key: string, min: number, max: number): number | null {

@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { parseBoolEnv } from '../../common/config/parse-bool-env.util';
 import { BackchannelLogoutConfig } from './backchannel-logout.config';
 import { LogoutPropagationService } from './logout-propagation.service';
 
@@ -23,8 +24,8 @@ export class BackchannelLogoutSchedulerService implements OnModuleInit, OnModule
 	) {}
 
 	onModuleInit(): void {
-		const raw = (this.configService.get<string>('MIGRATE_ONLY') ?? '').toLowerCase();
-		if (raw === '1' || raw === 'true') {
+		// §6.1: shared truthy-env parsing.
+		if (parseBoolEnv(this.configService.get<string>('MIGRATE_ONLY'))) {
 			return;
 		}
 		const tickMs = this.config.schedulerTickMs();

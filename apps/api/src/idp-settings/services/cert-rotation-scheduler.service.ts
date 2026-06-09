@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { parseBoolEnv } from '../../common/config/parse-bool-env.util';
 import { CertRotationConfig } from '../cert-rotation.config';
 import { IdpSettingsService } from './idp-settings.service';
 
@@ -81,8 +82,8 @@ export class CertRotationSchedulerService implements OnModuleInit, OnModuleDestr
 	}
 
 	private isMigrateOnly(): boolean {
-		const raw = (this.configService.get<string>('MIGRATE_ONLY') ?? '').toLowerCase();
-		return raw === '1' || raw === 'true';
+		// §6.1: shared truthy-env parsing.
+		return parseBoolEnv(this.configService.get<string>('MIGRATE_ONLY'));
 	}
 }
 
