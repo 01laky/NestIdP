@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AuditPersistenceService } from '../../audit/services/audit-persistence.service';
+import { recordAndLog } from '../../audit/utils/audit-and-log.util';
 
 @Injectable()
 export class SpConnectionsAuditService {
@@ -7,73 +8,34 @@ export class SpConnectionsAuditService {
 
 	constructor(private readonly audit: AuditPersistenceService) {}
 
-	logCreated(id: string, spEntityId: string): void {
-		const payload = { event: 'sp_connection_created', id, spEntityId };
-		this.logger.log(JSON.stringify(payload));
-		this.audit.recordSafe({
+	private record(event: string, id: string, metadata: Record<string, unknown>): void {
+		recordAndLog(this.audit, this.logger, {
 			category: 'admin_config',
-			event: 'sp_connection_created',
+			event,
 			actorType: 'admin',
 			subjectType: 'SpConnection',
 			subjectId: id,
-			metadata: { spEntityId },
+			metadata,
 		});
+	}
+
+	logCreated(id: string, spEntityId: string): void {
+		this.record('sp_connection_created', id, { spEntityId });
 	}
 
 	logUpdated(id: string, spEntityId: string): void {
-		const payload = { event: 'sp_connection_updated', id, spEntityId };
-		this.logger.log(JSON.stringify(payload));
-		this.audit.recordSafe({
-			category: 'admin_config',
-			event: 'sp_connection_updated',
-			actorType: 'admin',
-			subjectType: 'SpConnection',
-			subjectId: id,
-			metadata: { spEntityId },
-		});
+		this.record('sp_connection_updated', id, { spEntityId });
 	}
 
 	logDeleted(id: string, spEntityId: string): void {
-		const payload = { event: 'sp_connection_deleted', id, spEntityId };
-		this.logger.log(JSON.stringify(payload));
-		this.audit.recordSafe({
-			category: 'admin_config',
-			event: 'sp_connection_deleted',
-			actorType: 'admin',
-			subjectType: 'SpConnection',
-			subjectId: id,
-			metadata: { spEntityId },
-		});
+		this.record('sp_connection_deleted', id, { spEntityId });
 	}
 
 	logSigningProbe(id: string, spEntityId: string, ok: boolean): void {
-		const payload = { event: 'sp_signing_probe_performed', id, spEntityId, ok };
-		this.logger.log(JSON.stringify(payload));
-		this.audit.recordSafe({
-			category: 'admin_config',
-			event: 'sp_signing_probe_performed',
-			actorType: 'admin',
-			subjectType: 'SpConnection',
-			subjectId: id,
-			metadata: { spEntityId, ok },
-		});
+		this.record('sp_signing_probe_performed', id, { spEntityId, ok });
 	}
 
 	logAcsTested(id: string, reachable: boolean, statusCode?: number): void {
-		const payload = {
-			event: 'sp_connection_acs_tested',
-			id,
-			reachable,
-			statusCode: statusCode ?? null,
-		};
-		this.logger.log(JSON.stringify(payload));
-		this.audit.recordSafe({
-			category: 'admin_config',
-			event: 'sp_connection_acs_tested',
-			actorType: 'admin',
-			subjectType: 'SpConnection',
-			subjectId: id,
-			metadata: { reachable, statusCode: statusCode ?? null },
-		});
+		this.record('sp_connection_acs_tested', id, { reachable, statusCode: statusCode ?? null });
 	}
 }

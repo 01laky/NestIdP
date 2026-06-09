@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AuditPersistenceService } from '../../audit/services/audit-persistence.service';
+import { recordAndLog } from '../../audit/utils/audit-and-log.util';
 
 @Injectable()
 export class ApiConnectionsAuditService {
@@ -7,69 +8,35 @@ export class ApiConnectionsAuditService {
 
 	constructor(private readonly audit: AuditPersistenceService) {}
 
-	logCreated(id: string, name: string): void {
-		const payload = { event: 'api_connection_created', id, name };
-		this.logger.log(JSON.stringify(payload));
-		this.audit.recordSafe({
+	private record(event: string, id: string, metadata: Record<string, unknown>): void {
+		recordAndLog(this.audit, this.logger, {
 			category: 'admin_config',
-			event: 'api_connection_created',
+			event,
 			actorType: 'admin',
 			subjectType: 'ApiConnection',
 			subjectId: id,
-			metadata: { name },
+			metadata,
 		});
+	}
+
+	logCreated(id: string, name: string): void {
+		this.record('api_connection_created', id, { name });
 	}
 
 	logUpdated(id: string, name: string): void {
-		const payload = { event: 'api_connection_updated', id, name };
-		this.logger.log(JSON.stringify(payload));
-		this.audit.recordSafe({
-			category: 'admin_config',
-			event: 'api_connection_updated',
-			actorType: 'admin',
-			subjectType: 'ApiConnection',
-			subjectId: id,
-			metadata: { name },
-		});
+		this.record('api_connection_updated', id, { name });
 	}
 
 	logContractUpdated(id: string, name: string, customizedSections: string[]): void {
-		const payload = { event: 'api_connection_contract_updated', id, name, customizedSections };
-		this.logger.log(JSON.stringify(payload));
-		this.audit.recordSafe({
-			category: 'admin_config',
-			event: 'api_connection_contract_updated',
-			actorType: 'admin',
-			subjectType: 'ApiConnection',
-			subjectId: id,
-			metadata: { name, customizedSections },
-		});
+		this.record('api_connection_contract_updated', id, { name, customizedSections });
 	}
 
 	logAuthTypeChanged(id: string, name: string, authType: string): void {
-		const payload = { event: 'api_connection_auth_type_changed', id, name, authType };
-		this.logger.log(JSON.stringify(payload));
-		this.audit.recordSafe({
-			category: 'admin_config',
-			event: 'api_connection_auth_type_changed',
-			actorType: 'admin',
-			subjectType: 'ApiConnection',
-			subjectId: id,
-			metadata: { name, authType },
-		});
+		this.record('api_connection_auth_type_changed', id, { name, authType });
 	}
 
 	logDeleted(id: string, name: string): void {
-		const payload = { event: 'api_connection_deleted', id, name };
-		this.logger.log(JSON.stringify(payload));
-		this.audit.recordSafe({
-			category: 'admin_config',
-			event: 'api_connection_deleted',
-			actorType: 'admin',
-			subjectType: 'ApiConnection',
-			subjectId: id,
-			metadata: { name },
-		});
+		this.record('api_connection_deleted', id, { name });
 	}
 
 	/** A sync source's identities were removed (Prompt 37). */
@@ -79,16 +46,7 @@ export class ApiConnectionsAuditService {
 		mode: 'deactivate' | 'delete',
 		counts: { usersRemoved: number; groupsRemoved: number; rolesRemoved: number },
 	): void {
-		const payload = { event: 'identity_source_identities_removed', id, name, mode, ...counts };
-		this.logger.log(JSON.stringify(payload));
-		this.audit.recordSafe({
-			category: 'admin_config',
-			event: 'identity_source_identities_removed',
-			actorType: 'admin',
-			subjectType: 'ApiConnection',
-			subjectId: id,
-			metadata: { name, mode, ...counts },
-		});
+		this.record('identity_source_identities_removed', id, { name, mode, ...counts });
 	}
 
 	logProxyUpdated(
@@ -96,16 +54,7 @@ export class ApiConnectionsAuditService {
 		name: string,
 		detail: { enabled: boolean; proxyHost: string | null; hasAuth: boolean; hasNoProxy: boolean },
 	): void {
-		const payload = { event: 'api_connection_proxy_updated', id, name, ...detail };
-		this.logger.log(JSON.stringify(payload));
-		this.audit.recordSafe({
-			category: 'admin_config',
-			event: 'api_connection_proxy_updated',
-			actorType: 'admin',
-			subjectType: 'ApiConnection',
-			subjectId: id,
-			metadata: { name, ...detail },
-		});
+		this.record('api_connection_proxy_updated', id, { name, ...detail });
 	}
 
 	logProxyChecked(
@@ -115,40 +64,10 @@ export class ApiConnectionsAuditService {
 		viaProxy: boolean,
 		proxyHost: string | null,
 	): void {
-		const payload = {
-			event: 'api_connection_proxy_checked',
-			id,
-			name,
-			status,
-			viaProxy,
-			proxyHost,
-		};
-		this.logger.log(JSON.stringify(payload));
-		this.audit.recordSafe({
-			category: 'admin_config',
-			event: 'api_connection_proxy_checked',
-			actorType: 'admin',
-			subjectType: 'ApiConnection',
-			subjectId: id,
-			metadata: { name, status, viaProxy, proxyHost },
-		});
+		this.record('api_connection_proxy_checked', id, { name, status, viaProxy, proxyHost });
 	}
 
 	logTested(id: string, reachable: boolean, statusCode?: number): void {
-		const payload = {
-			event: 'api_connection_tested',
-			id,
-			reachable,
-			statusCode: statusCode ?? null,
-		};
-		this.logger.log(JSON.stringify(payload));
-		this.audit.recordSafe({
-			category: 'admin_config',
-			event: 'api_connection_tested',
-			actorType: 'admin',
-			subjectType: 'ApiConnection',
-			subjectId: id,
-			metadata: { reachable, statusCode: statusCode ?? null },
-		});
+		this.record('api_connection_tested', id, { reachable, statusCode: statusCode ?? null });
 	}
 }
