@@ -6,6 +6,7 @@ import {
 	type SamlLogoutBindingType,
 } from '@nestidp/shared';
 import { PrismaService } from '../../prisma/services/prisma.service';
+import { isUniqueConstraintError } from '../../common/utils/prisma-error.util';
 import { SamlSsoSessionService } from '../../saml-sessions/services/saml-sso-session.service';
 import { decodeRedirectBinding } from '../utils/build-authn-request.util';
 import {
@@ -153,7 +154,7 @@ export class SamlLogoutService {
 		try {
 			await this.sessions.recordLogoutRequestId(parsed.id, sp.id);
 		} catch (error) {
-			if (this.isUniqueConstraintError(error)) {
+			if (isUniqueConstraintError(error)) {
 				this.audit.logLogoutRequestRejected(
 					'logout_request_replayed',
 					ctx.clientIp,
@@ -339,14 +340,5 @@ export class SamlLogoutService {
 		}
 		const parsed = Number.parseInt(String(raw), 10);
 		return Number.isFinite(parsed) && parsed > 0 ? parsed : 120;
-	}
-
-	private isUniqueConstraintError(error: unknown): boolean {
-		return (
-			typeof error === 'object' &&
-			error !== null &&
-			'code' in error &&
-			(error as { code: string }).code === 'P2002'
-		);
 	}
 }

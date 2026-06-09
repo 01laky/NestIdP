@@ -6,6 +6,7 @@ import {
 	Logger,
 	ServiceUnavailableException,
 } from '@nestjs/common';
+import { isUniqueConstraintError } from '../../common/utils/prisma-error.util';
 import { ConfigService } from '@nestjs/config';
 import {
 	LOGIN_PAGE_ROUTE,
@@ -150,7 +151,7 @@ export class SamlSsoService {
 				},
 			});
 		} catch (error) {
-			if (this.isUniqueConstraintError(error)) {
+			if (isUniqueConstraintError(error)) {
 				this.audit.logRequestRejected('duplicate_saml_request_id', clientIp);
 				throw new ConflictException('Duplicate SAML request ID');
 			}
@@ -255,7 +256,7 @@ export class SamlSsoService {
 				},
 			});
 		} catch (error) {
-			if (this.isUniqueConstraintError(error)) {
+			if (isUniqueConstraintError(error)) {
 				this.audit.logRequestRejected('duplicate_saml_request_id', clientIp, 'post');
 				throw new ConflictException('Duplicate SAML request ID');
 			}
@@ -486,14 +487,5 @@ export class SamlSsoService {
 		}
 		const parsed = Number.parseInt(String(raw), 10);
 		return Number.isFinite(parsed) && parsed > 0 ? parsed : 900;
-	}
-
-	private isUniqueConstraintError(error: unknown): boolean {
-		return (
-			typeof error === 'object' &&
-			error !== null &&
-			'code' in error &&
-			(error as { code: string }).code === 'P2002'
-		);
 	}
 }
