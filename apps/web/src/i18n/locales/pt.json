@@ -148,7 +148,8 @@
 		"signInFailed": "Sign in failed. Please try again.",
 		"couldNotContinueSso": "Could not continue SSO.",
 		"tooManyAttempts": "Demasiadas tentativas. Tente novamente em {{seconds}} s.",
-		"tooManyAttemptsGeneric": "Demasiadas tentativas. Tente novamente mais tarde."
+		"tooManyAttemptsGeneric": "Demasiadas tentativas. Tente novamente mais tarde.",
+		"noRequestNotice": "To sign in, open NestIdP through your application. NestIdP authenticates you only to complete your application’s sign-in request."
 	},
 	"dashboard": {
 		"title": "Painel",
@@ -185,7 +186,10 @@
 			"requireSignedAuthnCount": "Require signed AuthnRequest: {{count}}",
 			"requireEncryptedAssertionsCount": "Require encrypted assertions: {{count}}",
 			"idpAdvertisesWithoutEnforcement": "IdP metadata advertises signed AuthnRequests, but no SP connection currently enforces signature verification.",
-			"ecKeyAdvisory": "IdP encryption uses an EC key (ECDH-ES). Service Providers must support XML Encryption 1.1 (xenc11:AgreementMethod). Older SPs may not be compatible — consider using an RSA key for broader compatibility."
+			"ecKeyAdvisory": "IdP encryption uses an EC key (ECDH-ES). Service Providers must support XML Encryption 1.1 (xenc11:AgreementMethod). Older SPs may not be compatible — consider using an RSA key for broader compatibility.",
+			"backchannelUnresolved": "{{count}} session(s) still logged in at some SP (unresolved back-channel logout).",
+			"backchannelAllResolved": "No unresolved back-channel logouts.",
+			"openSessions": "Open active sessions"
 		},
 		"activeSamlSessionsLabel": "Sessões SSO ativas",
 		"schedulerSummary": "Sincronização agendada",
@@ -349,7 +353,17 @@
 		"autofillSloMetadataPlaceholder": "Cole o XML EntityDescriptor do SP…",
 		"autofillSloApply": "Extrair URL de SLO",
 		"autofillSloFound": "URL de SLO preenchido a partir dos metadados",
-		"autofillSloNotFound": "Nenhum SingleLogoutService encontrado nos metadados"
+		"autofillSloNotFound": "Nenhum SingleLogoutService encontrado nos metadados",
+		"sloSoapUrl": "SOAP SLO endpoint (back-channel)",
+		"sloSoapUrlHint": "SP SOAP SingleLogoutService URL. When set, NestIdP propagates signed LogoutRequests over the back-channel. Requires an SP certificate; use HTTPS.",
+		"sloSoapUrlCertRequired": "An SP certificate is required to use a SOAP SLO endpoint (NestIdP verifies the SP’s LogoutResponse signature).",
+		"sloSoapUrlInsecure": "The SOAP SLO endpoint is not HTTPS — back-channel logout requests would be sent over an insecure channel.",
+		"autofillSloSoapFound": "Filled the SLO endpoint(s) from metadata, including the SOAP back-channel.",
+		"testBackchannel": "Test back-channel SLO",
+		"testBackchannelBusy": "Testing…",
+		"testBackchannelOk": "Reachable — the SP accepted a signed probe LogoutRequest.",
+		"testBackchannelFailed": "Failed: {{reason}}",
+		"testBackchannelFailedGeneric": "Back-channel test failed."
 	},
 	"idpSettings": {
 		"encryptionEcKeyAgreementInfo": "EC encryption key — ECDH-ES key agreement (XML Encryption 1.1). Service Providers must support xenc11:AgreementMethod. RSA keys are more widely compatible.",
@@ -875,7 +889,33 @@
 		"emptyTitle": "Sem sessões",
 		"emptyDescription": "Nenhuma sessão SSO corresponde aos filtros atuais.",
 		"showing": "A mostrar {{shown}} de {{total}}",
-		"pageOf": "Página {{page}} de {{totalPages}}"
+		"pageOf": "Página {{page}} de {{totalPages}}",
+		"selectAllActive": "Select all active",
+		"bulkActions": "Bulk actions",
+		"terminateSelected": "Terminate selected",
+		"selectedCount": "{{count}} selected",
+		"confirmBulkTitle": "Terminate selected sessions?",
+		"confirmBulkDescription": "Terminate {{count}} selected session(s)? Each is logged out at every other participating Service Provider over the back-channel.",
+		"toastBulkTerminated": "{{count}} session(s) terminated",
+		"terminateAllActive": "Terminate all active",
+		"confirmAllTitle": "Terminate ALL active sessions?",
+		"confirmAllDescription": "This logs out every active SSO session and propagates logout to all participating Service Providers. This cannot be undone.",
+		"toastAllTerminated": "{{count}} session(s) terminated",
+		"colPropagation": "Logout propagation",
+		"bcStatusPending": "Pending",
+		"bcStatusInFlight": "Sending",
+		"bcStatusSucceeded": "Done",
+		"bcStatusPartial": "Partial",
+		"bcStatusFailed": "Failed",
+		"bcStatusGivenUp": "Gave up",
+		"bcStatusSkipped": "No endpoint",
+		"bcResend": "Resend",
+		"bcAttempts": "{{count}} attempt(s)",
+		"toastResent": "Re-queued for delivery",
+		"queueHealthTitle": "Back-channel queue:",
+		"queueHealthLine": "{{pending}} in progress · {{failed}} failed · {{givenUp}} gave up · {{succeeded}} done",
+		"processQueue": "Process now",
+		"toastQueueProcessed": "{{count}} delivery(ies) processed"
 	},
 	"loggedOut": {
 		"title": "Sessão terminada",

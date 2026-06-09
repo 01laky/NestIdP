@@ -28,6 +28,7 @@ The database file is opened through the **`@prisma/adapter-libsql`** driver adap
 | `SpConnection`          | SAML Service Provider config                                         |
 | `AdminUser`             | Operator accounts (separate from `User`)                             |
 | `LoginLockout`          | Brute-force lockout state, keyed `(scope, usernameKey)` (v1.16.0)    |
+| `SamlBackchannelLogout` | Back-channel (SOAP) SLO delivery queue per session×SP (v1.17.0)      |
 | `SyncLog`               | Sync run history (detailed sync errors)                              |
 | `AuditEvent`            | Persistent security/config audit trail                               |
 | `SamlSession`           | In-flight SP-initiated SSO state                                     |
@@ -121,6 +122,8 @@ Singleton row `id = default`. Bootstrap creates **`entityId`** only (from `IDP_B
 **Invariants:** for each rotation kind (signing vs encryption), pending cert and key must both be set or both null; `complete` promotes pending → primary including crypto columns; `cancel` clears pending fields. Signing and encryption rotations may be active **at the same time**. Encryption cert is **never** lazy-generated on SSO. Private keys encrypted with `EncryptionService` (`v1:` prefix). **Automatic rotation (v1.15.0)** is an opt-in scheduler that drives these same primitives (generate pending → overlap → promote) before expiry; disabling a toggle returns the cert to manual control.
 
 **SpConnection (v1.5.0+):** `wantAssertionsEncrypted` defaults `false`; API rejects enabling without `spCertificate` PEM. When true (v1.7.0), SSO encrypts signed assertions to the SP cert (AES-256-CBC).
+
+**SpConnection (v1.17.0):** `sloSoapUrl` (nullable) is the SP's SOAP `SingleLogoutService` endpoint — when set, NestIdP propagates signed back-channel `LogoutRequest`s to it; the API rejects setting it without `spCertificate` (needed to verify the SP's `LogoutResponse`). `lastBackchannelLogoutStatus` / `lastBackchannelLogoutAt` record the last delivery outcome (degraded-SP indicator).
 
 Deploy: migrations through `20260605130000_idp_encryption_crypto` are applied automatically at API startup (or via `pnpm db:migrate:deploy`).
 

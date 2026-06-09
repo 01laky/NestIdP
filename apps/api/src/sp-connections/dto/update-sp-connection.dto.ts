@@ -35,6 +35,12 @@ export class UpdateSpConnectionBodyDto {
 	sloUrl?: string | null;
 
 	@IsOptional()
+	@ValidateIf((_, value) => value !== null)
+	@IsString()
+	@MaxLength(2048)
+	sloSoapUrl?: string | null;
+
+	@IsOptional()
 	@IsString()
 	@MaxLength(512)
 	nameIdFormat?: string;

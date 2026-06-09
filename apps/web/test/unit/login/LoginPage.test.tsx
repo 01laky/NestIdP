@@ -45,10 +45,18 @@ describe('LoginPage', () => {
 		vi.spyOn(document, 'write').mockImplementation(() => undefined);
 		vi.spyOn(document, 'close').mockImplementation(() => undefined);
 		vi.mocked(authApi.completeSsoLogin).mockResolvedValue('<html><form></form></html>');
+		// Strict SP-only IdP (Prompt 36, Deliverable 10): the login form renders only with a live pending
+		// request, so the default probe returns an unbound, non-expired SamlSession in context.
 		vi.mocked(authApi.getEndUserSession).mockResolvedValue({
 			authenticated: false,
 			user: null,
-			samlSession: null,
+			samlSession: {
+				id: 'pending-req',
+				bound: false,
+				expired: false,
+				spActive: true,
+				readyToComplete: false,
+			},
 		});
 	});
 
@@ -143,24 +151,19 @@ describe('LoginPage', () => {
 		});
 	});
 
-	it('WEB-AUTH-06: shows session banner when already authenticated', async () => {
+	it('LOGIN-GATE-01: no pending SSO request → neutral notice, no login form / username field', async () => {
 		vi.mocked(authApi.getEndUserSession).mockResolvedValue({
-			authenticated: true,
-			user: {
-				id: 'u1',
-				username: 'alice',
-				email: null,
-				displayName: null,
-				groups: [],
-				roles: [],
-			},
+			authenticated: false,
+			user: null,
 			samlSession: null,
 		});
 
 		renderLogin();
 		await waitFor(() => {
-			expect(screen.getByRole('status').textContent).toContain('Signed in as alice');
+			expect(screen.getByText(/through your application/i)).toBeDefined();
 		});
+		expect(screen.queryByLabelText(/Username/i)).toBeNull();
+		expect(screen.queryByRole('button', { name: /Sign in/i })).toBeNull();
 	});
 
 	it('WEB-AUTH-08: shows a localized rate-limit message on 429', async () => {
@@ -195,7 +198,7 @@ describe('LoginPage', () => {
 		});
 	});
 
-	it('WEB-AUTH-09: expired SAML session shows banner on mount', async () => {
+	it('WEB-AUTH-09 / LOGIN-GATE: an expired SAML session is not a valid request → neutral notice', async () => {
 		vi.mocked(authApi.getEndUserSession).mockResolvedValue({
 			authenticated: false,
 			user: null,
@@ -210,8 +213,9 @@ describe('LoginPage', () => {
 
 		renderLogin('/login?samlSessionId=clxxxxxxxxxxxxxxxxxxxxxxxxx');
 		await waitFor(() => {
-			expect(screen.getByText(/SAML session expired/i)).toBeDefined();
+			expect(screen.getByText(/through your application/i)).toBeDefined();
 		});
+		expect(screen.queryByLabelText(/Username/i)).toBeNull();
 	});
 
 	it('WEB-AUTH-10: SSO continue button calls completeSsoLogin with HTML', async () => {
@@ -374,23 +378,16 @@ describe('LoginPage', () => {
 		expect(screen.getByRole('link', { name: 'Back to admin' }).getAttribute('href')).toBe('/admin');
 	});
 
-	it('WEB-EVG-16: renders Callout with status role when session banner is set', async () => {
+	it('WEB-EVG-16 / LOGIN-GATE: renders a neutral notice Callout when there is no pending request', async () => {
 		vi.mocked(authApi.getEndUserSession).mockResolvedValue({
-			authenticated: true,
-			user: {
-				id: 'u1',
-				username: 'alice',
-				email: null,
-				displayName: null,
-				groups: [],
-				roles: [],
-			},
+			authenticated: false,
+			user: null,
 			samlSession: null,
 		});
 
 		renderLogin();
 		await waitFor(() => {
-			expect(screen.getByRole('status').textContent).toContain('Signed in as alice');
+			expect(screen.getByText(/through your application/i)).toBeDefined();
 		});
 	});
 });

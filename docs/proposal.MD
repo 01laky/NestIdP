@@ -46,6 +46,7 @@ NestIdP addresses the gap between a minimal SAML configuration tool and an enter
 | OIDC / OAuth 2.0 | Out of scope for initial release; SAML only. |
 | Multi-tenant SaaS | Single deployment instance per environment in v1. |
 | Social login, MFA | Deferred to future phases. |
+| IdP-initiated SSO / end-user portal | **Out of scope.** NestIdP is strictly an SP-facing IdP: end users only authenticate transiently in response to an SP `AuthnRequest` (SP-initiated). There is no standing end-user session, "logged-in" home, or app-launcher portal — and unsolicited `SAMLResponse` is also weaker security (no `InResponseTo`, replay surface). |
 | Configurable API contract mapping | v1 uses a fixed REST contract; endpoint/field mapping deferred to v2. |
 | Outbound HTTP proxy for sync | Implemented (v1.14.0) — opt-in per API connection, off by default; routes sync/OAuth/test traffic with a `noProxyHosts` bypass. |
 | Multiple identity APIs for sync | v1 and v2: one API connection per sync; merge from multiple sources in v3. |
@@ -711,9 +712,9 @@ _Phase 1 complete in **v1.0.0** (Prompt 10 — Docker, persistent audit, admin a
 - [x] **Rate limiting and brute-force protection** — unified sliding-window throttle (per-IP + per-username, admin now configurable), persistent per-account lockout with exponential backoff and guaranteed time-based recovery, cross-endpoint per-IP escalation/ban, `/saml/sso` throttle, trusted-CIDR bypass, configurable response mode, tarpit, audit + structured logs + admin unlock (v1.16.0)
 - [ ] Sync error reporting in admin UI
 - [x] **OAuth 2.0 Client Credentials for API connections** — token-endpoint exchange, caching, 401 refresh, per-connection config (v1.10.0)
-- [ ] IdP-initiated SSO
+- ~~IdP-initiated SSO~~ — **dropped** (see Non-Goals §3.2): NestIdP is strictly SP-facing with no end-user portal / standing logged-in session.
 - [x] Single Logout (SLO) — SP-initiated + admin session termination (v1.8.0)
-- [ ] Back-channel (SOAP) SLO + multi-SP logout propagation
+- [x] Back-channel (SOAP) SLO + multi-SP logout propagation (v1.17.0)
 
 ### Phase 3 — Extensibility
 

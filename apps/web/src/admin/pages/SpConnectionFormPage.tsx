@@ -11,6 +11,7 @@ import {
 	parseSpSloFromMetadata,
 	probeSpConnectionSigning,
 	testSpConnectionAcs,
+	testSpConnectionBackchannel,
 	updateSpConnection,
 } from '../adminApi';
 import { AdminPageHeader } from '../components/layout/AdminPageHeader';
@@ -46,6 +47,7 @@ export function SpConnectionFormPage() {
 	const [spEntityId, setSpEntityId] = useState('');
 	const [acsUrl, setAcsUrl] = useState('');
 	const [sloUrl, setSloUrl] = useState('');
+	const [sloSoapUrl, setSloSoapUrl] = useState('');
 	const [nameIdFormat, setNameIdFormat] = useState('');
 	const [active, setActive] = useState(true);
 	const [wantAssertionsEncrypted, setWantAssertionsEncrypted] = useState(false);
@@ -62,6 +64,9 @@ export function SpConnectionFormPage() {
 	const [probeSigningMessage, setProbeSigningMessage] = useState<string | null>(null);
 	const [probeSigningError, setProbeSigningError] = useState<string | null>(null);
 	const [acsTestMessage, setAcsTestMessage] = useState<string | null>(null);
+	const [backchannelTestBusy, setBackchannelTestBusy] = useState(false);
+	const [backchannelTestMessage, setBackchannelTestMessage] = useState<string | null>(null);
+	const [backchannelTestOk, setBackchannelTestOk] = useState(false);
 	const { showToast } = useToast();
 	const [saving, setSaving] = useState(false);
 	const hasSpCertificate = spCertificate.trim().length > 0 || hasStoredSpCertificate;
@@ -79,6 +84,7 @@ export function SpConnectionFormPage() {
 					setSpEntityId(item.spEntityId);
 					setAcsUrl(item.acsUrl);
 					setSloUrl(item.sloUrl ?? '');
+					setSloSoapUrl(item.sloSoapUrl ?? '');
 					setNameIdFormat(item.nameIdFormat);
 					setActive(item.active);
 					setWantAssertionsEncrypted(item.wantAssertionsEncrypted);
@@ -143,6 +149,7 @@ export function SpConnectionFormPage() {
 			spEntityId,
 			acsUrl,
 			sloUrl: sloUrl.trim() ? sloUrl.trim() : null,
+			sloSoapUrl: sloSoapUrl.trim() ? sloSoapUrl.trim() : null,
 			nameIdFormat: nameIdFormat || undefined,
 			active,
 			wantAssertionsEncrypted,
@@ -183,7 +190,12 @@ export function SpConnectionFormPage() {
 			const found = result.redirect ?? result.post;
 			if (found) {
 				setSloUrl(found);
-				setSloMetadataMessage(t('autofillSloFound'));
+			}
+			if (result.soap) {
+				setSloSoapUrl(result.soap);
+			}
+			if (found || result.soap) {
+				setSloMetadataMessage(result.soap ? t('autofillSloSoapFound') : t('autofillSloFound'));
 			} else {
 				setSloMetadataMessage(t('autofillSloNotFound'));
 			}
@@ -243,6 +255,37 @@ export function SpConnectionFormPage() {
 						)
 					: t('acsTestFailed'),
 			);
+		}
+	}
+
+	async function handleTestBackchannel() {
+		if (!id) {
+			return;
+		}
+		setBackchannelTestBusy(true);
+		setBackchannelTestMessage(null);
+		try {
+			const result = await testSpConnectionBackchannel(id);
+			setBackchannelTestOk(result.ok);
+			setBackchannelTestMessage(
+				result.ok
+					? t('testBackchannelOk')
+					: t('testBackchannelFailed', { reason: result.reason ?? tCommon('emDash') }),
+			);
+		} catch (err) {
+			setBackchannelTestOk(false);
+			setBackchannelTestMessage(
+				err instanceof AdminApiError
+					? formatAdminApiError(
+							err.statusCode,
+							err.message,
+							resolveI18nKey,
+							'spConnections.testBackchannelFailedGeneric',
+						)
+					: t('testBackchannelFailedGeneric'),
+			);
+		} finally {
+			setBackchannelTestBusy(false);
 		}
 	}
 
@@ -354,6 +397,40 @@ export function SpConnectionFormPage() {
 							</Button>
 							{sloMetadataMessage ? <p className="evg-muted">{sloMetadataMessage}</p> : null}
 						</details>
+						<TextInput
+							label={t('sloSoapUrl')}
+							name="sloSoapUrl"
+							value={sloSoapUrl}
+							hint={t('sloSoapUrlHint')}
+							onChange={(e) => setSloSoapUrl(e.target.value)}
+						/>
+						{sloSoapUrl.trim() ? (
+							<>
+								{!hasSpCertificate ? (
+									<Callout variant="warning">{t('sloSoapUrlCertRequired')}</Callout>
+								) : null}
+								{/^http:\/\//i.test(sloSoapUrl.trim()) ? (
+									<Callout variant="warning">{t('sloSoapUrlInsecure')}</Callout>
+								) : null}
+							</>
+						) : null}
+						{!isNew && id && sloSoapUrl.trim() && hasSpCertificate ? (
+							<div className="evg-stack inline">
+								<Button
+									type="button"
+									variant="secondary"
+									disabled={saving || backchannelTestBusy}
+									onClick={() => void handleTestBackchannel()}
+								>
+									{backchannelTestBusy ? t('testBackchannelBusy') : t('testBackchannel')}
+								</Button>
+								{backchannelTestMessage ? (
+									<Callout variant={backchannelTestOk ? 'success' : 'danger'}>
+										{backchannelTestMessage}
+									</Callout>
+								) : null}
+							</div>
+						) : null}
 						<Select
 							label={t('nameIdFormat')}
 							value={nameIdFormat}

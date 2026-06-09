@@ -110,7 +110,9 @@ describe('saml-logout.service', () => {
 			raw: { samlRequest: signed.samlRequest, sigAlg: signed.sigAlg, signature: signed.signature },
 			clientIp: '1.2.3.4',
 		});
-		expect(sessions.terminate).toHaveBeenCalledWith('sso1', 'sp_logout');
+		expect(sessions.terminate).toHaveBeenCalledWith('sso1', 'sp_logout', undefined, {
+			excludeSpConnectionId: 'sp1',
+		});
 		expect(result.clearEndUserCookie).toBe(true);
 		expect(result.delivery.type).toBe('redirect');
 		if (result.delivery.type === 'redirect') {

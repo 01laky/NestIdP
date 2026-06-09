@@ -2,7 +2,7 @@
 
 **A deployable SAML Identity Provider you run yourself** — one Docker image, one admin console, identity from your REST API, SAML assertions to your apps.
 
-[![Version](https://img.shields.io/badge/version-1.16.0-blue)](package.json)
+[![Version](https://img.shields.io/badge/version-1.17.0-blue)](package.json)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-green)](package.json)
 [![pnpm](https://img.shields.io/badge/pnpm-%3E%3D9-orange)](package.json)
 

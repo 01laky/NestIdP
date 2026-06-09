@@ -93,24 +93,34 @@ export class AdminDashboardService {
 	}
 
 	private async buildSpSecuritySummary(idpAdvertisesSignedAuthnRequests: boolean) {
-		const [requireSigned, requireEncrypted, flaggedRows, idpSettings, activeSamlSessions] =
-			await Promise.all([
-				this.prisma.spConnection.count({ where: { wantAuthnRequestsSigned: true } }),
-				this.prisma.spConnection.count({ where: { wantAssertionsEncrypted: true } }),
-				this.prisma.spConnection.findMany({
-					where: {
-						OR: [{ wantAuthnRequestsSigned: true }, { wantAssertionsEncrypted: true }],
-					},
-					select: { spCertificate: true },
-				}),
-				this.prisma.idpSettings.findUnique({
-					where: { id: 'default' },
-					select: { encryptionKeyFamily: true },
-				}),
-				this.prisma.samlSsoSession.count({
-					where: { status: 'active', expiresAt: { gt: new Date() } },
-				}),
-			]);
+		const [
+			requireSigned,
+			requireEncrypted,
+			flaggedRows,
+			idpSettings,
+			activeSamlSessions,
+			backchannelUnresolved,
+		] = await Promise.all([
+			this.prisma.spConnection.count({ where: { wantAuthnRequestsSigned: true } }),
+			this.prisma.spConnection.count({ where: { wantAssertionsEncrypted: true } }),
+			this.prisma.spConnection.findMany({
+				where: {
+					OR: [{ wantAuthnRequestsSigned: true }, { wantAssertionsEncrypted: true }],
+				},
+				select: { spCertificate: true },
+			}),
+			this.prisma.idpSettings.findUnique({
+				where: { id: 'default' },
+				select: { encryptionKeyFamily: true },
+			}),
+			this.prisma.samlSsoSession.count({
+				where: { status: 'active', expiresAt: { gt: new Date() } },
+			}),
+			// Sessions still logged in at some SP — unresolved back-channel deliveries (Prompt 36, item Q).
+			this.prisma.samlBackchannelLogout.count({
+				where: { status: { in: ['pending', 'in_flight', 'failed', 'given_up'] } },
+			}),
+		]);
 
 		const missingCertCount = flaggedRows.filter((row) => !row.spCertificate?.trim()).length;
 
@@ -121,6 +131,7 @@ export class AdminDashboardService {
 			idpAdvertisesSignedAuthnRequests,
 			idpEncryptionKeyIsEc: idpSettings?.encryptionKeyFamily === 'ec',
 			activeSamlSessions,
+			backchannelUnresolved,
 		};
 	}
 }

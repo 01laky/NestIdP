@@ -60,6 +60,7 @@ function dashboardStub(): AdminDashboardResponseDto {
 			idpAdvertisesSignedAuthnRequests: false,
 			idpEncryptionKeyIsEc: false,
 			activeSamlSessions: 0,
+			backchannelUnresolved: 0,
 		},
 		apiConnection: null,
 		lastSyncStatus: null,
@@ -113,10 +114,17 @@ describe('i18n integration (WEB-I18N-09–40)', () => {
 	});
 
 	it('WEB-I18N-11: login Slovak submit', async () => {
+		// Strict SP-only IdP (Prompt 36, Deliverable 10): the form renders only with a live pending request.
 		vi.spyOn(authApi, 'getEndUserSession').mockResolvedValue({
 			authenticated: false,
 			user: null,
-			samlSession: null,
+			samlSession: {
+				id: 'pending-req',
+				bound: false,
+				expired: false,
+				spActive: true,
+				readyToComplete: false,
+			},
 		});
 		await initI18n('sk');
 		renderWithUi(

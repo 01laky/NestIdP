@@ -222,6 +222,115 @@ describe('EndUserAuthService', () => {
 		expect(status.samlSession).toBeNull();
 	});
 
+	// --- Strict SP-only IdP (Prompt 36, Deliverable 10): no standing-session identity leak ----------
+
+	it('LOGIN-NOSESSION-01: a valid cookie WITHOUT a samlSessionId leaks no identity', async () => {
+		identityRepository.findUserProfileById.mockResolvedValue(profile);
+		const status = await service.getSessionStatus({ userId: 'u1' });
+		expect(status.authenticated).toBe(false);
+		expect(status.user).toBeNull();
+		expect(status.samlSession).toBeNull();
+		// the SamlSession registry is never even consulted without a pending request id
+		expect(prisma.samlSession.findUnique).not.toHaveBeenCalled();
+	});
+
+	it('LOGIN-NOSESSION-mismatch: a cookie user that does not own the pending session is not authenticated', async () => {
+		identityRepository.findUserProfileById.mockResolvedValue(profile);
+		prisma.samlSession.findUnique.mockResolvedValue({
+			id: 'sess-1',
+			userId: 'someone-else',
+			expiresAt: new Date(Date.now() + 60_000),
+			spConnection: { active: true },
+		});
+		prisma.idpSettings.findUnique.mockResolvedValue({
+			id: 'default',
+			entityId: 'http://localhost:3000',
+		});
+
+		const status = await service.getSessionStatus({ userId: 'u1', samlSessionId: 'sess-1' });
+		expect(status.authenticated).toBe(false);
+		expect(status.user).toBeNull();
+		expect(status.samlSession).toEqual({
+			id: 'sess-1',
+			bound: true,
+			expired: false,
+			spActive: true,
+			readyToComplete: false,
+		});
+	});
+
+	it('LOGIN-NOSESSION-unbound: an unbound pending session with a cookie is not authenticated and not ready', async () => {
+		identityRepository.findUserProfileById.mockResolvedValue(profile);
+		prisma.samlSession.findUnique.mockResolvedValue({
+			id: 'sess-1',
+			userId: null,
+			expiresAt: new Date(Date.now() + 60_000),
+			spConnection: { active: true },
+		});
+		prisma.idpSettings.findUnique.mockResolvedValue({
+			id: 'default',
+			entityId: 'http://localhost:3000',
+		});
+
+		const status = await service.getSessionStatus({ userId: 'u1', samlSessionId: 'sess-1' });
+		expect(status.authenticated).toBe(false);
+		expect(status.user).toBeNull();
+		expect(status.samlSession).toMatchObject({ bound: false, readyToComplete: false });
+	});
+
+	it('LOGIN-NOSESSION-expired: an expired pending session is never ready to complete', async () => {
+		identityRepository.findUserProfileById.mockResolvedValue(profile);
+		prisma.samlSession.findUnique.mockResolvedValue({
+			id: 'sess-1',
+			userId: 'u1',
+			expiresAt: new Date(Date.now() - 1_000),
+			spConnection: { active: true },
+		});
+		prisma.idpSettings.findUnique.mockResolvedValue({
+			id: 'default',
+			entityId: 'http://localhost:3000',
+		});
+
+		const status = await service.getSessionStatus({ userId: 'u1', samlSessionId: 'sess-1' });
+		expect(status.samlSession).toMatchObject({ expired: true, readyToComplete: false });
+	});
+
+	it('LOGIN-NOSESSION-spInactive: an inactive SP keeps the session not ready', async () => {
+		identityRepository.findUserProfileById.mockResolvedValue(profile);
+		prisma.samlSession.findUnique.mockResolvedValue({
+			id: 'sess-1',
+			userId: 'u1',
+			expiresAt: new Date(Date.now() + 60_000),
+			spConnection: { active: false },
+		});
+		prisma.idpSettings.findUnique.mockResolvedValue({
+			id: 'default',
+			entityId: 'http://localhost:3000',
+		});
+
+		const status = await service.getSessionStatus({ userId: 'u1', samlSessionId: 'sess-1' });
+		expect(status.samlSession).toMatchObject({ spActive: false, readyToComplete: false });
+	});
+
+	it('LOGIN-NOSESSION-noUser: a pending session with no cookie user is reportable but not authenticated', async () => {
+		prisma.samlSession.findUnique.mockResolvedValue({
+			id: 'sess-1',
+			userId: null,
+			expiresAt: new Date(Date.now() + 60_000),
+			spConnection: { active: true },
+		});
+		prisma.idpSettings.findUnique.mockResolvedValue({
+			id: 'default',
+			entityId: 'http://localhost:3000',
+		});
+
+		const status = await service.getSessionStatus({ samlSessionId: 'sess-1' });
+		expect(status.authenticated).toBe(false);
+		expect(status.user).toBeNull();
+		expect(status.samlSession).toMatchObject({ id: 'sess-1', bound: false });
+		expect(identityRepository.findUserProfileById).not.toHaveBeenCalled();
+	});
+
 	it('API-AUTH-SVC-14: getMe throws when profile missing', async () => {
 		identityRepository.findUserProfileById.mockResolvedValue(null);
 		await expect(service.getMe('missing')).rejects.toThrow('Unauthorized');

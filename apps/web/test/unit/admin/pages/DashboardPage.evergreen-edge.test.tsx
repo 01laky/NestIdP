@@ -53,6 +53,7 @@ function dashboardStub(
 			idpAdvertisesSignedAuthnRequests: false,
 			idpEncryptionKeyIsEc: false,
 			activeSamlSessions: 0,
+			backchannelUnresolved: 0,
 		},
 		apiConnection: null,
 		lastSyncStatus: null,

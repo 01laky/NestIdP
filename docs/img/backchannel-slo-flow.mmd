@@ -1,0 +1,37 @@
+sequenceDiagram
+	autonumber
+	actor Trigger as Admin / User / SP
+	participant Term as terminate choke-point
+	participant Port as LOGOUT_PROPAGATION_PORT
+	participant Engine as Back-channel engine
+	participant Queue as SamlBackchannelLogout DB
+	participant Sched as Retry scheduler
+	participant SPb as Other SP SOAP SLO
+
+	rect rgb(235, 244, 255)
+	Note over Trigger,SPb: Authoritative-local, best-effort propagation
+	Trigger->>Term: terminate with optional excludeSpConnectionId
+	Term->>Term: Flip session status to terminated, always succeeds local
+	Term->>Port: propagateLogout ssoSessionId reason exclude
+	Port->>Engine: real impl, Noop default is local-only
+	end
+
+	rect rgb(235, 255, 240)
+	Note over Engine,Queue: Enqueue per participating SP
+	Engine->>Queue: upsert pending row per active SP with sloSoapUrl, dedup by session x SP
+	Engine->>Queue: skipped_no_endpoint for SPs without SOAP, audited
+	Engine-->>Term: enqueue awaited, delivery fire-and-forget, never blocks caller
+	end
+
+	rect rgb(255, 248, 235)
+	Note over Engine,SPb: First pass plus retries, signed and verified
+	Engine->>Queue: claim row to in_flight, per-SP serialization and global cap
+	Engine->>SPb: POST SOAP 1.1 plus IdP-signed LogoutRequest, stable requestId
+	SPb-->>Engine: SOAP LogoutResponse, verify signature InResponseTo Status
+	alt success or partial
+		Engine->>Queue: status succeeded or partial, audit, update SP indicator
+	else failure
+		Engine->>Queue: status failed, attempts plus 1, exponential nextRetryAt
+		Sched->>Queue: tick picks due rows, at MAX_RETRIES mark given_up plus notifier
+	end
+	end

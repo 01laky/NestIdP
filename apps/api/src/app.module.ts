@@ -18,6 +18,7 @@ import { IdentityModule } from './identity/identity.module';
 import { ExternalIdentityDatabaseModule } from './identity/store/external/external-identity-database.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { SamlModule } from './saml/saml.module';
+import { BackchannelLogoutModule } from './saml/backchannel-logout.module';
 import { SpaModule } from './spa/spa.module';
 import { EncryptionModule } from './encryption/encryption.module';
 import { AuditModule } from './audit/audit.module';
@@ -57,6 +58,7 @@ const enableStaticServing = shouldEnableStaticServing(
 		IdentityModule,
 		ExternalIdentityDatabaseModule,
 		SamlModule,
+		BackchannelLogoutModule,
 		SpaModule,
 	],
 })

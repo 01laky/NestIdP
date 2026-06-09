@@ -28,10 +28,17 @@ beforeEach(() => {
 	vi.spyOn(document, 'open').mockImplementation(() => window);
 	vi.spyOn(document, 'write').mockImplementation(() => undefined);
 	vi.spyOn(document, 'close').mockImplementation(() => undefined);
+	// Strict SP-only IdP (Prompt 36, Deliverable 10): the form renders only with a live pending request.
 	vi.mocked(authApi.getEndUserSession).mockResolvedValue({
 		authenticated: false,
 		user: null,
-		samlSession: null,
+		samlSession: {
+			id: 'pending-req',
+			bound: false,
+			expired: false,
+			spActive: true,
+			readyToComplete: false,
+		},
 	});
 });
 

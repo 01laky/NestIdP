@@ -1,16 +1,24 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
 	SAML_SESSIONS_LIST_PAGE_SIZE,
+	type BackchannelLogoutStatus,
+	type SamlBackchannelLogoutPublicDto,
+	type SamlBackchannelQueueHealthDto,
 	type SamlSsoSessionListResponseDto,
 	type SamlSsoSessionPublicDto,
 	type SamlSsoSessionStatusFilter,
 } from '@nestidp/shared';
 import {
 	AdminApiError,
+	getBackchannelQueueHealth,
 	listSamlSessions,
 	listSpConnections,
+	processBackchannelQueue,
+	resendBackchannelLogout,
+	terminateAllSamlSessions,
 	terminateSamlSession,
+	terminateSamlSessionsBulk,
 	terminateSamlSessionsByUser,
 } from '../adminApi';
 import { AdminPageHeader } from '../components/layout/AdminPageHeader';
@@ -22,6 +30,7 @@ import {
 	Badge,
 	Button,
 	Callout,
+	Checkbox,
 	EmptyState,
 	Select,
 	Table,
@@ -34,6 +43,26 @@ interface SpOption {
 	id: string;
 	name: string;
 }
+
+const BC_BADGE_VARIANT: Record<BackchannelLogoutStatus, 'success' | 'neutral' | 'danger'> = {
+	pending: 'neutral',
+	in_flight: 'neutral',
+	succeeded: 'success',
+	partial: 'success',
+	failed: 'danger',
+	given_up: 'danger',
+	skipped_no_endpoint: 'neutral',
+};
+
+const BC_STATUS_KEY: Record<BackchannelLogoutStatus, string> = {
+	pending: 'bcStatusPending',
+	in_flight: 'bcStatusInFlight',
+	succeeded: 'bcStatusSucceeded',
+	partial: 'bcStatusPartial',
+	failed: 'bcStatusFailed',
+	given_up: 'bcStatusGivenUp',
+	skipped_no_endpoint: 'bcStatusSkipped',
+};
 
 export function SamlSessionsPage() {
 	const { t } = useTranslation('samlSessions');
@@ -51,6 +80,17 @@ export function SamlSessionsPage() {
 	const [page, setPage] = useState(1);
 	const [data, setData] = useState<SamlSsoSessionListResponseDto | null>(null);
 	const [spOptions, setSpOptions] = useState<SpOption[]>([]);
+	const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+	const [bulkBusy, setBulkBusy] = useState(false);
+	const [queueHealth, setQueueHealth] = useState<SamlBackchannelQueueHealthDto | null>(null);
+
+	const loadQueueHealth = useCallback(async () => {
+		try {
+			setQueueHealth(await getBackchannelQueueHealth());
+		} catch {
+			setQueueHealth(null);
+		}
+	}, []);
 
 	const load = useCallback(async () => {
 		setLoading(true);
@@ -64,6 +104,7 @@ export function SamlSessionsPage() {
 				pageSize: SAML_SESSIONS_LIST_PAGE_SIZE,
 			});
 			setData(result);
+			setSelectedIds(new Set());
 		} catch (err) {
 			setError(
 				err instanceof AdminApiError
@@ -85,10 +126,36 @@ export function SamlSessionsPage() {
 	}, [load]);
 
 	useEffect(() => {
+		void loadQueueHealth();
+	}, [loadQueueHealth]);
+
+	useEffect(() => {
 		void listSpConnections()
 			.then((res) => setSpOptions(res.items.map((s) => ({ id: s.id, name: s.name }))))
 			.catch(() => setSpOptions([]));
 	}, []);
+
+	const activeIds = useMemo(
+		() => (data?.items ?? []).filter((s) => s.status === 'active').map((s) => s.id),
+		[data],
+	);
+	const allActiveSelected = activeIds.length > 0 && activeIds.every((id) => selectedIds.has(id));
+
+	function toggleRow(id: string, checked: boolean) {
+		setSelectedIds((prev) => {
+			const next = new Set(prev);
+			if (checked) {
+				next.add(id);
+			} else {
+				next.delete(id);
+			}
+			return next;
+		});
+	}
+
+	function toggleSelectAll(checked: boolean) {
+		setSelectedIds(checked ? new Set(activeIds) : new Set());
+	}
 
 	async function onTerminate(session: SamlSsoSessionPublicDto) {
 		const ok = await confirm({
@@ -104,7 +171,7 @@ export function SamlSessionsPage() {
 		try {
 			await terminateSamlSession(session.id);
 			showToast(t('toastTerminated'));
-			await load();
+			await Promise.all([load(), loadQueueHealth()]);
 		} catch (err) {
 			showToast(err instanceof AdminApiError ? err.message : t('terminateFailed'));
 		}
@@ -127,7 +194,80 @@ export function SamlSessionsPage() {
 		try {
 			const res = await terminateSamlSessionsByUser(session.userId);
 			showToast(t('toastTerminatedUser', { count: res.terminatedCount }));
-			await load();
+			await Promise.all([load(), loadQueueHealth()]);
+		} catch (err) {
+			showToast(err instanceof AdminApiError ? err.message : t('terminateFailed'));
+		}
+	}
+
+	async function onTerminateSelected() {
+		const ids = [...selectedIds];
+		if (ids.length === 0) {
+			return;
+		}
+		const ok = await confirm({
+			title: t('confirmBulkTitle'),
+			description: t('confirmBulkDescription', { count: ids.length }),
+			confirmLabel: t('terminateSelected'),
+			tone: 'danger',
+			showAuditNote: true,
+		});
+		if (!ok) {
+			return;
+		}
+		setBulkBusy(true);
+		try {
+			const res = await terminateSamlSessionsBulk(ids);
+			showToast(t('toastBulkTerminated', { count: res.terminatedCount }));
+			await Promise.all([load(), loadQueueHealth()]);
+		} catch (err) {
+			showToast(err instanceof AdminApiError ? err.message : t('terminateFailed'));
+		} finally {
+			setBulkBusy(false);
+		}
+	}
+
+	async function onTerminateAll() {
+		const ok = await confirm({
+			title: t('confirmAllTitle'),
+			description: t('confirmAllDescription'),
+			confirmLabel: t('terminateAllActive'),
+			tone: 'danger',
+			showAuditNote: true,
+		});
+		if (!ok) {
+			return;
+		}
+		setBulkBusy(true);
+		try {
+			const res = await terminateAllSamlSessions();
+			showToast(t('toastAllTerminated', { count: res.terminatedCount }));
+			await Promise.all([load(), loadQueueHealth()]);
+		} catch (err) {
+			showToast(err instanceof AdminApiError ? err.message : t('terminateFailed'));
+		} finally {
+			setBulkBusy(false);
+		}
+	}
+
+	async function onProcessQueue() {
+		setBulkBusy(true);
+		try {
+			const res = await processBackchannelQueue();
+			showToast(t('toastQueueProcessed', { count: res.processed }));
+			await Promise.all([load(), loadQueueHealth()]);
+		} catch (err) {
+			showToast(err instanceof AdminApiError ? err.message : t('terminateFailed'));
+		} finally {
+			setBulkBusy(false);
+		}
+	}
+
+	async function onResend(session: SamlSsoSessionPublicDto, bc: SamlBackchannelLogoutPublicDto) {
+		try {
+			await resendBackchannelLogout(session.id, bc.spConnectionId);
+			showToast(t('toastResent'));
+			await Promise.all([load(), loadQueueHealth()]);
 		} catch (err) {
 			showToast(err instanceof AdminApiError ? err.message : t('terminateFailed'));
 		}
@@ -135,6 +275,7 @@ export function SamlSessionsPage() {
 
 	const total = data?.total ?? 0;
 	const totalPages = Math.max(1, Math.ceil(total / SAML_SESSIONS_LIST_PAGE_SIZE));
+	const selectedCount = selectedIds.size;
 
 	return (
 		<section>
@@ -144,6 +285,25 @@ export function SamlSessionsPage() {
 				breadcrumbs={[{ label: tNav('dashboard'), to: '/admin' }, { label: t('title') }]}
 			/>
 			<Callout variant="info">{t('limitationNote')}</Callout>
+			{queueHealth ? (
+				<Callout variant={queueHealth.failed + queueHealth.givenUp > 0 ? 'warning' : 'info'}>
+					<strong>{t('queueHealthTitle')}</strong>{' '}
+					{t('queueHealthLine', {
+						pending: queueHealth.pending + queueHealth.inFlight,
+						failed: queueHealth.failed,
+						givenUp: queueHealth.givenUp,
+						succeeded: queueHealth.succeeded + queueHealth.partial,
+					})}{' '}
+					<Button
+						type="button"
+						variant="link"
+						disabled={bulkBusy}
+						onClick={() => void onProcessQueue()}
+					>
+						{t('processQueue')}
+					</Button>
+				</Callout>
+			) : null}
 			<details className="evg-filters-panel evg-filters-panel--collapsible">
 				<summary>{t('filters')}</summary>
 				<form
@@ -192,6 +352,27 @@ export function SamlSessionsPage() {
 					</Button>
 				</form>
 			</details>
+			{activeIds.length > 0 ? (
+				<div className="evg-stack inline" role="toolbar" aria-label={t('bulkActions')}>
+					<Button
+						type="button"
+						variant="danger"
+						disabled={bulkBusy || selectedCount === 0}
+						onClick={() => void onTerminateSelected()}
+					>
+						{t('terminateSelected')}
+					</Button>
+					<span className="evg-muted">{t('selectedCount', { count: selectedCount })}</span>
+					<Button
+						type="button"
+						variant="secondary"
+						disabled={bulkBusy}
+						onClick={() => void onTerminateAll()}
+					>
+						{t('terminateAllActive')}
+					</Button>
+				</div>
+			) : null}
 			{loading ? <LoadingState /> : null}
 			{error ? <ErrorBanner message={error} /> : null}
 			{data && !loading ? (
@@ -204,10 +385,19 @@ export function SamlSessionsPage() {
 							<Table>
 								<thead>
 									<tr>
+										<th>
+											{activeIds.length > 0 ? (
+												<Checkbox
+													label={t('selectAllActive')}
+													checked={allActiveSelected}
+													onChange={toggleSelectAll}
+												/>
+											) : null}
+										</th>
 										<th>{t('colUser')}</th>
 										<th>{t('colServiceProviders')}</th>
+										<th>{t('colPropagation')}</th>
 										<th>{t('colLoginIp')}</th>
-										<th>{t('colUserAgent')}</th>
 										<th>{t('colLastActive')}</th>
 										<th>{tCommon('status')}</th>
 										<th>{tCommon('actions')}</th>
@@ -216,16 +406,31 @@ export function SamlSessionsPage() {
 								<tbody>
 									{data.items.map((session) => (
 										<tr key={session.id}>
+											<td>
+												{session.status === 'active' ? (
+													<Checkbox
+														label=""
+														id={`sel-${session.id}`}
+														checked={selectedIds.has(session.id)}
+														onChange={(checked) => toggleRow(session.id, checked)}
+													/>
+												) : (
+													tCommon('emDash')
+												)}
+											</td>
 											<td>{session.username}</td>
 											<td>
 												{session.participations.length === 0
 													? tCommon('emDash')
 													: session.participations.map((p) => p.spName).join(', ')}
 											</td>
-											<td className="evg-muted">{session.loginIp ?? tCommon('emDash')}</td>
-											<td className="evg-muted" title={session.userAgent ?? undefined}>
-												{session.userAgent ? truncate(session.userAgent, 40) : tCommon('emDash')}
+											<td>
+												<BackchannelCell
+													session={session}
+													onResend={(bc) => void onResend(session, bc)}
+												/>
 											</td>
+											<td className="evg-muted">{session.loginIp ?? tCommon('emDash')}</td>
 											<td className="evg-muted">{new Date(session.lastSeenAt).toLocaleString()}</td>
 											<td>
 												<Badge variant={session.status === 'active' ? 'success' : 'neutral'}>
@@ -287,6 +492,35 @@ export function SamlSessionsPage() {
 	);
 }
 
-function truncate(value: string, max: number): string {
-	return value.length > max ? `${value.slice(0, max)}…` : value;
+function BackchannelCell({
+	session,
+	onResend,
+}: {
+	session: SamlSsoSessionPublicDto;
+	onResend: (bc: SamlBackchannelLogoutPublicDto) => void;
+}) {
+	const { t } = useTranslation('samlSessions');
+	const { t: tCommon } = useTranslation('common');
+	const rows = session.backchannelLogouts ?? [];
+	if (rows.length === 0) {
+		return <span className="evg-muted">{tCommon('emDash')}</span>;
+	}
+	return (
+		<div className="evg-stack">
+			{rows.map((bc) => (
+				<div key={bc.spConnectionId} className="evg-stack inline">
+					<Badge variant={BC_BADGE_VARIANT[bc.status]}>{t(BC_STATUS_KEY[bc.status])}</Badge>
+					<span className="evg-muted" title={bc.lastError ?? undefined}>
+						{bc.spName}
+						{bc.attempts > 0 ? ` · ${t('bcAttempts', { count: bc.attempts })}` : ''}
+					</span>
+					{bc.status === 'failed' || bc.status === 'given_up' ? (
+						<Button type="button" variant="link" onClick={() => onResend(bc)}>
+							{t('bcResend')}
+						</Button>
+					) : null}
+				</div>
+			))}
+		</div>
+	);
 }

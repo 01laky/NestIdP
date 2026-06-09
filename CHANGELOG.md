@@ -4,6 +4,54 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.17.0]
+
+### Added
+
+- **Back-channel (SOAP) Single Logout + multi-SP propagation (Prompt 36):** terminating an end-user SSO
+  session — operator kill (single, **bulk multi-select**, per-user, or a **terminate-all** kill-switch),
+  user logout, or an SP-initiated `/saml/slo` — now **propagates a signed SAML `LogoutRequest` to every
+  other participating Service Provider over the SOAP back-channel** (server-to-server), logging the user
+  out everywhere. Logout is authoritative locally and never blocked: propagation is best-effort with a
+  persistent retry queue (`SamlBackchannelLogout`) + an in-process retry/prune scheduler that survives
+  restarts. The SP-initiated initiator is answered front-channel and never back-channelled.
+- **Operator controls (API):** bulk `POST /api/admin/saml-sessions/terminate` `{ids}`, `terminate-all`,
+  per-delivery `resend-backchannel`, on-demand `process-backchannel`, and a `backchannel-health` queue
+  summary.
+- **Per-SP SOAP SLO config:** `SpConnection.sloSoapUrl` (back-channel fires only when set; requires the
+  SP certificate to verify the SP's LogoutResponse) + a `lastBackchannelLogout*` degraded indicator.
+- **Robustness & observability:** idempotent delivery (stable reused request ID), `PartialLogout`
+  handling, configurable validity/clock-skew, per-SP serialization + a global in-flight cap, exponential
+  backoff with give-up + SP-degraded escalation, audit events (`saml_backchannel_logout_*`, system actor)
+  - structured logs, and a no-op `LogoutPropagationNotifier` hook for alerting.
+- **Admin UI:** the Active Sessions page gains row checkboxes + "select all active" + **"Terminate
+  selected"** and **"Terminate all active"**, a per-session **back-channel propagation indicator** (per-SP
+  status + "resend" for failed/given-up deliveries), and a queue-health callout with **"process now"**. The
+  SP form gains a **SOAP SLO endpoint** field (with HTTPS / cert-required validation), metadata autofill of
+  the SOAP `SingleLogoutService`, and a **"Test back-channel SLO"** probe button. The dashboard surfaces a
+  **count of sessions with unresolved back-channel logouts**. All new strings in **all 10 locales**.
+
+### Changed
+
+- `SamlSsoSessionService.terminate()` is the single choke-point that fans out propagation (via a decoupled
+  `LOGOUT_PROPAGATION_PORT`, provided by a `@Global` module to avoid a module cycle); it gains an options
+  arg to exclude the SP-initiated initiator.
+- New `SamlBackchannelLogout` table + `SpConnection` SOAP/degraded columns (migration
+  `20260615120000_backchannel_slo`).
+- New bounded env knobs `SAML_BACKCHANNEL_LOGOUT_*` (scheduler tick `0` disables retries; HTTP timeout,
+  max retries, backoff, concurrency, in-flight cap, first-pass budget, validity, prune).
+
+### Security
+
+- **Strict SP-only end-user login — no standing IdP session (Prompt 36, Deliverable 10):** NestIdP is
+  strictly SP-facing and the end user is never a "logged-in" portal user. `/login` now renders the login
+  form **only** when there is a live pending SSO request; otherwise it shows a neutral "access NestIdP
+  through your application" notice (no form, no username field, no session indicator). After the assertion
+  is delivered (`complete-sso`), the `nestidp_user_session` browser cookie is **cleared** (the
+  `SamlSsoSession` registry entry stays active for SLO/admin visibility). `GET /api/auth/session` no longer
+  leaks identity without a valid pending request (`authenticated:false`, no username). The SP-initiated SSO
+  flow itself is unchanged.
+
 ## [1.16.0]
 
 ### Added

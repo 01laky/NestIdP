@@ -58,6 +58,7 @@ export class SpConnectionsService {
 
 		const acsUrl = this.validateAcsUrl(body.acsUrl);
 		const sloUrl = this.validateSloUrl(body.sloUrl);
+		const sloSoapUrl = this.validateSloUrl(body.sloSoapUrl);
 		const nameIdFormat = this.resolveNameIdFormat(body.nameIdFormat);
 		const attributeMapping = this.validateMapping(body.attributeMapping);
 		const spCertificate = this.validateCertificate(body.spCertificate);
@@ -67,6 +68,7 @@ export class SpConnectionsService {
 		this.assertWantAssertionsEncryptedRequiresSpCert(wantAssertionsEncrypted, spCertificate);
 		this.assertWantAuthnRequestsSignedRequiresSpCert(wantAuthnRequestsSigned, spCertificate);
 		this.assertWantLogoutRequestsSignedRequiresSpCert(wantLogoutRequestsSigned, spCertificate);
+		this.assertSoapSloRequiresSpCert(sloSoapUrl, spCertificate);
 
 		const row = await this.prisma.spConnection.create({
 			data: {
@@ -74,6 +76,7 @@ export class SpConnectionsService {
 				spEntityId,
 				acsUrl,
 				sloUrl,
+				sloSoapUrl,
 				nameIdFormat,
 				attributeMapping: attributeMapping ?? Prisma.JsonNull,
 				active: body.active ?? true,
@@ -94,6 +97,7 @@ export class SpConnectionsService {
 			body.spEntityId === undefined &&
 			body.acsUrl === undefined &&
 			body.sloUrl === undefined &&
+			body.sloSoapUrl === undefined &&
 			body.nameIdFormat === undefined &&
 			body.attributeMapping === undefined &&
 			body.active === undefined &&
@@ -134,6 +138,13 @@ export class SpConnectionsService {
 		}
 		if (body.sloUrl !== undefined) {
 			data.sloUrl = this.validateSloUrl(body.sloUrl);
+		}
+		if (body.sloSoapUrl !== undefined) {
+			const sloSoapUrl = this.validateSloUrl(body.sloSoapUrl);
+			const effectiveCert =
+				body.spCertificate !== undefined ? body.spCertificate : existing.spCertificate;
+			this.assertSoapSloRequiresSpCert(sloSoapUrl, effectiveCert ?? null);
+			data.sloSoapUrl = sloSoapUrl;
 		}
 		if (body.nameIdFormat !== undefined) {
 			data.nameIdFormat = this.resolveNameIdFormat(body.nameIdFormat);
@@ -341,6 +352,21 @@ export class SpConnectionsService {
 		if (!spCertificate?.trim()) {
 			throw new BadRequestException(
 				'SP certificate PEM is required when require signed LogoutRequest is enabled',
+			);
+		}
+	}
+
+	/** Back-channel SOAP SLO needs the SP cert to verify the SP's LogoutResponse (Prompt 36). */
+	private assertSoapSloRequiresSpCert(
+		sloSoapUrl: string | null,
+		spCertificate: string | null,
+	): void {
+		if (!sloSoapUrl) {
+			return;
+		}
+		if (!spCertificate?.trim()) {
+			throw new BadRequestException(
+				'SP certificate PEM is required when a SOAP SLO endpoint is configured (to verify the SP LogoutResponse)',
 			);
 		}
 	}

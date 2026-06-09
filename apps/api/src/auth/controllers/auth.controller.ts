@@ -163,6 +163,10 @@ export class AuthController {
 				req.endUserSession?.sid,
 			);
 			this.endUserAuthAudit.logSsoCompleteSuccess(body.samlSessionId, req.endUser.id, clientIp);
+			// Strict SP-only IdP (Prompt 36, Deliverable 10): the assertion is delivered — drop the browser
+			// session so revisiting /login never shows "authenticated". The SamlSsoSession registry entry
+			// stays active for SLO / admin visibility (the user's session *at the SPs*).
+			this.endUserSessionService.clearCookie(res);
 			res.setHeader('Content-Type', 'text/html; charset=utf-8');
 			res.status(200).send(html);
 		} catch (error) {

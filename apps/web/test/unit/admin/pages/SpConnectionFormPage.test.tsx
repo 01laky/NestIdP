@@ -168,4 +168,103 @@ describe('SpConnectionFormPage', () => {
 			expect(screen.getByText('Probe SP signing key')).toBeDefined();
 		});
 	});
+
+	// --- Back-channel SOAP SLO field (Prompt 36, WEB-BC-02) ----------------------------------------
+
+	function spFixture(overrides: Record<string, unknown> = {}) {
+		return {
+			id: 'sp-1',
+			name: 'App',
+			spEntityId: 'urn:sp:1',
+			acsUrl: 'https://sp.example.com/acs',
+			nameIdFormat: '',
+			attributeMapping: null,
+			active: true,
+			hasSpCertificate: true,
+			wantAssertionsEncrypted: false,
+			wantAuthnRequestsSigned: false,
+			wantLogoutRequestsSigned: false,
+			sloUrl: null,
+			sloSoapUrl: 'https://sp.example.com/slo/soap',
+			createdAt: '2026-01-01T00:00:00.000Z',
+			updatedAt: '2026-01-01T00:00:00.000Z',
+			...overrides,
+		};
+	}
+
+	function renderEdit() {
+		return renderWithUi(
+			<MemoryRouter initialEntries={['/admin/sp-connections/sp-1']}>
+				<Routes>
+					<Route path="/admin/sp-connections/:id" element={<SpConnectionFormPage />} />
+				</Routes>
+			</MemoryRouter>,
+		);
+	}
+
+	it('WEB-BC-02: SOAP SLO field renders and warns when set without a cert and over http', async () => {
+		const { container } = renderNew();
+		const soap = container.querySelector('input[name="sloSoapUrl"]') as HTMLInputElement;
+		expect(soap).not.toBeNull();
+		fireEvent.change(soap, { target: { value: 'http://sp.example.com/slo/soap' } });
+		await waitFor(() => {
+			expect(screen.getByText(/certificate is required to use a SOAP SLO/i)).toBeDefined();
+			expect(screen.getByText(/not HTTPS/i)).toBeDefined();
+		});
+	});
+
+	it('WEB-BC-02b: the "Test back-channel SLO" button calls the probe endpoint and shows the result', async () => {
+		vi.spyOn(adminApi, 'getSpConnection').mockResolvedValue(spFixture() as never);
+		const probe = vi.spyOn(adminApi, 'testSpConnectionBackchannel').mockResolvedValue({ ok: true });
+		renderEdit();
+		const button = await waitFor(() =>
+			screen.getByRole('button', { name: 'Test back-channel SLO' }),
+		);
+		fireEvent.click(button);
+		await waitFor(() => {
+			expect(probe).toHaveBeenCalledWith('sp-1');
+			expect(screen.getByText(/Reachable/i)).toBeDefined();
+		});
+	});
+
+	it('WEB-BC-02c: a failed probe surfaces the redacted reason', async () => {
+		vi.spyOn(adminApi, 'getSpConnection').mockResolvedValue(spFixture() as never);
+		vi.spyOn(adminApi, 'testSpConnectionBackchannel').mockResolvedValue({
+			ok: false,
+			reason: 'timeout',
+		});
+		renderEdit();
+		const button = await waitFor(() =>
+			screen.getByRole('button', { name: 'Test back-channel SLO' }),
+		);
+		fireEvent.click(button);
+		await waitFor(() => {
+			expect(screen.getByText(/timeout/i)).toBeDefined();
+		});
+	});
+
+	it('WEB-BC-02d: the test button is hidden when no SOAP endpoint is configured', async () => {
+		vi.spyOn(adminApi, 'getSpConnection').mockResolvedValue(
+			spFixture({ sloSoapUrl: null }) as never,
+		);
+		renderEdit();
+		await waitFor(() => expect(screen.getByText('Probe SP signing key')).toBeDefined());
+		expect(screen.queryByRole('button', { name: 'Test back-channel SLO' })).toBeNull();
+	});
+
+	it('WEB-BC-02e: metadata autofill populates the SOAP SLO field', async () => {
+		vi.spyOn(adminApi, 'parseSpSloFromMetadata').mockResolvedValue({
+			redirect: null,
+			post: null,
+			soap: 'https://sp.example.com/slo/soap-from-meta',
+		});
+		const { container } = renderNew();
+		const metaArea = container.querySelector('textarea') as HTMLTextAreaElement;
+		fireEvent.change(metaArea, { target: { value: '<md:EntityDescriptor/>' } });
+		fireEvent.click(screen.getByRole('button', { name: 'Extract SLO URL' }));
+		await waitFor(() => {
+			const soap = container.querySelector('input[name="sloSoapUrl"]') as HTMLInputElement;
+			expect(soap.value).toBe('https://sp.example.com/slo/soap-from-meta');
+		});
+	});
 });

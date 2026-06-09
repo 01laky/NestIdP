@@ -8,6 +8,7 @@ export function toSpConnectionPublicDto(row: SpConnection): SpConnectionPublicDt
 		spEntityId: row.spEntityId,
 		acsUrl: row.acsUrl,
 		sloUrl: row.sloUrl ?? null,
+		sloSoapUrl: row.sloSoapUrl ?? null,
 		nameIdFormat: row.nameIdFormat,
 		attributeMapping: (row.attributeMapping ?? null) as SpAttributeMappingConfig | null,
 		active: row.active,
@@ -15,6 +16,8 @@ export function toSpConnectionPublicDto(row: SpConnection): SpConnectionPublicDt
 		wantAssertionsEncrypted: row.wantAssertionsEncrypted,
 		wantAuthnRequestsSigned: row.wantAuthnRequestsSigned,
 		wantLogoutRequestsSigned: row.wantLogoutRequestsSigned,
+		lastBackchannelLogoutStatus: row.lastBackchannelLogoutStatus ?? null,
+		lastBackchannelLogoutAt: row.lastBackchannelLogoutAt?.toISOString() ?? null,
 		createdAt: row.createdAt.toISOString(),
 		updatedAt: row.updatedAt.toISOString(),
 	};

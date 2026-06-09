@@ -67,11 +67,17 @@ import type {
 import type {
 	IdpMetadataUrlResponseDto,
 	ParseSloFromMetadataResponseDto,
+	ProcessBackchannelResponseDto,
+	ResendBackchannelLogoutResponseDto,
+	SamlBackchannelQueueHealthDto,
 	SamlSsoSessionListQueryDto,
 	SamlSsoSessionListResponseDto,
 	SpConnectionListResponseDto,
+	TerminateAllSamlSessionsResponseDto,
 	TerminateSamlSessionResponseDto,
+	TerminateSamlSessionsBulkResponseDto,
 	TerminateSamlSessionsByUserResponseDto,
+	TestSpBackchannelSloResponseDto,
 } from '@nestidp/shared';
 import type {
 	ScheduleResponseDto,
@@ -357,6 +363,13 @@ export function testSpConnectionAcs(id: string): Promise<SpConnectionTestAcsResp
 	});
 }
 
+export function testSpConnectionBackchannel(id: string): Promise<TestSpBackchannelSloResponseDto> {
+	return adminFetch<TestSpBackchannelSloResponseDto>(
+		`${SP_CONNECTIONS_API_PATH}/${id}/test-backchannel`,
+		{ method: 'POST' },
+	);
+}
+
 export function getSpConnectionTestSsoUrl(
 	id: string,
 	options: { signed?: boolean; encrypted?: boolean; relayState?: string } = {},
@@ -425,6 +438,43 @@ export function terminateSamlSessionsByUser(
 		`${SAML_SESSIONS_API_PATH}/terminate-by-user`,
 		{ method: 'POST', body: JSON.stringify({ userId }) },
 	);
+}
+
+export function terminateSamlSessionsBulk(
+	ids: string[],
+): Promise<TerminateSamlSessionsBulkResponseDto> {
+	return adminFetch<TerminateSamlSessionsBulkResponseDto>(`${SAML_SESSIONS_API_PATH}/terminate`, {
+		method: 'POST',
+		body: JSON.stringify({ ids }),
+	});
+}
+
+export function terminateAllSamlSessions(): Promise<TerminateAllSamlSessionsResponseDto> {
+	return adminFetch<TerminateAllSamlSessionsResponseDto>(
+		`${SAML_SESSIONS_API_PATH}/terminate-all`,
+		{ method: 'POST' },
+	);
+}
+
+export function resendBackchannelLogout(
+	id: string,
+	spConnectionId: string,
+): Promise<ResendBackchannelLogoutResponseDto> {
+	return adminFetch<ResendBackchannelLogoutResponseDto>(
+		`${SAML_SESSIONS_API_PATH}/${id}/resend-backchannel/${spConnectionId}`,
+		{ method: 'POST' },
+	);
+}
+
+export function processBackchannelQueue(): Promise<ProcessBackchannelResponseDto> {
+	return adminFetch<ProcessBackchannelResponseDto>(
+		`${SAML_SESSIONS_API_PATH}/process-backchannel`,
+		{ method: 'POST' },
+	);
+}
+
+export function getBackchannelQueueHealth(): Promise<SamlBackchannelQueueHealthDto> {
+	return adminFetch<SamlBackchannelQueueHealthDto>(`${SAML_SESSIONS_API_PATH}/backchannel-health`);
 }
 
 function identityQuery(params: Record<string, string | number | undefined>): string {

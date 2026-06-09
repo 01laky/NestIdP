@@ -115,7 +115,8 @@ describe('end-user auth integration (SQLite)', () => {
 		expect(me.body.user.username).toBe('alice');
 	});
 
-	it('API-AUTH-INT-02: login → GET /api/auth/session → authenticated', async () => {
+	it('LOGIN-NOSESSION-01: login → GET /api/auth/session WITHOUT a samlSessionId leaks no identity', async () => {
+		// Strict SP-only IdP (Prompt 36, Deliverable 10): a standing cookie must NOT advertise a session.
 		const agent = request.agent(app.getHttpServer() as App);
 		await agent
 			.post(`${AUTH_API_PATH}/login`)
@@ -123,8 +124,8 @@ describe('end-user auth integration (SQLite)', () => {
 			.expect(200);
 
 		const session = await agent.get(`${AUTH_API_PATH}/session`).expect(200);
-		expect(session.body.authenticated).toBe(true);
-		expect(session.body.user.username).toBe('alice');
+		expect(session.body.authenticated).toBe(false);
+		expect(session.body.user).toBeNull();
 	});
 
 	it('API-AUTH-INT-03: no login → GET /api/auth/me → 401', async () => {

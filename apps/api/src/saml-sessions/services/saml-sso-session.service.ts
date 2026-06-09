@@ -1,11 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import type {
+	LogoutPropagationPort,
 	SamlSsoSessionListQueryDto,
 	SamlSsoSessionListResponseDto,
 	SamlSsoSessionStatusFilter,
 	SamlSsoSessionTerminationReason,
+	TerminateSessionOptions,
 } from '@nestidp/shared';
-import { SAML_SESSIONS_LIST_PAGE_SIZE } from '@nestidp/shared';
+import { LOGOUT_PROPAGATION_PORT, SAML_SESSIONS_LIST_PAGE_SIZE } from '@nestidp/shared';
 import type { Prisma } from '@prisma/client';
 import { AuditPersistenceService } from '../../audit/services/audit-persistence.service';
 import { PrismaService } from '../../prisma/services/prisma.service';
@@ -48,6 +50,11 @@ export class SamlSsoSessionService {
 	constructor(
 		private readonly prisma: PrismaService,
 		private readonly audit: AuditPersistenceService,
+		// Optional so unit tests can `new SamlSsoSessionService(prisma, audit)`; the @Global
+		// BackchannelLogoutModule provides the real implementation in production (Prompt 36).
+		@Optional()
+		@Inject(LOGOUT_PROPAGATION_PORT)
+		private readonly propagation?: LogoutPropagationPort,
 	) {}
 
 	async create(input: CreateSsoSessionInput): Promise<{ id: string }> {
@@ -118,6 +125,7 @@ export class SamlSsoSessionService {
 		id: string,
 		reason: SamlSsoSessionTerminationReason,
 		adminId?: string,
+		options?: TerminateSessionOptions,
 	): Promise<{ alreadyTerminated: boolean; found: boolean }> {
 		const existing = await this.prisma.samlSsoSession.findUnique({
 			where: { id },
@@ -147,6 +155,17 @@ export class SamlSsoSessionService {
 			subjectId: id,
 			metadata: { reason },
 		});
+		// Back-channel (SOAP) SLO fan-out to the session's other SPs (Prompt 36). Best-effort, never blocks
+		// — the local logout above is authoritative.
+		if (this.propagation) {
+			await this.propagation
+				.propagateLogout({
+					ssoSessionId: id,
+					reason,
+					excludeSpConnectionId: options?.excludeSpConnectionId,
+				})
+				.catch(() => undefined);
+		}
 		return { alreadyTerminated: false, found: true };
 	}
 
@@ -167,6 +186,74 @@ export class SamlSsoSessionService {
 			}
 		}
 		return count;
+	}
+
+	/** Bulk-terminate selected sessions (Prompt 36); each fans out back-channel propagation. */
+	async terminateBulk(
+		ids: string[],
+		adminId?: string,
+	): Promise<{
+		results: { id: string; outcome: 'terminated' | 'already_terminated' | 'not_found' }[];
+		terminatedCount: number;
+	}> {
+		const results: { id: string; outcome: 'terminated' | 'already_terminated' | 'not_found' }[] =
+			[];
+		let terminatedCount = 0;
+		for (const id of ids) {
+			const result = await this.terminate(id, 'admin_action', adminId);
+			const outcome = !result.found
+				? 'not_found'
+				: result.alreadyTerminated
+					? 'already_terminated'
+					: 'terminated';
+			if (outcome === 'terminated') {
+				terminatedCount += 1;
+			}
+			results.push({ id, outcome });
+		}
+		return { results, terminatedCount };
+	}
+
+	/** Emergency kill-switch: terminate every active session (Prompt 36). */
+	async terminateAllActive(adminId?: string): Promise<number> {
+		const sessions = await this.prisma.samlSsoSession.findMany({
+			where: { status: 'active' },
+			select: { id: true },
+		});
+		let count = 0;
+		for (const session of sessions) {
+			const result = await this.terminate(session.id, 'admin_action', adminId);
+			if (result.found && !result.alreadyTerminated) {
+				count += 1;
+			}
+		}
+		return count;
+	}
+
+	/** Back-channel delivery queue health counts (Prompt 36). */
+	async backchannelQueueHealth(): Promise<{
+		pending: number;
+		inFlight: number;
+		succeeded: number;
+		partial: number;
+		failed: number;
+		givenUp: number;
+		skipped: number;
+	}> {
+		const grouped = await this.prisma.samlBackchannelLogout.groupBy({
+			by: ['status'],
+			_count: { _all: true },
+		});
+		const get = (status: string) => grouped.find((g) => g.status === status)?._count._all ?? 0;
+		return {
+			pending: get('pending'),
+			inFlight: get('in_flight'),
+			succeeded: get('succeeded'),
+			partial: get('partial'),
+			failed: get('failed'),
+			givenUp: get('given_up'),
+			skipped: get('skipped_no_endpoint'),
+		};
 	}
 
 	/**
@@ -232,6 +319,28 @@ export class SamlSsoSessionService {
 			}),
 		]);
 
-		return { items: rows.map(toSamlSsoSessionPublicDto), total };
+		// Per-SP back-channel delivery state for the page's sessions (Prompt 36, item N).
+		const sessionIds = rows.map((r) => r.id);
+		const bcRows = sessionIds.length
+			? await this.prisma.samlBackchannelLogout.findMany({
+					where: { ssoSessionId: { in: sessionIds } },
+					include: { spConnection: { select: { name: true } } },
+					orderBy: { createdAt: 'asc' },
+				})
+			: [];
+		const bcBySession = new Map<string, typeof bcRows>();
+		for (const bc of bcRows) {
+			const list = bcBySession.get(bc.ssoSessionId);
+			if (list) {
+				list.push(bc);
+			} else {
+				bcBySession.set(bc.ssoSessionId, [bc]);
+			}
+		}
+
+		return {
+			items: rows.map((r) => toSamlSsoSessionPublicDto(r, bcBySession.get(r.id) ?? [])),
+			total,
+		};
 	}
 }

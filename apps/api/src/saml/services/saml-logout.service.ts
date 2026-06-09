@@ -181,7 +181,11 @@ export class SamlLogoutService {
 		});
 		let sessionTerminated = false;
 		if (match) {
-			const result = await this.sessions.terminate(match.ssoSessionId, 'sp_logout');
+			// Terminate locally + propagate back-channel SLO to the OTHER SPs in this session — never the
+			// initiator, which gets the front-channel LogoutResponse below (Prompt 36).
+			const result = await this.sessions.terminate(match.ssoSessionId, 'sp_logout', undefined, {
+				excludeSpConnectionId: sp.id,
+			});
 			sessionTerminated = result.found && !result.alreadyTerminated;
 		}
 

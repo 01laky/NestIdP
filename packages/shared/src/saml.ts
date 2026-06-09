@@ -6,6 +6,8 @@ export const SAML_SLO_PATH = '/saml/slo';
 /** SAML binding URIs. */
 export const POST_BINDING_URI = 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST';
 export const REDIRECT_BINDING_URI = 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect';
+/** SOAP back-channel binding for Single Logout (Prompt 36). */
+export const SOAP_BINDING_URI = 'urn:oasis:names:tc:SAML:2.0:bindings:SOAP';
 
 /** Query params on SP → IdP redirect (SAML 2.0 HTTP-Redirect). */
 export const SAML_REQUEST_QUERY_PARAM = 'SAMLRequest';
@@ -113,6 +115,8 @@ export interface SpConnectionPublicDto {
 	spEntityId: string;
 	acsUrl: string;
 	sloUrl: string | null;
+	/** SP SOAP SLO endpoint for back-channel logout (Prompt 36); null = front-channel only. */
+	sloSoapUrl?: string | null;
 	nameIdFormat: string;
 	attributeMapping: SpAttributeMappingConfig | null;
 	active: boolean;
@@ -120,6 +124,9 @@ export interface SpConnectionPublicDto {
 	wantAssertionsEncrypted: boolean;
 	wantAuthnRequestsSigned: boolean;
 	wantLogoutRequestsSigned: boolean;
+	/** Last back-channel LogoutRequest delivery outcome (Prompt 36), for the degraded indicator. */
+	lastBackchannelLogoutStatus?: string | null;
+	lastBackchannelLogoutAt?: string | null;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -143,6 +150,7 @@ export interface CreateSpConnectionRequestDto {
 	spEntityId: string;
 	acsUrl: string;
 	sloUrl?: string | null;
+	sloSoapUrl?: string | null;
 	nameIdFormat?: string;
 	attributeMapping?: SpAttributeMappingConfig | null;
 	active?: boolean;
@@ -157,6 +165,7 @@ export interface UpdateSpConnectionRequestDto {
 	spEntityId?: string;
 	acsUrl?: string;
 	sloUrl?: string | null;
+	sloSoapUrl?: string | null;
 	nameIdFormat?: string;
 	attributeMapping?: SpAttributeMappingConfig | null;
 	active?: boolean;
@@ -173,6 +182,8 @@ export interface ParseSloFromMetadataRequestDto {
 export interface ParseSloFromMetadataResponseDto {
 	redirect: string | null;
 	post: string | null;
+	/** SOAP back-channel SLO endpoint, when the metadata advertises it (Prompt 36). */
+	soap: string | null;
 }
 
 export interface DeleteSpConnectionResponseDto {

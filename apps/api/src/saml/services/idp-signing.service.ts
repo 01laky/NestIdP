@@ -133,6 +133,15 @@ export class IdpSigningService {
 		return sig.getSignedXml() ?? stripped;
 	}
 
+	/**
+	 * Sign an outbound `<samlp:LogoutRequest>` for the back-channel SOAP SLO (Prompt 36). Same enveloped
+	 * XML-DSig path as {@link signLogoutResponse} — the `<ds:Signature>` goes after `<saml2:Issuer>`, valid
+	 * for the LogoutRequest schema sequence (Issuer, Signature, …).
+	 */
+	signLogoutRequest(messageXml: string, material: SigningMaterial, messageId: string): string {
+		return this.signLogoutResponse(messageXml, material, messageId);
+	}
+
 	async hasSigningMaterial(): Promise<boolean> {
 		const settings = await this.prisma.idpSettings.findUnique({ where: { id: 'default' } });
 		return Boolean(settings?.signingCertPem && settings?.signingKeyEncrypted);

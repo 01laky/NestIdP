@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import {
 	API_CONNECTION_ROUTE_PREFIX,
 	IDENTITY_ROUTE_PREFIX,
+	SAML_SESSIONS_ROUTE_PREFIX,
 	SP_CONNECTION_ROUTE_PREFIX,
 } from '@nestidp/shared';
 import type { SchedulesOverviewResponseDto } from '@nestidp/shared';
@@ -290,6 +291,15 @@ export function DashboardPage() {
 				{spSecurity.idpEncryptionKeyIsEc ? (
 					<Callout variant="info">{t('spSecurity.ecKeyAdvisory')}</Callout>
 				) : null}
+				{spSecurity.backchannelUnresolved > 0 ? (
+					<Callout variant="warning" role="alert">
+						{t('spSecurity.backchannelUnresolved', { count: spSecurity.backchannelUnresolved })}
+						<br />
+						<Link to={SAML_SESSIONS_ROUTE_PREFIX}>{t('spSecurity.openSessions')}</Link>
+					</Callout>
+				) : (
+					<p className="evg-muted">{t('spSecurity.backchannelAllResolved')}</p>
+				)}
 			</Panel>
 			{dashboard.lockouts ? (
 				<Panel title={t('securityLockoutsTitle')}>

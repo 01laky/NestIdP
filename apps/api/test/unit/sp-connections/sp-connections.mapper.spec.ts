@@ -7,6 +7,7 @@ describe('toSpConnectionPublicDto', () => {
 		spEntityId: 'urn:sp:app',
 		acsUrl: 'https://sp.example.com/acs',
 		sloUrl: null,
+		sloSoapUrl: null,
 		nameIdFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
 		attributeMapping: { attributes: [{ samlName: 'uid', source: 'username' }] },
 		active: true,
@@ -14,6 +15,8 @@ describe('toSpConnectionPublicDto', () => {
 		wantAssertionsEncrypted: false,
 		wantAuthnRequestsSigned: false,
 		wantLogoutRequestsSigned: false,
+		lastBackchannelLogoutStatus: null,
+		lastBackchannelLogoutAt: null,
 		createdAt: new Date('2026-01-01T00:00:00.000Z'),
 		updatedAt: new Date('2026-01-02T00:00:00.000Z'),
 	};

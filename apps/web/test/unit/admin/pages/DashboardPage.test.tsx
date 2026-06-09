@@ -52,6 +52,7 @@ function dashboardStub(
 			idpAdvertisesSignedAuthnRequests: false,
 			idpEncryptionKeyIsEc: false,
 			activeSamlSessions: 0,
+			backchannelUnresolved: 0,
 		},
 		apiConnection: null,
 		lastSyncStatus: null,
@@ -167,6 +168,7 @@ describe('DashboardPage', () => {
 					idpAdvertisesSignedAuthnRequests: false,
 					idpEncryptionKeyIsEc: false,
 					activeSamlSessions: 0,
+					backchannelUnresolved: 0,
 				},
 			}),
 		);
@@ -283,6 +285,49 @@ describe('DashboardPage', () => {
 			expect(screen.getByRole('heading', { name: 'IdP configuration' })).toBeDefined();
 			expect(screen.getByText('http://localhost:3000/saml/metadata')).toBeDefined();
 			expect(document.querySelectorAll('.evg-stat__value').length).toBe(6);
+		});
+	});
+
+	it('WEB-BC-Q: warns about sessions with unresolved back-channel logouts (Prompt 36, item Q)', async () => {
+		vi.spyOn(adminApi, 'getAdminDashboard').mockResolvedValue(
+			dashboardStub({
+				spSecurity: {
+					spConnectionsRequireSignedAuthn: 0,
+					spConnectionsRequireEncryptedAssertions: 0,
+					spConnectionsMissingCertWithSecurityFlags: 0,
+					idpAdvertisesSignedAuthnRequests: false,
+					idpEncryptionKeyIsEc: false,
+					activeSamlSessions: 0,
+					backchannelUnresolved: 5,
+				},
+			}),
+		);
+
+		render(
+			<MemoryRouter>
+				<DashboardPage />
+			</MemoryRouter>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByText(/still logged in at some SP/i)).toBeDefined();
+			expect(screen.getByRole('link', { name: 'Open active sessions' }).getAttribute('href')).toBe(
+				'/admin/sessions',
+			);
+		});
+	});
+
+	it('WEB-BC-Q0: shows the all-resolved note when the back-channel queue is clean', async () => {
+		vi.spyOn(adminApi, 'getAdminDashboard').mockResolvedValue(dashboardStub());
+
+		render(
+			<MemoryRouter>
+				<DashboardPage />
+			</MemoryRouter>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByText(/No unresolved back-channel logouts/i)).toBeDefined();
 		});
 	});
 });

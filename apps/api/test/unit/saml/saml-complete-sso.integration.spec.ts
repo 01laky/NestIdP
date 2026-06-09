@@ -222,10 +222,13 @@ describe('SAML complete-sso integration (SQLite)', () => {
 			.expect(400);
 	});
 
-	it('API-AUTH-SSO-09: second complete on same session → 400', async () => {
+	it('API-AUTH-SSO-09 / LOGIN-NOSESSION-02: a second complete is rejected — the browser session was cleared', async () => {
+		// Strict SP-only IdP (Prompt 36, Deliverable 10): the first complete delivers the assertion and
+		// clears the end-user cookie, so a repeat request is unauthenticated (401) rather than reaching the
+		// already-consumed (400) path. Either way the session cannot be completed twice.
 		const { agent, samlSessionId } = await startSsoFlow();
 		await agent.post(`${AUTH_API_PATH}/login/complete-sso`).send({ samlSessionId }).expect(200);
-		await agent.post(`${AUTH_API_PATH}/login/complete-sso`).send({ samlSessionId }).expect(400);
+		await agent.post(`${AUTH_API_PATH}/login/complete-sso`).send({ samlSessionId }).expect(401);
 	});
 
 	it('API-AUTH-SSO-10: HTML contains base64 SAMLResponse not raw assertion', async () => {

@@ -96,18 +96,16 @@ export class EndUserAuthService {
 		userId?: string;
 		samlSessionId?: string;
 	}): Promise<EndUserSessionStatusResponseDto> {
-		let user: EndUserPublicDto | null = null;
-		let authenticated = false;
-
-		if (options.userId) {
-			const profile = await this.identityRepository.findUserProfileById(options.userId);
-			if (profile?.active) {
-				authenticated = true;
-				user = toEndUserPublicDto(profile);
-			}
-		}
+		// Strict SP-only IdP (Prompt 36, Deliverable 10): the end user is never a standing portal user.
+		// We resolve the cookie profile only to drive the *pending SSO request*; we never advertise a
+		// standing session (authenticated / username) when there is no live request the user belongs to.
+		const profile = options.userId
+			? await this.identityRepository.findUserProfileById(options.userId)
+			: null;
+		const profileActive = Boolean(profile?.active);
 
 		let samlSession: EndUserSessionStatusResponseDto['samlSession'] = null;
+		let belongsToRequest = false;
 		if (options.samlSessionId) {
 			const row = await this.prisma.samlSession.findUnique({
 				where: { id: options.samlSessionId },
@@ -124,8 +122,9 @@ export class EndUserAuthService {
 					(await this.idpSigningService.hasSigningMaterial()) || idpSettings != null;
 				const userMatches =
 					options.userId != null && row.userId != null && options.userId === row.userId;
+				belongsToRequest = userMatches && profileActive;
 				const readyToComplete =
-					!expired && bound && spActive && hasSigning && userMatches && authenticated;
+					!expired && bound && spActive && hasSigning && userMatches && profileActive;
 
 				samlSession = {
 					id: row.id,
@@ -136,6 +135,12 @@ export class EndUserAuthService {
 				};
 			}
 		}
+
+		// Identity is exposed only inside a pending SSO request the cookie's user belongs to — never
+		// from the cookie alone (no standing-session leak).
+		const authenticated = belongsToRequest;
+		const user: EndUserPublicDto | null =
+			belongsToRequest && profile ? toEndUserPublicDto(profile) : null;
 
 		return { authenticated, user, samlSession };
 	}

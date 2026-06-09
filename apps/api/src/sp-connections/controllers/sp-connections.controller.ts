@@ -5,10 +5,12 @@ import {
 	Get,
 	HttpCode,
 	HttpStatus,
+	Optional,
 	Param,
 	Patch,
 	Post,
 	Query,
+	ServiceUnavailableException,
 	UseGuards,
 	ValidationPipe,
 } from '@nestjs/common';
@@ -23,10 +25,12 @@ import {
 	type SpConnectionResponseDto,
 	type SpConnectionTestAcsResponseDto,
 	type SpConnectionTestSsoUrlResponseDto,
+	type TestSpBackchannelSloResponseDto,
 } from '@nestidp/shared';
 import { AdminAuthGuard } from '../../admin-auth/guards/admin-auth.guard';
 import { AdminCsrfGuard } from '../../admin-auth/guards/admin-csrf.guard';
 import { ParseCuidPipe } from '../../common/pipes/parse-cuid.pipe';
+import { LogoutPropagationService } from '../../saml/services/logout-propagation.service';
 import { SpConnectionProbeSigningService } from '../services/sp-connection-probe-signing.service';
 import { SpConnectionTestAcsService } from '../services/sp-connection-test-acs.service';
 import { SpConnectionTestSsoUrlService } from '../services/sp-connection-test-sso-url.service';
@@ -44,6 +48,9 @@ export class SpConnectionsController {
 		private readonly testAcsService: SpConnectionTestAcsService,
 		private readonly testSsoUrlService: SpConnectionTestSsoUrlService,
 		private readonly probeSigningService: SpConnectionProbeSigningService,
+		// @Global BackchannelLogoutModule provides this in production; @Optional so modules that don't
+		// import it still resolve the controller (Prompt 36, item S).
+		@Optional() private readonly propagation?: LogoutPropagationService,
 	) {}
 
 	@Get()
@@ -122,5 +129,17 @@ export class SpConnectionsController {
 		body: ProbeSpSigningBodyDto,
 	): Promise<ProbeSpSigningResponseDto> {
 		return this.probeSigningService.probeSigning(id, body as ProbeSpSigningRequestDto);
+	}
+
+	@Post(':id/test-backchannel')
+	@HttpCode(HttpStatus.OK)
+	@UseGuards(AdminCsrfGuard)
+	async testBackchannel(
+		@Param('id', ParseCuidPipe) id: string,
+	): Promise<TestSpBackchannelSloResponseDto> {
+		if (!this.propagation) {
+			throw new ServiceUnavailableException('Back-channel logout not available');
+		}
+		return this.propagation.probe(id);
 	}
 }

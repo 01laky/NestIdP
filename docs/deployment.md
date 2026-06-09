@@ -214,6 +214,17 @@ docker compose exec nestidp pnpm db:rekey -- "$NEW_KEY"
 | `LOGIN_IP_BAN_THRESHOLD` / `_WINDOW_MS` / `_MS`      | `10` / `900000` / `3600000` | Cross-endpoint per-IP escalation/ban; threshold `0` disables                                                     |
 | `RATE_LIMIT_TRUSTED_CIDRS`                           | _(none)_                    | CIDRs/IPs exempt from throttle + IP ban (never from account lockout)                                             |
 | `LOGIN_TARPIT_BASE_MS`                               | `0`                         | Optional progressive delay before a failed-login response; `0` = off                                             |
+| `SAML_BACKCHANNEL_LOGOUT_SCHEDULER_TICK_MS`          | `30000`                     | Back-channel (SOAP) SLO retry tick; `0` disables retries (synchronous first pass only)                           |
+| `SAML_BACKCHANNEL_LOGOUT_HTTP_TIMEOUT_MS`            | `5000`                      | Per-delivery outbound SOAP timeout; bounded `[1000, 60000]`                                                      |
+| `SAML_BACKCHANNEL_LOGOUT_MAX_RETRIES`                | `5`                         | Retry attempts after the first pass before `given_up`; bounded `[0, 50]` (`0` = first pass only)                 |
+| `SAML_BACKCHANNEL_LOGOUT_RETRY_BASE_MS`              | `30000`                     | Exponential backoff base (`× 2^attempt`, clamped by `…_RETRY_MAX_MS`)                                            |
+| `SAML_BACKCHANNEL_LOGOUT_RETRY_MAX_MS`               | `3600000`                   | Backoff clamp for retries                                                                                        |
+| `SAML_BACKCHANNEL_LOGOUT_CONCURRENCY`                | `5`                         | Max parallel deliveries per tick; bounded `[1, 100]`                                                             |
+| `SAML_BACKCHANNEL_LOGOUT_MAX_INFLIGHT`               | `20`                        | Global in-flight cap so a mass terminate cannot flood SPs; bounded `[1, 1000]`                                   |
+| `SAML_BACKCHANNEL_LOGOUT_FIRST_PASS_BUDGET_MS`       | `4000`                      | Wall-clock budget for the inline first pass; the rest falls to the retry queue (`0` = no inline pass)            |
+| `SAML_BACKCHANNEL_LOGOUT_VALIDITY_S`                 | `300`                       | Outbound LogoutRequest `NotOnOrAfter` window (seconds); bounded `[30, 3600]`                                     |
+| `SAML_BACKCHANNEL_LOGOUT_PRUNE_INTERVAL_MS`          | `3600000`                   | Sweep of resolved queue rows; `0` disables                                                                       |
+| `SAML_BACKCHANNEL_LOGOUT_PRUNE_RETENTION_MS`         | `604800000`                 | Delete resolved rows older than this in the prune sweep                                                          |
 
 > **Single-instance scheduling.** The scheduled-sync scheduler is **in-process** and assumes a single
 > NestIdP container. Running multiple replicas would **double-run** schedules (no HA leader election).
@@ -225,6 +236,11 @@ docker compose exec nestidp pnpm db:rekey -- "$NEW_KEY"
 > The persistent per-account **lockout** is shared via the DB and behaves consistently across replicas and
 > restarts. Set `LOGIN_LOCKOUT_THRESHOLD=0` to disable lockout, or `LOGIN_LOCKOUT_RESPONSE_MODE=opaque`
 > to hide lockout from clients entirely.
+
+> **Back-channel SLO is single-instance too.** The retry scheduler is **in-process**. Logout is always
+> authoritative locally; SOAP propagation to SPs is best-effort with persistent, restart-surviving retries.
+> Multiple replicas would **double-send** LogoutRequests — keep the scheduler on exactly one instance and
+> set `SAML_BACKCHANNEL_LOGOUT_SCHEDULER_TICK_MS=0` on the others (the synchronous first pass still runs).
 
 See also `.env.docker.example` and root `.env.example` for optional SAML, sync, and login tuning.
 

@@ -13,6 +13,7 @@ describe('AdminDashboardService', () => {
 		apiConnection: { findFirst: jest.fn() },
 		spConnection: { count: jest.fn(), findMany: jest.fn() },
 		samlSsoSession: { count: jest.fn().mockResolvedValue(0) },
+		samlBackchannelLogout: { count: jest.fn().mockResolvedValue(0) },
 	};
 
 	const idpSettingsService = {
@@ -52,6 +53,7 @@ describe('AdminDashboardService', () => {
 		prisma.spConnection.count.mockResolvedValue(0);
 		prisma.spConnection.findMany.mockResolvedValue([]);
 		prisma.samlSsoSession.count.mockResolvedValue(0);
+		prisma.samlBackchannelLogout.count.mockResolvedValue(0);
 		idpSettingsService.buildDashboardIdpStatus.mockResolvedValue({
 			idpSettingsRoute: IDP_SETTINGS_ROUTE_PREFIX,
 			hasSigningCertificate: true,
@@ -90,6 +92,22 @@ describe('AdminDashboardService', () => {
 		expect(result.idp.signingKeyFamily).toBe('rsa');
 		expect(result.idp.signingSignatureAlgorithmId).toBe('rsa-sha256');
 		expect(result.idp.signingRsaModulusBits).toBe(2048);
+	});
+
+	it('API-ADM-DASH-BC-Q: surfaces the unresolved back-channel logout count (Prompt 36, item Q)', async () => {
+		prisma.samlBackchannelLogout.count.mockResolvedValue(4);
+		const result = await service.getDashboard();
+		expect(result.spSecurity.backchannelUnresolved).toBe(4);
+		// only unresolved states are counted (pending/in_flight/failed/given_up) — not succeeded/skipped
+		expect(prisma.samlBackchannelLogout.count).toHaveBeenCalledWith({
+			where: { status: { in: ['pending', 'in_flight', 'failed', 'given_up'] } },
+		});
+	});
+
+	it('API-ADM-DASH-BC-Q0: reports zero unresolved when the queue is clean', async () => {
+		prisma.samlBackchannelLogout.count.mockResolvedValue(0);
+		const result = await service.getDashboard();
+		expect(result.spSecurity.backchannelUnresolved).toBe(0);
 	});
 
 	it('API-ADM-DASH-SVC-02: includes apiConnection and sync fields', async () => {

@@ -42,6 +42,8 @@ export interface AdminDashboardSpSecuritySummaryDto {
 	idpAdvertisesSignedAuthnRequests: boolean;
 	idpEncryptionKeyIsEc: boolean;
 	activeSamlSessions: number;
+	/** Sessions still unresolved at some SP via back-channel SLO (pending/in_flight/failed/given_up). */
+	backchannelUnresolved: number;
 }
 
 /** Brute-force lockout summary for the dashboard security signal (Prompt 35). */

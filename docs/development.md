@@ -515,7 +515,48 @@ curl -s -b "$COOKIE_JAR" "http://localhost:3000/api/admin/sync/CONNECTION_ID/log
 
 ## SAML module
 
-Custom NestJS `SamlModule` (xmlbuilder2 + xml-crypto) — SP-initiated SSO, signed assertions, metadata. Flow: [sso-flow.svg](./img/sso-flow.svg) (see [proposal.MD](./proposal.MD) §6.2). `/saml/slo` remains unimplemented (501).
+Custom NestJS `SamlModule` (xmlbuilder2 + xml-crypto) — SP-initiated SSO, signed assertions, metadata. Flow: [sso-flow.svg](./img/sso-flow.svg) (see [proposal.MD](./proposal.MD) §6.2). Single Logout (`/saml/slo`) ships from v1.8.0 (SP-initiated + admin session termination, local invalidation).
+
+### Back-channel SLO & multi-SP propagation (v1.17.0)
+
+Terminating an SSO session — admin single/bulk/per-user, end-user logout, or an SP-initiated `/saml/slo` —
+propagates a **signed SAML `LogoutRequest` over the SOAP back-channel** (server-to-server, no browser) to
+**every other** participating SP that has a SOAP SLO endpoint configured. Flow:
+[backchannel-slo-flow.svg](./img/backchannel-slo-flow.svg).
+
+- **Authoritative-local, best-effort-propagation.** The session is invalidated locally **immediately**
+  (status flip), regardless of back-channel outcome. Propagation is fire-then-retry — a slow/unreachable SP
+  **never blocks** the operator action, the user logout, or the initiator's front-channel `LogoutResponse`.
+- **Opt-in per SP.** Back-channel fires only for `active` participating SPs with `sloSoapUrl` set (which
+  requires an SP certificate, to verify the SP's `LogoutResponse`). SPs without a SOAP endpoint get a
+  `skipped_no_endpoint` queue row (audited) and invalidate locally only.
+- **Never to the initiator.** On SP-initiated SLO the choke-point `terminate(id, reason, adminId?,
+{ excludeSpConnectionId })` skips the initiator; it is answered front-channel as before.
+- **Decoupled via a port.** `SamlSsoSessionService.terminate()` (the single choke-point all logout paths
+  funnel through) depends only on `LOGOUT_PROPAGATION_PORT` (Noop default → local-only). The `@Global`
+  `BackchannelLogoutModule` (imports `SamlModule` for IdP signing) provides the real engine, avoiding a
+  module cycle.
+- **Persistent retry queue.** `SamlBackchannelLogout` (one row per session×SP, deduped by
+  `@@unique([ssoSessionId, spConnectionId])`) holds delivery state. A stable `requestId` is reused across
+  retries (idempotent + `InResponseTo` match). The in-process scheduler retries `pending`/`failed` with
+  exponential backoff, marks `given_up` at `MAX_RETRIES`, prunes resolved rows, and is re-entrancy-guarded;
+  `SAML_BACKCHANNEL_LOGOUT_SCHEDULER_TICK_MS=0` disables retries. **Single-instance** (see deployment docs).
+- **Operability.** Admin can bulk-terminate, terminate-all (kill switch), "process queue now", resend a
+  failed/given-up delivery, and test an SP's SOAP endpoint with a signed probe. Per-SP status surfaces on
+  the sessions page; the dashboard shows a count of sessions with unresolved back-channel logouts.
+
+### Strict SP-only login — no standing session (v1.17.0)
+
+NestIdP is strictly SP-facing (proposal Non-Goals §3.2): the end user authenticates **only** transiently to
+satisfy an SP's SSO request and is never a "logged-in" portal user.
+
+- `/login` renders the login form **only** when there is a live pending SSO request; otherwise it shows a
+  neutral "access NestIdP through your application" notice (no form, no username field, no session state).
+- After the assertion is delivered (`POST /api/auth/login/complete-sso`), the
+  `nestidp_user_session` browser cookie is **cleared**. The `SamlSsoSession` registry entry stays active for
+  SLO / admin visibility (the user's session _at the SPs_).
+- `GET /api/auth/session` leaks **no identity** without a valid pending request — `authenticated:false`,
+  no username — so revisiting `/login` never shows "authenticated".
 
 ## Evergreen UI (v1.1.0+, admin forms complete in v1.1.3)
 

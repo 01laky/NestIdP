@@ -229,7 +229,11 @@ describe('saml-sso-session.service', () => {
 				participations: [],
 			},
 		]);
-		const { service } = makeService({ samlSsoSession: { count, findMany } });
+		const bcFindMany = jest.fn().mockResolvedValue([]);
+		const { service } = makeService({
+			samlSsoSession: { count, findMany },
+			samlBackchannelLogout: { findMany: bcFindMany },
+		});
 		const res = await service.listForAdmin({
 			status: 'terminated',
 			spConnectionId: 'sp1',
@@ -241,5 +245,86 @@ describe('saml-sso-session.service', () => {
 		expect(where.status).toBe('terminated');
 		expect(where.participations).toEqual({ some: { spConnectionId: 'sp1' } });
 		expect(where.OR).toBeDefined();
+		// Per-SP back-channel state is fetched for the page's sessions (Prompt 36, item N).
+		expect(bcFindMany.mock.calls[0][0].where).toEqual({ ssoSessionId: { in: ['s1'] } });
+	});
+
+	it('BC-ADMIN-02: terminateBulk reports per-id outcomes (terminated / already / not-found)', async () => {
+		const findUnique = jest
+			.fn()
+			.mockResolvedValueOnce({ status: 'active' })
+			.mockResolvedValueOnce({ status: 'terminated' })
+			.mockResolvedValueOnce(null);
+		const update = jest.fn().mockResolvedValue({});
+		const { service } = makeService({ samlSsoSession: { findUnique, update } });
+		const res = await service.terminateBulk(['a', 'b', 'c'], 'admin-1');
+		expect(res.results).toEqual([
+			{ id: 'a', outcome: 'terminated' },
+			{ id: 'b', outcome: 'already_terminated' },
+			{ id: 'c', outcome: 'not_found' },
+		]);
+		expect(res.terminatedCount).toBe(1);
+	});
+
+	it('BC-ADMIN-L: terminateAllActive terminates every active session', async () => {
+		const findMany = jest.fn().mockResolvedValue([{ id: 'a' }, { id: 'b' }]);
+		const findUnique = jest.fn().mockResolvedValue({ status: 'active' });
+		const update = jest.fn().mockResolvedValue({});
+		const { service } = makeService({ samlSsoSession: { findMany, findUnique, update } });
+		const count = await service.terminateAllActive('admin-1');
+		expect(count).toBe(2);
+		expect(findMany).toHaveBeenCalledWith({
+			where: { status: 'active' },
+			select: { id: true },
+		});
+	});
+
+	it('BC-ADMIN-empty: terminateBulk with an empty id list is a no-op', async () => {
+		const findUnique = jest.fn();
+		const { service } = makeService({ samlSsoSession: { findUnique, update: jest.fn() } });
+		const res = await service.terminateBulk([], 'admin-1');
+		expect(res).toEqual({ results: [], terminatedCount: 0 });
+		expect(findUnique).not.toHaveBeenCalled();
+	});
+
+	it('BC-ADMIN-dupes: terminateBulk de-duplicates outcomes per id (already-terminated on the second pass)', async () => {
+		const findUnique = jest
+			.fn()
+			.mockResolvedValueOnce({ status: 'active' })
+			.mockResolvedValueOnce({ status: 'terminated' });
+		const update = jest.fn().mockResolvedValue({});
+		const { service } = makeService({ samlSsoSession: { findUnique, update } });
+		const res = await service.terminateBulk(['a', 'a'], 'admin-1');
+		expect(res.results).toEqual([
+			{ id: 'a', outcome: 'terminated' },
+			{ id: 'a', outcome: 'already_terminated' },
+		]);
+		expect(res.terminatedCount).toBe(1);
+	});
+
+	it('BC-ADMIN-L0: terminateAllActive returns 0 when there are no active sessions', async () => {
+		const findMany = jest.fn().mockResolvedValue([]);
+		const { service } = makeService({
+			samlSsoSession: { findMany, findUnique: jest.fn(), update: jest.fn() },
+		});
+		expect(await service.terminateAllActive('admin-1')).toBe(0);
+	});
+
+	it('BC-PROP fan-out: terminate() invokes the propagation port with the exclude option', async () => {
+		const findUnique = jest.fn().mockResolvedValue({ status: 'active' });
+		const update = jest.fn().mockResolvedValue({});
+		const audit = { recordSafe: jest.fn() } as unknown as AuditPersistenceService;
+		const propagation = { propagateLogout: jest.fn().mockResolvedValue(undefined) };
+		const service = new SamlSsoSessionService(
+			{ samlSsoSession: { findUnique, update } } as never,
+			audit,
+			propagation,
+		);
+		await service.terminate('sess-1', 'sp_logout', undefined, { excludeSpConnectionId: 'sp-init' });
+		expect(propagation.propagateLogout).toHaveBeenCalledWith({
+			ssoSessionId: 'sess-1',
+			reason: 'sp_logout',
+			excludeSpConnectionId: 'sp-init',
+		});
 	});
 });

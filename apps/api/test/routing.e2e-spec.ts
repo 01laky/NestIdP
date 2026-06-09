@@ -68,6 +68,9 @@ describe('Routing (e2e)', () => {
 			deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
 			count: jest.fn().mockResolvedValue(0),
 		},
+		samlBackchannelLogout: {
+			count: jest.fn().mockResolvedValue(0),
+		},
 		samlLogoutRequestLog: {
 			deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
 		},

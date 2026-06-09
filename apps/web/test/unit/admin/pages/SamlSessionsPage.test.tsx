@@ -67,12 +67,12 @@ describe('SamlSessionsPage', () => {
 		});
 	});
 
-	it('WEB-SESS-04: limitation callout is visible', async () => {
+	it('WEB-SESS-04: back-channel-aware limitation callout is visible', async () => {
 		vi.spyOn(adminApi, 'listSamlSessions').mockResolvedValue(sessionFixture());
 		vi.spyOn(adminApi, 'listSpConnections').mockResolvedValue({ items: [] });
 		renderPage();
 		await waitFor(() => {
-			expect(screen.getByText(/does not end the session already established/i)).toBeDefined();
+			expect(screen.getByText(/authoritative at the IdP/i)).toBeDefined();
 		});
 	});
 
@@ -98,5 +98,102 @@ describe('SamlSessionsPage', () => {
 		await waitFor(() => {
 			expect(terminate).toHaveBeenCalledWith('sso1');
 		});
+	});
+
+	function backchannelFixture(): SamlSsoSessionListResponseDto {
+		const base = sessionFixture();
+		base.items[0].backchannelLogouts = [
+			{
+				spConnectionId: 'sp1',
+				spName: 'App One',
+				status: 'failed',
+				attempts: 2,
+				lastError: 'network',
+				lastAttemptAt: '2026-01-01T00:05:00.000Z',
+				nextRetryAt: '2026-01-01T00:10:00.000Z',
+			},
+		];
+		return base;
+	}
+
+	it('WEB-BC-01: renders checkboxes, select-all, bulk + propagation indicator', async () => {
+		vi.spyOn(adminApi, 'listSamlSessions').mockResolvedValue(backchannelFixture());
+		vi.spyOn(adminApi, 'listSpConnections').mockResolvedValue({ items: [] });
+		vi.spyOn(adminApi, 'getBackchannelQueueHealth').mockResolvedValue({
+			pending: 1,
+			inFlight: 0,
+			succeeded: 3,
+			partial: 0,
+			failed: 2,
+			givenUp: 1,
+			skipped: 0,
+		});
+		renderPage();
+		await waitFor(() => expect(screen.getByText('alice')).toBeDefined());
+
+		expect(screen.getByLabelText('Select all active')).toBeDefined();
+		expect(screen.getAllByRole('checkbox').length).toBeGreaterThanOrEqual(2);
+		expect(screen.getByRole('button', { name: 'Terminate selected' })).toBeDefined();
+		expect(screen.getByRole('button', { name: 'Terminate all active' })).toBeDefined();
+		expect(screen.getByRole('button', { name: 'Process now' })).toBeDefined();
+		// per-SP indicator + resend for the failed delivery
+		expect(screen.getByText('Failed')).toBeDefined();
+		expect(screen.getByRole('button', { name: 'Resend' })).toBeDefined();
+	});
+
+	it('WEB-BC-01b: select-all then "Terminate selected" calls the bulk endpoint', async () => {
+		vi.spyOn(adminApi, 'listSamlSessions').mockResolvedValue(backchannelFixture());
+		vi.spyOn(adminApi, 'listSpConnections').mockResolvedValue({ items: [] });
+		vi.spyOn(adminApi, 'getBackchannelQueueHealth').mockResolvedValue({
+			pending: 0,
+			inFlight: 0,
+			succeeded: 0,
+			partial: 0,
+			failed: 0,
+			givenUp: 0,
+			skipped: 0,
+		});
+		const bulk = vi.spyOn(adminApi, 'terminateSamlSessionsBulk').mockResolvedValue({
+			ok: true,
+			results: [{ id: 'sso1', outcome: 'terminated' }],
+			terminatedCount: 1,
+		});
+		renderPage();
+		await waitFor(() => expect(screen.getByText('alice')).toBeDefined());
+
+		fireEvent.click(screen.getByLabelText('Select all active'));
+		fireEvent.click(screen.getByRole('button', { name: 'Terminate selected' }));
+		// confirm dialog → click its confirm (last button with that name)
+		await waitFor(() => {
+			expect(screen.getAllByRole('button', { name: 'Terminate selected' }).length).toBeGreaterThan(
+				1,
+			);
+		});
+		const confirmButtons = screen.getAllByRole('button', { name: 'Terminate selected' });
+		fireEvent.click(confirmButtons[confirmButtons.length - 1]);
+
+		await waitFor(() => expect(bulk).toHaveBeenCalledWith(['sso1']));
+	});
+
+	it('WEB-BC-01c: "Resend" on a failed delivery calls the resend endpoint', async () => {
+		vi.spyOn(adminApi, 'listSamlSessions').mockResolvedValue(backchannelFixture());
+		vi.spyOn(adminApi, 'listSpConnections').mockResolvedValue({ items: [] });
+		vi.spyOn(adminApi, 'getBackchannelQueueHealth').mockResolvedValue({
+			pending: 0,
+			inFlight: 0,
+			succeeded: 0,
+			partial: 0,
+			failed: 1,
+			givenUp: 0,
+			skipped: 0,
+		});
+		const resend = vi
+			.spyOn(adminApi, 'resendBackchannelLogout')
+			.mockResolvedValue({ ok: true, ssoSessionId: 'sso1', spConnectionId: 'sp1' });
+		renderPage();
+		await waitFor(() => expect(screen.getByText('alice')).toBeDefined());
+
+		fireEvent.click(screen.getByRole('button', { name: 'Resend' }));
+		await waitFor(() => expect(resend).toHaveBeenCalledWith('sso1', 'sp1'));
 	});
 });

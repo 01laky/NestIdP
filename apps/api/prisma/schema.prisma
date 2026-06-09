@@ -179,6 +179,7 @@ model SpConnection {
   spEntityId               String   @unique
   acsUrl                   String
   sloUrl                   String?
+  sloSoapUrl               String?
   spCertificate            String?
   nameIdFormat             String   @default("urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress")
   attributeMapping         Json?
@@ -186,11 +187,41 @@ model SpConnection {
   wantAssertionsEncrypted  Boolean  @default(false)
   wantAuthnRequestsSigned  Boolean  @default(false)
   wantLogoutRequestsSigned Boolean  @default(false)
+  // Back-channel SLO degraded indicator (Prompt 36): last outbound LogoutRequest delivery outcome.
+  lastBackchannelLogoutStatus String?
+  lastBackchannelLogoutAt     DateTime?
   createdAt                DateTime @default(now())
   updatedAt                DateTime @updatedAt
 
-  samlSessions       SamlSession[]
-  samlParticipations SamlSpParticipation[]
+  samlSessions        SamlSession[]
+  samlParticipations  SamlSpParticipation[]
+  backchannelLogouts  SamlBackchannelLogout[]
+}
+
+// Back-channel (SOAP) SLO delivery queue (Prompt 36). One row per (terminated SSO session × target SP).
+// Persistent so retries survive restart; logout is authoritative locally, propagation is best-effort.
+model SamlBackchannelLogout {
+  id             String    @id @default(cuid())
+  ssoSessionId   String
+  spConnectionId String
+  sessionIndex   String
+  nameId         String
+  nameIdFormat   String
+  reason         String
+  status         String    @default("pending") // pending|in_flight|succeeded|partial|failed|given_up|skipped_no_endpoint
+  attempts       Int       @default(0)
+  requestId      String? // stable outbound LogoutRequest ID, reused on retry (idempotent + InResponseTo match)
+  lastError      String?
+  lastAttemptAt  DateTime?
+  nextRetryAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  spConnection SpConnection @relation(fields: [spConnectionId], references: [id], onDelete: Cascade)
+
+  @@unique([ssoSessionId, spConnectionId])
+  @@index([status, nextRetryAt])
+  @@index([ssoSessionId])
 }
 
 model AdminUser {

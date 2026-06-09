@@ -3,6 +3,7 @@ import * as xpath from 'xpath';
 import {
 	POST_BINDING_URI,
 	REDIRECT_BINDING_URI,
+	SOAP_BINDING_URI,
 	type ParseSloFromMetadataResponseDto,
 } from '@nestidp/shared';
 
@@ -15,7 +16,7 @@ const select = xpath.useNamespaces({
  * EntityDescriptor. Returns null fields when the metadata has no SLO endpoint.
  */
 export function extractSloUrlFromSpMetadata(xml: string): ParseSloFromMetadataResponseDto {
-	const empty: ParseSloFromMetadataResponseDto = { redirect: null, post: null };
+	const empty: ParseSloFromMetadataResponseDto = { redirect: null, post: null, soap: null };
 	if (!xml || xml.trim().length === 0) {
 		return empty;
 	}
@@ -36,6 +37,7 @@ export function extractSloUrlFromSpMetadata(xml: string): ParseSloFromMetadataRe
 	) as Node[];
 	let redirect: string | null = null;
 	let post: string | null = null;
+	let soap: string | null = null;
 	for (const node of nodes) {
 		const el = node as Element;
 		const binding = el.getAttribute('Binding');
@@ -47,7 +49,9 @@ export function extractSloUrlFromSpMetadata(xml: string): ParseSloFromMetadataRe
 			redirect = location;
 		} else if (binding === POST_BINDING_URI && !post) {
 			post = location;
+		} else if (binding === SOAP_BINDING_URI && !soap) {
+			soap = location;
 		}
 	}
-	return { redirect, post };
+	return { redirect, post, soap };
 }

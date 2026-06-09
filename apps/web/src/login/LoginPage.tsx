@@ -24,6 +24,9 @@ export function LoginPage() {
 	const [sessionBanner, setSessionBanner] = useState<string | null>(null);
 	const [samlSessionBound, setSamlSessionBound] = useState(false);
 	const [readyToComplete, setReadyToComplete] = useState(false);
+	// Strict SP-only IdP (Prompt 36, Deliverable 10): the login form renders only when there is a live
+	// pending SSO request. Without one we show a neutral notice — no form, no username, no session state.
+	const [hasPendingRequest, setHasPendingRequest] = useState(false);
 	const [retryAfter, setRetryAfter] = useState<number | null>(null);
 	const autoCompleteAttempted = useRef(false);
 
@@ -71,9 +74,10 @@ export function LoginPage() {
 				if (cancelled) {
 					return;
 				}
-				if (status.authenticated && status.user) {
-					setSessionBanner(t('signedInAs', { username: status.user.username }));
-				}
+				// A live pending request = a SamlSession in context that has not expired. We never surface a
+				// standing "signed in as …" banner from the cookie alone (no standing-session leak).
+				const pending = Boolean(status.samlSession) && !status.samlSession?.expired;
+				setHasPendingRequest(pending);
 				if (status.samlSession?.expired) {
 					setSessionBanner(t('samlSessionExpired'));
 				} else if (status.samlSession && !status.samlSession.spActive) {
@@ -147,6 +151,22 @@ export function LoginPage() {
 			<div className="evg-auth-layout">
 				<Card>
 					<LoadingState message={t('checkingSession')} />
+				</Card>
+			</div>
+		);
+	}
+
+	// No live SSO request → neutral notice only: no login form, no username field, no session indicator.
+	if (!hasPendingRequest) {
+		return (
+			<div className="evg-auth-layout">
+				<Card>
+					<h1>{t('title')}</h1>
+					<Callout variant="info">{t('noRequestNotice')}</Callout>
+					<p>
+						<Link to="/admin">{t('backToAdmin')}</Link>
+					</p>
+					<LanguageSelect />
 				</Card>
 			</div>
 		);
