@@ -46,11 +46,12 @@ The `authCredentialsEncrypted` column stores **AES-256-GCM** ciphertext of the B
 
 ### Manual identity (v1.2.0)
 
-| Field / model                                | Purpose                                                                                                  |
-| -------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `ApiConnection.isLocalDirectory`             | Bootstrap **Local directory** row (`name` constant in shared); excluded from operator list; not syncable |
-| `User.origin`, `Group.origin`, `Role.origin` | `SYNCED` (API sync) or `MANUAL` (admin CRUD); sync never deactivates/deletes/overwrites `MANUAL`         |
-| Manual `externalId`                          | Server-generated `manual:user:<id>`, `manual:group:<id>`, `manual:role:<id>`                             |
+| Field / model                                                                       | Purpose                                                                                                                                                                                                                                                                                                                      |
+| ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ApiConnection.isLocalDirectory`                                                    | Bootstrap **Local directory** row (`name` constant in shared); excluded from operator list; not syncable                                                                                                                                                                                                                     |
+| `ApiConnection.includeInSyncAll` / `usernameCollisionPolicy` / `lastCollisionCount` | Multi-source (v1.18.0): include in "Sync all"; per-connection collision policy override (null = global); last run's skipped-collision count. `SyncLog.usersSkippedCollision` holds the per-run count. `User.username` stays globally `@unique` (login determinism) — collisions across sources are skipped, not stored twice |
+| `User.origin`, `Group.origin`, `Role.origin`                                        | `SYNCED` (API sync) or `MANUAL` (admin CRUD); sync never deactivates/deletes/overwrites `MANUAL`                                                                                                                                                                                                                             |
+| Manual `externalId`                                                                 | Server-generated `manual:user:<id>`, `manual:group:<id>`, `manual:role:<id>`                                                                                                                                                                                                                                                 |
 
 Migration: `20260604120000_identity_manual_crud` (single history under `prisma/migrations/`).
 

@@ -9,8 +9,17 @@ import {
 	MaxLength,
 	ValidateIf,
 } from 'class-validator';
-import type { ApiContractConfig, AuthType, OAuthClientAuthMethod } from '@nestidp/shared';
-import { AUTH_TYPES, OAUTH_CLIENT_AUTH_METHODS } from '@nestidp/shared';
+import type {
+	ApiContractConfig,
+	AuthType,
+	OAuthClientAuthMethod,
+	UsernameCollisionPolicy,
+} from '@nestidp/shared';
+import {
+	AUTH_TYPES,
+	OAUTH_CLIENT_AUTH_METHODS,
+	USERNAME_COLLISION_POLICIES,
+} from '@nestidp/shared';
 
 export class UpdateApiConnectionBodyDto {
 	@IsOptional()
@@ -106,4 +115,18 @@ export class UpdateApiConnectionBodyDto {
 	@IsString()
 	@MaxLength(4096)
 	noProxyHosts?: string | null;
+
+	// --- Multiple API connections for sync (Prompt 37) ---
+	@IsOptional()
+	@IsBoolean()
+	includeInSyncAll?: boolean;
+
+	@IsOptional()
+	@ValidateIf((_, value) => value !== null)
+	@IsIn([...USERNAME_COLLISION_POLICIES])
+	usernameCollisionPolicy?: UsernameCollisionPolicy | null;
+
+	@IsOptional()
+	@IsBoolean()
+	acknowledgeRebind?: boolean;
 }

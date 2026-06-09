@@ -15,6 +15,7 @@ import type {
 	AuthType,
 	CreateApiConnectionRequestDto,
 	DeleteApiConnectionResponseDto,
+	RemoveSourceIdentitiesResponseDto,
 	UpdateApiConnectionRequestDto,
 } from '@nestidp/shared';
 import {
@@ -32,6 +33,7 @@ import {
 } from '../../encryption/credentials-encryption.port';
 import { PrismaService } from '../../prisma/services/prisma.service';
 import { ActiveIdentityStore } from '../../identity/store/active-identity-store';
+import { SamlSsoSessionService } from '../../saml-sessions/services/saml-sso-session.service';
 import { OAuthTokenService } from '../../sync/services/oauth-token.service';
 import { ProxyDispatcherService } from '../../sync/services/proxy-dispatcher.service';
 import { assertValidBaseUrl, BaseUrlValidationError } from '../utils/base-url.util';
@@ -51,6 +53,7 @@ export class ApiConnectionsService {
 		private readonly oauthTokenService: OAuthTokenService,
 		private readonly identityStore: ActiveIdentityStore,
 		private readonly proxyDispatcher: ProxyDispatcherService,
+		private readonly ssoSessions: SamlSsoSessionService,
 	) {}
 
 	async list(): Promise<ApiConnectionListResponseDto> {
@@ -58,7 +61,9 @@ export class ApiConnectionsService {
 			where: { isLocalDirectory: false },
 			orderBy: { createdAt: 'asc' },
 		});
-		return { connections: rows.map((row) => this.toDto(row)) };
+		// Per-source synced counts for the multi-source connections list (Prompt 37; single groupBy, no N+1).
+		const counts = await this.identityStore.countsByConnection();
+		return { connections: rows.map((row) => this.toDto(row, counts)) };
 	}
 
 	async getById(id: string): Promise<ApiConnectionResponseDto> {
@@ -67,13 +72,8 @@ export class ApiConnectionsService {
 	}
 
 	async create(body: CreateApiConnectionRequestDto): Promise<ApiConnectionResponseDto> {
-		const count = await this.prisma.apiConnection.count({
-			where: { isLocalDirectory: false },
-		});
-		if (count >= 1) {
-			throw new ConflictException('Only one API connection is supported in v1');
-		}
-
+		// Multiple API connections for sync (Prompt 37): the single-connection cap is lifted — each
+		// registered connection is an independent sync source into the shared, per-record-tagged store.
 		await this.assertNameAvailable(body.name);
 
 		const baseUrl = this.validateBaseUrl(body.baseUrl);
@@ -88,6 +88,8 @@ export class ApiConnectionsService {
 			apiContractConfig: apiContractConfig
 				? (apiContractConfig as unknown as Prisma.InputJsonValue)
 				: Prisma.JsonNull,
+			...(body.includeInSyncAll !== undefined ? { includeInSyncAll: body.includeInSyncAll } : {}),
+			usernameCollisionPolicy: body.usernameCollisionPolicy ?? null,
 		};
 
 		if (authType === 'OAUTH2_CLIENT_CREDENTIALS') {
@@ -122,12 +124,31 @@ export class ApiConnectionsService {
 			body.oauthAudience === undefined &&
 			body.oauthClientAuthMethod === undefined &&
 			body.oauthTokenRequestParams === undefined &&
+			body.includeInSyncAll === undefined &&
+			body.usernameCollisionPolicy === undefined &&
 			!this.proxyTouched(body)
 		) {
 			throw new BadRequestException('At least one field must be provided');
 		}
 
 		const existing = await this.findOrThrow(id);
+
+		// Re-bind guard (Prompt 37): re-pointing a connection (baseUrl / contract) that already has synced
+		// identities can remap externalIds and cause mass deactivation/collisions on the next sync — require
+		// an explicit acknowledgement. The store check covers the external-DB (relocated) case too.
+		const rebinding =
+			(body.baseUrl !== undefined && body.baseUrl.trim() !== existing.baseUrl) ||
+			body.apiContractConfig !== undefined;
+		if (
+			rebinding &&
+			!body.acknowledgeRebind &&
+			!existing.isLocalDirectory &&
+			(await this.identityStore.connectionHasIdentityRows(id))
+		) {
+			throw new ConflictException(
+				'Re-pointing a connection with existing synced identities requires acknowledgement (acknowledgeRebind)',
+			);
+		}
 
 		if (body.name !== undefined) {
 			if (body.name.trim().length === 0) {
@@ -185,6 +206,13 @@ export class ApiConnectionsService {
 			}
 		}
 
+		if (body.includeInSyncAll !== undefined) {
+			data.includeInSyncAll = body.includeInSyncAll;
+		}
+		if (body.usernameCollisionPolicy !== undefined) {
+			data.usernameCollisionPolicy = body.usernameCollisionPolicy;
+		}
+
 		this.applyProxyData(data, body, existing);
 
 		const row = await this.prisma.apiConnection.update({
@@ -232,12 +260,51 @@ export class ApiConnectionsService {
 		return { ok: true, id };
 	}
 
-	private toDto(row: ApiConnection) {
+	/**
+	 * Remove a sync source's SYNCED identities (Prompt 37): terminate their active SSO sessions (back-channel
+	 * SLO fans out via the choke-point), then deactivate or delete the rows — after which the connection can
+	 * be deleted. Never touches manual/local-directory identities; the local-directory connection is barred.
+	 */
+	async removeSourceIdentities(
+		id: string,
+		mode: 'deactivate' | 'delete',
+	): Promise<RemoveSourceIdentitiesResponseDto> {
+		const existing = await this.findOrThrow(id);
+		if (existing.isLocalDirectory) {
+			throw new BadRequestException('Local directory identities cannot be removed this way');
+		}
+		const userIds = await this.identityStore.syncedUserIdsForConnection(id);
+		let sessionsTerminated = 0;
+		for (const userId of userIds) {
+			sessionsTerminated += await this.ssoSessions.terminateAllForUser(userId, 'user_deactivated');
+		}
+		const counts = await this.identityStore.removeConnectionIdentities(id, mode);
+		this.audit.logSourceIdentitiesRemoved(existing.id, existing.name, mode, counts);
+		return { ok: true, mode, ...counts, sessionsTerminated };
+	}
+
+	private toDto(
+		row: ApiConnection,
+		counts?: {
+			users: Record<string, number>;
+			groups: Record<string, number>;
+			roles: Record<string, number>;
+		},
+	) {
 		const oauthLastTokenAt =
 			row.authType === 'OAUTH2_CLIENT_CREDENTIALS'
 				? this.oauthTokenService.getLastTokenAt(row.id)
 				: null;
-		return toApiConnectionDto(row, { oauthLastTokenAt });
+		return toApiConnectionDto(row, {
+			oauthLastTokenAt,
+			...(counts
+				? {
+						syncedUserCount: counts.users[row.id] ?? 0,
+						syncedGroupCount: counts.groups[row.id] ?? 0,
+						syncedRoleCount: counts.roles[row.id] ?? 0,
+					}
+				: {}),
+		});
 	}
 
 	private applyOAuthData(

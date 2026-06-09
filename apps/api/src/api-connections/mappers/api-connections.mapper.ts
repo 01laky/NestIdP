@@ -4,12 +4,18 @@ import type {
 	ApiContractConfig,
 	OAuthClientAuthMethod,
 	ProxyCheckStatus,
+	UsernameCollisionPolicy,
 } from '@nestidp/shared';
-import { isProxyCheckStatus } from '@nestidp/shared';
+import { isProxyCheckStatus, isUsernameCollisionPolicy } from '@nestidp/shared';
 
 export function toApiConnectionDto(
 	row: ApiConnection,
-	extra?: { oauthLastTokenAt?: string | null },
+	extra?: {
+		oauthLastTokenAt?: string | null;
+		syncedUserCount?: number;
+		syncedGroupCount?: number;
+		syncedRoleCount?: number;
+	},
 ): ApiConnectionDto {
 	return {
 		id: row.id,
@@ -38,6 +44,16 @@ export function toApiConnectionDto(
 		lastProxyCheckAt: row.lastProxyCheckAt?.toISOString() ?? null,
 		lastSyncAt: row.lastSyncAt?.toISOString() ?? null,
 		lastSyncStatus: row.lastSyncStatus,
+		// --- Multiple API connections for sync (Prompt 37) ---
+		isLocalDirectory: row.isLocalDirectory,
+		includeInSyncAll: row.includeInSyncAll,
+		usernameCollisionPolicy: isUsernameCollisionPolicy(row.usernameCollisionPolicy ?? '')
+			? (row.usernameCollisionPolicy as UsernameCollisionPolicy)
+			: null,
+		lastCollisionCount: row.lastCollisionCount,
+		...(extra?.syncedUserCount !== undefined ? { syncedUserCount: extra.syncedUserCount } : {}),
+		...(extra?.syncedGroupCount !== undefined ? { syncedGroupCount: extra.syncedGroupCount } : {}),
+		...(extra?.syncedRoleCount !== undefined ? { syncedRoleCount: extra.syncedRoleCount } : {}),
 		createdAt: row.createdAt.toISOString(),
 		updatedAt: row.updatedAt.toISOString(),
 	};

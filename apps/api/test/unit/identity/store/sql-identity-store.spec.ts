@@ -1,5 +1,9 @@
 import { IdentityOrigin } from '@prisma/client';
-import { GroupNameCollisionError, UsernameCollisionError } from '@api/identity/identity.repository';
+import {
+	GroupNameCollisionError,
+	MembershipCrossConnectionError,
+	UsernameCollisionError,
+} from '@api/identity/identity.repository';
 import {
 	classifyOwnership,
 	getMetaValue,
@@ -320,5 +324,59 @@ describe('SqlIdentityStore (external, PGlite)', () => {
 		} finally {
 			await fresh.destroy();
 		}
+	});
+
+	// --- Multiple API connections for sync — external store parity (Prompt 37) ---
+
+	it('MAS-EXT-MEMBERSHIP: a user cannot be assigned a group from another connection', async () => {
+		const u = await store.upsertUser(CONN, upsertInput());
+		const own = await store.upsertGroup(CONN, { id: 'g-own', name: 'Own' });
+		const foreign = await store.upsertGroup('conn-api-2', { id: 'g-foreign', name: 'Foreign' });
+		await store.replaceUserGroups(u.id, [own.id]); // ok
+		await expect(store.replaceUserGroups(u.id, [foreign.id])).rejects.toBeInstanceOf(
+			MembershipCrossConnectionError,
+		);
+	});
+
+	it('MAS-EXT-COUNTS: countsByConnection reports per-source counts', async () => {
+		await store.upsertUser(CONN, upsertInput({ externalId: 'a1', username: 'a1' }));
+		await store.upsertUser(CONN, upsertInput({ externalId: 'a2', username: 'a2' }));
+		await store.upsertUser('conn-api-2', upsertInput({ externalId: 'b1', username: 'b1' }));
+		await store.upsertGroup(CONN, { id: 'g1', name: 'g1' });
+		const counts = await store.countsByConnection();
+		expect(counts.users[CONN]).toBe(2);
+		expect(counts.users['conn-api-2']).toBe(1);
+		expect(counts.groups[CONN]).toBe(1);
+	});
+
+	it('MAS-EXT-REMOVE-DEACTIVATE: deactivates only the source’s users, leaves others active', async () => {
+		const a = await store.upsertUser(CONN, upsertInput({ externalId: 'a1', username: 'a1' }));
+		const b = await store.upsertUser(
+			'conn-api-2',
+			upsertInput({ externalId: 'b1', username: 'b1' }),
+		);
+		expect(await store.syncedUserIdsForConnection(CONN)).toEqual([a.id]);
+		const res = await store.removeConnectionIdentities(CONN, 'deactivate');
+		expect(res.usersRemoved).toBe(1);
+		expect((await store.getUserById(a.id))?.active).toBe(false);
+		expect((await store.getUserById(b.id))?.active).toBe(true);
+	});
+
+	it('MAS-EXT-REMOVE-DELETE: deletes only the source’s rows', async () => {
+		await store.upsertUser(CONN, upsertInput({ externalId: 'a1', username: 'a1' }));
+		await store.upsertGroup(CONN, { id: 'g1', name: 'g1' });
+		await store.upsertUser('conn-api-2', upsertInput({ externalId: 'b1', username: 'b1' }));
+		const res = await store.removeConnectionIdentities(CONN, 'delete');
+		expect(res.usersRemoved).toBe(1);
+		expect(res.groupsRemoved).toBe(1);
+		expect(await store.countUsers()).toBe(1); // only conn-api-2's user remains
+	});
+
+	it('MAS-EXT-INCONN: groupsAllInConnection is true only for same-source groups', async () => {
+		const own = await store.upsertGroup(CONN, { id: 'g-own', name: 'Own' });
+		const foreign = await store.upsertGroup('conn-api-2', { id: 'g-foreign', name: 'Foreign' });
+		expect(await store.groupsAllInConnection([own.id], CONN)).toBe(true);
+		expect(await store.groupsAllInConnection([own.id, foreign.id], CONN)).toBe(false);
+		expect(await store.groupsAllInConnection([], CONN)).toBe(true);
 	});
 });

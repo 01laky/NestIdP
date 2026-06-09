@@ -236,7 +236,7 @@ describe('api-connections integration (SQLite)', () => {
 		await agent.get(`${API_CONNECTIONS_API_PATH}/${id}`).expect(404);
 	});
 
-	it('API-CON-INT-06: Second POST create → 409', async () => {
+	it('API-CON-INT-06 / MAS: a second external connection is allowed (Prompt 37 multi-source)', async () => {
 		const agent = request.agent(app.getHttpServer() as App);
 		const csrf = await loginAgent(agent);
 
@@ -258,7 +258,7 @@ describe('api-connections integration (SQLite)', () => {
 				baseUrl: 'https://b.example.com',
 				bearerToken: 'secret',
 			})
-			.expect(409);
+			.expect(201);
 	});
 
 	it('API-CON-INT-07: POST create without CSRF header → 403', async () => {

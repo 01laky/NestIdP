@@ -199,7 +199,15 @@
 		"openSchedules": "Abrir programaciones",
 		"securityLockoutsTitle": "Cuentas bloqueadas",
 		"lockedAdmins": "Cuentas de administrador bloqueadas",
-		"lockedUsers": "Cuentas de usuario bloqueadas"
+		"lockedUsers": "Cuentas de usuario bloqueadas",
+		"syncSourcesTitle": "Sync sources",
+		"syncSourcesCount": "{{count}} sync source(s)",
+		"noSyncSources": "No sync sources configured.",
+		"staleSourcesWarning": "{{count}} sync source(s) need attention (never-synced, failing, or overdue).",
+		"sourceStateOk": "OK",
+		"sourceStateNeverSynced": "Never synced",
+		"sourceStateFailing": "Failing",
+		"sourceStateOverdue": "Overdue"
 	},
 	"apiConnections": {
 		"listTitle": "Conexiones API",
@@ -278,7 +286,25 @@
 		"proxyStatus_tunnel_failed": "Fallo del túnel",
 		"proxyStatus_tls_error": "Error de TLS",
 		"proxyStatus_target_error": "Error del destino",
-		"proxyStatus_bypassed": "Omitido"
+		"proxyStatus_bypassed": "Omitido",
+		"syncAllSources": "Sync all sources",
+		"syncAllDryRun": "Dry-run all",
+		"syncAllRunning": "Syncing all sources…",
+		"syncAllResult": "{{succeeded}} succeeded · {{failed}} failed · {{skipped}} skipped",
+		"includeInSyncAll": "Include in \"Sync all sources\"",
+		"includeInSyncAllHint": "When off, this connection is excluded from the bulk \"Sync all\" but can still be synced individually and on schedule.",
+		"usernameCollisionPolicy": "Username collision policy",
+		"collisionInherit": "Inherit global default",
+		"collisionSkip": "Skip (keep the existing owner)",
+		"collisionFailRun": "Fail the run",
+		"rebindWarning": "This connection already has synced identities. Changing the base URL or contract may deactivate or replace them on the next sync and cause username collisions. Continue?",
+		"removeIdentities": "Remove this source’s identities",
+		"removeIdentitiesDeactivate": "Deactivate (keep rows)",
+		"removeIdentitiesDelete": "Delete rows",
+		"removeIdentitiesConfirm": "Remove this source’s synced identities and terminate their SSO sessions? This cannot be undone for \"delete\".",
+		"removeIdentitiesResult": "Removed {{users}} user(s), {{groups}} group(s), {{roles}} role(s); {{sessions}} session(s) terminated.",
+		"syncedCounts": "{{users}} users · {{groups}} groups · {{roles}} roles",
+		"lastCollisions": "{{count}} collision(s) skipped"
 	},
 	"spConnections": {
 		"listTitle": "Conexiones SP",
@@ -665,7 +691,10 @@
 		"unlock": "Desbloquear",
 		"unlockConfirmTitle": "¿Desbloquear la cuenta?",
 		"unlockConfirmBody": "¿Quitar el bloqueo de {{username}}?",
-		"unlockSuccess": "Cuenta desbloqueada"
+		"unlockSuccess": "Cuenta desbloqueada",
+		"sourceFilter": "Source",
+		"sourceAll": "All sources",
+		"colSource": "Source"
 	},
 	"audit": {
 		"title": "Registro de auditoría",

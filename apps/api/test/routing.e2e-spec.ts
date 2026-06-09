@@ -31,12 +31,14 @@ describe('Routing (e2e)', () => {
 		user: {
 			count: jest.fn().mockResolvedValue(0),
 			findUnique: jest.fn(),
+			groupBy: jest.fn().mockResolvedValue([]),
 		},
-		group: { count: jest.fn().mockResolvedValue(0) },
-		role: { count: jest.fn().mockResolvedValue(0) },
+		group: { count: jest.fn().mockResolvedValue(0), groupBy: jest.fn().mockResolvedValue([]) },
+		role: { count: jest.fn().mockResolvedValue(0), groupBy: jest.fn().mockResolvedValue([]) },
 		apiConnection: {
 			count: jest.fn().mockResolvedValue(0),
 			findFirst: jest.fn().mockResolvedValue(null),
+			findMany: jest.fn().mockResolvedValue([]),
 		},
 		spConnection: {
 			count: jest.fn().mockResolvedValue(0),

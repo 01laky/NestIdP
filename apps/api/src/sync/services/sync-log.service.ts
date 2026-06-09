@@ -26,7 +26,12 @@ export class SyncLogService {
 	async finishLog(
 		logId: string,
 		status: SyncLogStatus,
-		counters: { usersSynced: number; groupsSynced: number; rolesSynced: number },
+		counters: {
+			usersSynced: number;
+			groupsSynced: number;
+			rolesSynced: number;
+			usersSkippedCollision?: number;
+		},
 		errors: SyncLogErrorEntryDto[] | null,
 	): Promise<SyncLog> {
 		const cappedErrors = capSyncErrors(errors);
@@ -38,6 +43,7 @@ export class SyncLogService {
 				usersSynced: counters.usersSynced,
 				groupsSynced: counters.groupsSynced,
 				rolesSynced: counters.rolesSynced,
+				usersSkippedCollision: counters.usersSkippedCollision ?? 0,
 				errors:
 					cappedErrors == null
 						? Prisma.JsonNull

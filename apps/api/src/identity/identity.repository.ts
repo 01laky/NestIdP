@@ -6,6 +6,7 @@ import { PrismaService } from '../prisma/services/prisma.service';
 import { AccountLockoutService } from '../auth-protection/account-lockout.service';
 import type {
 	CreateManualUserInput,
+	IdentityCountsByConnection,
 	IdentitySnapshot,
 	IdentityStore,
 	ImportCounts,
@@ -66,6 +67,14 @@ export class RoleNameCollisionError extends Error {
 	}
 }
 
+/** A membership would cross identity sources — a user may only belong to its own source's groups/roles. */
+export class MembershipCrossConnectionError extends Error {
+	constructor(public readonly kind: 'group' | 'role') {
+		super(`Cannot assign a ${kind} from a different identity source`);
+		this.name = 'MembershipCrossConnectionError';
+	}
+}
+
 /** Local (libSQL/Prisma) implementation of {@link IdentityStore}. */
 @Injectable()
 export class IdentityRepository implements IdentityStore {
@@ -86,6 +95,17 @@ export class IdentityRepository implements IdentityStore {
 
 	countRoles(): Promise<number> {
 		return this.prisma.role.count();
+	}
+
+	async countsByConnection(): Promise<IdentityCountsByConnection> {
+		const [users, groups, roles] = await Promise.all([
+			this.prisma.user.groupBy({ by: ['apiConnectionId'], _count: { _all: true } }),
+			this.prisma.group.groupBy({ by: ['apiConnectionId'], _count: { _all: true } }),
+			this.prisma.role.groupBy({ by: ['apiConnectionId'], _count: { _all: true } }),
+		]);
+		const toRecord = (rows: { apiConnectionId: string; _count: { _all: number } }[]) =>
+			Object.fromEntries(rows.map((r) => [r.apiConnectionId, r._count._all]));
+		return { users: toRecord(users), groups: toRecord(groups), roles: toRecord(roles) };
 	}
 
 	findUserByUsername(username: string): Promise<StoreUser | null> {
@@ -156,33 +176,48 @@ export class IdentityRepository implements IdentityStore {
 			throw new UsernameCollisionError(user.externalId, user.username);
 		}
 
-		const row = await this.prisma.user.upsert({
-			where: {
-				apiConnectionId_externalId: {
-					apiConnectionId: connectionId,
-					externalId: user.externalId,
+		let row: StoreUser;
+		try {
+			row = await this.prisma.user.upsert({
+				where: {
+					apiConnectionId_externalId: {
+						apiConnectionId: connectionId,
+						externalId: user.externalId,
+					},
 				},
-			},
-			create: {
-				apiConnectionId: connectionId,
-				origin: IdentityOrigin.SYNCED,
-				externalId: user.externalId,
-				username: user.username,
-				email,
-				displayName: user.displayName,
-				passwordHash: user.passwordHash,
-				passwordHashAlgorithm: user.passwordHashAlgorithm,
-				active: user.active,
-			},
-			update: {
-				username: user.username,
-				email,
-				displayName: user.displayName,
-				passwordHash: user.passwordHash,
-				passwordHashAlgorithm: user.passwordHashAlgorithm,
-				active: user.active,
-			},
-		});
+				create: {
+					apiConnectionId: connectionId,
+					origin: IdentityOrigin.SYNCED,
+					externalId: user.externalId,
+					username: user.username,
+					email,
+					displayName: user.displayName,
+					passwordHash: user.passwordHash,
+					passwordHashAlgorithm: user.passwordHashAlgorithm,
+					active: user.active,
+				},
+				update: {
+					username: user.username,
+					email,
+					displayName: user.displayName,
+					passwordHash: user.passwordHash,
+					passwordHashAlgorithm: user.passwordHashAlgorithm,
+					active: user.active,
+				},
+			});
+		} catch (error) {
+			// Concurrency race (Prompt 37): the read-then-write check above can be raced by a concurrent
+			// sync of another connection. The `username` global @unique is the final arbiter — convert the
+			// P2002 into the same collision outcome so exactly one user persists and the loser is reported.
+			if (
+				error instanceof Prisma.PrismaClientKnownRequestError &&
+				error.code === 'P2002' &&
+				(error.meta?.target as string[] | string | undefined)?.includes('username')
+			) {
+				throw new UsernameCollisionError(user.externalId, user.username);
+			}
+			throw error;
+		}
 		// Credential rotated upstream (new hash) → clear any brute-force lockout for this account so the
 		// legitimate user is not stuck behind a stale lock (Prompt 35). `existingByUsername` is the prior
 		// row for this same identity; comparing its hash is free (already fetched above).
@@ -193,6 +228,7 @@ export class IdentityRepository implements IdentityStore {
 	}
 
 	async replaceUserGroups(userId: string, groupIds: string[]): Promise<void> {
+		await this.assertMembershipsSameConnection(userId, 'group', groupIds);
 		await this.prisma.$transaction(async (tx) => {
 			await tx.userGroup.deleteMany({ where: { userId } });
 			if (groupIds.length > 0) {
@@ -204,6 +240,7 @@ export class IdentityRepository implements IdentityStore {
 	}
 
 	async replaceUserRoles(userId: string, roleIds: string[]): Promise<void> {
+		await this.assertMembershipsSameConnection(userId, 'role', roleIds);
 		await this.prisma.$transaction(async (tx) => {
 			await tx.userRole.deleteMany({ where: { userId } });
 			if (roleIds.length > 0) {
@@ -212,6 +249,40 @@ export class IdentityRepository implements IdentityStore {
 				});
 			}
 		});
+	}
+
+	/**
+	 * Membership-within-source invariant (Prompt 37): a user may only be a member of groups/roles that
+	 * belong to the user's own `apiConnectionId`. Defensive — sync already passes same-source ids; this
+	 * blocks a cross-connection assignment (e.g. via a buggy/manual path). Throws
+	 * {@link MembershipCrossConnectionError} on a mismatch.
+	 */
+	private async assertMembershipsSameConnection(
+		userId: string,
+		kind: 'group' | 'role',
+		ids: string[],
+	): Promise<void> {
+		if (ids.length === 0) {
+			return;
+		}
+		const user = await this.prisma.user.findUnique({
+			where: { id: userId },
+			select: { apiConnectionId: true },
+		});
+		if (!user) {
+			return;
+		}
+		const foreign =
+			kind === 'group'
+				? await this.prisma.group.count({
+						where: { id: { in: ids }, apiConnectionId: { not: user.apiConnectionId } },
+					})
+				: await this.prisma.role.count({
+						where: { id: { in: ids }, apiConnectionId: { not: user.apiConnectionId } },
+					});
+		if (foreign > 0) {
+			throw new MembershipCrossConnectionError(kind);
+		}
 	}
 
 	async upsertGroup(
@@ -329,6 +400,7 @@ export class IdentityRepository implements IdentityStore {
 		const where: Prisma.UserWhereInput = {
 			...this.userSearchWhere(query.search),
 			...(query.origin ? { origin: query.origin } : {}),
+			...(query.apiConnectionId ? { apiConnectionId: query.apiConnectionId } : {}),
 		};
 		const [items, total] = await Promise.all([
 			this.prisma.user.findMany({
@@ -461,10 +533,29 @@ export class IdentityRepository implements IdentityStore {
 		return count === ids.length;
 	}
 
+	async groupsAllInConnection(ids: string[], apiConnectionId: string): Promise<boolean> {
+		if (ids.length === 0) {
+			return true;
+		}
+		const count = await this.prisma.group.count({ where: { id: { in: ids }, apiConnectionId } });
+		return count === ids.length;
+	}
+
+	async rolesAllInConnection(ids: string[], apiConnectionId: string): Promise<boolean> {
+		if (ids.length === 0) {
+			return true;
+		}
+		const count = await this.prisma.role.count({ where: { id: { in: ids }, apiConnectionId } });
+		return count === ids.length;
+	}
+
 	// --- admin: groups ---
 
 	async listGroups(query: ListQuery): Promise<ListResult<StoreGroupWithCount>> {
-		const where: Prisma.GroupWhereInput = query.origin ? { origin: query.origin } : {};
+		const where: Prisma.GroupWhereInput = {
+			...(query.origin ? { origin: query.origin } : {}),
+			...(query.apiConnectionId ? { apiConnectionId: query.apiConnectionId } : {}),
+		};
 		const [rows, total] = await Promise.all([
 			this.prisma.group.findMany({
 				where,
@@ -550,7 +641,10 @@ export class IdentityRepository implements IdentityStore {
 	// --- admin: roles ---
 
 	async listRoles(query: ListQuery): Promise<ListResult<StoreRoleWithCount>> {
-		const where: Prisma.RoleWhereInput = query.origin ? { origin: query.origin } : {};
+		const where: Prisma.RoleWhereInput = {
+			...(query.origin ? { origin: query.origin } : {}),
+			...(query.apiConnectionId ? { apiConnectionId: query.apiConnectionId } : {}),
+		};
 		const [rows, total] = await Promise.all([
 			this.prisma.role.findMany({
 				where,
@@ -791,6 +885,39 @@ export class IdentityRepository implements IdentityStore {
 			this.prisma.group.deleteMany(),
 			this.prisma.role.deleteMany(),
 		]);
+	}
+
+	async syncedUserIdsForConnection(apiConnectionId: string): Promise<string[]> {
+		const rows = await this.prisma.user.findMany({
+			where: { apiConnectionId, origin: IdentityOrigin.SYNCED },
+			select: { id: true },
+		});
+		return rows.map((r) => r.id);
+	}
+
+	async removeConnectionIdentities(
+		apiConnectionId: string,
+		mode: 'deactivate' | 'delete',
+	): Promise<{ usersRemoved: number; groupsRemoved: number; rolesRemoved: number }> {
+		const where = { apiConnectionId, origin: IdentityOrigin.SYNCED } as const;
+		if (mode === 'deactivate') {
+			const users = await this.prisma.user.findMany({ where, select: { id: true } });
+			for (const part of chunk(users, 200)) {
+				await this.prisma.$transaction([
+					this.prisma.userGroup.deleteMany({ where: { userId: { in: part.map((u) => u.id) } } }),
+					this.prisma.userRole.deleteMany({ where: { userId: { in: part.map((u) => u.id) } } }),
+					this.prisma.user.updateMany({
+						where: { id: { in: part.map((u) => u.id) } },
+						data: { active: false },
+					}),
+				]);
+			}
+			return { usersRemoved: users.length, groupsRemoved: 0, rolesRemoved: 0 };
+		}
+		const u = await this.prisma.user.deleteMany({ where });
+		const g = await this.prisma.group.deleteMany({ where });
+		const r = await this.prisma.role.deleteMany({ where });
+		return { usersRemoved: u.count, groupsRemoved: g.count, rolesRemoved: r.count };
 	}
 
 	async connectionHasIdentityRows(apiConnectionId: string): Promise<boolean> {

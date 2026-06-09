@@ -1,6 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { AdminDashboardResponseDto } from '@nestidp/shared';
+import type {
+	AdminDashboardResponseDto,
+	AdminDashboardSyncSourceDto,
+	AdminDashboardSyncSourceHealthDto,
+	AdminDashboardSyncSourceState,
+} from '@nestidp/shared';
 import {
 	API_CONNECTION_ROUTE_PREFIX,
 	API_CONNECTIONS_API_PATH,
@@ -17,6 +22,8 @@ import { IdpSettingsService } from '../../idp-settings/services/idp-settings.ser
 import { PrismaService } from '../../prisma/services/prisma.service';
 import { buildIdpUrls } from '../../idp-settings/mappers/idp-settings.mapper';
 import { AccountLockoutService } from '../../auth-protection/account-lockout.service';
+import { ActiveIdentityStore } from '../../identity/store/active-identity-store';
+import { SyncMultiSourceConfig } from '../../sync/services/sync-multi-source.config';
 import { AdminStatsService } from './admin-stats.service';
 
 @Injectable()
@@ -27,6 +34,8 @@ export class AdminDashboardService {
 		private readonly configService: ConfigService,
 		private readonly idpSettingsService: IdpSettingsService,
 		private readonly accountLockout: AccountLockoutService,
+		private readonly identityStore: ActiveIdentityStore,
+		private readonly multiSourceConfig: SyncMultiSourceConfig,
 	) {}
 
 	async getDashboard(): Promise<AdminDashboardResponseDto> {
@@ -41,6 +50,7 @@ export class AdminDashboardService {
 			where: { isLocalDirectory: false },
 			orderBy: { createdAt: 'asc' },
 		});
+		const multiSource = await this.buildSyncSources();
 
 		const entityId = settings?.entityId ?? base;
 		const urls = buildIdpUrls(base);
@@ -87,8 +97,81 @@ export class AdminDashboardService {
 			apiConnection: connectionRow ? toApiConnectionDto(connectionRow) : null,
 			lastSyncStatus: connectionRow?.lastSyncStatus ?? null,
 			lastSyncAt: connectionRow?.lastSyncAt?.toISOString() ?? null,
+			syncSources: multiSource.syncSources,
+			manualIdentityCount: multiSource.manualIdentityCount,
+			syncSourceHealth: multiSource.syncSourceHealth,
 			auditEventsRoute: AUDIT_ROUTE_PREFIX,
 			adminUsersRoute: ADMIN_USERS_ROUTE_PREFIX,
+		};
+	}
+
+	/** Multi-source sync rollup for the dashboard (Prompt 37). */
+	private async buildSyncSources(): Promise<{
+		syncSources: AdminDashboardSyncSourceDto[];
+		manualIdentityCount: number;
+		syncSourceHealth: AdminDashboardSyncSourceHealthDto;
+	}> {
+		const now = Date.now();
+		const staleFactor = this.multiSourceConfig.syncSourceStaleFactor();
+		const [connections, localDir, counts] = await Promise.all([
+			this.prisma.apiConnection.findMany({
+				where: { isLocalDirectory: false },
+				orderBy: { createdAt: 'asc' },
+			}),
+			this.prisma.apiConnection.findFirst({
+				where: { isLocalDirectory: true },
+				select: { id: true },
+			}),
+			this.identityStore.countsByConnection(),
+		]);
+
+		const syncSources: AdminDashboardSyncSourceDto[] = connections.map((c) => {
+			let state: AdminDashboardSyncSourceState = 'ok';
+			if (c.lastSyncStatus === 'NEVER') {
+				state = 'never_synced';
+			} else if (c.lastSyncStatus === 'FAILED') {
+				state = 'failing';
+			} else if (
+				c.scheduleEnabled &&
+				!c.schedulePaused &&
+				c.lastSyncAt &&
+				c.lastScheduledRunAt &&
+				c.nextRunAt
+			) {
+				// Cron interval ≈ gap between the last scheduled run and the next; overdue when the last real
+				// sync is older than interval × staleFactor.
+				const interval = Math.max(60_000, c.nextRunAt.getTime() - c.lastScheduledRunAt.getTime());
+				if (now - c.lastSyncAt.getTime() > interval * staleFactor) {
+					state = 'overdue';
+				}
+			}
+			return {
+				apiConnectionId: c.id,
+				name: c.name,
+				lastSyncStatus: c.lastSyncStatus,
+				lastSyncAt: c.lastSyncAt?.toISOString() ?? null,
+				userCount: counts.users[c.id] ?? 0,
+				groupCount: counts.groups[c.id] ?? 0,
+				roleCount: counts.roles[c.id] ?? 0,
+				lastCollisionCount: c.lastCollisionCount,
+				includeInSyncAll: c.includeInSyncAll,
+				state,
+			};
+		});
+
+		const neverSynced = syncSources.filter((s) => s.state === 'never_synced').length;
+		const failing = syncSources.filter((s) => s.state === 'failing').length;
+		const overdue = syncSources.filter((s) => s.state === 'overdue').length;
+		return {
+			syncSources,
+			manualIdentityCount: localDir ? (counts.users[localDir.id] ?? 0) : 0,
+			syncSourceHealth: {
+				total: syncSources.length,
+				neverSynced,
+				failing,
+				overdue,
+				unhealthy: neverSynced + failing + overdue,
+			},
 		};
 	}
 

@@ -5,7 +5,11 @@ import {
 	toSyncLogDto,
 	toSyncStatusResponseDto,
 } from '@api/sync/mappers/sync.mapper';
-import { PROXY_FIELD_DEFAULTS, SCHEDULE_FIELD_DEFAULTS } from '../../support/prisma/test-fixtures';
+import {
+	MULTI_SOURCE_FIELD_DEFAULTS,
+	PROXY_FIELD_DEFAULTS,
+	SCHEDULE_FIELD_DEFAULTS,
+} from '../../support/prisma/test-fixtures';
 
 describe('sync.mapper', () => {
 	const baseLog: SyncLog = {
@@ -17,6 +21,7 @@ describe('sync.mapper', () => {
 		usersSynced: 2,
 		groupsSynced: 1,
 		rolesSynced: 1,
+		usersSkippedCollision: 0,
 		errors: null,
 		triggerSource: null,
 	};
@@ -40,6 +45,7 @@ describe('sync.mapper', () => {
 		lastSyncStatus: 'SUCCESS',
 		...SCHEDULE_FIELD_DEFAULTS,
 		...PROXY_FIELD_DEFAULTS,
+		...MULTI_SOURCE_FIELD_DEFAULTS,
 		createdAt: new Date('2025-12-01T00:00:00.000Z'),
 		updatedAt: new Date('2026-01-01T00:00:01.500Z'),
 	};

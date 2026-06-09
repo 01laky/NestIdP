@@ -7,7 +7,20 @@ export const IDENTITY_LIST_PAGE_SIZE = 10 as const;
 export const IDENTITY_USERS_API_PATH = '/api/admin/identity/users';
 export const IDENTITY_GROUPS_API_PATH = '/api/admin/identity/groups';
 export const IDENTITY_ROLES_API_PATH = '/api/admin/identity/roles';
+/** Source options (connections + Local directory) for the identity/sessions Source filter (Prompt 37). */
+export const IDENTITY_SOURCES_API_PATH = '/api/admin/identity/sources';
 export const IDENTITY_ROUTE_PREFIX = '/admin/identity';
+
+/** A selectable identity source for the Source filter (Prompt 37). */
+export interface IdentitySourceOptionDto {
+	apiConnectionId: string;
+	label: string;
+	isLocalDirectory: boolean;
+}
+
+export interface IdentitySourcesResponseDto {
+	sources: IdentitySourceOptionDto[];
+}
 
 export const LOCAL_DIRECTORY_CONNECTION_NAME = 'Local directory';
 export const LOCAL_DIRECTORY_BASE_URL = 'https://local.nestidp/manual';
@@ -58,6 +71,8 @@ export interface IdentityUserListItemDto {
 export interface IdentityUserListResponseDto {
 	items: IdentityUserListItemDto[];
 	total: number;
+	/** apiConnectionId → label lookup for the page's rows (Prompt 37; present from v1.18.0). */
+	sources?: IdentitySourceOptionDto[];
 }
 
 export interface IdentityGroupListItemDto {
@@ -72,6 +87,7 @@ export interface IdentityGroupListItemDto {
 export interface IdentityGroupListResponseDto {
 	items: IdentityGroupListItemDto[];
 	total: number;
+	sources?: IdentitySourceOptionDto[];
 }
 
 export interface IdentityRoleListItemDto {
@@ -86,6 +102,7 @@ export interface IdentityRoleListItemDto {
 export interface IdentityRoleListResponseDto {
 	items: IdentityRoleListItemDto[];
 	total: number;
+	sources?: IdentitySourceOptionDto[];
 }
 
 export interface IdentityUserSourceDto {

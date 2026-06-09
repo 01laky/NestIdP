@@ -230,9 +230,17 @@ describe('saml-sso-session.service', () => {
 			},
 		]);
 		const bcFindMany = jest.fn().mockResolvedValue([]);
+		const userFindMany = jest.fn().mockResolvedValue([
+			{
+				id: 'u1',
+				apiConnectionId: 'conn-1',
+				apiConnection: { name: 'HR', isLocalDirectory: false },
+			},
+		]);
 		const { service } = makeService({
 			samlSsoSession: { count, findMany },
 			samlBackchannelLogout: { findMany: bcFindMany },
+			user: { findMany: userFindMany },
 		});
 		const res = await service.listForAdmin({
 			status: 'terminated',
@@ -247,6 +255,30 @@ describe('saml-sso-session.service', () => {
 		expect(where.OR).toBeDefined();
 		// Per-SP back-channel state is fetched for the page's sessions (Prompt 36, item N).
 		expect(bcFindMany.mock.calls[0][0].where).toEqual({ ssoSessionId: { in: ['s1'] } });
+		// Per-user source resolution (Prompt 37): sourceLabel is attached from the user's connection.
+		expect(res.items[0].sourceApiConnectionId).toBe('conn-1');
+		expect(res.items[0].sourceLabel).toBe('HR');
+	});
+
+	it('MAS-SESS-FILTER: apiConnectionId filter scopes sessions to that source’s users', async () => {
+		const count = jest.fn().mockResolvedValue(0);
+		const findMany = jest.fn().mockResolvedValue([]);
+		const bcFindMany = jest.fn().mockResolvedValue([]);
+		// First user.findMany resolves the connection's user ids; second resolves page sources (none).
+		const userFindMany = jest
+			.fn()
+			.mockResolvedValueOnce([{ id: 'u1' }, { id: 'u2' }])
+			.mockResolvedValueOnce([]);
+		const { service } = makeService({
+			samlSsoSession: { count, findMany },
+			samlBackchannelLogout: { findMany: bcFindMany },
+			user: { findMany: userFindMany },
+		});
+
+		await service.listForAdmin({ status: 'active', apiConnectionId: 'conn-7' });
+
+		expect(userFindMany.mock.calls[0][0].where).toEqual({ apiConnectionId: 'conn-7' });
+		expect(findMany.mock.calls[0][0].where.userId).toEqual({ in: ['u1', 'u2'] });
 	});
 
 	it('BC-ADMIN-02: terminateBulk reports per-id outcomes (terminated / already / not-found)', async () => {

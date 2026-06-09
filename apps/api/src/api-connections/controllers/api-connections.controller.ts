@@ -19,6 +19,7 @@ import {
 	type ApiConnectionTestTokenResponseDto,
 	type DeleteApiConnectionResponseDto,
 	type ProxyCheckResultDto,
+	type RemoveSourceIdentitiesResponseDto,
 } from '@nestidp/shared';
 import { AdminAuthGuard } from '../../admin-auth/guards/admin-auth.guard';
 import { AdminCsrfGuard } from '../../admin-auth/guards/admin-csrf.guard';
@@ -27,6 +28,7 @@ import { ApiConnectionTestService } from '../services/api-connection-test.servic
 import { ApiConnectionsService } from '../services/api-connections.service';
 import { CreateApiConnectionBodyDto } from '../dto/create-api-connection.dto';
 import { UpdateApiConnectionBodyDto } from '../dto/update-api-connection.dto';
+import { RemoveSourceIdentitiesBodyDto } from '../dto/remove-source-identities.dto';
 
 @Controller(API_CONNECTIONS_API_PATH)
 @UseGuards(AdminAuthGuard)
@@ -70,6 +72,18 @@ export class ApiConnectionsController {
 	@UseGuards(AdminCsrfGuard)
 	delete(@Param('id', ParseCuidPipe) id: string): Promise<DeleteApiConnectionResponseDto> {
 		return this.apiConnectionsService.delete(id);
+	}
+
+	/** Remove this sync source's identities (deactivate|delete) before the connection can be deleted (Prompt 37). */
+	@Post(':id/remove-identities')
+	@HttpCode(HttpStatus.OK)
+	@UseGuards(AdminCsrfGuard)
+	removeSourceIdentities(
+		@Param('id', ParseCuidPipe) id: string,
+		@Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+		body: RemoveSourceIdentitiesBodyDto,
+	): Promise<RemoveSourceIdentitiesResponseDto> {
+		return this.apiConnectionsService.removeSourceIdentities(id, body.mode);
 	}
 
 	@Post(':id/test')

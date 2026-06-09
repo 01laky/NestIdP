@@ -16,6 +16,8 @@ export interface SyncLogDto {
 	usersSynced: number;
 	groupsSynced: number;
 	rolesSynced: number;
+	/** Cross-connection username collisions skipped in this run (Prompt 37; present from v1.18.0). */
+	usersSkippedCollision?: number;
 	/** True when run was POST with dryRun — detected via dry_run_summary error entry. */
 	dryRun: boolean;
 	/** How the run was started; null on legacy rows is treated as 'manual'. */
@@ -41,12 +43,20 @@ export interface SyncLogErrorEntryDto {
 		| 'cleanup_orphans'
 		| 'concurrency'
 		| 'dry_run_summary'
-		| 'user_limit';
+		| 'user_limit'
+		| 'username_collision';
 	externalUserId?: string;
 	externalGroupId?: string;
 	externalRoleId?: string;
 	message: string;
 	httpStatus?: number;
+	// --- username collision context (Prompt 37; no secrets) ---
+	/** The username that collided. */
+	username?: string;
+	/** The connection that currently owns the username (the record kept). */
+	ownerApiConnectionId?: string;
+	/** Resolved owner label — connection name, or "Local directory" for a manual owner. */
+	ownerLabel?: string;
 }
 
 export interface TriggerSyncRequestDto {
@@ -77,4 +87,42 @@ export interface SyncStatusResponseDto {
 	syncInProgress: boolean;
 	/** Most recent SyncLog for this connection; null if never synced. */
 	latestSyncLog: SyncLogDto | null;
+}
+
+// --- "Sync all sources" bulk trigger (Prompt 37) ------------------------------------------------
+
+/** REST sub-path for the bulk trigger: `${SYNC_API_PATH}/all`. */
+export const SYNC_ALL_API_PATH = '/api/admin/sync/all';
+
+export interface SyncAllRequestDto {
+	/** When true, every connection runs in dry-run (no writes) — a cross-source preview. */
+	dryRun?: boolean;
+}
+
+export type SyncAllConnectionStatus = 'succeeded' | 'failed' | 'skipped_in_progress' | 'excluded';
+
+export interface SyncAllConnectionResultDto {
+	connectionId: string;
+	name: string;
+	status: SyncAllConnectionStatus;
+	usersSynced: number;
+	groupsSynced: number;
+	rolesSynced: number;
+	usersSkippedCollision: number;
+	/** Redacted reason on failure / why it was skipped. */
+	message?: string;
+}
+
+export interface SyncAllResponseDto {
+	dryRun: boolean;
+	results: SyncAllConnectionResultDto[];
+	totals: {
+		connections: number;
+		succeeded: number;
+		failed: number;
+		skippedInProgress: number;
+		excluded: number;
+		usersSynced: number;
+		usersSkippedCollision: number;
+	};
 }

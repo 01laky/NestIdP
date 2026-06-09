@@ -330,4 +330,49 @@ describe('DashboardPage', () => {
 			expect(screen.getByText(/No unresolved back-channel logouts/i)).toBeDefined();
 		});
 	});
+
+	it('WEB-MAS-DASH: renders the sync-sources panel + stale-sources warning (Prompt 37)', async () => {
+		vi.spyOn(adminApi, 'getAdminDashboard').mockResolvedValue(
+			dashboardStub({
+				syncSources: [
+					{
+						apiConnectionId: 'c1',
+						name: 'HR',
+						lastSyncStatus: 'FAILED',
+						lastSyncAt: null,
+						userCount: 3,
+						groupCount: 1,
+						roleCount: 0,
+						lastCollisionCount: 0,
+						includeInSyncAll: true,
+						state: 'failing',
+					},
+				],
+				manualIdentityCount: 0,
+				syncSourceHealth: { total: 1, neverSynced: 0, failing: 1, overdue: 0, unhealthy: 1 },
+			}),
+		);
+
+		render(
+			<MemoryRouter>
+				<DashboardPage />
+			</MemoryRouter>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByText('Sync sources')).toBeDefined();
+			expect(screen.getByText(/need attention/i)).toBeDefined();
+		});
+	});
+
+	it('WEB-MAS-DASH-0: no sync-sources panel when there are no sources', async () => {
+		vi.spyOn(adminApi, 'getAdminDashboard').mockResolvedValue(dashboardStub({ syncSources: [] }));
+		render(
+			<MemoryRouter>
+				<DashboardPage />
+			</MemoryRouter>,
+		);
+		await waitFor(() => expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeDefined());
+		expect(screen.queryByText(/need attention/i)).toBeNull();
+	});
 });

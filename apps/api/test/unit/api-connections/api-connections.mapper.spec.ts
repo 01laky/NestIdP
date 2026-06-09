@@ -1,6 +1,10 @@
 import type { ApiConnection } from '@prisma/client';
 import { toApiConnectionDto } from '@api/api-connections/mappers/api-connections.mapper';
-import { PROXY_FIELD_DEFAULTS, SCHEDULE_FIELD_DEFAULTS } from '../../support/prisma/test-fixtures';
+import {
+	MULTI_SOURCE_FIELD_DEFAULTS,
+	PROXY_FIELD_DEFAULTS,
+	SCHEDULE_FIELD_DEFAULTS,
+} from '../../support/prisma/test-fixtures';
 
 describe('toApiConnectionDto', () => {
 	const baseRow: ApiConnection = {
@@ -22,6 +26,7 @@ describe('toApiConnectionDto', () => {
 		lastSyncStatus: 'SUCCESS',
 		...PROXY_FIELD_DEFAULTS,
 		...SCHEDULE_FIELD_DEFAULTS,
+		...MULTI_SOURCE_FIELD_DEFAULTS,
 		createdAt: new Date('2026-01-01T00:00:00.000Z'),
 		updatedAt: new Date('2026-01-02T00:00:00.000Z'),
 	};
@@ -52,6 +57,10 @@ describe('toApiConnectionDto', () => {
 			lastProxyCheckAt: null,
 			lastSyncAt: '2026-02-01T12:00:00.000Z',
 			lastSyncStatus: 'SUCCESS',
+			isLocalDirectory: false,
+			includeInSyncAll: true,
+			usernameCollisionPolicy: null,
+			lastCollisionCount: 0,
 			createdAt: '2026-01-01T00:00:00.000Z',
 			updatedAt: '2026-01-02T00:00:00.000Z',
 		});

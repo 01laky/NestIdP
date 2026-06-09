@@ -14,8 +14,12 @@ import type {
 	TriggerSyncResponseDto,
 	ApiContractConfig,
 	ResolvedApiContract,
+	UsernameCollisionPolicy,
+	SyncAllResponseDto,
+	SyncAllConnectionResultDto,
 } from '@nestidp/shared';
 import { getByPath, resolveApiContract } from '@nestidp/shared';
+import { SyncMultiSourceConfig } from './sync-multi-source.config';
 import { ApiConnection } from '@prisma/client';
 import { toApiConnectionDto } from '../../api-connections/mappers/api-connections.mapper';
 import {
@@ -81,6 +85,7 @@ export class SyncService {
 		private readonly audit: AuditPersistenceService,
 		private readonly oauthTokenService: OAuthTokenService,
 		private readonly proxyDispatcher: ProxyDispatcherService,
+		private readonly multiSourceConfig: SyncMultiSourceConfig,
 	) {}
 
 	async triggerSync(
@@ -126,6 +131,11 @@ export class SyncService {
 		let usersSynced = 0;
 		let groupsSynced = 0;
 		let rolesSynced = 0;
+		let usersSkippedCollision = 0;
+		// Cross-connection username collision policy: per-connection override → global default (Prompt 37).
+		const collisionPolicy: UsernameCollisionPolicy =
+			(connection.usernameCollisionPolicy as UsernameCollisionPolicy | null) ??
+			this.multiSourceConfig.usernameCollisionPolicy();
 		const seenGroupExternalIds = new Set<string>();
 		const seenRoleExternalIds = new Set<string>();
 		const upsertedGroupExternalIds = new Set<string>();
@@ -250,7 +260,16 @@ export class SyncService {
 						localUserId = row.id;
 						usersSynced += 1;
 					} catch (error) {
-						this.pushUpsertUserError(errors, user.id, error);
+						if (error instanceof UsernameCollisionError) {
+							usersSkippedCollision += 1;
+							await this.recordUsernameCollision(errors, error, connectionId);
+							// Strict deployments fail the whole connection run on any collision (Prompt 37).
+							if (collisionPolicy === 'fail_run') {
+								throw new StrictRowError();
+							}
+							continue;
+						}
+						this.pushUpsertUserError(errors, user.id);
 						continue;
 					}
 				}
@@ -325,7 +344,7 @@ export class SyncService {
 			const finishedLog = await this.syncLogService.finishLog(
 				runningLog.id,
 				'SUCCESS',
-				{ usersSynced, groupsSynced, rolesSynced },
+				{ usersSynced, groupsSynced, rolesSynced, usersSkippedCollision },
 				errors.length > 0 ? errors : null,
 			);
 
@@ -339,6 +358,7 @@ export class SyncService {
 					data: {
 						lastSyncAt: finishedLog.finishedAt ?? new Date(),
 						lastSyncStatus: 'SUCCESS',
+						lastCollisionCount: usersSkippedCollision,
 						scheduleConsecutiveFailures: 0,
 						scheduleAutoPausedAt: null,
 						scheduleLastError: null,
@@ -349,6 +369,7 @@ export class SyncService {
 
 			this.recordSyncAudit('sync_completed', finishedLog.id, options, {
 				usersSynced,
+				usersSkippedCollision,
 				status: 'SUCCESS',
 			});
 			return {
@@ -362,10 +383,102 @@ export class SyncService {
 				runningLog.id,
 				dryRun,
 				errors,
-				{ usersSynced, groupsSynced, rolesSynced },
+				{ usersSynced, groupsSynced, rolesSynced, usersSkippedCollision },
 				auditContext,
 			);
 		}
+	}
+
+	/**
+	 * "Sync all sources" (Prompt 37): trigger a sync for every included non-local connection, with bounded
+	 * concurrency, isolating failures, skipping in-progress connections. Connections are processed in
+	 * `createdAt` order so the cross-source collision winner is deterministic at concurrency 1.
+	 */
+	async syncAll(options: {
+		dryRun?: boolean;
+		adminId?: string;
+		adminUsername?: string;
+	}): Promise<SyncAllResponseDto> {
+		const dryRun = options.dryRun === true;
+		const connections = await this.prisma.apiConnection.findMany({
+			where: { isLocalDirectory: false, includeInSyncAll: true },
+			orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+		});
+		const byId = new Map<string, SyncAllConnectionResultDto>();
+		const concurrency = this.multiSourceConfig.syncAllConcurrency();
+
+		await this.runPool(connections, concurrency, async (c) => {
+			if (!dryRun && (await this.isSyncInProgress(c.id))) {
+				byId.set(c.id, this.skippedResult(c.id, c.name));
+				return;
+			}
+			try {
+				const res = await this.triggerSync(c.id, {
+					dryRun,
+					triggerSource: 'manual_all',
+					adminId: options.adminId,
+					adminUsername: options.adminUsername,
+				});
+				const log = res.syncLog;
+				byId.set(c.id, {
+					connectionId: c.id,
+					name: c.name,
+					status: log.status === 'FAILED' ? 'failed' : 'succeeded',
+					usersSynced: log.usersSynced,
+					groupsSynced: log.groupsSynced,
+					rolesSynced: log.rolesSynced,
+					usersSkippedCollision: log.usersSkippedCollision ?? 0,
+				});
+			} catch (error) {
+				// A concurrent in-progress race surfaces as a Conflict — report it as skipped, not failed.
+				if (error instanceof ConflictException) {
+					byId.set(c.id, this.skippedResult(c.id, c.name));
+					return;
+				}
+				byId.set(c.id, {
+					connectionId: c.id,
+					name: c.name,
+					status: 'failed',
+					usersSynced: 0,
+					groupsSynced: 0,
+					rolesSynced: 0,
+					usersSkippedCollision: 0,
+					message: error instanceof Error ? error.message : 'sync_failed',
+				});
+			}
+		});
+
+		// Stable output in createdAt order (runPool may complete out of order).
+		const results = connections.map((c) => byId.get(c.id) ?? this.skippedResult(c.id, c.name));
+		const totals = {
+			connections: results.length,
+			succeeded: results.filter((r) => r.status === 'succeeded').length,
+			failed: results.filter((r) => r.status === 'failed').length,
+			skippedInProgress: results.filter((r) => r.status === 'skipped_in_progress').length,
+			excluded: 0,
+			usersSynced: results.reduce((n, r) => n + r.usersSynced, 0),
+			usersSkippedCollision: results.reduce((n, r) => n + r.usersSkippedCollision, 0),
+		};
+		this.audit.recordSafe({
+			category: 'sync',
+			event: 'identity_sync_all_triggered',
+			actorType: options.adminId ? 'admin' : 'system',
+			actorId: options.adminId,
+			metadata: { connections: results.length, dryRun },
+		});
+		return { dryRun, results, totals };
+	}
+
+	private skippedResult(connectionId: string, name: string): SyncAllConnectionResultDto {
+		return {
+			connectionId,
+			name,
+			status: 'skipped_in_progress',
+			usersSynced: 0,
+			groupsSynced: 0,
+			rolesSynced: 0,
+			usersSkippedCollision: 0,
+		};
 	}
 
 	/** Endpoint mode: bounded-parallel raw fetch. Embedded mode: synchronous extract. */
@@ -632,19 +745,28 @@ export class SyncService {
 		logId: string,
 		dryRun: boolean,
 		errors: SyncLogErrorEntryDto[],
-		counters: { usersSynced: number; groupsSynced: number; rolesSynced: number },
+		counters: {
+			usersSynced: number;
+			groupsSynced: number;
+			rolesSynced: number;
+			usersSkippedCollision?: number;
+		},
 		options?: { adminId?: string; adminUsername?: string },
 	): Promise<TriggerSyncResponseDto> {
 		const finishedLog = await this.syncLogService.finishLog(logId, 'FAILED', counters, errors);
 		this.recordSyncAudit('sync_failed', finishedLog.id, options, {
 			usersSynced: counters.usersSynced,
+			usersSkippedCollision: counters.usersSkippedCollision ?? 0,
 			status: 'FAILED',
 		});
 		let connectionAfter = connectionBefore;
 		if (!dryRun) {
 			connectionAfter = await this.prisma.apiConnection.update({
 				where: { id: connectionId },
-				data: { lastSyncStatus: 'FAILED' },
+				data: {
+					lastSyncStatus: 'FAILED',
+					lastCollisionCount: counters.usersSkippedCollision ?? 0,
+				},
 			});
 		}
 		return {
@@ -728,23 +850,63 @@ export class SyncService {
 		errors.push({ phase: 'fetch_users', message: 'Failed to fetch users' });
 	}
 
-	private pushUpsertUserError(
-		errors: SyncLogErrorEntryDto[],
-		externalUserId: string,
-		error: unknown,
-	): void {
-		if (error instanceof UsernameCollisionError) {
-			errors.push({
-				phase: 'upsert_user',
-				externalUserId,
-				message: error.message,
-			});
-			return;
-		}
+	private pushUpsertUserError(errors: SyncLogErrorEntryDto[], externalUserId: string): void {
 		errors.push({
 			phase: 'upsert_user',
 			externalUserId,
 			message: 'Failed to upsert user',
+		});
+	}
+
+	/**
+	 * Record a cross-connection username collision as a first-class outcome (Prompt 37): a distinct
+	 * `username_collision` error entry that names the current owner (the record kept), plus a system audit
+	 * event. No secrets; the colliding record is skipped, the owner is never overwritten.
+	 */
+	private async recordUsernameCollision(
+		errors: SyncLogErrorEntryDto[],
+		error: UsernameCollisionError,
+		connectionId: string,
+	): Promise<void> {
+		let owner: {
+			apiConnectionId: string;
+			apiConnection: { name: string; isLocalDirectory: boolean };
+		} | null = null;
+		try {
+			owner = await this.prisma.user.findUnique({
+				where: { username: error.username },
+				select: {
+					apiConnectionId: true,
+					apiConnection: { select: { name: true, isLocalDirectory: true } },
+				},
+			});
+		} catch {
+			owner = null;
+		}
+		const ownerLabel = owner
+			? owner.apiConnection.isLocalDirectory
+				? 'Local directory'
+				: owner.apiConnection.name
+			: undefined;
+		errors.push({
+			phase: 'username_collision',
+			externalUserId: error.externalUserId,
+			username: error.username,
+			ownerApiConnectionId: owner?.apiConnectionId,
+			ownerLabel,
+			message: `Username "${error.username}" already owned by ${ownerLabel ?? 'another source'}`,
+		});
+		this.audit.recordSafe({
+			category: 'sync',
+			event: 'identity_sync_username_collision',
+			actorType: 'system',
+			subjectType: 'ApiConnection',
+			subjectId: connectionId,
+			metadata: {
+				username: error.username,
+				externalId: error.externalUserId,
+				ownerApiConnectionId: owner?.apiConnectionId,
+			},
 		});
 	}
 

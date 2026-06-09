@@ -301,6 +301,19 @@ export function DashboardPage() {
 					<p className="evg-muted">{t('spSecurity.backchannelAllResolved')}</p>
 				)}
 			</Panel>
+			{dashboard.syncSources && dashboard.syncSources.length > 0 ? (
+				<Panel title={t('syncSourcesTitle')}>
+					<p className="evg-muted">
+						{t('syncSourcesCount', { count: dashboard.syncSources.length })}
+					</p>
+					{dashboard.syncSourceHealth && dashboard.syncSourceHealth.unhealthy > 0 ? (
+						<Callout variant="warning" role="alert">
+							{t('staleSourcesWarning', { count: dashboard.syncSourceHealth.unhealthy })}{' '}
+							<Link to={API_CONNECTION_ROUTE_PREFIX}>{t('spSecurity.openSpConnections')}</Link>
+						</Callout>
+					) : null}
+				</Panel>
+			) : null}
 			{dashboard.lockouts ? (
 				<Panel title={t('securityLockoutsTitle')}>
 					{dashboard.lockouts.lockedAdminAccounts + dashboard.lockouts.lockedUserAccounts > 0 ? (

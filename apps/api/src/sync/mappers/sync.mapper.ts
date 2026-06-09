@@ -42,6 +42,7 @@ export function toSyncLogDto(row: SyncLog): SyncLogDto {
 		usersSynced: row.usersSynced,
 		groupsSynced: row.groupsSynced,
 		rolesSynced: row.rolesSynced,
+		usersSkippedCollision: row.usersSkippedCollision,
 		dryRun: isDryRunLog(errors),
 		triggerSource: normalizeTriggerSource(row.triggerSource),
 		errors,

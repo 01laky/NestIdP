@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+	BadRequestException,
+	ConflictException,
+	ForbiddenException,
+	NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { ApiConnectionsService } from '@api/api-connections/services/api-connections.service';
@@ -33,6 +38,7 @@ describe('ApiConnectionsService', () => {
 		logContractUpdated: jest.fn(),
 		logAuthTypeChanged: jest.fn(),
 		logProxyUpdated: jest.fn(),
+		logSourceIdentitiesRemoved: jest.fn(),
 	};
 	const oauthTokenService = {
 		getAccessToken: jest.fn(),
@@ -42,6 +48,15 @@ describe('ApiConnectionsService', () => {
 
 	const identityStore = {
 		connectionHasIdentityRows: jest.fn().mockResolvedValue(false),
+		countsByConnection: jest.fn().mockResolvedValue({ users: {}, groups: {}, roles: {} }),
+		syncedUserIdsForConnection: jest.fn().mockResolvedValue([]),
+		removeConnectionIdentities: jest
+			.fn()
+			.mockResolvedValue({ usersRemoved: 0, groupsRemoved: 0, rolesRemoved: 0 }),
+	};
+
+	const ssoSessions = {
+		terminateAllForUser: jest.fn().mockResolvedValue(0),
 	};
 
 	const proxyDispatcher = fakeProxyDispatcher();
@@ -53,6 +68,7 @@ describe('ApiConnectionsService', () => {
 		oauthTokenService as never,
 		identityStore as never,
 		proxyDispatcher,
+		ssoSessions as never,
 	);
 
 	const sampleRow = {
@@ -130,24 +146,22 @@ describe('ApiConnectionsService', () => {
 		getMock.mockImplementation((key: string) => (key === 'NODE_ENV' ? 'test' : undefined));
 	});
 
-	it('API-CON-05: create second external connection → ConflictException', async () => {
-		prisma.apiConnection.count.mockResolvedValue(1);
+	it('API-CON-05 / MAS: multiple external connections are allowed (Prompt 37)', async () => {
+		prisma.apiConnection.findMany.mockResolvedValue([sampleRow]);
+		prisma.apiConnection.create.mockResolvedValue({ ...sampleRow, id: 'conn-2', name: 'Second' });
 
-		await expect(
-			service.create({
-				name: 'Second',
-				baseUrl: 'https://b.example.com',
-				bearerToken: 't',
-			}),
-		).rejects.toThrow(ConflictException);
-
-		expect(prisma.apiConnection.count).toHaveBeenCalledWith({
-			where: { isLocalDirectory: false },
+		const res = await service.create({
+			name: 'Second',
+			baseUrl: 'https://b.example.com',
+			bearerToken: 't',
 		});
+
+		expect(res.connection.name).toBe('Second');
+		expect(prisma.apiConnection.create).toHaveBeenCalled();
 	});
 
-	it('API-CON-05b: create allowed when only local directory row exists', async () => {
-		prisma.apiConnection.count.mockResolvedValue(0);
+	it('API-CON-05b: create allowed', async () => {
+		prisma.apiConnection.findMany.mockResolvedValue([]);
 		prisma.apiConnection.create.mockResolvedValue(sampleRow);
 
 		await service.create({
@@ -156,9 +170,7 @@ describe('ApiConnectionsService', () => {
 			bearerToken: 'mock-sync-dev-token',
 		});
 
-		expect(prisma.apiConnection.count).toHaveBeenCalledWith({
-			where: { isLocalDirectory: false },
-		});
+		expect(prisma.apiConnection.create).toHaveBeenCalled();
 	});
 
 	it('API-CON-06: update changes name only; token unchanged', async () => {
@@ -822,6 +834,130 @@ describe('ApiConnectionsService', () => {
 			await expect(service.update(sampleRow.id, { proxyEnabled: true })).rejects.toBeInstanceOf(
 				BadRequestException,
 			);
+		});
+	});
+
+	describe('multi-source (Prompt 37)', () => {
+		beforeEach(() => {
+			jest.clearAllMocks();
+			identityStore.connectionHasIdentityRows.mockResolvedValue(false);
+			identityStore.syncedUserIdsForConnection.mockResolvedValue([]);
+			identityStore.removeConnectionIdentities.mockResolvedValue({
+				usersRemoved: 0,
+				groupsRemoved: 0,
+				rolesRemoved: 0,
+			});
+			ssoSessions.terminateAllForUser.mockResolvedValue(0);
+		});
+
+		it('MAS-CREATE: create persists includeInSyncAll + usernameCollisionPolicy', async () => {
+			prisma.apiConnection.findMany.mockResolvedValue([]);
+			prisma.apiConnection.create.mockResolvedValue(sampleRow);
+			await service.create({
+				name: 'C',
+				baseUrl: 'https://c.example.com',
+				bearerToken: 't',
+				includeInSyncAll: false,
+				usernameCollisionPolicy: 'fail_run',
+			});
+			const data = prisma.apiConnection.create.mock.calls[0][0].data;
+			expect(data.includeInSyncAll).toBe(false);
+			expect(data.usernameCollisionPolicy).toBe('fail_run');
+		});
+
+		it('MAS-UPDATE: update sets includeInSyncAll + usernameCollisionPolicy', async () => {
+			prisma.apiConnection.findUnique.mockResolvedValue(sampleRow);
+			prisma.apiConnection.findMany.mockResolvedValue([sampleRow]);
+			prisma.apiConnection.update.mockResolvedValue(sampleRow);
+			await service.update(sampleRow.id, {
+				includeInSyncAll: false,
+				usernameCollisionPolicy: 'skip',
+			});
+			const data = prisma.apiConnection.update.mock.calls[0][0].data;
+			expect(data.includeInSyncAll).toBe(false);
+			expect(data.usernameCollisionPolicy).toBe('skip');
+		});
+
+		it('MAS-REBIND-01: changing baseUrl with existing identities and no acknowledgement → 409', async () => {
+			prisma.apiConnection.findUnique.mockResolvedValue(sampleRow);
+			identityStore.connectionHasIdentityRows.mockResolvedValue(true);
+			await expect(
+				service.update(sampleRow.id, { baseUrl: 'https://moved.example.com' }),
+			).rejects.toBeInstanceOf(ConflictException);
+		});
+
+		it('MAS-REBIND-02: re-bind proceeds with acknowledgeRebind=true', async () => {
+			prisma.apiConnection.findUnique.mockResolvedValue(sampleRow);
+			prisma.apiConnection.findMany.mockResolvedValue([sampleRow]);
+			identityStore.connectionHasIdentityRows.mockResolvedValue(true);
+			prisma.apiConnection.update.mockResolvedValue(sampleRow);
+			await expect(
+				service.update(sampleRow.id, {
+					baseUrl: 'https://moved.example.com',
+					acknowledgeRebind: true,
+				}),
+			).resolves.toBeDefined();
+		});
+
+		it('MAS-REBIND-03: changing only non-rebind fields with identities does not require acknowledgement', async () => {
+			prisma.apiConnection.findUnique.mockResolvedValue(sampleRow);
+			prisma.apiConnection.findMany.mockResolvedValue([sampleRow]);
+			identityStore.connectionHasIdentityRows.mockResolvedValue(true);
+			prisma.apiConnection.update.mockResolvedValue(sampleRow);
+			await expect(service.update(sampleRow.id, { name: 'Renamed' })).resolves.toBeDefined();
+		});
+
+		it('MAS-REMOVE-01: removeSourceIdentities terminates each user’s sessions and returns counts', async () => {
+			prisma.apiConnection.findUnique.mockResolvedValue({ ...sampleRow, isLocalDirectory: false });
+			identityStore.syncedUserIdsForConnection.mockResolvedValue(['u1', 'u2']);
+			identityStore.removeConnectionIdentities.mockResolvedValue({
+				usersRemoved: 2,
+				groupsRemoved: 1,
+				rolesRemoved: 0,
+			});
+			ssoSessions.terminateAllForUser.mockResolvedValue(1);
+
+			const res = await service.removeSourceIdentities(sampleRow.id, 'delete');
+
+			expect(ssoSessions.terminateAllForUser).toHaveBeenCalledTimes(2);
+			expect(ssoSessions.terminateAllForUser).toHaveBeenCalledWith('u1', 'user_deactivated');
+			expect(identityStore.removeConnectionIdentities).toHaveBeenCalledWith(sampleRow.id, 'delete');
+			expect(res).toEqual({
+				ok: true,
+				mode: 'delete',
+				usersRemoved: 2,
+				groupsRemoved: 1,
+				rolesRemoved: 0,
+				sessionsTerminated: 2,
+			});
+			expect(audit.logSourceIdentitiesRemoved).toHaveBeenCalled();
+		});
+
+		it('MAS-REMOVE-02: the local-directory connection’s identities cannot be removed this way', async () => {
+			prisma.apiConnection.findUnique.mockResolvedValue({ ...sampleRow, isLocalDirectory: true });
+			// findOrThrow rejects the local-directory connection up front (Forbidden), never deleting identities.
+			await expect(service.removeSourceIdentities(sampleRow.id, 'delete')).rejects.toBeInstanceOf(
+				ForbiddenException,
+			);
+		});
+
+		it('MAS-DELGUARD: deleting a connection with identities is blocked (409)', async () => {
+			prisma.apiConnection.findUnique.mockResolvedValue(sampleRow);
+			identityStore.connectionHasIdentityRows.mockResolvedValue(true);
+			await expect(service.delete(sampleRow.id)).rejects.toBeInstanceOf(ConflictException);
+		});
+
+		it('MAS-LIST-COUNTS: list attaches per-source synced counts', async () => {
+			prisma.apiConnection.findMany.mockResolvedValue([sampleRow]);
+			identityStore.countsByConnection.mockResolvedValue({
+				users: { [sampleRow.id]: 5 },
+				groups: { [sampleRow.id]: 2 },
+				roles: {},
+			});
+			const res = await service.list();
+			expect(res.connections[0].syncedUserCount).toBe(5);
+			expect(res.connections[0].syncedGroupCount).toBe(2);
+			expect(res.connections[0].syncedRoleCount).toBe(0);
 		});
 	});
 });

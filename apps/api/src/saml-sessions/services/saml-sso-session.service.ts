@@ -307,6 +307,14 @@ export class SamlSsoSessionService {
 				{ participations: { some: { nameId: { contains: q } } } },
 			];
 		}
+		// Filter by the signed-in user's originating identity source (Prompt 37).
+		if (query.apiConnectionId) {
+			const userIds = await this.prisma.user.findMany({
+				where: { apiConnectionId: query.apiConnectionId },
+				select: { id: true },
+			});
+			where.userId = { in: userIds.map((u) => u.id) };
+		}
 
 		const [total, rows] = await Promise.all([
 			this.prisma.samlSsoSession.count({ where }),
@@ -338,8 +346,39 @@ export class SamlSsoSessionService {
 			}
 		}
 
+		// Resolve each session user's originating identity source (Prompt 37). Best-effort: under an
+		// external identity DB the local User table is empty, so source is left null (no leak).
+		const userIds = [
+			...new Set(rows.map((r) => r.userId).filter((id): id is string => id != null)),
+		];
+		const sourceByUser = new Map<string, { apiConnectionId: string; label: string }>();
+		if (userIds.length > 0) {
+			const users = await this.prisma.user.findMany({
+				where: { id: { in: userIds } },
+				select: {
+					id: true,
+					apiConnectionId: true,
+					apiConnection: { select: { name: true, isLocalDirectory: true } },
+				},
+			});
+			for (const u of users) {
+				sourceByUser.set(u.id, {
+					apiConnectionId: u.apiConnectionId,
+					label: u.apiConnection.isLocalDirectory ? 'Local directory' : u.apiConnection.name,
+				});
+			}
+		}
+
 		return {
-			items: rows.map((r) => toSamlSsoSessionPublicDto(r, bcBySession.get(r.id) ?? [])),
+			items: rows.map((r) => {
+				const dto = toSamlSsoSessionPublicDto(r, bcBySession.get(r.id) ?? []);
+				const source = r.userId ? sourceByUser.get(r.userId) : undefined;
+				return {
+					...dto,
+					sourceApiConnectionId: source?.apiConnectionId ?? null,
+					sourceLabel: source?.label ?? null,
+				};
+			}),
 			total,
 		};
 	}

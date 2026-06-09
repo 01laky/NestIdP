@@ -48,6 +48,7 @@ export class SamlSessionsController {
 	list(
 		@Query('status') status?: string,
 		@Query('spConnectionId') spConnectionId?: string,
+		@Query('apiConnectionId') apiConnectionId?: string,
 		@Query('q') q?: string,
 		@Query('page') page?: string,
 		@Query('pageSize') pageSize?: string,
@@ -55,6 +56,7 @@ export class SamlSessionsController {
 		return this.sessions.listForAdmin({
 			status: this.normalizeStatus(status),
 			spConnectionId: spConnectionId && spConnectionId.length > 0 ? spConnectionId : undefined,
+			apiConnectionId: apiConnectionId && apiConnectionId.length > 0 ? apiConnectionId : undefined,
 			q: q && q.length > 0 ? q : undefined,
 			page: this.toPositiveInt(page),
 			pageSize: this.toPositiveInt(pageSize),

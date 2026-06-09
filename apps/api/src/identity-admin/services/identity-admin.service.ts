@@ -14,6 +14,7 @@ import type {
 	IdentityGroupListResponseDto,
 	IdentityRoleDetailResponseDto,
 	IdentityRoleListResponseDto,
+	IdentitySourceOptionDto,
 	IdentityUserDetailResponseDto,
 	IdentityUserListResponseDto,
 	UpdateManualIdentityGroupDto,
@@ -67,6 +68,7 @@ export class IdentityAdminService {
 		offsetRaw?: number,
 		search?: string,
 		originFilter?: string,
+		apiConnectionId?: string,
 	): Promise<IdentityUserListResponseDto> {
 		const limit = this.parseLimit(limitRaw);
 		const offset = this.parseOffset(offsetRaw);
@@ -75,6 +77,7 @@ export class IdentityAdminService {
 			offset,
 			search,
 			origin: this.parseOrigin(originFilter),
+			apiConnectionId: apiConnectionId || undefined,
 		});
 		const mapped = items.map((row) => this.toUserListItem(row));
 		const statuses = await this.accountLockout.getStatusMany(
@@ -94,6 +97,7 @@ export class IdentityAdminService {
 				),
 			})),
 			total,
+			sources: await this.listSourceOptions(),
 		};
 	}
 
@@ -160,7 +164,7 @@ export class IdentityAdminService {
 		const passwordHash = await hashPassword(body.password);
 		const groupIds = body.groupIds ?? [];
 		const roleIds = body.roleIds ?? [];
-		await this.validateMembershipIds(groupIds, roleIds);
+		await this.validateMembershipIds(groupIds, roleIds, local.id);
 
 		const user = await this.store.createManualUser({
 			apiConnectionId: local.id,
@@ -188,10 +192,10 @@ export class IdentityAdminService {
 		}
 		const email = body.email !== undefined ? this.normalizeEmail(body.email) : undefined;
 		if (body.groupIds !== undefined) {
-			await this.validateMembershipIds(body.groupIds, []);
+			await this.validateMembershipIds(body.groupIds, [], existing.apiConnectionId);
 		}
 		if (body.roleIds !== undefined) {
-			await this.validateMembershipIds([], body.roleIds);
+			await this.validateMembershipIds([], body.roleIds, existing.apiConnectionId);
 		}
 
 		await this.store.updateManualUser(id, {
@@ -226,6 +230,7 @@ export class IdentityAdminService {
 		limitRaw?: number,
 		offsetRaw?: number,
 		originFilter?: string,
+		apiConnectionId?: string,
 	): Promise<IdentityGroupListResponseDto> {
 		const limit = this.parseLimit(limitRaw);
 		const offset = this.parseOffset(offsetRaw);
@@ -233,6 +238,7 @@ export class IdentityAdminService {
 			limit,
 			offset,
 			origin: this.parseOrigin(originFilter),
+			apiConnectionId: apiConnectionId || undefined,
 		});
 		return {
 			items: items.map((row) => ({
@@ -244,6 +250,7 @@ export class IdentityAdminService {
 				memberCount: row.memberCount,
 			})),
 			total,
+			sources: await this.listSourceOptions(),
 		};
 	}
 
@@ -306,6 +313,7 @@ export class IdentityAdminService {
 		limitRaw?: number,
 		offsetRaw?: number,
 		originFilter?: string,
+		apiConnectionId?: string,
 	): Promise<IdentityRoleListResponseDto> {
 		const limit = this.parseLimit(limitRaw);
 		const offset = this.parseOffset(offsetRaw);
@@ -313,6 +321,7 @@ export class IdentityAdminService {
 			limit,
 			offset,
 			origin: this.parseOrigin(originFilter),
+			apiConnectionId: apiConnectionId || undefined,
 		});
 		return {
 			items: items.map((row) => ({
@@ -324,6 +333,7 @@ export class IdentityAdminService {
 				memberCount: row.memberCount,
 			})),
 			total,
+			sources: await this.listSourceOptions(),
 		};
 	}
 
@@ -420,6 +430,19 @@ export class IdentityAdminService {
 		return ensureLocalDirectoryConnection(this.prisma, (plain) => this.encryption.encrypt(plain));
 	}
 
+	/** Source options (connections + Local directory) for list responses + the Source filter (Prompt 37). */
+	async listSourceOptions(): Promise<IdentitySourceOptionDto[]> {
+		const rows = await this.prisma.apiConnection.findMany({
+			select: { id: true, name: true, isLocalDirectory: true },
+			orderBy: [{ isLocalDirectory: 'asc' }, { name: 'asc' }],
+		});
+		return rows.map((c) => ({
+			apiConnectionId: c.id,
+			label: c.isLocalDirectory ? LOCAL_DIRECTORY_CONNECTION_NAME : c.name,
+			isLocalDirectory: c.isLocalDirectory,
+		}));
+	}
+
 	private async findManualUserOrThrow(id: string): Promise<StoreUser> {
 		const row = await this.store.getUserById(id);
 		if (!row) {
@@ -493,12 +516,26 @@ export class IdentityAdminService {
 		}
 	}
 
-	private async validateMembershipIds(groupIds: string[], roleIds: string[]): Promise<void> {
+	private async validateMembershipIds(
+		groupIds: string[],
+		roleIds: string[],
+		apiConnectionId: string,
+	): Promise<void> {
 		if (groupIds.length > 0 && !(await this.store.groupsExistAll(groupIds))) {
 			throw new BadRequestException('Invalid group id');
 		}
 		if (roleIds.length > 0 && !(await this.store.rolesExistAll(roleIds))) {
 			throw new BadRequestException('Invalid role id');
+		}
+		// Membership-within-source invariant (Prompt 37): a user may only join its own source's groups/roles.
+		if (
+			groupIds.length > 0 &&
+			!(await this.store.groupsAllInConnection(groupIds, apiConnectionId))
+		) {
+			throw new BadRequestException('Group belongs to a different identity source');
+		}
+		if (roleIds.length > 0 && !(await this.store.rolesAllInConnection(roleIds, apiConnectionId))) {
+			throw new BadRequestException('Role belongs to a different identity source');
 		}
 	}
 

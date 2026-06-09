@@ -10,6 +10,7 @@ import { ApiConnectionsController } from './controllers/api-connections.controll
 import { ApiConnectionsService } from './services/api-connections.service';
 import { OAuthCoreModule } from '../sync/oauth-core.module';
 import { ProxyCoreModule } from '../sync/proxy-core.module';
+import { SamlSessionRegistryModule } from '../saml-sessions/saml-session-registry.module';
 
 @Module({
 	imports: [
@@ -20,6 +21,7 @@ import { ProxyCoreModule } from '../sync/proxy-core.module';
 		OAuthCoreModule,
 		ProxyCoreModule,
 		IdentityModule,
+		SamlSessionRegistryModule,
 	],
 	controllers: [ApiConnectionsController],
 	providers: [ApiConnectionsService, ApiConnectionTestService, ApiConnectionsAuditService],

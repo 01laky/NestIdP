@@ -199,7 +199,15 @@
 		"openSchedules": "Schema’s openen",
 		"securityLockoutsTitle": "Vergrendelde accounts",
 		"lockedAdmins": "Vergrendelde adminaccounts",
-		"lockedUsers": "Vergrendelde gebruikersaccounts"
+		"lockedUsers": "Vergrendelde gebruikersaccounts",
+		"syncSourcesTitle": "Sync sources",
+		"syncSourcesCount": "{{count}} sync source(s)",
+		"noSyncSources": "No sync sources configured.",
+		"staleSourcesWarning": "{{count}} sync source(s) need attention (never-synced, failing, or overdue).",
+		"sourceStateOk": "OK",
+		"sourceStateNeverSynced": "Never synced",
+		"sourceStateFailing": "Failing",
+		"sourceStateOverdue": "Overdue"
 	},
 	"apiConnections": {
 		"listTitle": "API-verbindingen",
@@ -278,7 +286,25 @@
 		"proxyStatus_tunnel_failed": "Tunnel mislukt",
 		"proxyStatus_tls_error": "TLS-fout",
 		"proxyStatus_target_error": "Doelfout",
-		"proxyStatus_bypassed": "Overgeslagen"
+		"proxyStatus_bypassed": "Overgeslagen",
+		"syncAllSources": "Sync all sources",
+		"syncAllDryRun": "Dry-run all",
+		"syncAllRunning": "Syncing all sources…",
+		"syncAllResult": "{{succeeded}} succeeded · {{failed}} failed · {{skipped}} skipped",
+		"includeInSyncAll": "Include in \"Sync all sources\"",
+		"includeInSyncAllHint": "When off, this connection is excluded from the bulk \"Sync all\" but can still be synced individually and on schedule.",
+		"usernameCollisionPolicy": "Username collision policy",
+		"collisionInherit": "Inherit global default",
+		"collisionSkip": "Skip (keep the existing owner)",
+		"collisionFailRun": "Fail the run",
+		"rebindWarning": "This connection already has synced identities. Changing the base URL or contract may deactivate or replace them on the next sync and cause username collisions. Continue?",
+		"removeIdentities": "Remove this source’s identities",
+		"removeIdentitiesDeactivate": "Deactivate (keep rows)",
+		"removeIdentitiesDelete": "Delete rows",
+		"removeIdentitiesConfirm": "Remove this source’s synced identities and terminate their SSO sessions? This cannot be undone for \"delete\".",
+		"removeIdentitiesResult": "Removed {{users}} user(s), {{groups}} group(s), {{roles}} role(s); {{sessions}} session(s) terminated.",
+		"syncedCounts": "{{users}} users · {{groups}} groups · {{roles}} roles",
+		"lastCollisions": "{{count}} collision(s) skipped"
 	},
 	"spConnections": {
 		"listTitle": "SP-verbindingen",
@@ -665,7 +691,10 @@
 		"unlock": "Ontgrendelen",
 		"unlockConfirmTitle": "Account ontgrendelen?",
 		"unlockConfirmBody": "Vergrendeling voor {{username}} opheffen?",
-		"unlockSuccess": "Account ontgrendeld"
+		"unlockSuccess": "Account ontgrendeld",
+		"sourceFilter": "Source",
+		"sourceAll": "All sources",
+		"colSource": "Source"
 	},
 	"audit": {
 		"title": "Auditlogboek",

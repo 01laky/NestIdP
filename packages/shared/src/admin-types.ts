@@ -67,11 +67,43 @@ export interface AdminDashboardResponseDto {
 	ssoUrl: string;
 	idp: AdminDashboardIdpStatusDto;
 	spSecurity: AdminDashboardSpSecuritySummaryDto;
+	/** @deprecated since v1.18.0 — use `syncSources`. Kept for back-compat (the first non-local source). */
 	apiConnection: ApiConnectionDto | null;
 	lastSyncStatus: LastSyncStatus | null;
 	lastSyncAt: string | null;
+	/** All non-local sync sources with per-source status + counts (Prompt 37; present from v1.18.0). */
+	syncSources?: AdminDashboardSyncSourceDto[];
+	/** Manual/local-directory identity bucket count (Prompt 37). */
+	manualIdentityCount?: number;
+	/** Rollup for the "stale / failing sources" dashboard warning widget (Prompt 37). */
+	syncSourceHealth?: AdminDashboardSyncSourceHealthDto;
 	auditEventsRoute: typeof AUDIT_ROUTE_PREFIX;
 	adminUsersRoute: typeof ADMIN_USERS_ROUTE_PREFIX;
+}
+
+/** A single sync source on the dashboard (Prompt 37). */
+export type AdminDashboardSyncSourceState = 'ok' | 'never_synced' | 'failing' | 'overdue';
+
+export interface AdminDashboardSyncSourceDto {
+	apiConnectionId: string;
+	name: string;
+	lastSyncStatus: LastSyncStatus;
+	lastSyncAt: string | null;
+	userCount: number;
+	groupCount: number;
+	roleCount: number;
+	lastCollisionCount: number;
+	includeInSyncAll: boolean;
+	state: AdminDashboardSyncSourceState;
+}
+
+export interface AdminDashboardSyncSourceHealthDto {
+	total: number;
+	neverSynced: number;
+	failing: number;
+	overdue: number;
+	/** neverSynced + failing + overdue — the count the warning widget surfaces. */
+	unhealthy: number;
 }
 
 /** @deprecated Use AdminDashboardResponseDto */

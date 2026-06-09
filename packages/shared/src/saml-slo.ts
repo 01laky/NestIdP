@@ -72,6 +72,9 @@ export interface SamlSsoSessionPublicDto {
 	participations: SamlSpParticipationPublicDto[];
 	/** Per-SP back-channel logout delivery state (Prompt 36); present from v1.17.0. */
 	backchannelLogouts?: SamlBackchannelLogoutPublicDto[];
+	/** Originating identity source of the signed-in user (Prompt 37); null for non-identity rows. */
+	sourceApiConnectionId?: string | null;
+	sourceLabel?: string | null;
 }
 
 // --- Back-channel SLO propagation port (Prompt 36) ---------------------------------------------
@@ -104,6 +107,8 @@ export const SAML_SESSIONS_LIST_PAGE_SIZE = 10 as const;
 export interface SamlSsoSessionListQueryDto {
 	status?: SamlSsoSessionStatusFilter;
 	spConnectionId?: string;
+	/** Filter by the signed-in user's originating identity source (Prompt 37). */
+	apiConnectionId?: string;
 	q?: string;
 	page?: number;
 	pageSize?: number;

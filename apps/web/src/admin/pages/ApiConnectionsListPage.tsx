@@ -1,15 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { API_CONNECTION_ROUTE_PREFIX } from '@nestidp/shared';
-import { AdminApiError, listApiConnections } from '../adminApi';
+import { AdminApiError, listApiConnections, syncAllSources } from '../adminApi';
 import { AdminPageHeader } from '../components/layout/AdminPageHeader';
 import { EmptyState } from '../components/common/EmptyState';
 import { ErrorBanner } from '../components/common/ErrorBanner';
 import { LoadingState } from '../components/common/LoadingState';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
 import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
-import { Table } from '../../ui';
+import { Button, Table, useToast } from '../../ui';
 
 export function ApiConnectionsListPage() {
 	const { t } = useTranslation('apiConnections');
@@ -21,6 +21,34 @@ export function ApiConnectionsListPage() {
 	const [connections, setConnections] = useState<
 		Awaited<ReturnType<typeof listApiConnections>>['connections']
 	>([]);
+	const [syncingAll, setSyncingAll] = useState(false);
+	const { showToast } = useToast();
+
+	const reload = useCallback(async () => {
+		const data = await listApiConnections();
+		setConnections(data.connections);
+	}, []);
+
+	async function onSyncAll(dryRun: boolean) {
+		setSyncingAll(true);
+		try {
+			const res = await syncAllSources({ dryRun });
+			showToast(
+				t('syncAllResult', {
+					succeeded: res.totals.succeeded,
+					failed: res.totals.failed,
+					skipped: res.totals.skippedInProgress,
+				}),
+			);
+			if (!dryRun) {
+				await reload();
+			}
+		} catch (err) {
+			showToast(err instanceof AdminApiError ? err.message : t('loadListFailed'));
+		} finally {
+			setSyncingAll(false);
+		}
+	}
 
 	useEffect(() => {
 		let cancelled = false;
@@ -61,9 +89,31 @@ export function ApiConnectionsListPage() {
 				subtitle={t('listSubtitle')}
 				breadcrumbs={[{ label: tNav('dashboard'), to: '/admin' }, { label: t('listTitle') }]}
 				actions={
-					<Link className="evg-btn evg-btn--link" to={`${API_CONNECTION_ROUTE_PREFIX}/new`}>
-						{t('newConnection')}
-					</Link>
+					<div className="evg-stack inline">
+						{connections.length > 0 ? (
+							<>
+								<Button
+									type="button"
+									variant="primary"
+									disabled={syncingAll}
+									onClick={() => void onSyncAll(false)}
+								>
+									{syncingAll ? t('syncAllRunning') : t('syncAllSources')}
+								</Button>
+								<Button
+									type="button"
+									variant="secondary"
+									disabled={syncingAll}
+									onClick={() => void onSyncAll(true)}
+								>
+									{t('syncAllDryRun')}
+								</Button>
+							</>
+						) : null}
+						<Link className="evg-btn evg-btn--link" to={`${API_CONNECTION_ROUTE_PREFIX}/new`}>
+							{t('newConnection')}
+						</Link>
+					</div>
 				}
 			/>
 			{loading ? <LoadingState /> : null}
@@ -87,6 +137,7 @@ export function ApiConnectionsListPage() {
 								<th>{tCommon('name')}</th>
 								<th>{tCommon('baseUrl')}</th>
 								<th>{t('tableLastSync')}</th>
+								<th>{t('syncSourcesTitle', { defaultValue: 'Identities' })}</th>
 								<th />
 							</tr>
 						</thead>
@@ -97,7 +148,24 @@ export function ApiConnectionsListPage() {
 									<td>
 										<code>{connection.baseUrl}</code>
 									</td>
-									<td>{connection.lastSyncStatus}</td>
+									<td>
+										{connection.lastSyncStatus}
+										{connection.lastCollisionCount && connection.lastCollisionCount > 0 ? (
+											<>
+												{' '}
+												<span className="evg-muted">
+													({t('lastCollisions', { count: connection.lastCollisionCount })})
+												</span>
+											</>
+										) : null}
+									</td>
+									<td className="evg-muted">
+										{t('syncedCounts', {
+											users: connection.syncedUserCount ?? 0,
+											groups: connection.syncedGroupCount ?? 0,
+											roles: connection.syncedRoleCount ?? 0,
+										})}
+									</td>
 									<td>
 										<Link to={`${API_CONNECTION_ROUTE_PREFIX}/${connection.id}`}>
 											{t('editLink')}

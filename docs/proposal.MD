@@ -719,7 +719,7 @@ _Phase 1 complete in **v1.0.0** (Prompt 10 — Docker, persistent audit, admin a
 ### Phase 3 — Extensibility
 
 - [x] **External identity database** — relocate or mirror users/groups/roles to an external Postgres/MySQL database, attached at runtime from the admin console (v1.12.0)
-- [ ] **Multiple API connections for sync** — merge users, groups, and roles from more than one identity API into the local store
+- [x] **Multiple API connections for sync** — register several API connections and sync from all of them into the shared store, every record tagged by its source `apiConnectionId`; "sync all", per-source surfacing, username-collision policy, membership-within-source invariant (v1.18.0)
 - [ ] Additional hash algorithms (argon2, pbkdf2)
 - [ ] SCIM connector
 - [ ] Multi-tenant support

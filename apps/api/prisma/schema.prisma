@@ -63,6 +63,14 @@ model ApiConnection {
   lastSyncAt                 DateTime?
   lastSyncStatus             LastSyncStatus @default(NEVER)
 
+  // Multiple API connections for sync (Prompt 37). includeInSyncAll opts a source in/out of the "sync all"
+  // bulk trigger (independent of the schedule pause flag); usernameCollisionPolicy overrides the global
+  // SYNC_USERNAME_COLLISION_POLICY (null = inherit); lastCollisionCount = the last run's skipped-collision
+  // count, surfaced on the connections list / dashboard.
+  includeInSyncAll        Boolean @default(true)
+  usernameCollisionPolicy String?
+  lastCollisionCount      Int     @default(0)
+
   // Outbound HTTP proxy (Prompt 33) — opt-in, off by default; never used for the local-directory
   // connection. proxyPasswordEncrypted is encrypted at rest via CREDENTIALS_ENCRYPTION (libSQL only).
   proxyEnabled           Boolean   @default(false)
@@ -259,8 +267,10 @@ model SyncLog {
   usersSynced     Int           @default(0)
   groupsSynced    Int           @default(0)
   rolesSynced     Int           @default(0)
+  // Cross-connection username collisions skipped in this run (Prompt 37).
+  usersSkippedCollision Int     @default(0)
   errors          Json?
-  // How the run was started (Prompt 32): "manual" | "scheduled". Null on legacy rows = manual.
+  // How the run was started (Prompt 32/37): "manual" | "scheduled" | "manual_all". Null on legacy rows = manual.
   triggerSource   String?
 
   apiConnection ApiConnection @relation(fields: [apiConnectionId], references: [id], onDelete: Restrict)

@@ -17,6 +17,7 @@ import { AdminAuthenticatedRequest } from '../../admin-auth/admin-auth.types';
 import {
 	SYNC_API_PATH,
 	isSyncTriggerSource,
+	type SyncAllResponseDto,
 	type SyncLogListResponseDto,
 	type SyncLogResponseDto,
 	type SyncStatusResponseDto,
@@ -56,6 +57,23 @@ export class SyncController {
 		const triggerSource: SyncTriggerSource | undefined =
 			source !== undefined && isSyncTriggerSource(source) ? source : undefined;
 		return this.syncService.listSyncLogs(connectionId, safeLimit, triggerSource);
+	}
+
+	/** "Sync all sources" (Prompt 37). Declared before `:connectionId` so the literal route wins. */
+	@Post('all')
+	@HttpCode(HttpStatus.OK)
+	@UseGuards(AdminCsrfGuard)
+	syncAll(
+		@Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+		body: TriggerSyncBodyDto,
+		@Query('dryRun') dryRunQuery: string | undefined,
+		@Req() req: AdminAuthenticatedRequest,
+	): Promise<SyncAllResponseDto> {
+		return this.syncService.syncAll({
+			dryRun: body.dryRun === true || dryRunQuery === 'true',
+			adminId: req.adminUser?.id,
+			adminUsername: req.adminUser?.username,
+		});
 	}
 
 	@Post(':connectionId')

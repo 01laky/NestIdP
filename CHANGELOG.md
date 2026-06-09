@@ -4,6 +4,43 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.18.0]
+
+### Added
+
+- **Multiple API connections for sync (Prompt 37):** the operator can register **several** external API
+  connections and sync from all of them into the **one shared** User/Group/Role store, where every synced
+  record is tagged with the `apiConnectionId` of the source it came from. The single-connection cap is
+  lifted; manual per-connection "Sync now", a new **"Sync all sources"** bulk trigger, and the scheduler all
+  feed the shared store.
+- **"Sync all sources":** `POST /api/admin/sync/all` runs every included non-local connection with **bounded
+  concurrency** (`SYNC_ALL_CONCURRENCY`, default sequential), supports a **dry-run** cross-source preview,
+  skips in-progress connections, isolates failures, and returns a per-connection summary. A per-connection
+  **include-in-sync-all** toggle keeps a source registered but out of bulk runs.
+- **Username-collision policy:** `User.username` stays globally unique (login stays deterministic); a
+  cross-connection overlap is **skipped + reported** by default (the run stays `SUCCESS`, the owner is named,
+  the collision is counted in `SyncLog.usersSkippedCollision` and audited), with a deterministic winner
+  (earliest `createdAt`) and an opt-in strict `fail_run` policy (`SYNC_USERNAME_COLLISION_POLICY` + a
+  per-connection override). The DB unique constraint is the final arbiter under concurrent races (`P2002`
+  is converted to a collision, never a crash).
+- **Surfacing:** the dashboard lists **all sync sources** (per-source status/counts) plus a **stale/failing
+  sources** warning widget; the API-connections list shows per-source synced counts + last-collision count;
+  identity Users/Groups/Roles lists gain a **source filter + label** (and a `/identity/sources` endpoint);
+  Active SAML sessions can be filtered by the signed-in user's originating source.
+- **Source-removal lifecycle:** removing a sync source's identities (`deactivate`|`delete`, bounded batches)
+  terminates the removed users' active SSO sessions (back-channel SLO fans out) before the connection can be
+  deleted; re-pointing a connection's `baseUrl`/contract with existing identities requires acknowledgement.
+
+### Changed
+
+- **Membership-within-source invariant:** a user may only belong to groups/roles of its own
+  `apiConnectionId` (enforced in the store + admin validation; sync already upheld it). Cross-source overlay
+  membership is out of scope.
+- Additive schema (migration `20260616120000_multi_source_sync`): `ApiConnection.includeInSyncAll`,
+  `ApiConnection.usernameCollisionPolicy`, `ApiConnection.lastCollisionCount`,
+  `SyncLog.usersSkippedCollision`. No change to the identity model or to `User.username`'s global `@unique`.
+- New bounded env knobs `SYNC_USERNAME_COLLISION_POLICY`, `SYNC_ALL_CONCURRENCY`, `SYNC_SOURCE_STALE_FACTOR`.
+
 ## [1.17.0]
 
 ### Added

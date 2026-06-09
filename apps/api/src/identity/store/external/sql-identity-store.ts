@@ -3,6 +3,7 @@ import type { Kysely } from 'kysely';
 import { IdentityOrigin } from '@prisma/client';
 import {
 	GroupNameCollisionError,
+	MembershipCrossConnectionError,
 	RoleNameCollisionError,
 	UsernameCollisionError,
 } from '../../identity.repository';
@@ -21,6 +22,7 @@ import {
 } from './external-schema-types';
 import type {
 	CreateManualUserInput,
+	IdentityCountsByConnection,
 	IdentitySnapshot,
 	IdentityStore,
 	ImportCounts,
@@ -119,6 +121,25 @@ export class SqlIdentityStore implements IdentityStore {
 		return this.count(T_ROLE);
 	}
 
+	async countsByConnection(): Promise<IdentityCountsByConnection> {
+		const byConn = async (table: typeof T_USER | typeof T_GROUP | typeof T_ROLE) => {
+			const rows = await this.db
+				.selectFrom(table)
+				.select((eb) => ['api_connection_id', eb.fn.countAll().as('n')])
+				.groupBy('api_connection_id')
+				.execute();
+			return Object.fromEntries(
+				rows.map((r) => [r.api_connection_id as string, Number(r.n)]),
+			) as Record<string, number>;
+		};
+		const [users, groups, roles] = await Promise.all([
+			byConn(T_USER),
+			byConn(T_GROUP),
+			byConn(T_ROLE),
+		]);
+		return { users, groups, roles };
+	}
+
 	async findUserByUsername(username: string): Promise<StoreUser | null> {
 		const row = await this.db
 			.selectFrom(T_USER)
@@ -212,27 +233,45 @@ export class SqlIdentityStore implements IdentityStore {
 
 		const id = cuid();
 		const now = this.now();
-		await this.db
-			.insertInto(T_USER)
-			.values({
-				id,
-				external_id: user.externalId,
-				api_connection_id: connectionId,
-				origin: IdentityOrigin.SYNCED,
-				username: user.username,
-				email,
-				display_name: user.displayName,
-				password_hash: user.passwordHash,
-				password_hash_algorithm: user.passwordHashAlgorithm,
-				active: user.active,
-				created_at: now,
-				updated_at: now,
-			})
-			.execute();
+		try {
+			await this.db
+				.insertInto(T_USER)
+				.values({
+					id,
+					external_id: user.externalId,
+					api_connection_id: connectionId,
+					origin: IdentityOrigin.SYNCED,
+					username: user.username,
+					email,
+					display_name: user.displayName,
+					password_hash: user.passwordHash,
+					password_hash_algorithm: user.passwordHashAlgorithm,
+					active: user.active,
+					created_at: now,
+					updated_at: now,
+				})
+				.execute();
+		} catch (error) {
+			// Concurrency race (Prompt 37): another connection inserted this username first. The DB unique
+			// constraint is the arbiter — convert it to a collision (parity with the local repo).
+			const owner = await this.db
+				.selectFrom(T_USER)
+				.select(['api_connection_id', 'external_id'])
+				.where('username', '=', user.username)
+				.executeTakeFirst();
+			if (
+				owner &&
+				(owner.api_connection_id !== connectionId || owner.external_id !== user.externalId)
+			) {
+				throw new UsernameCollisionError(user.externalId, user.username);
+			}
+			throw error;
+		}
 		return { id };
 	}
 
 	async replaceUserGroups(userId: string, groupIds: string[]): Promise<void> {
+		await this.assertMembershipsSameConnection(userId, 'group', groupIds);
 		await this.db.transaction().execute(async (trx) => {
 			await trx.deleteFrom(T_USER_GROUP).where('user_id', '=', userId).execute();
 			if (groupIds.length > 0) {
@@ -245,6 +284,7 @@ export class SqlIdentityStore implements IdentityStore {
 	}
 
 	async replaceUserRoles(userId: string, roleIds: string[]): Promise<void> {
+		await this.assertMembershipsSameConnection(userId, 'role', roleIds);
 		await this.db.transaction().execute(async (trx) => {
 			await trx.deleteFrom(T_USER_ROLE).where('user_id', '=', userId).execute();
 			if (roleIds.length > 0) {
@@ -254,6 +294,35 @@ export class SqlIdentityStore implements IdentityStore {
 					.execute();
 			}
 		});
+	}
+
+	/** Membership-within-source invariant (Prompt 37) — parity with the local repo. */
+	private async assertMembershipsSameConnection(
+		userId: string,
+		kind: 'group' | 'role',
+		ids: string[],
+	): Promise<void> {
+		if (ids.length === 0) {
+			return;
+		}
+		const user = await this.db
+			.selectFrom(T_USER)
+			.select(['api_connection_id'])
+			.where('id', '=', userId)
+			.executeTakeFirst();
+		if (!user) {
+			return;
+		}
+		const table = kind === 'group' ? T_GROUP : T_ROLE;
+		const foreign = await this.db
+			.selectFrom(table)
+			.select(['id'])
+			.where('id', 'in', ids)
+			.where('api_connection_id', '!=', user.api_connection_id)
+			.executeTakeFirst();
+		if (foreign) {
+			throw new MembershipCrossConnectionError(kind);
+		}
 	}
 
 	private async upsertNamed(
@@ -387,10 +456,12 @@ export class SqlIdentityStore implements IdentityStore {
 	async listUsers(query: ListQuery): Promise<ListResult<StoreUser>> {
 		const term = query.search?.trim();
 		const origin = query.origin;
+		const conn = query.apiConnectionId;
 		const rows = await this.db
 			.selectFrom(T_USER)
 			.selectAll()
 			.$if(!!origin, (qb) => qb.where('origin', '=', origin as string))
+			.$if(!!conn, (qb) => qb.where('api_connection_id', '=', conn as string))
 			.$if(!!term, (qb) =>
 				qb.where((eb) =>
 					eb.or([eb('username', this.likeOp, `%${term}%`), eb('email', this.likeOp, `%${term}%`)]),
@@ -404,6 +475,7 @@ export class SqlIdentityStore implements IdentityStore {
 			.selectFrom(T_USER)
 			.select((eb) => eb.fn.countAll().as('n'))
 			.$if(!!origin, (qb) => qb.where('origin', '=', origin as string))
+			.$if(!!conn, (qb) => qb.where('api_connection_id', '=', conn as string))
 			.$if(!!term, (qb) =>
 				qb.where((eb) =>
 					eb.or([eb('username', this.likeOp, `%${term}%`), eb('email', this.likeOp, `%${term}%`)]),
@@ -562,6 +634,29 @@ export class SqlIdentityStore implements IdentityStore {
 	rolesExistAll(ids: string[]): Promise<boolean> {
 		return this.existsAll(T_ROLE, ids);
 	}
+	groupsAllInConnection(ids: string[], apiConnectionId: string): Promise<boolean> {
+		return this.existsAllInConnection(T_GROUP, ids, apiConnectionId);
+	}
+	rolesAllInConnection(ids: string[], apiConnectionId: string): Promise<boolean> {
+		return this.existsAllInConnection(T_ROLE, ids, apiConnectionId);
+	}
+
+	private async existsAllInConnection(
+		table: typeof T_GROUP | typeof T_ROLE,
+		ids: string[],
+		apiConnectionId: string,
+	): Promise<boolean> {
+		if (ids.length === 0) {
+			return true;
+		}
+		const row = await this.db
+			.selectFrom(table)
+			.select((eb) => eb.fn.countAll().as('n'))
+			.where('id', 'in', ids)
+			.where('api_connection_id', '=', apiConnectionId)
+			.executeTakeFirst();
+		return Number(row?.n ?? 0) === ids.length;
+	}
 
 	// --- admin: groups / roles (shared impl) ---
 
@@ -576,6 +671,10 @@ export class SqlIdentityStore implements IdentityStore {
 		if (query.origin) {
 			base = base.where('origin', '=', query.origin);
 			countQ = countQ.where('origin', '=', query.origin);
+		}
+		if (query.apiConnectionId) {
+			base = base.where('api_connection_id', '=', query.apiConnectionId);
+			countQ = countQ.where('api_connection_id', '=', query.apiConnectionId);
 		}
 		const rows = await base
 			.orderBy('name', 'asc')
@@ -966,5 +1065,63 @@ export class SqlIdentityStore implements IdentityStore {
 			}
 		}
 		return false;
+	}
+
+	async syncedUserIdsForConnection(apiConnectionId: string): Promise<string[]> {
+		const rows = await this.db
+			.selectFrom(T_USER)
+			.select(['id'])
+			.where('api_connection_id', '=', apiConnectionId)
+			.where('origin', '=', IdentityOrigin.SYNCED)
+			.execute();
+		return rows.map((r) => r.id as string);
+	}
+
+	async removeConnectionIdentities(
+		apiConnectionId: string,
+		mode: 'deactivate' | 'delete',
+	): Promise<{ usersRemoved: number; groupsRemoved: number; rolesRemoved: number }> {
+		if (mode === 'deactivate') {
+			const users = await this.db
+				.selectFrom(T_USER)
+				.select(['id'])
+				.where('api_connection_id', '=', apiConnectionId)
+				.where('origin', '=', IdentityOrigin.SYNCED)
+				.execute();
+			const ids = users.map((u) => u.id as string);
+			if (ids.length > 0) {
+				await this.db.deleteFrom(T_USER_GROUP).where('user_id', 'in', ids).execute();
+				await this.db.deleteFrom(T_USER_ROLE).where('user_id', 'in', ids).execute();
+				await this.db
+					.updateTable(T_USER)
+					.set({ active: false, updated_at: this.now() })
+					.where('id', 'in', ids)
+					.execute();
+			}
+			return { usersRemoved: ids.length, groupsRemoved: 0, rolesRemoved: 0 };
+		}
+		// Count then delete (driver-agnostic: some drivers don't report numDeletedRows).
+		const del = async (table: typeof T_USER | typeof T_GROUP | typeof T_ROLE) => {
+			const countRow = await this.db
+				.selectFrom(table)
+				.select((eb) => eb.fn.countAll().as('n'))
+				.where('api_connection_id', '=', apiConnectionId)
+				.where('origin', '=', IdentityOrigin.SYNCED)
+				.executeTakeFirst();
+			const n = Number(countRow?.n ?? 0);
+			if (n > 0) {
+				await this.db
+					.deleteFrom(table)
+					.where('api_connection_id', '=', apiConnectionId)
+					.where('origin', '=', IdentityOrigin.SYNCED)
+					.execute();
+			}
+			return n;
+		};
+		return {
+			usersRemoved: await del(T_USER),
+			groupsRemoved: await del(T_GROUP),
+			rolesRemoved: await del(T_ROLE),
+		};
 	}
 }

@@ -199,7 +199,15 @@
 		"openSchedules": "Otevřít plány",
 		"securityLockoutsTitle": "Uzamčené účty",
 		"lockedAdmins": "Uzamčené admin účty",
-		"lockedUsers": "Uzamčené uživatelské účty"
+		"lockedUsers": "Uzamčené uživatelské účty",
+		"syncSourcesTitle": "Zdroje synchronizace",
+		"syncSourcesCount": "Zdrojů synchronizace: {{count}}",
+		"noSyncSources": "Žádné nakonfigurované zdroje synchronizace.",
+		"staleSourcesWarning": "{{count}} zdrojů synchronizace vyžaduje pozornost (nikdy nesynchronizované, selhávající nebo opožděné).",
+		"sourceStateOk": "OK",
+		"sourceStateNeverSynced": "Nikdy nesynchronizováno",
+		"sourceStateFailing": "Selhává",
+		"sourceStateOverdue": "Opožděné"
 	},
 	"apiConnections": {
 		"listTitle": "API připojení",
@@ -278,7 +286,25 @@
 		"proxyStatus_tunnel_failed": "Tunel selhal",
 		"proxyStatus_tls_error": "Chyba TLS",
 		"proxyStatus_target_error": "Chyba cíle",
-		"proxyStatus_bypassed": "Obejito"
+		"proxyStatus_bypassed": "Obejito",
+		"syncAllSources": "Synchronizovat všechny zdroje",
+		"syncAllDryRun": "Zkušební běh všech",
+		"syncAllRunning": "Synchronizuji všechny zdroje…",
+		"syncAllResult": "{{succeeded}} úspěšných · {{failed}} selhalo · {{skipped}} přeskočeno",
+		"includeInSyncAll": "Zahrnout do „Synchronizovat všechny zdroje\"",
+		"includeInSyncAllHint": "Když je vypnuto, toto připojení je vyloučeno z hromadné synchronizace, ale lze jej synchronizovat samostatně a podle plánu.",
+		"usernameCollisionPolicy": "Politika kolize uživatelského jména",
+		"collisionInherit": "Zdědit globální výchozí",
+		"collisionSkip": "Přeskočit (zachovat stávajícího vlastníka)",
+		"collisionFailRun": "Nechat běh selhat",
+		"rebindWarning": "Toto připojení už má synchronizované identity. Změna base URL nebo kontraktu je může při další synchronizaci deaktivovat/nahradit a způsobit kolize jmen. Pokračovat?",
+		"removeIdentities": "Odstranit identity tohoto zdroje",
+		"removeIdentitiesDeactivate": "Deaktivovat (zachovat záznamy)",
+		"removeIdentitiesDelete": "Smazat záznamy",
+		"removeIdentitiesConfirm": "Odstranit synchronizované identity tohoto zdroje a ukončit jejich SSO relace? U „smazat\" to nelze vrátit.",
+		"removeIdentitiesResult": "Odstraněno {{users}} uživatelů, {{groups}} skupin, {{roles}} rolí; ukončeno {{sessions}} relací.",
+		"syncedCounts": "{{users}} uživatelů · {{groups}} skupin · {{roles}} rolí",
+		"lastCollisions": "Přeskočeno kolizí: {{count}}"
 	},
 	"spConnections": {
 		"listTitle": "SP připojení",
@@ -665,7 +691,10 @@
 		"unlock": "Odemknout",
 		"unlockConfirmTitle": "Odemknout účet?",
 		"unlockConfirmBody": "Zrušit uzamčení pro {{username}}?",
-		"unlockSuccess": "Účet odemčen"
+		"unlockSuccess": "Účet odemčen",
+		"sourceFilter": "Zdroj",
+		"sourceAll": "Všechny zdroje",
+		"colSource": "Zdroj"
 	},
 	"audit": {
 		"title": "Audit log",

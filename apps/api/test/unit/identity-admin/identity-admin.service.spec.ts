@@ -15,6 +15,8 @@ function makeStoreMock() {
 		isUsernameTaken: jest.fn(),
 		groupsExistAll: jest.fn(),
 		rolesExistAll: jest.fn(),
+		groupsAllInConnection: jest.fn().mockResolvedValue(true),
+		rolesAllInConnection: jest.fn().mockResolvedValue(true),
 		listGroups: jest.fn(),
 		getGroupById: jest.fn(),
 		getGroupMembers: jest.fn(),
@@ -51,7 +53,12 @@ const baseUser = {
 
 describe('IdentityAdminService', () => {
 	const prisma = {
-		apiConnection: { findUnique: jest.fn(), findFirst: jest.fn(), create: jest.fn() },
+		apiConnection: {
+			findUnique: jest.fn(),
+			findFirst: jest.fn(),
+			create: jest.fn(),
+			findMany: jest.fn().mockResolvedValue([]),
+		},
 		auditEvent: { findMany: jest.fn() },
 	};
 	let store: ReturnType<typeof makeStoreMock>;
@@ -173,6 +180,22 @@ describe('IdentityAdminService', () => {
 		store.listUsers.mockResolvedValue({ items: [], total: 0 });
 		await service.listUsers(undefined, undefined, '  alice  ');
 		expect(store.listUsers).toHaveBeenCalledWith(expect.objectContaining({ search: '  alice  ' }));
+	});
+
+	it('MAS-FILTER: listUsers forwards the apiConnectionId source filter + returns source options', async () => {
+		store.listUsers.mockResolvedValue({ items: [], total: 0 });
+		prisma.apiConnection.findMany.mockResolvedValue([
+			{ id: 'conn-a', name: 'HR', isLocalDirectory: false },
+			{ id: 'local-1', name: 'Local directory', isLocalDirectory: true },
+		]);
+		const res = await service.listUsers(undefined, undefined, undefined, 'synced', 'conn-a');
+		expect(store.listUsers).toHaveBeenCalledWith(
+			expect.objectContaining({ apiConnectionId: 'conn-a' }),
+		);
+		expect(res.sources).toEqual([
+			{ apiConnectionId: 'conn-a', label: 'HR', isLocalDirectory: false },
+			{ apiConnectionId: 'local-1', label: 'Local directory', isLocalDirectory: true },
+		]);
 	});
 
 	it('API-IDN-SVC-06: getUserById unknown → NotFoundException', async () => {

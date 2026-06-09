@@ -394,7 +394,7 @@ describe('Identity manual CRUD (SQLite)', () => {
 			.expect(400);
 	});
 
-	it('API-IDN-MAN-19: local + syncable coexist; second syncable → 409', async () => {
+	it('API-IDN-MAN-19 / MAS: multiple syncable connections coexist (Prompt 37 multi-source)', async () => {
 		const { agent, csrf } = await adminAgent();
 		await createTestApiConnection(prisma, { name: 'First HR' });
 		await agent
@@ -405,7 +405,7 @@ describe('Identity manual CRUD (SQLite)', () => {
 				baseUrl: 'https://hr2.example.com',
 				bearerToken: 'token-2',
 			})
-			.expect(409);
+			.expect(201);
 	});
 
 	it('API-IDN-MAN-20: API connections list omits local row', async () => {
@@ -442,39 +442,52 @@ describe('Identity manual CRUD (SQLite)', () => {
 		expect(audit).not.toBeNull();
 	});
 
-	it('API-IDN-MAN-23: PATCH memberships replace and omit', async () => {
+	it('API-IDN-MAN-23: PATCH memberships replace and omit (manual groups only — Prompt 37 invariant)', async () => {
+		// A manual (local-directory) user may only be assigned manual groups; a synced group from another
+		// source is rejected by the membership-within-source invariant.
 		const conn = await createTestApiConnection(prisma);
 		const syncedGroup = await createTestGroup(prisma, conn.id, { name: 'sync-grp' });
 		const { agent, csrf } = await adminAgent();
-		const manualGrp = await agent
+		const manualGrpA = await agent
 			.post(IDENTITY_GROUPS_API_PATH)
 			.set(csrfHeader(csrf))
 			.send({ name: 'man-grp-a' })
 			.expect(201);
+		const manualGrpB = await agent
+			.post(IDENTITY_GROUPS_API_PATH)
+			.set(csrfHeader(csrf))
+			.send({ name: 'man-grp-b' })
+			.expect(201);
 		const user = await agent
 			.post(IDENTITY_USERS_API_PATH)
 			.set(csrfHeader(csrf))
-			.send(
-				manualUserBody({
-					groupIds: [manualGrp.body.group.id, syncedGroup.id],
-				}),
-			)
+			.send(manualUserBody({ groupIds: [manualGrpA.body.group.id] }))
 			.expect(201);
 		const userId = user.body.user.id as string;
+		// Cross-source synced group is rejected (membership-within-source invariant).
 		await agent
 			.patch(`${IDENTITY_USERS_API_PATH}/${userId}`)
 			.set(csrfHeader(csrf))
 			.send({ groupIds: [syncedGroup.id] })
+			.expect(400);
+		// Replacing with another manual group works.
+		await agent
+			.patch(`${IDENTITY_USERS_API_PATH}/${userId}`)
+			.set(csrfHeader(csrf))
+			.send({ groupIds: [manualGrpB.body.group.id] })
 			.expect(200);
 		const after = await agent.get(`${IDENTITY_USERS_API_PATH}/${userId}`).expect(200);
-		expect(after.body.groups.map((g: { id: string }) => g.id)).toEqual([syncedGroup.id]);
+		expect(after.body.groups.map((g: { id: string }) => g.id)).toEqual([manualGrpB.body.group.id]);
+		// Omitting groupIds keeps the existing membership.
 		await agent
 			.patch(`${IDENTITY_USERS_API_PATH}/${userId}`)
 			.set(csrfHeader(csrf))
 			.send({ displayName: 'Kept groups' })
 			.expect(200);
 		const afterOmit = await agent.get(`${IDENTITY_USERS_API_PATH}/${userId}`).expect(200);
-		expect(afterOmit.body.groups.map((g: { id: string }) => g.id)).toEqual([syncedGroup.id]);
+		expect(afterOmit.body.groups.map((g: { id: string }) => g.id)).toEqual([
+			manualGrpB.body.group.id,
+		]);
 	});
 
 	it('API-IDN-MAN-24: inactive manual user cannot login', async () => {

@@ -18,6 +18,7 @@ import type {
 	IdentityGroupListResponseDto,
 	IdentityRoleDetailResponseDto,
 	IdentityRoleListResponseDto,
+	IdentitySourcesResponseDto,
 	IdentityUserDetailResponseDto,
 	IdentityUserListResponseDto,
 	UnlockAccountResponseDto,
@@ -42,13 +43,21 @@ export class IdentityAdminController {
 		@Query('offset') offset?: string,
 		@Query('search') search?: string,
 		@Query('origin') origin?: string,
+		@Query('apiConnectionId') apiConnectionId?: string,
 	): Promise<IdentityUserListResponseDto> {
 		return this.identityAdminService.listUsers(
 			limit !== undefined ? Number(limit) : undefined,
 			offset !== undefined ? Number(offset) : undefined,
 			search,
 			origin,
+			apiConnectionId,
 		);
+	}
+
+	/** Source options (connections + Local directory) for the Source filter (Prompt 37). */
+	@Get('sources')
+	listSources(): Promise<IdentitySourcesResponseDto> {
+		return this.identityAdminService.listSourceOptions().then((sources) => ({ sources }));
 	}
 
 	@Post('users')
@@ -105,11 +114,13 @@ export class IdentityAdminController {
 		@Query('limit') limit?: string,
 		@Query('offset') offset?: string,
 		@Query('origin') origin?: string,
+		@Query('apiConnectionId') apiConnectionId?: string,
 	): Promise<IdentityGroupListResponseDto> {
 		return this.identityAdminService.listGroups(
 			limit !== undefined ? Number(limit) : undefined,
 			offset !== undefined ? Number(offset) : undefined,
 			origin,
+			apiConnectionId,
 		);
 	}
 
@@ -150,11 +161,13 @@ export class IdentityAdminController {
 		@Query('limit') limit?: string,
 		@Query('offset') offset?: string,
 		@Query('origin') origin?: string,
+		@Query('apiConnectionId') apiConnectionId?: string,
 	): Promise<IdentityRoleListResponseDto> {
 		return this.identityAdminService.listRoles(
 			limit !== undefined ? Number(limit) : undefined,
 			offset !== undefined ? Number(offset) : undefined,
 			origin,
+			apiConnectionId,
 		);
 	}
 

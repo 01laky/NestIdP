@@ -76,11 +76,19 @@ export interface UpsertUserInput {
 	active: boolean;
 }
 
+export interface IdentityCountsByConnection {
+	users: Record<string, number>;
+	groups: Record<string, number>;
+	roles: Record<string, number>;
+}
+
 export interface ListQuery {
 	limit: number;
 	offset: number;
 	search?: string;
 	origin?: IdentityOrigin;
+	/** Filter to a single identity source (Prompt 37). */
+	apiConnectionId?: string;
 }
 
 export interface ListResult<T> {
@@ -144,6 +152,15 @@ export interface IdentityStore {
 	countUsers(): Promise<number>;
 	countGroups(): Promise<number>;
 	countRoles(): Promise<number>;
+	/** Per-source identity counts (Prompt 37): apiConnectionId → count, for users/groups/roles. */
+	countsByConnection(): Promise<IdentityCountsByConnection>;
+	/** Synced user ids for a source (Prompt 37) — used to terminate their SSO sessions before removal. */
+	syncedUserIdsForConnection(apiConnectionId: string): Promise<string[]>;
+	/** Remove a source's SYNCED identities (Prompt 37): `deactivate` disables users; `delete` removes rows. */
+	removeConnectionIdentities(
+		apiConnectionId: string,
+		mode: 'deactivate' | 'delete',
+	): Promise<{ usersRemoved: number; groupsRemoved: number; rolesRemoved: number }>;
 
 	// --- auth / SAML reads ---
 	findUserByUsername(username: string): Promise<StoreUser | null>;
@@ -175,6 +192,9 @@ export interface IdentityStore {
 	isUsernameTaken(username: string, excludeId?: string): Promise<boolean>;
 	groupsExistAll(ids: string[]): Promise<boolean>;
 	rolesExistAll(ids: string[]): Promise<boolean>;
+	/** True only if every id is a group/role belonging to `apiConnectionId` (Prompt 37 membership invariant). */
+	groupsAllInConnection(ids: string[], apiConnectionId: string): Promise<boolean>;
+	rolesAllInConnection(ids: string[], apiConnectionId: string): Promise<boolean>;
 
 	// --- admin: groups ---
 	listGroups(query: ListQuery): Promise<ListResult<StoreGroupWithCount>>;

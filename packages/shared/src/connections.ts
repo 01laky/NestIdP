@@ -1,4 +1,4 @@
-import type { AuthType, LastSyncStatus } from './schema-enums.js';
+import type { AuthType, LastSyncStatus, UsernameCollisionPolicy } from './schema-enums.js';
 import type { ApiContractConfig } from './api-contract.js';
 import type { OAuthClientAuthMethod } from './oauth.js';
 import type { ProxyCheckStatus, ProxyConnectionRequestFields } from './proxy.js';
@@ -43,6 +43,19 @@ export interface ApiConnectionDto {
 	lastProxyCheckAt: string | null;
 	lastSyncAt: string | null;
 	lastSyncStatus: LastSyncStatus;
+	// --- Multiple API connections for sync (Prompt 37; present from v1.18.0) ---
+	/** True for the manual/local-directory connection — never a sync source. */
+	isLocalDirectory?: boolean;
+	/** Whether "Sync all sources" includes this connection (independent of the schedule pause flag). */
+	includeInSyncAll?: boolean;
+	/** Per-connection username-collision override; null inherits SYNC_USERNAME_COLLISION_POLICY. */
+	usernameCollisionPolicy?: UsernameCollisionPolicy | null;
+	/** Cross-connection username collisions skipped in the most recent run. */
+	lastCollisionCount?: number;
+	/** Synced identity counts for this source (present on the list response; manual bucket for local dir). */
+	syncedUserCount?: number;
+	syncedGroupCount?: number;
+	syncedRoleCount?: number;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -67,6 +80,10 @@ export interface CreateApiConnectionRequestDto
 	/** Required when authType is BEARER (or omitted, which defaults to BEARER). */
 	bearerToken?: string;
 	apiContractConfig?: ApiContractConfig | null;
+	/** Prompt 37 — include in "Sync all" (default true). */
+	includeInSyncAll?: boolean;
+	/** Prompt 37 — per-connection collision override; null inherits the global default. */
+	usernameCollisionPolicy?: UsernameCollisionPolicy | null;
 }
 
 export interface UpdateApiConnectionRequestDto
@@ -78,6 +95,16 @@ export interface UpdateApiConnectionRequestDto
 	bearerToken?: string;
 	/** Provide to set/replace; null clears back to the v1 default contract. */
 	apiContractConfig?: ApiContractConfig | null;
+	/** Prompt 37 — include in "Sync all". */
+	includeInSyncAll?: boolean;
+	/** Prompt 37 — per-connection collision override; null inherits the global default. */
+	usernameCollisionPolicy?: UsernameCollisionPolicy | null;
+	/**
+	 * Prompt 37 — operator acknowledgement when re-pointing a connection with existing synced identities
+	 * (changing baseUrl / apiContractConfig). Required to proceed; the next sync reconciles per the normal
+	 * cleanup + collision rules.
+	 */
+	acknowledgeRebind?: boolean;
 }
 
 export interface ApiConnectionListResponseDto {
@@ -91,6 +118,23 @@ export interface ApiConnectionResponseDto {
 export interface DeleteApiConnectionResponseDto {
 	ok: true;
 	id: string;
+}
+
+/** Prompt 37 — remove a sync source's identities (deactivate keeps rows + audit trail; delete removes them). */
+export type RemoveSourceIdentitiesMode = 'deactivate' | 'delete';
+
+export interface RemoveSourceIdentitiesRequestDto {
+	mode: RemoveSourceIdentitiesMode;
+}
+
+export interface RemoveSourceIdentitiesResponseDto {
+	ok: true;
+	mode: RemoveSourceIdentitiesMode;
+	usersRemoved: number;
+	groupsRemoved: number;
+	rolesRemoved: number;
+	/** Active SSO sessions terminated for the removed users (back-channel SLO fanned out). */
+	sessionsTerminated: number;
 }
 
 /** A mapped user preview row in the test response — never includes a password hash. */

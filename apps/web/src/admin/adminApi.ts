@@ -53,6 +53,9 @@ import type {
 	SpConnectionTestAcsResponseDto,
 	StartIdpCertRotationRequestDto,
 	StartIdpEncryptionCertRotationRequestDto,
+	RemoveSourceIdentitiesMode,
+	RemoveSourceIdentitiesResponseDto,
+	SyncAllResponseDto,
 	SyncLogListResponseDto,
 	SyncLogResponseDto,
 	SyncStatusResponseDto,
@@ -65,6 +68,7 @@ import type {
 	UploadIdpSigningCertRequestDto,
 } from '@nestidp/shared';
 import type {
+	IdentitySourcesResponseDto,
 	IdpMetadataUrlResponseDto,
 	ParseSloFromMetadataResponseDto,
 	ProcessBackchannelResponseDto,
@@ -91,6 +95,7 @@ import {
 	IDENTITY_LIST_PAGE_SIZE,
 	IDENTITY_GROUPS_API_PATH,
 	IDENTITY_ROLES_API_PATH,
+	IDENTITY_SOURCES_API_PATH,
 	IDENTITY_USERS_API_PATH,
 	IDP_METADATA_URL_API_PATH,
 	IDP_SETTINGS_API_PATH,
@@ -270,6 +275,30 @@ export function triggerIdentitySync(
 		method: 'POST',
 		body: JSON.stringify(options),
 	});
+}
+
+/** "Sync all sources" bulk trigger (Prompt 37). */
+export function syncAllSources(options: { dryRun?: boolean } = {}): Promise<SyncAllResponseDto> {
+	return adminFetch<SyncAllResponseDto>(`${SYNC_API_PATH}/all`, {
+		method: 'POST',
+		body: JSON.stringify({ dryRun: options.dryRun === true }),
+	});
+}
+
+/** Remove a sync source's identities (Prompt 37). */
+export function removeSourceIdentities(
+	connectionId: string,
+	mode: RemoveSourceIdentitiesMode,
+): Promise<RemoveSourceIdentitiesResponseDto> {
+	return adminFetch<RemoveSourceIdentitiesResponseDto>(
+		`${API_CONNECTIONS_API_PATH}/${connectionId}/remove-identities`,
+		{ method: 'POST', body: JSON.stringify({ mode }) },
+	);
+}
+
+/** Identity source options for the Source filter (Prompt 37). */
+export function listIdentitySources(): Promise<IdentitySourcesResponseDto> {
+	return adminFetch<IdentitySourcesResponseDto>(IDENTITY_SOURCES_API_PATH);
 }
 
 export function getSyncStatus(connectionId: string): Promise<SyncStatusResponseDto> {

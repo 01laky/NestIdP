@@ -41,6 +41,13 @@ export const SCHEDULE_FIELD_DEFAULTS = {
 	scheduleAutoPausedAt: null,
 } satisfies Partial<ApiConnection>;
 
+/** Default values for the Prompt 37 multi-source columns — spread into full `ApiConnection` literals. */
+export const MULTI_SOURCE_FIELD_DEFAULTS = {
+	includeInSyncAll: true,
+	usernameCollisionPolicy: null,
+	lastCollisionCount: 0,
+} satisfies Partial<ApiConnection>;
+
 /** Default (proxy-off) values for the Prompt 33 proxy columns — spread into ApiConnection literals. */
 export const PROXY_FIELD_DEFAULTS = {
 	proxyEnabled: false,

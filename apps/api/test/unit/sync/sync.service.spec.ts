@@ -35,6 +35,7 @@ describe('SyncService', () => {
 		apiConnection: {
 			findUnique: jest.fn(),
 			update: jest.fn(),
+			findMany: jest.fn().mockResolvedValue([]),
 		},
 	};
 
@@ -93,6 +94,11 @@ describe('SyncService', () => {
 		audit as never,
 		oauthTokenService as never,
 		fakeProxyDispatcher(),
+		{
+			usernameCollisionPolicy: () => 'skip',
+			syncAllConcurrency: () => 1,
+			syncSourceStaleFactor: () => 3,
+		} as never,
 	);
 
 	const baseConnection = {
@@ -116,6 +122,7 @@ describe('SyncService', () => {
 		usersSynced: 0,
 		groupsSynced: 0,
 		rolesSynced: 0,
+		usersSkippedCollision: 0,
 		errors: null,
 		triggerSource: null,
 	};
@@ -352,6 +359,7 @@ describe('SyncService', () => {
 			data: {
 				lastSyncAt: finishedAt,
 				lastSyncStatus: 'SUCCESS',
+				lastCollisionCount: 0,
 				// A successful run also clears any scheduled-failure backoff state (Prompt 32).
 				scheduleConsecutiveFailures: 0,
 				scheduleAutoPausedAt: null,
@@ -468,7 +476,7 @@ describe('SyncService', () => {
 		expect(prisma.apiConnection.update).not.toHaveBeenCalled();
 	});
 
-	it('API-SYNC-SVC-17: Upsert failure → skips groups/roles fetch for that user', async () => {
+	it('API-SYNC-SVC-17: a username collision skips that user (and its group/role fetch) but the run succeeds', async () => {
 		setupHappyPathMocks();
 		identityRepository.upsertUser.mockRejectedValue(
 			new UsernameCollisionError('ext-user-1', 'alice'),
@@ -478,16 +486,37 @@ describe('SyncService', () => {
 
 		expect(identitySyncClient.fetchGroupsRawForUser).not.toHaveBeenCalled();
 		expect(identitySyncClient.fetchRolesRawForUser).not.toHaveBeenCalled();
+		// Prompt 37: a cross-connection collision is non-fatal — SUCCESS, counted, recorded as a distinct entry.
 		expect(syncLogService.finishLog).toHaveBeenCalledWith(
 			runningLog.id,
 			'SUCCESS',
-			expect.objectContaining({ usersSynced: 0 }),
+			expect.objectContaining({ usersSynced: 0, usersSkippedCollision: 1 }),
 			expect.arrayContaining([
 				expect.objectContaining({
-					phase: 'upsert_user',
+					phase: 'username_collision',
 					externalUserId: 'ext-user-1',
 				}),
 			]),
+		);
+	});
+
+	it('MAS-COLL-FAILRUN: a collision under per-connection fail_run policy marks the run FAILED', async () => {
+		setupHappyPathMocks();
+		prisma.apiConnection.findUnique.mockResolvedValue({
+			...baseConnection,
+			usernameCollisionPolicy: 'fail_run',
+		});
+		identityRepository.upsertUser.mockRejectedValue(
+			new UsernameCollisionError('ext-user-1', 'alice'),
+		);
+
+		await service.triggerSync(CONNECTION_ID);
+
+		expect(syncLogService.finishLog).toHaveBeenCalledWith(
+			runningLog.id,
+			'FAILED',
+			expect.objectContaining({ usersSkippedCollision: 1 }),
+			expect.anything(),
 		);
 	});
 
@@ -1061,6 +1090,11 @@ describe('SyncService', () => {
 			audit as never,
 			oauthTokenService as never,
 			fakeProxyDispatcher({ proxied: true, dispatcher: marker }),
+			{
+				usernameCollisionPolicy: () => 'skip',
+				syncAllConcurrency: () => 1,
+				syncSourceStaleFactor: () => 3,
+			} as never,
 		);
 
 		it('PROXY-WIRE-01: a proxied sync passes a dispatcher to the users + membership fetches', async () => {
@@ -1101,6 +1135,80 @@ describe('SyncService', () => {
 				expect.anything(),
 				marker,
 			);
+		});
+	});
+
+	describe('syncAll (Prompt 37, MAS-ALL)', () => {
+		const log = (over: Record<string, unknown> = {}) => ({
+			syncLog: {
+				status: 'SUCCESS',
+				usersSynced: 0,
+				groupsSynced: 0,
+				rolesSynced: 0,
+				usersSkippedCollision: 0,
+				...over,
+			},
+			connection: {},
+		});
+
+		it('MAS-ALL-07: an empty eligible set returns an empty summary', async () => {
+			prisma.apiConnection.findMany.mockResolvedValue([]);
+			const res = await service.syncAll({});
+			expect(res.results).toEqual([]);
+			expect(res.totals.connections).toBe(0);
+		});
+
+		it('MAS-ALL-FILTER: only included non-local connections, in createdAt order (deterministic winner)', async () => {
+			prisma.apiConnection.findMany.mockResolvedValue([]);
+			await service.syncAll({});
+			const args = prisma.apiConnection.findMany.mock.calls[0][0];
+			expect(args.where).toEqual({ isLocalDirectory: false, includeInSyncAll: true });
+			expect(args.orderBy).toEqual([{ createdAt: 'asc' }, { id: 'asc' }]);
+		});
+
+		it('MAS-ALL-01/02: aggregates per-connection results in createdAt order and isolates failures', async () => {
+			prisma.apiConnection.findMany.mockResolvedValue([
+				{ id: 'c1', name: 'A' },
+				{ id: 'c2', name: 'B' },
+			]);
+			jest.spyOn(service, 'isSyncInProgress').mockResolvedValue(false);
+			const trigger = jest
+				.spyOn(service, 'triggerSync')
+				.mockResolvedValueOnce(log({ usersSynced: 5, usersSkippedCollision: 1 }) as never)
+				.mockRejectedValueOnce(new Error('boom'));
+
+			const res = await service.syncAll({ adminId: 'admin-1' });
+
+			expect(trigger).toHaveBeenCalledWith(
+				'c1',
+				expect.objectContaining({ triggerSource: 'manual_all' }),
+			);
+			expect(res.results[0]).toMatchObject({
+				connectionId: 'c1',
+				status: 'succeeded',
+				usersSynced: 5,
+				usersSkippedCollision: 1,
+			});
+			expect(res.results[1]).toMatchObject({ connectionId: 'c2', status: 'failed' });
+			expect(res.totals).toMatchObject({ connections: 2, succeeded: 1, failed: 1 });
+		});
+
+		it('MAS-ALL-03: an in-progress connection is reported skipped, not double-run', async () => {
+			prisma.apiConnection.findMany.mockResolvedValue([{ id: 'c1', name: 'A' }]);
+			jest.spyOn(service, 'isSyncInProgress').mockResolvedValue(true);
+			const trigger = jest.spyOn(service, 'triggerSync');
+			const res = await service.syncAll({});
+			expect(res.results[0].status).toBe('skipped_in_progress');
+			expect(trigger).not.toHaveBeenCalled();
+		});
+
+		it('MAS-ALL-05: dry-run does not check in-progress and passes dryRun through', async () => {
+			prisma.apiConnection.findMany.mockResolvedValue([{ id: 'c1', name: 'A' }]);
+			const inProgress = jest.spyOn(service, 'isSyncInProgress');
+			jest.spyOn(service, 'triggerSync').mockResolvedValue(log() as never);
+			const res = await service.syncAll({ dryRun: true });
+			expect(res.dryRun).toBe(true);
+			expect(inProgress).not.toHaveBeenCalled();
 		});
 	});
 });

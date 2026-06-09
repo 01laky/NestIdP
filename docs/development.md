@@ -280,6 +280,34 @@ Constants in `@nestidp/shared`:
 
 Bearer tokens are encrypted at rest (AES-256-GCM via `ENCRYPTION_KEY`); API responses expose `hasBearerToken: true` but **never** the plaintext token.
 
+### Multiple API connections for sync (v1.18.0)
+
+Several external API connections can be registered and synced into the **one shared** local
+User/Group/Role store; every synced record is tagged with the `apiConnectionId` of the source it came from
+(`@@unique([apiConnectionId, externalId])`). Diagram: [multi-source-sync-flow.svg](./img/multi-source-sync-flow.svg).
+
+- **Per-source isolation.** `SyncService.triggerSync(connectionId, …)` and its deactivate/orphan cleanup are
+  scoped to the synced connection — syncing source A never touches source B's records. The scheduler runs
+  every due connection independently; **"Sync all sources"** (`POST /api/admin/sync/all`) runs every included
+  non-local connection with bounded concurrency (`SYNC_ALL_CONCURRENCY`), a dry-run preview, and an
+  in-progress skip, isolating failures.
+- **Login determinism / username collisions.** End-user login presents only a username, mapped to the SAML
+  NameID, so `User.username` stays **globally unique** and `findUserByUsername` is a global lookup. A
+  cross-connection overlap is **non-fatal**: by default the conflicting record is **skipped** (the existing
+  owner is kept), the run finishes `SUCCESS`, and the collision is counted (`SyncLog.usersSkippedCollision`),
+  surfaced (with the owner named) and audited. The winner is deterministic (earliest `ApiConnection.createdAt`);
+  the DB unique constraint is the final arbiter under concurrent races (a `P2002` becomes a collision, never a
+  crash). `SYNC_USERNAME_COLLISION_POLICY` (`skip`|`fail_run`) + a per-connection `usernameCollisionPolicy`
+  override choose the policy.
+- **Membership-within-source invariant.** A user may only belong to groups/roles of its own
+  `apiConnectionId` (enforced in `replaceUserGroups`/`replaceUserRoles` + admin `validateMembershipIds`). Same
+  `externalId`/`name` across sources are separate records — there is **no cross-source merge**.
+- **Surfacing.** The dashboard lists all sync sources (status + counts) and warns about never-synced/failing/
+  overdue sources; the connections list shows per-source counts; identity lists + Active sessions can filter
+  by source. Removing a source's identities (`deactivate`|`delete`) terminates the removed users' SSO
+  sessions first; the local-directory (manual) connection is never a sync source. Store-agnostic (local repo
+  - external identity DB).
+
 ### Identity sync semantics (v1)
 
 - **Full snapshot sync** per run — no incremental/delta filter on `GET /users` (proposal §14 Q1 resolved)

@@ -72,6 +72,25 @@ export class ApiConnectionsAuditService {
 		});
 	}
 
+	/** A sync source's identities were removed (Prompt 37). */
+	logSourceIdentitiesRemoved(
+		id: string,
+		name: string,
+		mode: 'deactivate' | 'delete',
+		counts: { usersRemoved: number; groupsRemoved: number; rolesRemoved: number },
+	): void {
+		const payload = { event: 'identity_source_identities_removed', id, name, mode, ...counts };
+		this.logger.log(JSON.stringify(payload));
+		this.audit.recordSafe({
+			category: 'admin_config',
+			event: 'identity_source_identities_removed',
+			actorType: 'admin',
+			subjectType: 'ApiConnection',
+			subjectId: id,
+			metadata: { name, mode, ...counts },
+		});
+	}
+
 	logProxyUpdated(
 		id: string,
 		name: string,

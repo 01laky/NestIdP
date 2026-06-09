@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { IdentityRepository } from '../identity.repository';
 import type {
 	CreateManualUserInput,
+	IdentityCountsByConnection,
 	IdentitySnapshot,
 	IdentityStore,
 	ImportCounts,
@@ -70,6 +71,9 @@ export class ActiveIdentityStore implements IdentityStore {
 	}
 	countRoles(): Promise<number> {
 		return this.current.countRoles();
+	}
+	countsByConnection(): Promise<IdentityCountsByConnection> {
+		return this.current.countsByConnection();
 	}
 
 	// --- auth / SAML ---
@@ -140,6 +144,12 @@ export class ActiveIdentityStore implements IdentityStore {
 	rolesExistAll(ids: string[]): Promise<boolean> {
 		return this.current.rolesExistAll(ids);
 	}
+	groupsAllInConnection(ids: string[], apiConnectionId: string): Promise<boolean> {
+		return this.current.groupsAllInConnection(ids, apiConnectionId);
+	}
+	rolesAllInConnection(ids: string[], apiConnectionId: string): Promise<boolean> {
+		return this.current.rolesAllInConnection(ids, apiConnectionId);
+	}
 
 	// --- admin: groups ---
 	listGroups(query: ListQuery): Promise<ListResult<StoreGroupWithCount>> {
@@ -206,6 +216,15 @@ export class ActiveIdentityStore implements IdentityStore {
 	}
 	wipeAll(): Promise<void> {
 		return this.current.wipeAll();
+	}
+	syncedUserIdsForConnection(apiConnectionId: string): Promise<string[]> {
+		return this.current.syncedUserIdsForConnection(apiConnectionId);
+	}
+	removeConnectionIdentities(
+		apiConnectionId: string,
+		mode: 'deactivate' | 'delete',
+	): Promise<{ usersRemoved: number; groupsRemoved: number; rolesRemoved: number }> {
+		return this.current.removeConnectionIdentities(apiConnectionId, mode);
 	}
 	connectionHasIdentityRows(apiConnectionId: string): Promise<boolean> {
 		return this.current.connectionHasIdentityRows(apiConnectionId);
