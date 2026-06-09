@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { positiveIntOrDefault } from '../../common/config/positive-int.util';
 
 interface RateLimitEntry {
 	count: number;
@@ -46,15 +47,17 @@ export class AdminUserCreateRateLimiterService {
 	}
 
 	private getMaxAttempts(): number {
-		const raw = this.configService.get<string>('ADMIN_USER_CREATE_RATE_LIMIT_MAX');
-		const parsed = Number.parseInt(String(raw ?? '5'), 10);
-		return Number.isFinite(parsed) && parsed > 0 ? parsed : 5;
+		return positiveIntOrDefault(
+			this.configService.get<string>('ADMIN_USER_CREATE_RATE_LIMIT_MAX'),
+			5,
+		);
 	}
 
 	private getWindowMs(): number {
-		const raw = this.configService.get<string>('ADMIN_USER_CREATE_RATE_LIMIT_WINDOW_MS');
-		const parsed = Number.parseInt(String(raw ?? '900000'), 10);
-		return Number.isFinite(parsed) && parsed > 0 ? parsed : 900000;
+		return positiveIntOrDefault(
+			this.configService.get<string>('ADMIN_USER_CREATE_RATE_LIMIT_WINDOW_MS'),
+			900000,
+		);
 	}
 
 	private isKeyLimited(store: Map<string, RateLimitEntry>, key: string): boolean {

@@ -9,6 +9,7 @@ import {
 	MAX_ADMIN_SESSION_REMEMBER_TTL_SECONDS,
 } from '@nestidp/shared';
 import { HmacSessionCodec } from '../../common/session/hmac-session-codec';
+import { positiveIntOrDefault } from '../../common/config/positive-int.util';
 import { NodeEnv } from '../../config/env.validation';
 
 export interface AdminSessionPayload {
@@ -32,23 +33,17 @@ export class AdminSessionService {
 		if (remember) {
 			return this.getSessionRememberTtlSeconds();
 		}
-		const raw = this.configService.get<string>('ADMIN_SESSION_TTL_SECONDS');
-		if (!raw) {
-			return DEFAULT_ADMIN_SESSION_TTL_SECONDS;
-		}
-		const parsed = Number.parseInt(raw, 10);
-		return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_ADMIN_SESSION_TTL_SECONDS;
+		return positiveIntOrDefault(
+			this.configService.get<string>('ADMIN_SESSION_TTL_SECONDS'),
+			DEFAULT_ADMIN_SESSION_TTL_SECONDS,
+		);
 	}
 
 	getSessionRememberTtlSeconds(): number {
-		const raw = this.configService.get<string>('ADMIN_SESSION_REMEMBER_TTL_SECONDS');
-		let ttl: number = DEFAULT_ADMIN_SESSION_REMEMBER_TTL_SECONDS;
-		if (raw) {
-			const parsed = Number.parseInt(raw, 10);
-			if (Number.isFinite(parsed) && parsed > 0) {
-				ttl = parsed;
-			}
-		}
+		const ttl = positiveIntOrDefault(
+			this.configService.get<string>('ADMIN_SESSION_REMEMBER_TTL_SECONDS'),
+			DEFAULT_ADMIN_SESSION_REMEMBER_TTL_SECONDS,
+		);
 		return Math.min(ttl, MAX_ADMIN_SESSION_REMEMBER_TTL_SECONDS);
 	}
 

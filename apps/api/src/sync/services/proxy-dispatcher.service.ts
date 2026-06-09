@@ -5,6 +5,7 @@ import type { ApiConnection } from '@prisma/client';
 import type { Dispatcher } from 'undici';
 import { ProxyAgent } from 'undici';
 import { hostBypassesProxy } from '@nestidp/shared';
+import { boundedInt } from '../../common/config/bounded-int.util';
 import {
 	CREDENTIALS_ENCRYPTION,
 	type CredentialsEncryptionPort,
@@ -135,10 +136,11 @@ export class ProxyDispatcherService implements OnModuleDestroy {
 	}
 
 	private connectTimeoutMs(): number {
-		const raw = Number(this.configService.get<number | string>('PROXY_CONNECT_TIMEOUT_MS'));
-		if (Number.isFinite(raw) && raw >= 100 && raw <= 60_000) {
-			return raw;
-		}
-		return DEFAULT_PROXY_CONNECT_TIMEOUT_MS;
+		return boundedInt(
+			this.configService.get<number | string>('PROXY_CONNECT_TIMEOUT_MS'),
+			DEFAULT_PROXY_CONNECT_TIMEOUT_MS,
+			100,
+			60_000,
+		);
 	}
 }

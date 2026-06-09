@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/services/prisma.service';
+import { positiveIntOrDefault } from '../../common/config/positive-int.util';
 
 @Injectable()
 export class AuditRetentionCleanupService implements OnModuleInit, OnModuleDestroy {
@@ -48,9 +49,7 @@ export class AuditRetentionCleanupService implements OnModuleInit, OnModuleDestr
 	}
 
 	private getRetentionDays(): number {
-		const raw = this.configService.get<string>('AUDIT_RETENTION_DAYS');
-		const parsed = Number.parseInt(String(raw ?? '90'), 10);
-		return Number.isFinite(parsed) && parsed > 0 ? parsed : 90;
+		return positiveIntOrDefault(this.configService.get<string>('AUDIT_RETENTION_DAYS'), 90);
 	}
 
 	private getIntervalMs(): number {

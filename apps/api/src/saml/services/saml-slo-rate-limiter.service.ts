@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { positiveIntOrDefault } from '../../common/config/positive-int.util';
 
 interface RateLimitEntry {
 	count: number;
@@ -57,14 +58,16 @@ export class SamlSloRateLimiterService {
 	}
 
 	private getIpMax(): number {
-		const raw = this.configService.get<number | string>('SAML_SLO_RATE_IP_MAX');
-		const parsed = Number.parseInt(String(raw ?? ''), 10);
-		return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_IP_MAX;
+		return positiveIntOrDefault(
+			this.configService.get<number | string>('SAML_SLO_RATE_IP_MAX'),
+			DEFAULT_IP_MAX,
+		);
 	}
 
 	private getIpWindowMs(): number {
-		const raw = this.configService.get<number | string>('SAML_SLO_RATE_WINDOW_MS');
-		const parsed = Number.parseInt(String(raw ?? ''), 10);
-		return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_IP_WINDOW_MS;
+		return positiveIntOrDefault(
+			this.configService.get<number | string>('SAML_SLO_RATE_WINDOW_MS'),
+			DEFAULT_IP_WINDOW_MS,
+		);
 	}
 }

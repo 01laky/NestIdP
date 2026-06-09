@@ -7,6 +7,7 @@ import {
 } from '@nestidp/shared';
 import { PrismaService } from '../../prisma/services/prisma.service';
 import { isUniqueConstraintError } from '../../common/utils/prisma-error.util';
+import { positiveIntOrDefault } from '../../common/config/positive-int.util';
 import { SamlSsoSessionService } from '../../saml-sessions/services/saml-sso-session.service';
 import { decodeRedirectBinding } from '../utils/build-authn-request.util';
 import {
@@ -334,11 +335,9 @@ export class SamlLogoutService {
 	}
 
 	private getClockSkewSeconds(): number {
-		const raw = this.configService.get<number | string>('SAML_CLOCK_SKEW_SECONDS');
-		if (raw == null || raw === '') {
-			return 120;
-		}
-		const parsed = Number.parseInt(String(raw), 10);
-		return Number.isFinite(parsed) && parsed > 0 ? parsed : 120;
+		return positiveIntOrDefault(
+			this.configService.get<number | string>('SAML_CLOCK_SKEW_SECONDS'),
+			120,
+		);
 	}
 }

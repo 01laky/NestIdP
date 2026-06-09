@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import type { Response } from 'express';
 import { END_USER_SESSION_COOKIE_NAME } from '@nestidp/shared';
 import { HmacSessionCodec } from '../../common/session/hmac-session-codec';
+import { positiveIntOrDefault } from '../../common/config/positive-int.util';
 import { NodeEnv } from '../../config/env.validation';
 import type { EndUserSessionPayload } from '../end-user-auth.types';
 
@@ -18,12 +19,10 @@ export class EndUserSessionService {
 	}
 
 	getSessionTtlSeconds(): number {
-		const raw = this.configService.get<number | string>('END_USER_SESSION_TTL_SECONDS');
-		if (raw == null || raw === '') {
-			return DEFAULT_END_USER_SESSION_TTL_SECONDS;
-		}
-		const parsed = Number.parseInt(String(raw), 10);
-		return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_END_USER_SESSION_TTL_SECONDS;
+		return positiveIntOrDefault(
+			this.configService.get<number | string>('END_USER_SESSION_TTL_SECONDS'),
+			DEFAULT_END_USER_SESSION_TTL_SECONDS,
+		);
 	}
 
 	sign(payload: EndUserSessionPayload): string {

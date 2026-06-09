@@ -29,6 +29,12 @@ frontend de-duplication) and remaining items land in subsequent commits under th
   instead of using its default. Adopted in the back-channel/sync-schedule/multi-source/rate-limit/
   cert-rotation configs + the OAuth/identity-sync clients, and the `MIGRATE_ONLY` checks across `main.ts`
   and the three schedulers.
+- **Shared `positiveIntOrDefault` config helper** (§6.1): the second config-parse shape in the codebase —
+  `Number.parseInt(String(raw), 10)` + strictly-`> 0` (preserving `parseInt` leniency, distinct from
+  `boundedInt`'s `Number()` + explicit `[min, max]`). Replaces the hand-copied inline copies in the
+  admin/end-user session-TTL readers, the admin-user-create and SAML-SLO rate limiters, the SAML
+  clock-skew reader and the audit-retention day count. `proxy-dispatcher`'s connect-timeout reader (a
+  `Number()` + range copy) now uses the existing `boundedInt`. Behaviour-preserving.
 
 ### Security
 
