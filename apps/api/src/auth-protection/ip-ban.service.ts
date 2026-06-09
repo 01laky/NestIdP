@@ -20,12 +20,31 @@ export interface IpBanTripResult {
  * any single account/window. In-memory (per instance), time-bounded — never a permanent ban. Threshold
  * `0` disables the layer entirely.
  */
+/**
+ * Soft cap on the number of tracked banned IPs. Once exceeded, expired bans are swept on the next trip
+ * (§5.B14). Without this, a distributed attacker spraying distinct IPs — each banned once and never seen
+ * again — would grow the `bans` map without bound (memory-growth DoS).
+ */
+const MAX_TRACKED_BANNED_IPS = 50_000;
+
 @Injectable()
 export class IpBanService {
 	private readonly trips = new SlidingWindowRateLimiter();
 	private readonly bans = new Map<string, number>();
 
 	constructor(private readonly config: RateLimitConfig) {}
+
+	/** Evict expired bans. Returns how many were removed. Called opportunistically + can be scheduled. */
+	prune(now: number = Date.now()): number {
+		let removed = 0;
+		for (const [ip, until] of this.bans) {
+			if (until <= now) {
+				this.bans.delete(ip);
+				removed += 1;
+			}
+		}
+		return removed;
+	}
 
 	/** Is this IP currently banned? Run up-front, before throttle and password. */
 	check(ip: string): IpBanCheck {
@@ -55,8 +74,13 @@ export class IpBanService {
 		if (!limited) {
 			return { bannedNow: false, count: threshold, bannedUntil: null };
 		}
-		const alreadyBanned = (this.bans.get(ip) ?? 0) > Date.now();
-		const bannedUntil = new Date(Date.now() + this.config.ipBanMs());
+		const now = Date.now();
+		const alreadyBanned = (this.bans.get(ip) ?? 0) > now;
+		// §5.B14: bound the map — sweep expired bans once it grows past the soft cap.
+		if (this.bans.size >= MAX_TRACKED_BANNED_IPS) {
+			this.prune(now);
+		}
+		const bannedUntil = new Date(now + this.config.ipBanMs());
 		this.bans.set(ip, bannedUntil.getTime());
 		// `bannedNow` only on the transition into banned, so audit/notify is de-duped under a flood.
 		return { bannedNow: !alreadyBanned, count: threshold, bannedUntil };

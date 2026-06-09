@@ -8,6 +8,8 @@ interface RateLimitEntry {
 
 const DEFAULT_IP_MAX = 30;
 const DEFAULT_IP_WINDOW_MS = 15 * 60 * 1000;
+// §5.B14: bound the in-memory map against a distinct-IP spray (memory-growth DoS).
+const MAX_TRACKED_IPS = 50_000;
 
 /**
  * Per-IP request counter for the public, state-mutating `/saml/slo` endpoint.
@@ -24,6 +26,10 @@ export class SamlSloRateLimiterService {
 		const max = this.getIpMax();
 		const windowMs = this.getIpWindowMs();
 		const now = Date.now();
+		// §5.B14: sweep expired windows once the map grows past the soft cap.
+		if (this.byIp.size >= MAX_TRACKED_IPS) {
+			this.prune(now);
+		}
 		const entry = this.byIp.get(ip);
 		if (!entry || now - entry.windowStartMs >= windowMs) {
 			this.byIp.set(ip, { count: 1, windowStartMs: now });
@@ -31,6 +37,19 @@ export class SamlSloRateLimiterService {
 		}
 		entry.count += 1;
 		return entry.count > max;
+	}
+
+	/** Evict entries whose window has elapsed. Returns how many were removed. */
+	prune(now: number = Date.now()): number {
+		const windowMs = this.getIpWindowMs();
+		let removed = 0;
+		for (const [ip, entry] of this.byIp) {
+			if (now - entry.windowStartMs >= windowMs) {
+				this.byIp.delete(ip);
+				removed += 1;
+			}
+		}
+		return removed;
 	}
 
 	clear(): void {

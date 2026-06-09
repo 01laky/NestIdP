@@ -244,6 +244,61 @@ describe('back-channel logout engine (SQLite, mocked SOAP)', () => {
 		expect(notifier.onGivenUp).toHaveBeenCalledTimes(1);
 	});
 
+	it('BC-PROP-RESEND-ATTEMPTS: operator resend resets attempts so retries are fresh (§5.B2)', async () => {
+		const sp = await makeSp('https://sp.example.com/slo/soap');
+		const session = await makeSession();
+		await participate(session.id, sp.id);
+		await sessions.terminate(session.id, 'admin_action', 'admin-1');
+		deliver.mockResolvedValue({ outcome: 'failed', reason: 'network' });
+
+		const rowId = (
+			await prisma.samlBackchannelLogout.findFirstOrThrow({ where: { ssoSessionId: session.id } })
+		).id;
+		const past = () =>
+			prisma.samlBackchannelLogout.update({
+				where: { id: rowId },
+				data: { nextRetryAt: new Date(0) },
+			});
+
+		// drive to given_up (attempts 3 > maxRetries 2)
+		await propagation.processDue();
+		await past();
+		await propagation.processDue();
+		await past();
+		await propagation.processDue();
+		let row = await prisma.samlBackchannelLogout.findUniqueOrThrow({ where: { id: rowId } });
+		expect(row.status).toBe('given_up');
+		expect(row.attempts).toBe(3);
+
+		// operator resend → the next delivery succeeds; attempts must be reset (final attempts === 1, not 4)
+		deliver.mockResolvedValue({ outcome: 'succeeded' });
+		await propagation.resend(session.id, sp.id);
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		await propagation.processDue();
+		row = await prisma.samlBackchannelLogout.findUniqueOrThrow({ where: { id: rowId } });
+		expect(row.status).toBe('succeeded');
+		expect(row.attempts).toBe(1);
+	});
+
+	it('BC-PROP-PRUNE-PARTIAL: partial rows are terminal and get pruned (§5.B2)', async () => {
+		const sp = await makeSp('https://sp.example.com/slo/soap');
+		const session = await makeSession();
+		await participate(session.id, sp.id);
+		await sessions.terminate(session.id, 'admin_action', 'admin-1');
+		deliver.mockResolvedValue({ outcome: 'partial', reason: 'partial_logout' });
+		await propagation.processDue();
+		const row = await prisma.samlBackchannelLogout.findFirstOrThrow({
+			where: { ssoSessionId: session.id },
+		});
+		expect(row.status).toBe('partial');
+
+		// prune with a now far past the retention cutoff → the partial row must be removed
+		const future = new Date(Date.now() + 400 * 24 * 60 * 60 * 1000);
+		const pruned = await propagation.prune(future);
+		expect(pruned).toBeGreaterThanOrEqual(1);
+		expect(await prisma.samlBackchannelLogout.findFirst({ where: { id: row.id } })).toBeNull();
+	});
+
 	it('BC-PROP-A: the requestId is stable and reused across retries (idempotent delivery)', async () => {
 		const sp = await makeSp('https://sp.example.com/slo/soap');
 		const session = await makeSession();

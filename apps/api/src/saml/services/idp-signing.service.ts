@@ -1,4 +1,3 @@
-import { execSync } from 'node:child_process';
 import { generateKeyPairSync } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -14,6 +13,7 @@ import {
 	toStoredSigningCrypto,
 } from '@nestidp/shared';
 import { SignedXml } from 'xml-crypto';
+import { runOpenssl } from '../utils/openssl.util';
 import { applyNestIdpXmlCryptoExtensions } from '../xml-crypto-extended-algorithms';
 import { EncryptionService } from '../../encryption/services/encryption.service';
 import { PrismaService } from '../../prisma/services/prisma.service';
@@ -100,8 +100,17 @@ export class IdpSigningService {
 		sig.computeSignature(wrapper, {
 			location: { reference: `//*[@ID='${assertionId}']`, action: 'after' },
 		});
-		const signedWrapper = sig.getSignedXml() ?? wrapper;
-		return this.extractSignedAssertionFragment(signedWrapper) ?? stripped;
+		// SECURITY: never fall back to the unsigned assertion. If signing or fragment extraction fails we
+		// must reject — emitting an unsigned assertion would let an attacker strip the signature silently.
+		const signedWrapper = sig.getSignedXml();
+		if (!signedWrapper) {
+			throw new Error('Failed to sign SAML assertion (empty signed output)');
+		}
+		const fragment = this.extractSignedAssertionFragment(signedWrapper);
+		if (!fragment) {
+			throw new Error('Failed to extract the signed SAML assertion fragment');
+		}
+		return fragment;
 	}
 
 	/**
@@ -224,10 +233,23 @@ export class IdpSigningService {
 			writeFileSync(keyPath, privateKeyPem);
 			const cn = entityId.replace(/^https?:\/\//, '').slice(0, 64) || 'nestidp';
 			const days = daysFromTodayUntilNotAfter(resolved.notAfter);
-			execSync(
-				`openssl req -new -x509 -key "${keyPath}" -out "${certPath}" -days ${days} -subj "/CN=${cn}" -nodes`,
-				{ stdio: 'pipe' },
-			);
+			// SECURITY: never interpolate operator-controlled values (entityId → cn) into a shell command
+			// string. spawnSync with an args array and no shell passes `/CN=${cn}` as a single literal argv
+			// element, so shell metacharacters in entityId cannot inject commands.
+			runOpenssl([
+				'req',
+				'-new',
+				'-x509',
+				'-key',
+				keyPath,
+				'-out',
+				certPath,
+				'-days',
+				String(days),
+				'-subj',
+				`/CN=${cn}`,
+				'-nodes',
+			]);
 			return {
 				privateKeyPem,
 				certPem: readFileSync(certPath, 'utf8'),

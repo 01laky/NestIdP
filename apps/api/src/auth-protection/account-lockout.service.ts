@@ -78,11 +78,27 @@ export class AccountLockoutService {
 		if (threshold === 0) {
 			return { lockedNow: false, failedCount: 0, lockedUntil: null };
 		}
-		const existing = await this.prisma.loginLockout.findUnique({
+		// §5.A5: atomically increment the failure count (ON CONFLICT DO UPDATE … += 1) instead of a
+		// read-then-write. The old read+upsert lost-update under concurrency (two requests both read N,
+		// both wrote N+1), under-counting failures and weakening the lockout. The upsert returns the
+		// post-increment count, so the threshold decision is made against the true value.
+		const row = await this.prisma.loginLockout.upsert({
 			where: { scope_usernameKey: { scope, usernameKey } },
+			create: {
+				scope,
+				usernameKey,
+				failedCount: 1,
+				lockedUntil: null,
+				lastFailedAt: now,
+			},
+			update: {
+				failedCount: { increment: 1 },
+				lastFailedAt: now,
+			},
 		});
-		const failedCount = (existing?.failedCount ?? 0) + 1;
-		let lockedUntil = existing?.lockedUntil ?? null;
+
+		const failedCount = row.failedCount;
+		let lockedUntil = row.lockedUntil;
 		let lockedNow = false;
 		if (failedCount >= threshold) {
 			const over = failedCount - threshold;
@@ -90,24 +106,11 @@ export class AccountLockoutService {
 			const backoff = Math.min(this.config.lockoutMaxMs(scope), base * 2 ** over);
 			lockedUntil = new Date(now.getTime() + backoff);
 			lockedNow = true;
+			await this.prisma.loginLockout.update({
+				where: { scope_usernameKey: { scope, usernameKey } },
+				data: { lockedUntil, lastLockedAt: now },
+			});
 		}
-		await this.prisma.loginLockout.upsert({
-			where: { scope_usernameKey: { scope, usernameKey } },
-			create: {
-				scope,
-				usernameKey,
-				failedCount,
-				lockedUntil,
-				lastFailedAt: now,
-				lastLockedAt: lockedNow ? now : null,
-			},
-			update: {
-				failedCount,
-				lockedUntil,
-				lastFailedAt: now,
-				...(lockedNow ? { lastLockedAt: now } : {}),
-			},
-		});
 		return { lockedNow, failedCount, lockedUntil };
 	}
 

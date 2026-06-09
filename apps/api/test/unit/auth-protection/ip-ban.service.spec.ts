@@ -29,6 +29,18 @@ describe('IpBanService (Prompt 35)', () => {
 		expect(svc.check('1.2.3.4').banned).toBe(true);
 	});
 
+	it('BAN-PRUNE-01: prune evicts expired bans, bounding the map (§5.B14)', () => {
+		const svc = new IpBanService(makeConfig(1, 10_000, 5000));
+		svc.recordTrip('1.1.1.1');
+		svc.recordTrip('2.2.2.2');
+		// not yet expired → nothing pruned
+		expect(svc.prune(0)).toBe(0);
+		expect(svc.check('1.1.1.1').banned).toBe(true);
+		// after the ban window both are expired → both pruned
+		expect(svc.prune(6000)).toBe(2);
+		expect(svc.check('1.1.1.1').banned).toBe(false);
+	});
+
 	it('BAN-02: the ban auto-expires (never permanent)', () => {
 		const svc = new IpBanService(makeConfig(1, 10_000, 5000));
 		svc.recordTrip('9.9.9.9');

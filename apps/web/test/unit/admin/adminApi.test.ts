@@ -7,6 +7,7 @@ import {
 	IDENTITY_USERS_API_PATH,
 	IDP_METADATA_URL_API_PATH,
 	IDP_SETTINGS_API_PATH,
+	SAML_SESSIONS_API_PATH,
 	SP_CONNECTIONS_API_PATH,
 	SYNC_API_PATH,
 } from '@nestidp/shared';
@@ -54,6 +55,7 @@ import {
 	unlockIdentityUser,
 	changeAdminPassword,
 	listAuditEvents,
+	listSamlSessions,
 	probeSpConnectionSigning,
 	auditExportUrl,
 } from '@/admin/adminApi';
@@ -62,6 +64,45 @@ describe('adminApi', () => {
 	afterEach(() => {
 		vi.restoreAllMocks();
 		setCsrfToken(null);
+	});
+
+	it('WEB-MAS-SESS-URL-01: listSamlSessions serialises apiConnectionId into the query string (§5.B1)', async () => {
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ total: 0, items: [] }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		await listSamlSessions({
+			status: 'active',
+			spConnectionId: 'sp1',
+			apiConnectionId: 'api7',
+			q: 'alice',
+			page: 2,
+			pageSize: 25,
+		});
+
+		const calledUrl = fetchMock.mock.calls[0][0] as string;
+		expect(calledUrl.startsWith(SAML_SESSIONS_API_PATH)).toBe(true);
+		const qs = new URLSearchParams(calledUrl.split('?')[1] ?? '');
+		expect(qs.get('apiConnectionId')).toBe('api7');
+		expect(qs.get('spConnectionId')).toBe('sp1');
+		expect(qs.get('status')).toBe('active');
+		expect(qs.get('q')).toBe('alice');
+	});
+
+	it('WEB-MAS-SESS-URL-02: listSamlSessions omits apiConnectionId when not set', async () => {
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => ({ total: 0, items: [] }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		await listSamlSessions({ status: 'active' });
+		const calledUrl = fetchMock.mock.calls[0][0] as string;
+		expect(calledUrl).not.toContain('apiConnectionId');
 	});
 
 	it('WEB-ADM-08: loginAdmin uses credentials include and throws AdminApiError on 401', async () => {

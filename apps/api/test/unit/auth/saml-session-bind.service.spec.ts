@@ -12,6 +12,7 @@ import {
 	createTestUser,
 } from '@test/support/prisma/test-fixtures';
 import { runMigrationsOnTestDb } from '@test/support/prisma/test-db.helper';
+import { countFulfilled, runConcurrentlySettled } from '@test/support/concurrency/race.helper';
 import { SamlSessionBindService } from '@api/auth/services/saml-session-bind.service';
 
 jest.setTimeout(60_000);
@@ -92,5 +93,25 @@ describe('SamlSessionBindService (SQLite)', () => {
 		await expect(service.bindUserToSession(session.id, user.id)).rejects.toThrow(
 			'SP connection is inactive',
 		);
+	});
+
+	it('API-AUTH-SAML-BIND-06: concurrent binds — exactly one wins (§5.A9)', async () => {
+		const connection = await createTestApiConnection(prisma);
+		const session = await createTestSamlSession(prisma, spConnectionId);
+		const users = await Promise.all(
+			Array.from({ length: 6 }, (_, i) =>
+				createTestUser(prisma, connection.id, { username: `race-bind-${i}` }),
+			),
+		);
+
+		const results = await runConcurrentlySettled(users.length, (i) =>
+			service.bindUserToSession(session.id, users[i].id),
+		);
+
+		// atomic conditional bind: exactly one request wins, the rest get a conflict
+		expect(countFulfilled(results)).toBe(1);
+		expect(results.filter((r) => r.status === 'rejected')).toHaveLength(users.length - 1);
+		const updated = await prisma.samlSession.findUnique({ where: { id: session.id } });
+		expect(users.map((u) => u.id)).toContain(updated?.userId);
 	});
 });

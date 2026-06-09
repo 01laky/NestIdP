@@ -20,6 +20,7 @@ import { PrismaModule } from '@api/prisma/prisma.module';
 import { PrismaService } from '@api/prisma/services/prisma.service';
 import { createTestAdminUserWithPassword } from '@test/support/prisma/test-fixtures';
 import { runMigrationsOnTestDb } from '@test/support/prisma/test-db.helper';
+import { countFulfilled, runConcurrentlySettled } from '@test/support/concurrency/race.helper';
 import { AdminUserCreateRateLimiterService } from '@api/admin-users/services/admin-user-create-rate-limiter.service';
 import { AdminUsersService } from '@api/admin-users/services/admin-users.service';
 import { AdminSessionService } from '@api/admin-auth/services/admin-session.service';
@@ -213,6 +214,28 @@ describe('admin-users integration (SQLite)', () => {
 		).rejects.toMatchObject({
 			response: { message: 'Cannot delete the last admin account' },
 		});
+	});
+
+	it('API-ADM-USR-RACE-01: concurrent delete of the last two admins keeps ≥1 (§5.A6)', async () => {
+		const service = app.get(AdminUsersService);
+		// isolate to exactly two deletable admins so the "drop to zero" guard is actually exercised
+		await prisma.adminUser.deleteMany({});
+		const a = await createTestAdminUserWithPassword(prisma, 'race-a', 'RaceaPass123456');
+		const b = await createTestAdminUserWithPassword(prisma, 'race-b', 'RacebPass123456');
+		const actor = { id: 'external-actor', username: 'ext' };
+
+		const results = await runConcurrentlySettled(2, (i) =>
+			service.delete(i === 0 ? a.id : b.id, actor),
+		);
+
+		// at most one delete may succeed; the system must never reach zero admins
+		expect(countFulfilled(results)).toBeLessThanOrEqual(1);
+		const remaining = await prisma.adminUser.count();
+		expect(remaining).toBeGreaterThanOrEqual(1);
+
+		// restore the shared 'admin' fixture (beforeEach only deletes non-'admin' rows)
+		await prisma.adminUser.deleteMany({});
+		await createTestAdminUserWithPassword(prisma, 'admin', adminPassword);
 	});
 
 	it('API-ADM-USR-08: POST duplicate username → 409', async () => {

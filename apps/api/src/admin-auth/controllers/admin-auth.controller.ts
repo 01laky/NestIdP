@@ -27,6 +27,7 @@ import type { AdminChangePasswordResponseDto } from '@nestidp/shared';
 import { AdminChangePasswordBodyDto } from '../dto/admin-change-password.dto';
 import { AdminLoginBodyDto } from '../dto/admin-login-body.dto';
 import { AdminAuthAuditService } from '../services/admin-auth-audit.service';
+import { AdminCsrfService } from '../services/admin-csrf.service';
 import { AdminSessionService } from '../services/admin-session.service';
 import { LoginProtectionService } from '../../auth-protection/login-protection.service';
 
@@ -37,6 +38,7 @@ export class AdminAuthController {
 		private readonly adminSessionService: AdminSessionService,
 		private readonly loginProtection: LoginProtectionService,
 		private readonly adminAuthAudit: AdminAuthAuditService,
+		private readonly adminCsrf: AdminCsrfService,
 	) {}
 
 	@Post('login')
@@ -92,16 +94,14 @@ export class AdminAuthController {
 		if (payload) {
 			const header = req.headers?.[ADMIN_CSRF_HEADER_NAME.toLowerCase()];
 			const headerValue = Array.isArray(header) ? header[0] : header;
-			if (
-				!headerValue ||
-				headerValue !== payload.csrfToken ||
-				typeof payload.csrfToken !== 'string'
-			) {
+			// §5.A7: constant-time CSRF comparison (was a non-constant-time `!==`, a timing oracle).
+			if (!this.adminCsrf.validateToken(headerValue, payload.csrfToken)) {
 				throw new ForbiddenException('Invalid CSRF token');
 			}
-		}
-		if (payload && req.adminUser) {
-			this.adminAuthAudit.logLogout(req.adminUser.id, req.adminUser.username, req.ip ?? 'unknown');
+			// §5.A7: audit every authenticated logout. AdminAuthGuard is NOT applied to logout, so
+			// `req.adminUser` was always undefined here and the old `&& req.adminUser` guard was dead —
+			// logouts were never recorded. Derive the identity from the verified session payload instead.
+			this.adminAuthAudit.logLogout(payload.adminUserId, payload.username, req.ip ?? 'unknown');
 		}
 		this.adminSessionService.clearCookie(res);
 		return { ok: true };

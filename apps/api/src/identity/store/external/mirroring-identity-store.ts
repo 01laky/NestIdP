@@ -20,6 +20,9 @@ const MUTATING_METHODS = new Set<string>([
 	'deleteRole',
 	'importSnapshot',
 	'wipeAll',
+	// §5.B5: Prompt 37 added removeConnectionIdentities but did not register it here, so a source-removal
+	// in mirror mode mutated local without flagging the external copy stale → silent divergence.
+	'removeConnectionIdentities',
 ]);
 
 /**

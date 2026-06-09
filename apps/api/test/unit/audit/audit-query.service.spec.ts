@@ -107,7 +107,34 @@ describe('AuditQueryService', () => {
 		expect(csv).toMatch(/note.*hello/);
 		expect(csv).toContain('""');
 		expect(csv.split('\n')[0]).toBe(
-			'createdAt,category,event,actorType,actorLabel,subjectType,subjectId,clientIp,metadata',
+			'id,createdAt,category,event,actorType,actorLabel,subjectType,subjectId,clientIp,metadata',
 		);
+	});
+
+	it('API-AUD-QRY-07: exportCsv neutralises spreadsheet formula injection + includes id (§5.A11)', async () => {
+		prisma.auditEvent.findMany.mockResolvedValue([
+			{
+				id: 'e7',
+				category: 'admin_auth',
+				event: 'login_failure',
+				actorType: 'admin',
+				actorId: null,
+				// attacker-chosen username that begins with `=` (a formula trigger in Excel/Sheets)
+				actorLabel: '=cmd|/c calc',
+				subjectType: null,
+				subjectId: '+SUM(A1:A9)',
+				clientIp: null,
+				metadata: null,
+				createdAt: new Date('2026-06-01T12:00:00.000Z'),
+			},
+		]);
+
+		const csv = await service.exportCsv({});
+		const dataRow = csv.split('\n')[1];
+		// the formula cells are prefixed with a single quote so the cell is treated as text
+		expect(dataRow).toContain(`"'=cmd|/c calc"`);
+		expect(dataRow).toContain(`"'+SUM(A1:A9)"`);
+		// id column present and first
+		expect(dataRow.startsWith('"e7"')).toBe(true);
 	});
 });

@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { SpConnectionTestAcsResponseDto } from '@nestidp/shared';
 import { assertValidAcsUrl } from '../../common/utils/acs-url.util';
+import { assertNotPrivateHost, SsrfBlockedError } from '../../common/utils/ssrf-guard.util';
 import { PrismaService } from '../../prisma/services/prisma.service';
 import { SpConnectionsAuditService } from './sp-connections-audit.service';
 
@@ -31,11 +32,27 @@ export class SpConnectionTestAcsService {
 			};
 		}
 
+		// §5.A10: SSRF guard — refuse to probe a private/loopback/link-local host (e.g. cloud metadata).
+		try {
+			assertNotPrivateHost(acsUrl);
+		} catch (error) {
+			if (error instanceof SsrfBlockedError) {
+				this.audit.logAcsTested(id, false);
+				return {
+					ok: false,
+					reachable: false,
+					message: 'ACS host is not allowed (private/loopback/link-local address)',
+				};
+			}
+			throw error;
+		}
+
 		try {
 			const response = await fetch(acsUrl, {
 				method: 'GET',
 				signal: AbortSignal.timeout(10_000),
-				redirect: 'follow',
+				// §5.A10: do not follow redirects — a public URL must not be able to bounce to an internal one.
+				redirect: 'manual',
 			});
 
 			const reachable = true;

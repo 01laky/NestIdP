@@ -27,18 +27,40 @@ function fakePrisma() {
 					.scope_usernameKey;
 				const k = key(scope, usernameKey);
 				const existing = rows.get(k);
-				const row: Row = existing
-					? { ...existing, ...(update as object) }
-					: ({
-							id: `id-${rows.size}`,
-							scope,
-							usernameKey,
-							failedCount: 0,
-							lockedUntil: null,
-							lastFailedAt: null,
-							lastLockedAt: null,
-							...(create as object),
-						} as Row);
+				let row: Row;
+				if (existing) {
+					const upd = update as Record<string, unknown>;
+					// model Prisma's atomic { increment } for failedCount (§5.A5)
+					const fc = upd.failedCount as number | { increment: number } | undefined;
+					const resolvedFailed =
+						fc && typeof fc === 'object' && 'increment' in fc
+							? existing.failedCount + fc.increment
+							: ((fc as number | undefined) ?? existing.failedCount);
+					row = { ...existing, ...upd, failedCount: resolvedFailed } as Row;
+				} else {
+					row = {
+						id: `id-${rows.size}`,
+						scope,
+						usernameKey,
+						failedCount: 0,
+						lockedUntil: null,
+						lastFailedAt: null,
+						lastLockedAt: null,
+						...(create as object),
+					} as Row;
+				}
+				rows.set(k, row);
+				return row;
+			}),
+			update: jest.fn(async ({ where, data }: never) => {
+				const { scope, usernameKey } = (where as never as { scope_usernameKey: Row })
+					.scope_usernameKey;
+				const k = key(scope, usernameKey);
+				const existing = rows.get(k);
+				if (!existing) {
+					throw new Error('loginLockout row not found');
+				}
+				const row = { ...existing, ...(data as object) } as Row;
 				rows.set(k, row);
 				return row;
 			}),

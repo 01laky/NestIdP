@@ -65,6 +65,16 @@ describe('SamlAttributeMapperService', () => {
 		expect(mapped.attributes).toEqual([]);
 	});
 
+	it('API-SAML-MAP-12: throws on an empty resolved NameID instead of emitting <NameID/> (§5.B12)', () => {
+		expect(() =>
+			mapper.mapUser(
+				{ ...baseUser, username: '', email: null },
+				'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
+				{ nameId: { source: 'email' } },
+			),
+		).toThrow(/NameID is empty/i);
+	});
+
 	it('API-SAML-MAP-06: default mapping includes role attribute', () => {
 		const mapped = mapper.mapUser(
 			baseUser,

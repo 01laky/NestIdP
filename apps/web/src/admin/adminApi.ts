@@ -447,6 +447,7 @@ export function listSamlSessions(
 	const params = new URLSearchParams();
 	if (query.status) params.set('status', query.status);
 	if (query.spConnectionId) params.set('spConnectionId', query.spConnectionId);
+	if (query.apiConnectionId) params.set('apiConnectionId', query.apiConnectionId);
 	if (query.q) params.set('q', query.q);
 	if (query.page) params.set('page', String(query.page));
 	if (query.pageSize) params.set('pageSize', String(query.pageSize));

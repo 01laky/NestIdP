@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { unlinkSync } from 'node:fs';
+import { existsSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ConfigService } from '@nestjs/config';
@@ -308,5 +308,56 @@ describe('IdpSigningService (SQLite)', () => {
 		expect(certs[0]).toContain('BEGIN CERTIFICATE');
 		const row = await prisma.idpSettings.findUnique({ where: { id: 'default' } });
 		expect(row?.signingCertPem).toBe(certs[0]);
+	});
+
+	it('API-SAML-SIGN-21: entityId shell metacharacters cannot inject a command (§5.A1)', () => {
+		// A "/CN=..." subject is interpolated from entityId. Under the old execSync+shell path a payload
+		// that closes the quote and chains `;touch <marker>` would run touch. Under spawnSync (args array,
+		// no shell) it is a literal argv byte string and can never execute. We assert the injected command
+		// did NOT run regardless of whether openssl tolerates the odd subject (it may throw — that's fine).
+		const marker = join(tmpdir(), `nestidp-injtest-${randomUUID()}.flag`);
+		expect(existsSync(marker)).toBe(false);
+		const maliciousEntityId = `https://idp.example";touch ${marker};"`;
+		try {
+			service.generateKeyPairAndCert(maliciousEntityId, { notAfter: '2030-01-01' });
+		} catch {
+			// openssl may reject the unusual subject — irrelevant; the security property is below.
+		}
+		expect(existsSync(marker)).toBe(false);
+		if (existsSync(marker)) {
+			unlinkSync(marker);
+		}
+	});
+
+	it('API-SAML-SIGN-22: signAssertion throws rather than emitting an unsigned assertion (§5.A2)', () => {
+		const generated = service.generateKeyPairAndCert('https://a2.example', {
+			notAfter: '2030-01-01',
+		});
+		const id = '_a2-not-an-assertion';
+		// A wrapper whose signed element is NOT a <saml2:Assertion> makes fragment extraction return null.
+		// The fixed code must reject; the old code returned the unsigned `stripped` element.
+		const notAnAssertion = create()
+			.ele('saml2:Other', {
+				'xmlns:saml2': 'urn:oasis:names:tc:SAML:2.0:assertion',
+				ID: id,
+				Version: '2.0',
+				IssueInstant: new Date().toISOString(),
+			})
+			.ele('saml2:Issuer')
+			.txt('http://localhost:3000')
+			.up()
+			.up()
+			.end({ headless: true });
+		expect(() =>
+			service.signAssertion(
+				notAnAssertion,
+				{
+					certPem: generated.certPem,
+					privateKeyPem: generated.privateKeyPem,
+					signatureAlgorithmId: null,
+				},
+				id,
+			),
+		).toThrow(/signed SAML assertion/i);
 	});
 });

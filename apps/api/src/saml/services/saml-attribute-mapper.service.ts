@@ -52,17 +52,25 @@ export class SamlAttributeMapperService {
 		mapping: SpAttributeMappingConfig | null,
 	): string {
 		const source = mapping?.nameId?.source;
+		let nameId: string;
 		if (source === 'username') {
-			return user.username;
+			nameId = user.username;
+		} else if (source === 'email' && user.email) {
+			nameId = user.email;
+		} else if (defaultFormat.includes('email') && user.email) {
+			nameId = user.email;
+		} else {
+			nameId = user.username;
 		}
-		if (source === 'email' && user.email) {
-			return user.email;
+		// §5.B12: never emit an empty NameID. `<saml2:NameID/>` is rejected by SPs; surfacing this as a
+		// clear error beats issuing a malformed assertion (e.g. an email-format SP mapped to a user with
+		// no email AND no username).
+		if (!nameId || nameId.trim().length === 0) {
+			throw new Error(
+				'Resolved SAML NameID is empty — user has no usable username/email for this SP',
+			);
 		}
-		const emailFormat = defaultFormat.includes('email');
-		if (emailFormat && user.email) {
-			return user.email;
-		}
-		return user.username;
+		return nameId;
 	}
 
 	private resolveSource(user: EndUserPublicDto, source: string): string[] {

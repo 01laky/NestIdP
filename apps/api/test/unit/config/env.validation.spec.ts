@@ -301,6 +301,25 @@ describe('validateEnv', () => {
 		expect(() => validateEnv({ ...validConfig, AUDIT_RETENTION_DAYS: '0' })).toThrow();
 	});
 
+	it('API-ENV-ENC-01: rejects an ENCRYPTION_KEY shorter than 16 chars (§5.B11)', () => {
+		expect(() => validateEnv({ ...validConfig, ENCRYPTION_KEY: 'short-key' })).toThrow(
+			/ENCRYPTION_KEY/,
+		);
+	});
+
+	it('API-ENV-ENC-02: accepts an ENCRYPTION_KEY of exactly 16 chars', () => {
+		expect(() => validateEnv({ ...validConfig, ENCRYPTION_KEY: '0123456789abcdef' })).not.toThrow();
+	});
+
+	it('API-ENV-PORT-01: rejects a non-numeric PORT (§5.B10)', () => {
+		expect(() => validateEnv({ ...validConfig, PORT: 'abc' })).toThrow(/PORT/);
+		expect(() => validateEnv({ ...validConfig, PORT: '8080x' })).toThrow(/PORT/);
+	});
+
+	it('API-ENV-PORT-02: accepts a numeric PORT', () => {
+		expect(validateEnv({ ...validConfig, PORT: '8080' }).PORT).toBe('8080');
+	});
+
 	it('API-ADM-USR-ENV-01: accepts admin user create rate limit env vars', () => {
 		const result = validateEnv({
 			...validConfig,

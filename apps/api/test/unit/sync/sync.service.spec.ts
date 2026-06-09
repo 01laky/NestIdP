@@ -201,6 +201,21 @@ describe('SyncService', () => {
 		]);
 	});
 
+	it('API-SYNC-SVC-INTERNAL: an unexpected phase-3 throw records an internal error entry (§5.B3)', async () => {
+		setupHappyPathMocks();
+		identityRepository.deactivateUsersNotInExternalIds.mockRejectedValueOnce(
+			new Error('db exploded mid-deactivation'),
+		);
+
+		const result = await service.triggerSync(CONNECTION_ID);
+
+		expect(result.syncLog.status).toBe('FAILED');
+		const errors = result.syncLog.errors ?? [];
+		expect(errors.some((e) => e.phase === 'internal' && e.message.includes('db exploded'))).toBe(
+			true,
+		);
+	});
+
 	it('API-SYNC-SVC-02: GET /users failure → SyncLog FAILED', async () => {
 		setupHappyPathMocks();
 		identitySyncClient.fetchUsersRaw.mockRejectedValue(

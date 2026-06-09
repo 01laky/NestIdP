@@ -146,19 +146,27 @@ export class AdminUsersService {
 		id: string,
 		actor: { id: string; username: string },
 	): Promise<DeleteAdminUserResponseDto> {
-		const existing = await this.prisma.adminUser.findUnique({ where: { id } });
-		if (!existing) {
-			throw new NotFoundException('Admin user not found');
-		}
 		if (actor.id === id) {
 			throw new ConflictException('Cannot delete your own admin account while logged in');
 		}
-		const count = await this.prisma.adminUser.count();
-		if (count <= 1) {
-			throw new ConflictException('Cannot delete the last admin account');
-		}
 
-		await this.prisma.adminUser.delete({ where: { id } });
+		// §5.A6: delete + last-admin guard atomically. The old count()-then-delete let two concurrent
+		// deletes of the last two admins both pass the `count <= 1` check and drop the system to zero
+		// admins. SQLite serialises write transactions, so counting AFTER the delete inside one
+		// transaction makes the second concurrent delete see 0 remaining and roll back.
+		const existing = await this.prisma.$transaction(async (tx) => {
+			const row = await tx.adminUser.findUnique({ where: { id } });
+			if (!row) {
+				throw new NotFoundException('Admin user not found');
+			}
+			await tx.adminUser.delete({ where: { id } });
+			const remaining = await tx.adminUser.count();
+			if (remaining < 1) {
+				throw new ConflictException('Cannot delete the last admin account');
+			}
+			return row;
+		});
+
 		this.audit.recordSafe({
 			category: 'admin_config',
 			event: 'admin_user_deleted',

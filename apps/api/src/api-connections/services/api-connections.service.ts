@@ -104,6 +104,10 @@ export class ApiConnectionsService {
 		this.applyProxyData(data, body, null);
 
 		const row = await this.prisma.apiConnection.create({ data });
+		// Audit-trail completeness (§5.B4): a created API connection must emit a creation event (mirrors
+		// SpConnectionsService.create). Previously only a proxy-update event fired, so most creations were
+		// unaudited.
+		this.audit.logCreated(row.id, row.name);
 		if (this.proxyTouched(body)) {
 			this.audit.logProxyUpdated(row.id, row.name, this.proxyAuditDetail(row));
 		}
@@ -226,6 +230,10 @@ export class ApiConnectionsService {
 			this.audit.logProxyUpdated(row.id, row.name, this.proxyAuditDetail(row));
 		}
 
+		// §5.B13: any update may have changed the OAuth credentials/endpoint — drop the cached token so the
+		// next sync exchanges a fresh one (a cache miss costs one token exchange; a stale token costs a run).
+		this.oauthTokenService.invalidate(row.id);
+
 		this.audit.logUpdated(row.id, row.name);
 		if (authTypeChanged) {
 			this.audit.logAuthTypeChanged(row.id, row.name, row.authType);
@@ -256,6 +264,8 @@ export class ApiConnectionsService {
 			throw error;
 		}
 		this.proxyDispatcher.invalidate(id);
+		// §5.B13: evict the deleted connection's cached OAuth token / inflight / last-token timestamp.
+		this.oauthTokenService.invalidate(id);
 		this.audit.logDeleted(existing.id, existing.name);
 		return { ok: true, id };
 	}

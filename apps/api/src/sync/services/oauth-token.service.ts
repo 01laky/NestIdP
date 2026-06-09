@@ -91,6 +91,26 @@ export class OAuthTokenService {
 		return ms ? new Date(ms).toISOString() : null;
 	}
 
+	/**
+	 * Drop every cached token, in-flight exchange and last-token timestamp for a connection (§5.B13).
+	 * Call when the connection is deleted or its OAuth credentials change — otherwise a deleted/rotated
+	 * connection's entries leak forever and `getLastTokenAt` can report a stale time for a reused id.
+	 */
+	invalidate(connectionId: string): void {
+		const prefix = `${connectionId}:`;
+		for (const key of [...this.cache.keys()]) {
+			if (key.startsWith(prefix)) {
+				this.cache.delete(key);
+			}
+		}
+		for (const key of [...this.inflight.keys()]) {
+			if (key.startsWith(prefix)) {
+				this.inflight.delete(key);
+			}
+		}
+		this.lastTokenAt.delete(connectionId);
+	}
+
 	/** Resolve a valid access token, using the cache + single-flight; throws OAuthTokenError on failure. */
 	async getAccessToken(
 		connection: ApiConnection,
@@ -350,7 +370,9 @@ export class OAuthTokenService {
 			params: cfg.params,
 			secretHash,
 		});
-		return createHash('sha256').update(material).digest('hex');
+		// §5.B13: prefix with the connection id so all of a connection's cache/inflight entries can be
+		// found and evicted by invalidate() (the hash alone is opaque).
+		return `${connectionId}:${createHash('sha256').update(material).digest('hex')}`;
 	}
 
 	private errorToDiag(error: unknown): OAuthTokenDiagnosticsDto {

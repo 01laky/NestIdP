@@ -1,4 +1,3 @@
-import { execSync } from 'node:child_process';
 import { generateKeyPairSync } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -11,6 +10,7 @@ import {
 	resolveGenerateIdpEncryptionCertRequest,
 	toStoredEncryptionCrypto,
 } from '@nestidp/shared';
+import { runOpenssl } from '../utils/openssl.util';
 import { PrismaService } from '../../prisma/services/prisma.service';
 
 export interface GeneratedEncryptionKeyPair {
@@ -66,10 +66,23 @@ export class IdpEncryptionService {
 			writeFileSync(keyPath, privateKeyPem);
 			const cn = entityId.replace(/^https?:\/\//, '').slice(0, 64) || 'nestidp';
 			const days = daysFromTodayUntilNotAfter(resolved.notAfter);
-			execSync(
-				`openssl req -new -x509 -key "${keyPath}" -out "${certPath}" -days ${days} -subj "/CN=${cn}" -nodes -addext keyUsage=keyEncipherment,dataEncipherment`,
-				{ stdio: 'pipe' },
-			);
+			// SECURITY: args array + no shell — operator-controlled `cn` cannot inject a command. See openssl.util.
+			runOpenssl([
+				'req',
+				'-new',
+				'-x509',
+				'-key',
+				keyPath,
+				'-out',
+				certPath,
+				'-days',
+				String(days),
+				'-subj',
+				`/CN=${cn}`,
+				'-nodes',
+				'-addext',
+				'keyUsage=keyEncipherment,dataEncipherment',
+			]);
 			return {
 				privateKeyPem,
 				certPem: readFileSync(certPath, 'utf8'),

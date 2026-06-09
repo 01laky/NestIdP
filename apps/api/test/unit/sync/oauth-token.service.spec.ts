@@ -66,6 +66,23 @@ describe('OAuthTokenService', () => {
 		expect(body).toContain('audience=aud-1');
 	});
 
+	it('OAUTH-INVALIDATE: invalidate drops the cached token + lastTokenAt → next call re-exchanges (§5.B13)', async () => {
+		const fetchMock = jest
+			.spyOn(global, 'fetch')
+			.mockResolvedValue(jsonResponse({ access_token: 'AT', expires_in: 3600 }));
+
+		await service.getAccessToken(makeConn());
+		expect(service.getLastTokenAt('c1')).not.toBeNull();
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+
+		// a second call without invalidate would be a cache hit (still 1 fetch)
+		service.invalidate('c1');
+		expect(service.getLastTokenAt('c1')).toBeNull();
+
+		await service.getAccessToken(makeConn());
+		expect(fetchMock).toHaveBeenCalledTimes(2); // cache was cleared → exchanged again
+	});
+
 	it('PROXY-WIRE-02: token exchange routes through the dispatcher when proxied', async () => {
 		const marker = { __dispatcher: true };
 		const proxied = new OAuthTokenService(

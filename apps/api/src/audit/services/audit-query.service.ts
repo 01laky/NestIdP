@@ -86,22 +86,33 @@ export class AuditQueryService {
 
 	private jsonToCsv(items: AuditEventListResponseDto['items']): string {
 		const header =
-			'createdAt,category,event,actorType,actorLabel,subjectType,subjectId,clientIp,metadata';
+			'id,createdAt,category,event,actorType,actorLabel,subjectType,subjectId,clientIp,metadata';
 		const lines = items.map((row) => {
 			const metadata = row.metadata ? JSON.stringify(row.metadata) : '';
-			const escaped = (value: string) => `"${value.replace(/"/g, '""')}"`;
 			return [
-				escaped(row.createdAt),
-				escaped(row.category),
-				escaped(row.event),
-				escaped(row.actorType),
-				escaped(row.actorLabel ?? ''),
-				escaped(row.subjectType ?? ''),
-				escaped(row.subjectId ?? ''),
-				escaped(row.clientIp ?? ''),
-				escaped(metadata),
+				escapeCsvCell(row.id),
+				escapeCsvCell(row.createdAt),
+				escapeCsvCell(row.category),
+				escapeCsvCell(row.event),
+				escapeCsvCell(row.actorType),
+				escapeCsvCell(row.actorLabel ?? ''),
+				escapeCsvCell(row.subjectType ?? ''),
+				escapeCsvCell(row.subjectId ?? ''),
+				escapeCsvCell(row.clientIp ?? ''),
+				escapeCsvCell(metadata),
 			].join(',');
 		});
 		return [header, ...lines].join('\n');
 	}
+}
+
+/**
+ * Quote a CSV cell AND neutralise spreadsheet formula-injection (§5.A11). Audit fields can contain
+ * attacker-influenced data (e.g. a username chosen at login); a value starting with `=`, `+`, `-`, `@`,
+ * tab or CR is interpreted as a formula by Excel/Sheets. Prefix such values with a single quote so the
+ * cell is treated as text. The quote prefix is applied before the standard `"`-doubling/quoting.
+ */
+export function escapeCsvCell(value: string): string {
+	const neutralised = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+	return `"${neutralised.replace(/"/g, '""')}"`;
 }

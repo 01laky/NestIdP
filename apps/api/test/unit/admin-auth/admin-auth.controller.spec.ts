@@ -4,6 +4,7 @@ import { AdminAuthController } from '@api/admin-auth/controllers/admin-auth.cont
 import { AdminAuthService } from '@api/admin-auth/services/admin-auth.service';
 import { AdminAuthenticatedRequest } from '@api/admin-auth/admin-auth.types';
 import { AdminSessionService } from '@api/admin-auth/services/admin-session.service';
+import { AdminCsrfService } from '@api/admin-auth/services/admin-csrf.service';
 import { LoginProtectionService } from '@api/auth-protection/login-protection.service';
 
 describe('AdminAuthController', () => {
@@ -37,6 +38,7 @@ describe('AdminAuthController', () => {
 		adminSessionService as unknown as AdminSessionService,
 		loginProtection as unknown as LoginProtectionService,
 		adminAuthAudit as never,
+		new AdminCsrfService(),
 	);
 
 	beforeEach(() => {
@@ -221,6 +223,30 @@ describe('AdminAuthController', () => {
 		expect(() =>
 			controller.logout({ cookies: {}, headers: {} } as AdminAuthenticatedRequest, res),
 		).toThrow('Invalid CSRF token');
+	});
+
+	it('API-CTL-10: logout with matching CSRF audits via the session payload identity (§5.A7)', () => {
+		adminSessionService.verify.mockReturnValue({
+			adminUserId: 'a1',
+			username: 'admin',
+			iat: 1,
+			exp: 2,
+			csrfToken: 'expected-csrf',
+		});
+
+		const result = controller.logout(
+			{
+				cookies: {},
+				headers: { 'x-csrf-token': 'expected-csrf' },
+				ip: '10.0.0.9',
+				// note: no req.adminUser (AdminAuthGuard is not applied to logout)
+			} as unknown as AdminAuthenticatedRequest,
+			res,
+		);
+
+		expect(result).toEqual({ ok: true });
+		expect(adminAuthAudit.logLogout).toHaveBeenCalledWith('a1', 'admin', '10.0.0.9');
+		expect(adminSessionService.clearCookie).toHaveBeenCalledWith(res);
 	});
 
 	it('API-CTL-06: me throws when adminUser missing on request', () => {

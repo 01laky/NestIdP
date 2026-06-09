@@ -44,6 +44,7 @@ describe('ApiConnectionsService', () => {
 		getAccessToken: jest.fn(),
 		getLastTokenAt: jest.fn().mockReturnValue(null),
 		fetchDiagnostics: jest.fn(),
+		invalidate: jest.fn(),
 	};
 
 	const identityStore = {
@@ -102,6 +103,8 @@ describe('ApiConnectionsService', () => {
 		expect(result.connection.hasBearerToken).toBe(true);
 		expect(result.connection).not.toHaveProperty('bearerToken');
 		expect(result.connection).not.toHaveProperty('authCredentialsEncrypted');
+		// §5.B4: a created connection must emit an audit creation event.
+		expect(audit.logCreated).toHaveBeenCalledWith(sampleRow.id, sampleRow.name);
 	});
 
 	it('API-CON-02: create normalizes baseUrl trailing slash', async () => {

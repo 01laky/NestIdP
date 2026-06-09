@@ -149,7 +149,9 @@ export class LogoutPropagationService implements LogoutPropagationPort {
 	async resend(ssoSessionId: string, spConnectionId: string): Promise<void> {
 		await this.prisma.samlBackchannelLogout.updateMany({
 			where: { ssoSessionId, spConnectionId, status: { in: ['failed', 'given_up', 'partial'] } },
-			data: { status: 'pending', nextRetryAt: new Date() },
+			// §5.B2: reset attempts on an operator resend — otherwise a resent given-up row immediately
+			// re-exceeds maxRetries on its next failure and gives up again after a single try.
+			data: { status: 'pending', attempts: 0, nextRetryAt: new Date() },
 		});
 		void this.runFirstPass();
 	}
@@ -203,7 +205,10 @@ export class LogoutPropagationService implements LogoutPropagationPort {
 		const cutoff = new Date(now.getTime() - this.config.pruneRetentionMs());
 		const result = await this.prisma.samlBackchannelLogout.deleteMany({
 			where: {
-				status: { in: ['succeeded', 'given_up', 'skipped_no_endpoint'] },
+				// §5.B2: include 'partial' — it is a terminal status (the SP responded with PartialLogout;
+				// re-sending won't change that, and an operator can still resend manually). Previously it
+				// was neither retried by processDue nor pruned here, so partial rows accumulated forever.
+				status: { in: ['succeeded', 'given_up', 'skipped_no_endpoint', 'partial'] },
 				updatedAt: { lt: cutoff },
 			},
 		});
@@ -332,6 +337,9 @@ export class LogoutPropagationService implements LogoutPropagationPort {
 			this.config.retryMaxMs(),
 			this.config.retryBaseMs() * 2 ** (attempts - 1),
 		);
+		// §5.B2: add jitter (50–100% of the computed backoff) so a mass termination that fails against a
+		// down SP doesn't produce a synchronized retry thundering-herd against that SP.
+		const jittered = Math.round(backoff / 2 + Math.random() * (backoff / 2));
 		await this.prisma.samlBackchannelLogout.update({
 			where: { id: row.id },
 			data: {
@@ -339,7 +347,7 @@ export class LogoutPropagationService implements LogoutPropagationPort {
 				attempts,
 				lastError: reason,
 				requestId,
-				nextRetryAt: new Date(Date.now() + backoff),
+				nextRetryAt: new Date(Date.now() + jittered),
 			},
 		});
 		await this.updateSpStatus(row.spConnectionId, 'failed');

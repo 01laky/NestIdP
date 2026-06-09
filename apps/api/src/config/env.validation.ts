@@ -5,7 +5,9 @@ import {
 	IsNotEmpty,
 	IsOptional,
 	IsString,
+	Matches,
 	Max,
+	MinLength,
 	Min,
 	validateSync,
 } from 'class-validator';
@@ -36,8 +38,11 @@ export class EnvironmentVariables {
 	@IsNotEmpty()
 	SESSION_SECRET!: string;
 
+	// §5.B11: enforce the secret-encryption key length at boot (the encryption util also checks ≥16, but
+	// only at first encrypt — a too-short key must fail fast at startup, not mid-request).
 	@IsString()
 	@IsNotEmpty()
+	@MinLength(16, { message: 'ENCRYPTION_KEY must be at least 16 characters' })
 	ENCRYPTION_KEY!: string;
 
 	@IsString()
@@ -293,8 +298,11 @@ export class EnvironmentVariables {
 	@IsString()
 	SAML_METADATA_INCLUDE_ACS?: string;
 
+	// §5.B10: PORT must be a numeric string (a non-numeric value previously reached `Number(PORT)` → NaN →
+	// `app.listen(NaN)`). 1–5 digits; the [1,65535] range is re-checked in main.ts.
 	@IsOptional()
 	@IsString()
+	@Matches(/^[0-9]{1,5}$/, { message: 'PORT must be a numeric string (1–65535)' })
 	PORT?: string;
 
 	@IsOptional()

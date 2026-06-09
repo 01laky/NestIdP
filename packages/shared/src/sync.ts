@@ -44,7 +44,10 @@ export interface SyncLogErrorEntryDto {
 		| 'concurrency'
 		| 'dry_run_summary'
 		| 'user_limit'
-		| 'username_collision';
+		| 'username_collision'
+		// §5.B3: an unexpected internal failure (e.g. a throw in the membership/deactivation phase) so a
+		// FAILED run is always self-describing rather than showing an empty error list.
+		| 'internal';
 	externalUserId?: string;
 	externalGroupId?: string;
 	externalRoleId?: string;

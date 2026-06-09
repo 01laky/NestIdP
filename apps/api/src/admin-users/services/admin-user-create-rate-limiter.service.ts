@@ -6,6 +6,9 @@ interface RateLimitEntry {
 	windowStartMs: number;
 }
 
+// §5.B14: bound the in-memory maps against unbounded key growth (memory-growth DoS).
+const MAX_TRACKED_KEYS = 50_000;
+
 @Injectable()
 export class AdminUserCreateRateLimiterService {
 	private readonly byAdminId = new Map<string, RateLimitEntry>();
@@ -20,6 +23,21 @@ export class AdminUserCreateRateLimiterService {
 	recordAttempt(adminId: string, ip: string): void {
 		this.recordKey(this.byAdminId, adminId);
 		this.recordKey(this.byIp, ip);
+	}
+
+	/** Evict entries whose window has elapsed from both maps. Returns total removed. */
+	prune(now: number = Date.now()): number {
+		const windowMs = this.getWindowMs();
+		let removed = 0;
+		for (const store of [this.byAdminId, this.byIp]) {
+			for (const [key, entry] of store) {
+				if (now - entry.windowStartMs >= windowMs) {
+					store.delete(key);
+					removed += 1;
+				}
+			}
+		}
+		return removed;
 	}
 
 	clear(): void {
@@ -54,6 +72,10 @@ export class AdminUserCreateRateLimiterService {
 
 	private recordKey(store: Map<string, RateLimitEntry>, key: string): void {
 		const now = Date.now();
+		// §5.B14: sweep expired entries once a map grows past the soft cap.
+		if (store.size >= MAX_TRACKED_KEYS) {
+			this.prune(now);
+		}
 		const entry = store.get(key);
 		if (!entry || now - entry.windowStartMs >= this.getWindowMs()) {
 			store.set(key, { count: 1, windowStartMs: now });

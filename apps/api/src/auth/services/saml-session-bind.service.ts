@@ -28,9 +28,16 @@ export class SamlSessionBindService implements SamlSessionBindPort {
 			throw new BadRequestException('SP connection is inactive');
 		}
 
-		await this.prisma.samlSession.update({
-			where: { id: samlSessionId },
+		// §5.A9: atomic conditional bind. The checks above give precise error messages, but the bind itself
+		// must be a single guarded write — otherwise two concurrent logins both pass the `userId == null`
+		// check and the second silently overwrites the first. Only update while still unbound + unexpired;
+		// count === 0 means another request won the race (or it just expired) → conflict.
+		const result = await this.prisma.samlSession.updateMany({
+			where: { id: samlSessionId, userId: null, expiresAt: { gt: new Date() } },
 			data: { userId },
 		});
+		if (result.count === 0) {
+			throw new ConflictException('SAML session already authenticated');
+		}
 	}
 }

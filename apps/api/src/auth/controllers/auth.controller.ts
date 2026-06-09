@@ -4,7 +4,6 @@ import {
 	Controller,
 	Get,
 	HttpCode,
-	HttpException,
 	HttpStatus,
 	Post,
 	Query,
@@ -84,11 +83,11 @@ export class AuthController {
 			await this.loginProtection.recordLoginSuccess('end_user', usernameKey, clientIp);
 			return result;
 		} catch (error) {
-			if (
-				error instanceof UnauthorizedException ||
-				!(error instanceof HttpException) ||
-				error.getStatus() < 500
-			) {
+			// §5.A8: only a genuine credential failure counts toward the per-IP/per-username throttle and
+			// the account lockout. A *correct* password that then fails to bind to the SAML session
+			// (expired / already-bound / inactive SP → 400/409) must NOT poison those counters, and an
+			// unexpected 5xx is not a brute-force signal either. Matches the admin-auth predicate.
+			if (error instanceof UnauthorizedException) {
 				await this.loginProtection.recordLoginFailure('end_user', usernameKey, clientIp);
 			}
 			throw error;

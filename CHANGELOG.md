@@ -4,6 +4,55 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.18.1]
+
+Refactor + hardening pass (Prompt 38) — **first increment: security & correctness fixes**. This release is
+in progress; the broad refactors (shared helpers, identity-store parity, cert-lifecycle unification,
+frontend de-duplication) and remaining items land in subsequent commits under this same version.
+
+### Security
+
+- **SAML cert generation no longer shells out with string interpolation** — `openssl` is invoked via
+  `spawnSync` with an argv array and no shell, so an operator-controlled `entityId` (used as the cert CN)
+  can no longer inject a command (`apps/api/src/saml/utils/openssl.util.ts`).
+- **Signed assertions never fall back to unsigned** — if signing or signed-fragment extraction fails, the
+  IdP now throws instead of silently emitting an unsigned `<saml2:Assertion>`.
+- **Admin logout CSRF check is constant-time** (`timingSafeEqual` via `AdminCsrfService`) and the logout is
+  now actually audited (the previous `req.adminUser` guard was dead, so logouts went unrecorded).
+- **Login-failure poisoning fixed** — a _correct_ password that then fails to bind to the SAML session
+  (expired / already-bound / inactive SP → 400/409) no longer counts toward the per-IP/username throttle or
+  the account lockout; only genuine credential failures do.
+- **Test-ACS SSRF guard** — the admin "test ACS" probe refuses private/loopback/link-local hosts (e.g. cloud
+  metadata `169.254.169.254`) and no longer follows redirects (`redirect: 'manual'`).
+- **Audit CSV export neutralises spreadsheet formula-injection** (cells starting `= + - @` are quoted) and
+  now includes the event `id` column.
+- **Audit metadata redaction is deep + substring-matched + byte-measured** — secrets nested at any depth
+  (e.g. `{ details: { password } }`) and variants like `oauthClientSecret`/`apiKey` are stripped.
+- **Bounded in-memory rate-limit maps** — the IP-ban, SAML-SLO and admin-user-create limiters now prune
+  expired entries, preventing unbounded memory growth under a distinct-IP spray.
+
+### Fixed
+
+- **Concurrency races made atomic** (with real-libSQL regression tests): the per-account lockout counter
+  (atomic `increment` instead of read-then-write), the last-admin/self delete guard (count-after-delete in a
+  transaction — can no longer drop the system to zero admins), and the SAML session→user bind (atomic
+  conditional `updateMany` — exactly one concurrent login wins).
+- **Active SAML sessions "Source" filter works** — `listSamlSessions` now serialises `apiConnectionId` into
+  the request (the admin filter was a silent no-op).
+- **API-connection creation is audited** — `create()` now emits the `api_connection_created` event.
+- **Mirror-mode source removal flags drift** — `removeConnectionIdentities` was missing from the mirroring
+  store's mutating-method set, so removing a source in mirror mode silently diverged the external copy.
+- **Back-channel SLO**: `partial` deliveries are now pruned (terminal, not a leak), an operator resend resets
+  the retry counter, and failed-delivery backoff has jitter (no synchronised retry herd against a down SP).
+- **OAuth token cache invalidation** — deleting or updating an API connection now evicts its cached token /
+  in-flight exchange / last-token timestamp (`OAuthTokenService.invalidate`).
+- **Sync runs are self-describing on failure** — an unexpected throw in the membership/deactivation phase now
+  records an `internal` error entry instead of producing a `FAILED` log with no explanation.
+- **Boot/runtime hardening** — `app.enableShutdownHooks()` (clean Prisma `$disconnect` + interval cleanup on
+  SIGTERM), a numeric `PORT` guard, an explicit 1 MB body-size limit (resolving the 256 KB SLO-metadata DTO
+  vs. 100 KB default conflict), an empty-NameID guard in the SAML attribute mapper, and `ENCRYPTION_KEY`
+  minimum-length validation at boot.
+
 ## [1.18.0]
 
 ### Added

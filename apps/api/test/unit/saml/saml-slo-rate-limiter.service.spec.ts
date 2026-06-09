@@ -24,6 +24,14 @@ describe('saml-slo-rate-limiter.service', () => {
 		expect(limiter.hitAndCheck('b')).toBe(false);
 	});
 
+	it('API-SLO-RATE-PRUNE: prune evicts expired windows, bounding the map (§5.B14)', () => {
+		const limiter = makeLimiter({ SAML_SLO_RATE_IP_MAX: '5', SAML_SLO_RATE_WINDOW_MS: '1000' });
+		limiter.hitAndCheck('a');
+		limiter.hitAndCheck('b');
+		expect(limiter.prune(Date.now())).toBe(0); // windows still open
+		expect(limiter.prune(Date.now() + 5000)).toBe(2); // both windows elapsed
+	});
+
 	it('EDGE: default max (30) applies when unconfigured', () => {
 		const limiter = makeLimiter();
 		for (let i = 0; i < 30; i += 1) {

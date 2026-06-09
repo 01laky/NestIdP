@@ -248,7 +248,7 @@ describe('audit integration (SQLite)', () => {
 
 		expect(exported.headers['content-type']).toMatch(/text\/csv/);
 		expect(String(exported.text).split('\n')[0]).toBe(
-			'createdAt,category,event,actorType,actorLabel,subjectType,subjectId,clientIp,metadata',
+			'id,createdAt,category,event,actorType,actorLabel,subjectType,subjectId,clientIp,metadata',
 		);
 		expect(String(exported.text)).toContain('sync_started');
 	});

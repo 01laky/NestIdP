@@ -68,4 +68,37 @@ describe('sanitizeAuditMetadata', () => {
 			rotation: false,
 		});
 	});
+
+	it('API-AUD-META-11: redacts secret keys nested at any depth (§5.A12)', () => {
+		expect(
+			sanitizeAuditMetadata({
+				details: { password: 'p', user: 'admin' },
+				connection: { proxy: { proxyPassword: 'x', host: 'h' } },
+				list: [{ apiKey: 'k', label: 'ok' }],
+			}),
+		).toEqual({
+			details: { user: 'admin' },
+			connection: { proxy: { host: 'h' } },
+			list: [{ label: 'ok' }],
+		});
+	});
+
+	it('API-AUD-META-12: substring match catches secret variants (§5.A12)', () => {
+		expect(
+			sanitizeAuditMetadata({
+				oauthClientSecret: 's',
+				apiKey: 'k',
+				signingKeyEncrypted: 'v1:enc',
+				csrfToken: 't',
+				ssoSessionId: 'keep-me',
+				name: 'Corp',
+			}),
+		).toEqual({ ssoSessionId: 'keep-me', name: 'Corp' });
+	});
+
+	it('API-AUD-META-13: byte cap measures UTF-8 bytes not UTF-16 code units (§5.A12)', () => {
+		// 1500 multi-byte chars = 4500 UTF-8 bytes (>4096) but only 1500 UTF-16 code units.
+		const metadata = { payload: '€'.repeat(1500) };
+		expect(sanitizeAuditMetadata(metadata)).toEqual({ truncated: true, previewBytes: 4096 });
+	});
 });

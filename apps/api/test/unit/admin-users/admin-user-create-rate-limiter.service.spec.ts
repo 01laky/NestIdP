@@ -26,6 +26,12 @@ describe('AdminUserCreateRateLimiterService', () => {
 		expect(service.isLimited('admin-1', '10.0.0.1')).toBe(false);
 	});
 
+	it('API-ADM-USR-RL-PRUNE: prune evicts expired entries from both maps (§5.B14)', () => {
+		service.recordAttempt('admin-9', '9.9.9.9');
+		expect(service.prune(Date.now())).toBe(0); // window (60s) still open
+		expect(service.prune(Date.now() + 120_000)).toBe(2); // byAdminId + byIp both expired
+	});
+
 	it('API-ADM-USR-RL-02: limited after max attempts for same admin id', () => {
 		service.recordAttempt('admin-1', '10.0.0.1');
 		service.recordAttempt('admin-1', '10.0.0.1');

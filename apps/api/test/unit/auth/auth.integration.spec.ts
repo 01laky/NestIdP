@@ -640,6 +640,31 @@ describe('end-user auth integration (SQLite)', () => {
 		expect(setCookie).toBeUndefined();
 	});
 
+	it('API-AUTH-INT-50: correct-password bind failure does NOT record a login failure; bad password does (§5.A8)', async () => {
+		const lp = app.get(LoginProtectionService);
+		const spy = jest.spyOn(lp, 'recordLoginFailure');
+
+		// correct password, but the SAML session is expired → bind fails with 400. The credential was
+		// valid, so this must NOT poison the throttle / lockout counters.
+		const session = await createTestSamlSession(prisma, spConnectionId, {
+			expiresAt: new Date(Date.now() - 60_000),
+		});
+		await request(app.getHttpServer() as App)
+			.post(`${AUTH_API_PATH}/login`)
+			.send({ username: 'alice', password: endUserPassword, samlSessionId: session.id })
+			.expect(400);
+		expect(spy).not.toHaveBeenCalled();
+
+		// contrast: a genuinely wrong password IS recorded as a login failure
+		await request(app.getHttpServer() as App)
+			.post(`${AUTH_API_PATH}/login`)
+			.send({ username: 'alice', password: 'definitely-wrong-password' })
+			.expect(401);
+		expect(spy).toHaveBeenCalledWith('end_user', 'alice', expect.any(String));
+
+		spy.mockRestore();
+	});
+
 	it('API-AUTH-INT-47: GET /session with inactive SP reports spActive false', async () => {
 		const inactiveSp = await createTestSpConnection(prisma, { active: false });
 		const session = await createTestSamlSession(prisma, inactiveSp.id);

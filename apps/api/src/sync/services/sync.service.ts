@@ -376,7 +376,17 @@ export class SyncService {
 				syncLog: toSyncLogDto(finishedLog),
 				connection: toApiConnectionDto(connectionAfter),
 			};
-		} catch {
+		} catch (error) {
+			// §5.B3: a StrictRowError (onRowError='fail' / collision fail_run) has already pushed its
+			// describing entry before aborting. Any OTHER throw (e.g. in replaceUserGroups or
+			// deactivateUsersNotInExternalIds) would otherwise yield a FAILED log with no error entry —
+			// record an explicit internal error so the failure is self-describing.
+			if (!(error instanceof StrictRowError)) {
+				errors.push({
+					phase: 'internal',
+					message: error instanceof Error ? error.message : String(error),
+				});
+			}
 			return this.finishFailedTrigger(
 				connectionId,
 				connectionBefore,
