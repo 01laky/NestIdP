@@ -4,6 +4,7 @@ import type { LogoutPropagationInput, LogoutPropagationPort } from '@nestidp/sha
 import { PrismaService } from '../../prisma/services/prisma.service';
 import { AuditPersistenceService } from '../../audit/services/audit-persistence.service';
 import { redactSecrets } from '../../encryption/utils/redact-secret.util';
+import { errorMessage as messageOf } from '../../common/utils/error-message.util';
 import { BackchannelLogoutConfig } from './backchannel-logout.config';
 import { IdpSigningService } from './idp-signing.service';
 import { SamlLogoutRequestBuilderService } from './saml-logout-request-builder.service';
@@ -414,8 +415,4 @@ export class LogoutPropagationService implements LogoutPropagationPort {
 			}),
 		);
 	}
-}
-
-function messageOf(error: unknown): string {
-	return error instanceof Error ? error.message : String(error);
 }

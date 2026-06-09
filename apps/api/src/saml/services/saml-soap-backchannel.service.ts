@@ -3,6 +3,7 @@ import { DOMParser } from '@xmldom/xmldom';
 import * as xpath from 'xpath';
 import { SAML_STATUS_PARTIAL_LOGOUT, SAML_STATUS_SUCCESS } from '@nestidp/shared';
 import { redactSecrets } from '../../encryption/utils/redact-secret.util';
+import { errorMessage as messageOf } from '../../common/utils/error-message.util';
 import { verifyEnvelopedXmlDsig } from '../utils/saml-enveloped-signature.util';
 
 export type SoapDeliveryOutcome = 'succeeded' | 'partial' | 'failed';
@@ -133,8 +134,4 @@ function wrapSoap(logoutRequestXml: string): string {
 		`<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">` +
 		`<soap:Body>${stripped}</soap:Body></soap:Envelope>`
 	);
-}
-
-function messageOf(error: unknown): string {
-	return error instanceof Error ? error.message : String(error);
 }

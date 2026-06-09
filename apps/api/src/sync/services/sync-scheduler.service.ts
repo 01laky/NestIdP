@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import type { SyncLogErrorEntryDto } from '@nestidp/shared';
 import { CronScheduleError, SYNC_SCHEDULE_DEFAULT_TIMEZONE } from '@nestidp/shared';
 import { parseBoolEnv } from '../../common/config/parse-bool-env.util';
+import { errorMessage as messageOf } from '../../common/utils/error-message.util';
 import { ApiConnection } from '@prisma/client';
 import { PrismaService } from '../../prisma/services/prisma.service';
 import { AuditPersistenceService } from '../../audit/services/audit-persistence.service';
@@ -296,8 +297,4 @@ function summarizeSyncErrors(errors: SyncLogErrorEntryDto[] | null): string {
 	const first = errors[0];
 	const detail = first.message ?? first.phase;
 	return errors.length > 1 ? `${detail} (+${errors.length - 1} more)` : detail;
-}
-
-function messageOf(error: unknown): string {
-	return error instanceof Error ? error.message : String(error);
 }
