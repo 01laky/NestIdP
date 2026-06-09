@@ -43,6 +43,7 @@ describe('sync shared types', () => {
 			groupsSynced: 0,
 			rolesSynced: 0,
 			dryRun: false,
+			triggerSource: 'manual',
 			errors: null,
 		};
 		expect(log.durationMs).toBe(1000);

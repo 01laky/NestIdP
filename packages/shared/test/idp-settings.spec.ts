@@ -58,6 +58,14 @@ describe('idp-settings shared', () => {
 				pendingSigningRsaModulusBits: null,
 				pendingSigningEcCurve: null,
 				pendingSigningCertNotAfter: null,
+				auto: {
+					enabled: false,
+					disabledAt: null,
+					consecutiveFailures: 0,
+					lastError: null,
+					willAutoStartBy: null,
+					willAutoCompleteAt: null,
+				},
 			},
 			hasEncryptionCertificate: false,
 			encryptionCertFingerprintSha256: null,
@@ -76,7 +84,17 @@ describe('idp-settings shared', () => {
 				pendingEncryptionRsaModulusBits: null,
 				pendingEncryptionEcCurve: null,
 				pendingEncryptionCertNotAfter: null,
+				auto: {
+					enabled: false,
+					disabledAt: null,
+					consecutiveFailures: 0,
+					lastError: null,
+					willAutoStartBy: null,
+					willAutoCompleteAt: null,
+				},
 			},
+			lastAutoRotationCheckAt: null,
+			lastAutoRotationActionAt: null,
 			updatedAt: '2026-01-01T00:00:00.000Z',
 		};
 		expect(dto.hasSigningCertificate).toBe(true);
@@ -93,6 +111,14 @@ describe('idp-settings shared', () => {
 			pendingSigningRsaModulusBits: null,
 			pendingSigningEcCurve: null,
 			pendingSigningCertNotAfter: null,
+			auto: {
+				enabled: false,
+				disabledAt: null,
+				consecutiveFailures: 0,
+				lastError: null,
+				willAutoStartBy: null,
+				willAutoCompleteAt: null,
+			},
 		};
 		expect(rotation.active).toBe(false);
 	});
@@ -108,6 +134,14 @@ describe('idp-settings shared', () => {
 			pendingSigningRsaModulusBits: 3072,
 			pendingSigningEcCurve: null,
 			pendingSigningCertNotAfter: '2031-01-01T00:00:00.000Z',
+			auto: {
+				enabled: true,
+				disabledAt: null,
+				consecutiveFailures: 0,
+				lastError: null,
+				willAutoStartBy: '2030-11-01T00:00:00.000Z',
+				willAutoCompleteAt: '2026-01-08T00:00:00.000Z',
+			},
 		};
 		expect(rotation.pendingCertFingerprintSha256).toBe('pending-fp');
 	});

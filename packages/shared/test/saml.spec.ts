@@ -85,16 +85,21 @@ describe('saml shared', () => {
 
 	it('SH-SAML-07: signing probe DTOs and test SSO URL DTO are assignable', () => {
 		const testSso: SpConnectionTestSsoUrlResponseDto = {
-			url: 'https://idp.example.com/saml/sso?SAMLRequest=abc',
+			ssoUrl: 'https://idp.example.com/saml/sso?SAMLRequest=abc',
+			spEntityId: 'urn:sp:app',
+			authnRequestId: '_req-1',
+			signed: true,
+			encrypted: false,
 		};
 		const request: ProbeSpSigningRequestDto = {
-			requestUrl: testSso.url,
+			spPrivateKeyPem: '-----BEGIN PRIVATE KEY-----\nMII...\n-----END PRIVATE KEY-----',
 		};
 		const response: ProbeSpSigningResponseDto = {
-			isSigned: true,
-			signatureAlgorithm: SAML_REDIRECT_SIGNATURE_ALGORITHMS[0] ?? null,
+			ok: true,
+			fingerprintSha256: 'ab:cd',
 		};
-		expect(request.requestUrl).toContain('SAMLRequest');
-		expect(response.isSigned).toBe(true);
+		expect(testSso.ssoUrl).toContain('SAMLRequest');
+		expect(request.spPrivateKeyPem).toContain('BEGIN PRIVATE KEY');
+		expect(response.ok).toBe(true);
 	});
 });

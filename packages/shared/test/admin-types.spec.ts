@@ -36,6 +36,9 @@ const defaultSpSecurity = {
 	spConnectionsRequireEncryptedAssertions: 0,
 	spConnectionsMissingCertWithSecurityFlags: 0,
 	idpAdvertisesSignedAuthnRequests: false,
+	idpEncryptionKeyIsEc: false,
+	activeSamlSessions: 0,
+	backchannelUnresolved: 0,
 };
 
 describe('AdminStatsDto', () => {
@@ -165,6 +168,9 @@ describe('AdminDashboardResponseDto', () => {
 				spConnectionsRequireEncryptedAssertions: 1,
 				spConnectionsMissingCertWithSecurityFlags: 0,
 				idpAdvertisesSignedAuthnRequests: true,
+				idpEncryptionKeyIsEc: false,
+				activeSamlSessions: 0,
+				backchannelUnresolved: 0,
 			},
 			apiConnection: null,
 			lastSyncStatus: null,
