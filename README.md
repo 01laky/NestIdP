@@ -4,7 +4,7 @@
 
 **A self-hosted SAML 2.0 Identity Provider you deploy in minutes**
 
-[![Version](https://img.shields.io/badge/version-1.20.0-blue?style=flat-square)](package.json)
+[![Version](https://img.shields.io/badge/version-1.20.1-blue?style=flat-square)](package.json)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-green?style=flat-square)](package.json)
 [![pnpm](https://img.shields.io/badge/pnpm-%3E%3D9-orange?style=flat-square)](package.json)
 [![License](https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square)](LICENSE)
@@ -300,7 +300,7 @@ Alert when:
 | [docs/tutorial.md](docs/tutorial.md)               | **Operator walkthrough** — admin UI with screenshots, step by step      |
 | [docs/proposal.MD](docs/proposal.MD)               | Product scope, architecture, data model, full roadmap                   |
 | [docs/development.md](docs/development.md)         | Local setup, routing, REST API reference, Evergreen UI, test registries |
-| [docs/integration-api.md](docs/integration-api.md) | External identity API contract (Bearer + OAuth2 CC)                     |
+| [docs/integration-api.md](docs/integration-api.md) | External identity API contract — endpoints, field mapping, pagination   |
 | [docs/database.md](docs/database.md)               | Encrypted libSQL, migrations, rekey, backup, bootstrap admin            |
 | [docs/deployment.md](docs/deployment.md)           | Docker, env vars, health probes, troubleshooting                        |
 | [docs/audit-events.md](docs/audit-events.md)       | Full audit event catalogue by category                                  |

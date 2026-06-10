@@ -4,6 +4,26 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.20.1]
+
+Docs fix: document the existing `apiContractConfig` system in `integration-api.md`; the file previously
+contained a stale claim that there was no field or endpoint mapping in v1.
+
+### Changed
+
+- **`docs/integration-api.md`**: rewrote the intro to describe the default contract and point to the new
+  section; replaced the stale "no field or endpoint mapping in v1" sentence; added a full
+  **"API contract configuration (`apiContractConfig`) (v1.9.0)"** section documenting every config key:
+  `endpoints`, `responseRoot`, `userFieldMap`/`groupFieldMap`/`roleFieldMap`, `passwordHashAlgorithmConstant`,
+  `membershipSource` (endpoint vs embedded), `pagination` (none/offset/page), `activeMapping`
+  (inverted + trueValues), `queryParams`, `headers`, `defaults`, `onRowError`, `maxGroupsPerUser`/`maxRolesPerUser`,
+  and the two built-in presets (`keycloak-like`, `auth0-like`). Includes a worked JSON example; removes
+  the stale "No custom paths or JSON field mapping" bullet from the v1 limits section.
+- **`README.md`** and **`docs/README.md`**: updated integration-api.md description to reflect the
+  expanded coverage (endpoints, field mapping, pagination, presets).
+
+---
+
 ## [1.20.0]
 
 Documentation overhaul (Prompt 40): professional README, screenshot spec, diagram, and docs update across all 14 deliverables.

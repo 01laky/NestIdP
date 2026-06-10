@@ -1,6 +1,8 @@
 # External identity API — v1 integration guide
 
-NestIdP syncs users, groups, roles, and password hashes from one or more configured API connections. Each connection has its own `baseUrl`, authentication credentials, sync schedule, and identity scope — syncing one source never touches another's records. The external REST API for each connection must implement the contract below exactly. NestIdP only prepends the operator-configured `baseUrl` — there is no field or endpoint mapping in v1.
+NestIdP syncs users, groups, roles, and password hashes from one or more configured API connections. Each connection has its own `baseUrl`, authentication credentials, sync schedule, and identity scope — syncing one source never touches another's records.
+
+By default NestIdP calls the fixed v1 endpoints (`/users`, `/users/:id/groups`, `/users/:id/roles`) and reads identity from the standard field names. If your API uses different paths, a response envelope, renamed fields, or pagination, configure an [`apiContractConfig`](#api-contract-configuration-apicontractconfig-v190) on the connection — no middleware or adapter needed.
 
 Product context: [proposal.MD §7](./proposal.MD) · operator setup: [development.md](./development.md) · mock server: [examples/mock-identity-api.mjs](./examples/mock-identity-api.mjs)
 
@@ -217,10 +219,205 @@ target:
 | `target_error`  | Proxy + tunnel fine, target returned non-2xx / timed out            | Investigate the upstream identity API                                              |
 | `bypassed`      | Proxy off or target matched `noProxyHosts`                          | Informational — the call would go direct                                           |
 
+---
+
+## API contract configuration (`apiContractConfig`) (v1.9.0)
+
+Each connection accepts an optional `apiContractConfig` JSON blob that customises how NestIdP interprets the external API's responses. Omitting it (or setting it to `null`) applies the fixed v1 defaults described in the [Endpoints](#endpoints) and [GET /users](#get-users) sections above.
+
+The config is **sparse** — any key you omit keeps its default; you only need to specify what differs.
+
+### Endpoint paths
+
+```json
+{
+  "endpoints": {
+    "usersPath": "/api/users",
+    "userGroupsPath": "/api/users/:id/groups",
+    "userRolesPath": "/api/users/:id/roles"
+  }
+}
+```
+
+Defaults: `/users`, `/users/:id/groups`, `/users/:id/roles`. `:id` is substituted with the mapped external user `id` at runtime. `userGroupsPath` and `userRolesPath` must include `:id`.
+
+### Response envelope (`responseRoot`)
+
+Dot-path to unwrap a JSON envelope before reading the rows. An empty string (default) means the response body **is** the array.
+
+```json
+{
+  "responseRoot": {
+    "users": "data.items",
+    "groups": "result",
+    "roles": ""
+  }
+}
+```
+
+Nested paths up to 8 levels deep; only `[A-Za-z0-9_.-]` characters allowed per segment.
+
+### Field mapping (`userFieldMap`, `groupFieldMap`, `roleFieldMap`)
+
+Rename the JSON keys NestIdP reads from each row. Values are dot-paths into the source object.
+
+```json
+{
+  "userFieldMap": {
+    "id":                    "userId",
+    "username":              "loginName",
+    "email":                 "emailAddress",
+    "displayName":           "profile.fullName",
+    "passwordHash":          "credentials.hash",
+    "passwordHashAlgorithm": "credentials.algorithm",
+    "active":                "enabled"
+  },
+  "groupFieldMap": { "id": "groupId", "name": "groupName" },
+  "roleFieldMap":  { "id": "roleId",  "name": "roleName" }
+}
+```
+
+Defaults: identity mapping (JSON field name = NestIdP field name). Partial overrides merge over defaults — unspecified keys keep their defaults.
+
+### Fixed algorithm (`passwordHashAlgorithmConstant`)
+
+When the API returns hashes without an algorithm field, set a constant so you don't need to map `passwordHashAlgorithm` on every row:
+
+```json
+{ "passwordHashAlgorithmConstant": "bcrypt" }
+```
+
+Takes precedence over `userFieldMap.passwordHashAlgorithm` for every row in the run.
+
+### Membership source (`membershipSource`)
+
+By default NestIdP makes per-user calls to the group and role endpoints. If your API embeds membership inside the user object, use `embedded` mode with a dot-path into the user row:
+
+```json
+{
+  "membershipSource": {
+    "groups": { "mode": "embedded", "embeddedPath": "groups" },
+    "roles":  { "mode": "embedded", "embeddedPath": "membership.roles" }
+  }
+}
+```
+
+`endpoint` (default) and `embedded` can be mixed — e.g. embedded groups, endpoint roles. When `embedded`, the per-user group/role endpoint calls are skipped entirely.
+
+### Pagination (`pagination`)
+
+| `mode`             | Required params              | Optional params                                      |
+| ------------------ | ---------------------------- | ---------------------------------------------------- |
+| `"none"` (default) | —                            | —                                                    |
+| `"offset"`         | `offsetParam`                | `limitParam`, `pageSize` (default 100), `maxPages`   |
+| `"page"`           | `pageParam`                  | `limitParam`, `pageSize` (default 100), `startPage` (default 1), `maxPages` |
+
+```json
+{
+  "pagination": {
+    "mode": "offset",
+    "limitParam": "limit",
+    "offsetParam": "offset",
+    "pageSize": 100,
+    "maxPages": 200
+  }
+}
+```
+
+NestIdP stops fetching when the API returns fewer rows than `pageSize` or `maxPages` is reached (whichever comes first).
+
+### Active-field mapping (`activeMapping`)
+
+For APIs that use inverted booleans (`blocked: true` → inactive) or string values instead of booleans:
+
+```json
+{ "activeMapping": { "inverted": true } }
+```
+
+```json
+{ "activeMapping": { "trueValues": ["active", "ENABLED", "1"] } }
+```
+
+`inverted` and `trueValues` can be combined. When `trueValues` is set, the raw field value is coerced to string and matched case-sensitively against the list.
+
+### Extra query params and headers
+
+Injected on every outbound call for this connection. `Authorization` cannot be overridden here (use the connection auth fields instead).
+
+```json
+{
+  "queryParams": { "include_inactive": "true" },
+  "headers": { "X-Tenant-ID": "acme" }
+}
+```
+
+Up to 20 entries per map; keys and values ≤ 256 characters.
+
+### Default values (`defaults`)
+
+Applied when the mapped field is absent from the API row:
+
+| Key                      | Type              | Effect                                                              |
+| ------------------------ | ----------------- | ------------------------------------------------------------------- |
+| `displayNameFromUsername`| `boolean`         | Copy the mapped `username` value into `displayName` when absent     |
+| `email`                  | `string \| null`  | Fallback email when the API omits the field                         |
+
+```json
+{ "defaults": { "displayNameFromUsername": true, "email": "noreply@corp.example" } }
+```
+
+### Error policy and caps
+
+| Key                | Default   | Description                                                                        |
+| ------------------ | --------- | ---------------------------------------------------------------------------------- |
+| `onRowError`       | `"skip"`  | `"skip"` records the error and continues; `"fail"` aborts the entire sync run      |
+| `maxGroupsPerUser` | `null`    | Truncate groups per user beyond this cap (1–10 000)                                |
+| `maxRolesPerUser`  | `null`    | Truncate roles per user beyond this cap (1–10 000)                                 |
+
+### Presets
+
+Two starter templates are available in the admin console (`API connections → edit → Load preset`):
+
+**`keycloak-like`** — Keycloak Admin REST API (`/admin/realms/master/...`), offset pagination (`max` / `first`), maps `enabled` → `active` and `firstName` → `displayName`.
+
+**`auth0-like`** — Auth0 Management API (`/api/v2/...`), page pagination, maps `user_id` → `id`, `name` → `displayName`, `blocked` → `active` with `inverted: true`.
+
+### Complete example
+
+```json
+{
+  "endpoints": {
+    "usersPath": "/api/v2/users",
+    "userGroupsPath": "/api/v2/users/:id/groups",
+    "userRolesPath": "/api/v2/users/:id/roles"
+  },
+  "responseRoot": { "users": "data" },
+  "userFieldMap": {
+    "id": "user_id",
+    "email": "email",
+    "displayName": "name",
+    "passwordHash": "app_metadata.passwordHash",
+    "active": "blocked"
+  },
+  "passwordHashAlgorithmConstant": "bcrypt",
+  "activeMapping": { "inverted": true },
+  "pagination": {
+    "mode": "page",
+    "pageParam": "page",
+    "limitParam": "per_page",
+    "pageSize": 50,
+    "startPage": 0,
+    "maxPages": 50
+  },
+  "onRowError": "skip"
+}
+```
+
+---
+
 ## v1 limits (not in this contract)
 
-- No custom paths or JSON field mapping
-- Argon2 / PBKDF2 hashes (out of scope)
+- Argon2 / PBKDF2 hashes (out of scope — bcrypt only)
 
 ---
 

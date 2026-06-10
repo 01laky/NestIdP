@@ -2,7 +2,7 @@
 
 Product and developer documentation. Visual assets live in [`img/`](./img/) (UI `.png` screenshots + Mermaid `.mmd` / `.svg` diagrams).
 
-**Current release:** v1.20.0
+**Current release:** v1.20.1
 
 ## Start here
 
@@ -11,7 +11,7 @@ Product and developer documentation. Visual assets live in [`img/`](./img/) (UI 
 | [tutorial.md](./tutorial.md)                               | **Operator walkthrough** — admin UI with screenshots (IdP, sync, SP, SAML login) |
 | [proposal.MD](./proposal.MD)                               | Product scope, architecture, data model, roadmap (source of truth)               |
 | [development.md](./development.md)                         | Local setup, routing, REST reference, testing, UI registries                     |
-| [integration-api.md](./integration-api.md)                 | External identity API v1 contract (bcrypt, endpoints)                            |
+| [integration-api.md](./integration-api.md)                 | External identity API contract — endpoints, field mapping, pagination, presets   |
 | [database.md](./database.md)                               | Encrypted libSQL file, migrations, rekey/backup, bootstrap admin                 |
 | [deployment.md](./deployment.md)                           | Docker Compose, migrations, backup/restore                                       |
 | [migrations.md](./migrations.md)                           | Migration authoring rules + the §17 migration-safety guard                       |
