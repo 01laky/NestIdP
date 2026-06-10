@@ -20,7 +20,7 @@ import { join } from 'node:path';
 import { hashPassword } from '@api/admin-auth/utils/password.util';
 import { encrypt } from '@api/encryption/utils/encryption.util';
 import { generateTestRsaEncryptionCert } from '@api/idp-settings/utils/idp-encryption-cert.util';
-import { buildTestAuthnRequestRedirectPayload as buildAuthnRedirectPayload } from '@api/saml/utils/build-authn-request.util';
+import { buildTestAuthnRequestRedirectPayload as buildAuthnRedirectPayload } from '@test/support/saml/build-authn-request.util';
 
 export const TEST_ENCRYPTED_CREDENTIALS = 'test-encrypted-token';
 export const TEST_ENCRYPTION_KEY = 'test-encryption-key-32chars!!';
