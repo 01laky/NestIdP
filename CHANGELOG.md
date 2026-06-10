@@ -83,6 +83,12 @@ frontend de-duplication) and remaining items land in subsequent commits under th
   can no longer inject a command (`apps/api/src/saml/utils/openssl.util.ts`).
 - **Signed assertions never fall back to unsigned** — if signing or signed-fragment extraction fails, the
   IdP now throws instead of silently emitting an unsigned `<saml2:Assertion>`.
+- **Back-channel SLO response signature is verified on the original bytes, and the status read is scoped**
+  (§A3) — the SP `LogoutResponse` signature is now checked against the received SOAP body instead of a
+  re-serialised `LogoutResponse` substring (re-serialisation re-emits namespaces/whitespace and breaks
+  XML-DSig canonicalisation), the status `StatusCode` is read relative to the verified response element
+  (not a document-wide xpath), and a SOAP body carrying more than one `LogoutResponse` is rejected outright —
+  so a signature-wrapping payload (a second, attacker-controlled response) can't flip the interpreted status.
 - **Encryption-cert key-usage check is Node-native, not an `openssl` subprocess** (§B8) —
   `certHasEncryptionKeyUsage` now parses the X.509 KeyUsage extension (OID 2.5.29.15) directly from the
   certificate DER instead of shelling out to `openssl x509 -ext keyUsage` per upload. This removes the

@@ -128,6 +128,21 @@ describe('SamlSoapBackchannelService (BC-SOAP)', () => {
 		});
 	});
 
+	it('BC-SOAP-A3-WRAP: a second injected LogoutResponse is rejected, not allowed to flip the status (§A3)', async () => {
+		// Signature-wrapping payload: a forged Success response prepended before the genuine one. The
+		// doc-wide status read used to pick the first match; now extra responses are rejected outright.
+		const forged = logoutResponseXml({ id: '_evil', statusValues: [SAML_STATUS_SUCCESS] });
+		const genuine = logoutResponseXml({
+			id: '_resp-1',
+			statusValues: ['urn:oasis:names:tc:SAML:2.0:status:Responder'],
+		});
+		okResponse(envelope(forged + genuine));
+		await expect(service.deliver(input())).resolves.toEqual({
+			outcome: 'failed',
+			reason: 'multiple_logout_responses',
+		});
+	});
+
 	it('BC-SOAP-02c: absent InResponseTo is tolerated (no mismatch error)', async () => {
 		okResponse(
 			envelope(logoutResponseXml({ inResponseTo: null, statusValues: [SAML_STATUS_SUCCESS] })),

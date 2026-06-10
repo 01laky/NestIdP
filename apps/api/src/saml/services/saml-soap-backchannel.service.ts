@@ -90,6 +90,11 @@ export class SamlSoapBackchannelService {
 		if (!responseNodes.length) {
 			return { outcome: 'failed', reason: 'no_logout_response' };
 		}
+		// A legitimate SOAP LogoutResponse carries exactly one <LogoutResponse>. Reject extras outright so a
+		// signature-wrapping payload (a second, attacker-controlled response) can't flip the read status.
+		if (responseNodes.length > 1) {
+			return { outcome: 'failed', reason: 'multiple_logout_responses' };
+		}
 		const root = responseNodes[0];
 
 		const inResponseTo = root.getAttribute('InResponseTo');
@@ -97,12 +102,12 @@ export class SamlSoapBackchannelService {
 			return { outcome: 'failed', reason: 'in_response_to_mismatch' };
 		}
 
-		// Verify the SP's signature when we have its certificate (best-effort; only the response substring).
+		// Verify the SP's signature against the ORIGINAL received bytes, not a re-serialised node — a
+		// round-tripped `root.toString()` re-emits namespaces/whitespace and breaks XML-DSig canonicalisation.
 		if (input.spCertificate) {
-			const responseXml = root.toString();
 			let verified = false;
 			try {
-				verified = verifyEnvelopedXmlDsig(responseXml, input.spCertificate);
+				verified = verifyEnvelopedXmlDsig(body, input.spCertificate);
 			} catch {
 				verified = false;
 			}
@@ -111,10 +116,8 @@ export class SamlSoapBackchannelService {
 			}
 		}
 
-		const statusNodes = select(
-			'//samlp:LogoutResponse/samlp:Status/samlp:StatusCode/@Value',
-			doc as unknown as Node,
-		) as Attr[];
+		// Scope the status read to the (single, verified) response element rather than the whole document.
+		const statusNodes = select('./samlp:Status/samlp:StatusCode/@Value', root) as Attr[];
 		const topStatus = statusNodes[0]?.value ?? '';
 		if (topStatus === SAML_STATUS_SUCCESS) {
 			return { outcome: 'succeeded' };
