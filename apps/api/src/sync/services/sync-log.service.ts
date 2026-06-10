@@ -26,11 +26,12 @@ export class SyncLogService {
 	async finishLog(
 		logId: string,
 		status: SyncLogStatus,
+		// §5.B3: usersSkippedCollision is required — every terminal path carries the full snapshot.
 		counters: {
 			usersSynced: number;
 			groupsSynced: number;
 			rolesSynced: number;
-			usersSkippedCollision?: number;
+			usersSkippedCollision: number;
 		},
 		errors: SyncLogErrorEntryDto[] | null,
 	): Promise<SyncLog> {
@@ -43,7 +44,7 @@ export class SyncLogService {
 				usersSynced: counters.usersSynced,
 				groupsSynced: counters.groupsSynced,
 				rolesSynced: counters.rolesSynced,
-				usersSkippedCollision: counters.usersSkippedCollision ?? 0,
+				usersSkippedCollision: counters.usersSkippedCollision,
 				errors:
 					cappedErrors == null
 						? Prisma.JsonNull

@@ -21,6 +21,28 @@ historical rows (see `docs/audit-events.md`).
 
 ### Changed
 
+- **`sync.service` decomposition completed** (Prompt 39 / §6.8 reconciliation): `triggerSync` is now a
+  50-line orchestrator over named phases — `beginRun` (load/validate/claim), `fetchAndMapUsers`
+  (bearer + users fetch + row mapping; null-return on early failure), `applyUserMemberships` (descriptor
+  construction + gather + apply) and `deactivateOrphans` (phase C, now capturing the
+  `deleteOrphanGroups`/`deleteOrphanRoles` return counts into the new
+  `SyncCounters.groupsDeactivated`/`rolesDeactivated` diagnostics fields). `SyncCounters` moved to
+  `sync/utils/` and absorbed the per-run `Set`s plus the once-per-id counting mutators
+  (`addUser`/`addGroupOnce`/`addRoleOnce`/`addCollision`/`setDeactivated`/`toCounterSnapshot`); a new
+  `SyncErrors` wrapper (`sync/utils/sync-errors.ts`) replaces the raw error-entry array and the D3 push
+  helpers now take it plus a `kind: 'group' | 'role'` (phase strings derive from the kind inside the
+  helpers). The membership descriptor is exported as `MembershipDescriptor` from
+  `sync/utils/membership-descriptor.ts` and both call sites construct it inline with
+  `satisfies MembershipDescriptor`. **§5.B3 fix (the one intentional behaviour change):**
+  `usersSkippedCollision` is now a required counter carried on _every_ terminal path — the early
+  bearer/fetch-users FAILED exits and the stale-run reclaim previously omitted it from `finishLog`
+  (`SyncLogService.finishLog` no longer re-defaults it); the two characterization goldens pinning the
+  old 3-field shape were updated (each diff is exactly one added `"usersSkippedCollision": 0`). New
+  tests: `sync-counters.spec`, `sync-errors.spec`, `outbound-http.util.spec` (timeout abort, origin
+  violation, envelope extraction), the §5.B3 early-exit regression, the `clearAutoPause` pair and the
+  FAILED/`finishLog`-null finalize-path cases; `runPool` gained `concurrency <= 0` and
+  `items < concurrency` cases (it stays in `common/utils/` — shared with api-connections — and
+  `gatherMemberships` keeps its keyed-Map accumulator with a why-not-`runPoolMap` note).
 - **Shared literal-union types for the SAML/IdP status families** (§6.4 / §A14): added the missing
   `BACKCHANNEL_LOGOUT_STATUSES` const tuple (with `BackchannelLogoutStatus` now derived from it and an
   `isBackchannelLogoutStatus` guard) and the missing `SamlNameIdFormat` union, `isSamlNameIdFormat` guard

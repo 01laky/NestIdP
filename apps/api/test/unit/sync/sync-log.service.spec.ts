@@ -103,7 +103,7 @@ describe('SyncLogService', () => {
 		await service.finishLog(
 			'log-1',
 			'SUCCESS',
-			{ usersSynced: 0, groupsSynced: 0, rolesSynced: 0 },
+			{ usersSynced: 0, groupsSynced: 0, rolesSynced: 0, usersSkippedCollision: 0 },
 			errors,
 		);
 
@@ -122,7 +122,7 @@ describe('SyncLogService', () => {
 		await service.finishLog(
 			'log-1',
 			'FAILED',
-			{ usersSynced: 0, groupsSynced: 0, rolesSynced: 0 },
+			{ usersSynced: 0, groupsSynced: 0, rolesSynced: 0, usersSkippedCollision: 0 },
 			null,
 		);
 

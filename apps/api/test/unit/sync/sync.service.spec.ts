@@ -262,6 +262,28 @@ describe('SyncService', () => {
 		expect(identityRepository.upsertUser).not.toHaveBeenCalled();
 	});
 
+	it('SVC-B3-EARLY-EXIT: bearer failure before any user fetch reports usersSkippedCollision: 0 (§5.B3)', async () => {
+		setupHappyPathMocks();
+		encryption.decrypt.mockImplementation(() => {
+			throw new Error('bad ciphertext');
+		});
+
+		const result = await service.triggerSync(CONNECTION_ID);
+
+		expect(result.syncLog.status).toBe('FAILED');
+		// The counter is carried (a genuine 0), not omitted/re-defaulted, on the early-exit path.
+		expect(syncLogService.finishLog).toHaveBeenCalledWith(
+			runningLog.id,
+			'FAILED',
+			{ usersSynced: 0, groupsSynced: 0, rolesSynced: 0, usersSkippedCollision: 0 },
+			expect.arrayContaining([expect.objectContaining({ phase: 'decrypt_credentials' })]),
+		);
+		expect(prisma.apiConnection.update).toHaveBeenCalledWith({
+			where: { id: CONNECTION_ID },
+			data: { lastSyncStatus: 'FAILED', lastCollisionCount: 0 },
+		});
+	});
+
 	it('API-SYNC-SVC-04: User validation error → SUCCESS + errors[], other users proceed', async () => {
 		setupHappyPathMocks();
 		identitySyncClient.fetchUsersRaw.mockResolvedValue([
@@ -379,7 +401,7 @@ describe('SyncService', () => {
 		expect(syncLogService.finishLog).toHaveBeenCalledWith(
 			staleLog.id,
 			'FAILED',
-			{ usersSynced: 0, groupsSynced: 0, rolesSynced: 0 },
+			{ usersSynced: 0, groupsSynced: 0, rolesSynced: 0, usersSkippedCollision: 0 },
 			[
 				expect.objectContaining({
 					phase: 'concurrency',
@@ -415,6 +437,83 @@ describe('SyncService', () => {
 		});
 		expect(result.connection.lastSyncStatus).toBe('SUCCESS');
 		expect(result.connection.lastSyncAt).toBe(finishedAt.toISOString());
+	});
+
+	it('FIN-D4-01: FAILED run neither sets lastSyncAt nor clears the schedule backoff state', async () => {
+		setupHappyPathMocks();
+		identitySyncClient.fetchUsersRaw.mockRejectedValue(
+			new IdentitySyncHttpError('Identity API returned HTTP 503', {
+				statusCode: 503,
+				reachable: true,
+			}),
+		);
+
+		await service.triggerSync(CONNECTION_ID);
+
+		const failedUpdate = prisma.apiConnection.update.mock.calls
+			.map((call) => call[0])
+			.find((call) => call.data.lastSyncStatus === 'FAILED');
+		// Exact shape: no lastSyncAt, no scheduleConsecutiveFailures/scheduleAutoPausedAt reset.
+		expect(failedUpdate).toEqual({
+			where: { id: CONNECTION_ID },
+			data: { lastSyncStatus: 'FAILED', lastCollisionCount: 0 },
+		});
+	});
+
+	it('FIN-D4-02: SUCCESS while auto-paused (scheduleAutoPausedAt set) lifts the pause with schedulePaused: false', async () => {
+		setupHappyPathMocks();
+		prisma.apiConnection.findUnique.mockResolvedValue({
+			...baseConnection,
+			schedulePaused: true,
+			scheduleAutoPausedAt: new Date('2026-01-01T00:00:00.000Z'),
+		});
+
+		await service.triggerSync(CONNECTION_ID);
+
+		expect(prisma.apiConnection.update).toHaveBeenCalledWith({
+			where: { id: CONNECTION_ID },
+			data: expect.objectContaining({
+				lastSyncStatus: 'SUCCESS',
+				scheduleAutoPausedAt: null,
+				schedulePaused: false,
+			}),
+		});
+	});
+
+	it('FIN-D4-03: SUCCESS without auto-pause (scheduleAutoPausedAt null) omits the schedulePaused key', async () => {
+		setupHappyPathMocks();
+		prisma.apiConnection.findUnique.mockResolvedValue({
+			...baseConnection,
+			scheduleAutoPausedAt: null,
+		});
+
+		await service.triggerSync(CONNECTION_ID);
+
+		const successUpdate = prisma.apiConnection.update.mock.calls
+			.map((call) => call[0])
+			.find((call) => call.data.lastSyncStatus === 'SUCCESS');
+		expect(successUpdate?.data).toEqual(
+			expect.objectContaining({
+				scheduleConsecutiveFailures: 0,
+				scheduleAutoPausedAt: null,
+				scheduleLastError: null,
+			}),
+		);
+		// `schedulePaused` must be ABSENT, not `false` — an operator's manual pause stays in place.
+		expect(successUpdate?.data).not.toHaveProperty('schedulePaused');
+	});
+
+	it('FIN-D4-04: SUCCESS with no errors passes null (not an empty array) to finishLog', async () => {
+		setupHappyPathMocks();
+
+		await service.triggerSync(CONNECTION_ID);
+
+		expect(syncLogService.finishLog).toHaveBeenCalledWith(
+			runningLog.id,
+			'SUCCESS',
+			{ usersSynced: 1, groupsSynced: 1, rolesSynced: 1, usersSkippedCollision: 0 },
+			null,
+		);
 	});
 
 	it('API-SYNC-SVC-10: Orphan group deleted when no user references it', async () => {

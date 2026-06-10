@@ -7,7 +7,6 @@ import {
 	NotFoundException,
 } from '@nestjs/common';
 import type {
-	SyncLogErrorEntryDto,
 	SyncLogListResponseDto,
 	SyncLogResponseDto,
 	SyncStatusResponseDto,
@@ -21,7 +20,7 @@ import type {
 } from '@nestidp/shared';
 import { getByPath, isUsernameCollisionPolicy, resolveApiContract } from '@nestidp/shared';
 import { SyncMultiSourceConfig } from './sync-multi-source.config';
-import { ApiConnection } from '@prisma/client';
+import { ApiConnection, SyncLog } from '@prisma/client';
 import { toApiConnectionDto } from '../../api-connections/mappers/api-connections.mapper';
 import {
 	CREDENTIALS_ENCRYPTION,
@@ -46,11 +45,13 @@ import { IdentitySyncHttpError } from '../identity-sync.errors';
 import { OAuthTokenError, OAuthTokenService } from './oauth-token.service';
 import { ProxyDispatcherService } from './proxy-dispatcher.service';
 import { AuditPersistenceService } from '../../audit/services/audit-persistence.service';
-import { SyncCounters } from './sync-counters';
 import {
-	GROUP_ERROR_DESCRIPTOR,
-	ROLE_ERROR_DESCRIPTOR,
-	type MembershipErrorDescriptor,
+	type MembershipDescriptor,
+	type MembershipEntityKind,
+} from '../utils/membership-descriptor';
+import { SyncCounters } from '../utils/sync-counters';
+import { SyncErrors } from '../utils/sync-errors';
+import {
 	pushFetchUsersError,
 	pushMembershipFetchError,
 	pushMembershipRowParseError,
@@ -74,36 +75,18 @@ interface ProcessedUser {
 	localUserId: string | null;
 }
 
-interface MembershipRaw {
-	externalUserId: string;
-	rawByKind: Partial<Record<MembershipKindKey, unknown[]>>;
-	errorByKind: Partial<Record<MembershipKindKey, unknown>>;
+/** Immutable per-run inputs shared by the phase methods (resolved once in beginRun). */
+interface SyncRunContext {
+	connection: ApiConnection;
+	contract: ResolvedApiContract;
+	dispatcher: Dispatcher | undefined;
+	dryRun: boolean;
 }
 
-type MembershipKindKey = 'groups' | 'roles';
-
-/**
- * Per-run descriptor for one membership kind (Prompt 38 §6.8c): the groups and roles paths are
- * mirrors of each other — everything that differs between them lives here.
- */
-interface MembershipKind {
-	key: MembershipKindKey;
-	fetchPhase: 'fetch_groups' | 'fetch_roles';
-	errorDescriptor: MembershipErrorDescriptor;
-	mapRow: (
-		raw: unknown,
-		fieldMap: { id: string; name: string },
-	) => ExternalGroupDto | ExternalRoleDto;
-	fieldMap: { id: string; name: string };
-	embedded: boolean;
-	embeddedPath?: string;
-	embeddedCap: number | null;
-	fetchRaw: (externalUserId: string) => Promise<unknown[]>;
-	upsert: (mapped: ExternalGroupDto | ExternalRoleDto) => Promise<{ id: string }>;
-	replace: (localUserId: string, memberIds: string[]) => Promise<void>;
-	counterKey: 'groupsSynced' | 'rolesSynced';
-	seen: Set<string>;
-	upserted: Set<string>;
+interface MembershipRaw {
+	externalUserId: string;
+	rawByKind: Partial<Record<MembershipEntityKind, unknown[]>>;
+	errorByKind: Partial<Record<MembershipEntityKind, unknown>>;
 }
 
 @Injectable()
@@ -133,7 +116,53 @@ export class SyncService {
 		},
 	): Promise<TriggerSyncResponseDto> {
 		const dryRun = options?.dryRun === true;
-		const triggerSource: SyncTriggerSource = options?.triggerSource ?? 'manual';
+		const { ctx, connectionBefore, runningLog } = await this.beginRun(
+			connectionId,
+			dryRun,
+			options?.triggerSource ?? 'manual',
+		);
+		const errors = new SyncErrors();
+		const counters = new SyncCounters();
+		const finalize = (status: 'SUCCESS' | 'FAILED') =>
+			this.finalizeRun({
+				status,
+				connectionId,
+				connectionBefore,
+				logId: runningLog.id,
+				dryRun,
+				errors,
+				counters,
+				auditContext: { adminId: options?.adminId, adminUsername: options?.adminUsername },
+			});
+
+		try {
+			// `null` ⇒ bearer/fetch-users failure; the describing error entry is already recorded.
+			const fetched = await this.fetchAndMapUsers(ctx, counters, errors);
+			if (fetched == null) {
+				return finalize('FAILED');
+			}
+			await this.applyUserMemberships(ctx, fetched, counters, errors);
+			await this.deactivateOrphans(connectionId, counters, dryRun);
+			if (dryRun) {
+				errors.add(DRY_RUN_SUMMARY_PHASE, DRY_RUN_SUMMARY_MESSAGE);
+			}
+			return finalize('SUCCESS');
+		} catch (error) {
+			// §5.B3: a StrictRowError has already pushed its describing entry before aborting; any
+			// OTHER throw gets an explicit 'internal' entry so a FAILED log is always self-describing.
+			if (!(error instanceof StrictRowError)) {
+				errors.add('internal', error instanceof Error ? error.message : String(error));
+			}
+			return finalize('FAILED');
+		}
+	}
+
+	/** Load + validate the connection and claim the run: concurrency guard, RUNNING log, IN_PROGRESS. */
+	private async beginRun(
+		connectionId: string,
+		dryRun: boolean,
+		triggerSource: SyncTriggerSource,
+	): Promise<{ ctx: SyncRunContext; connectionBefore: ApiConnection; runningLog: SyncLog }> {
 		const connection = await this.prisma.apiConnection.findUnique({ where: { id: connectionId } });
 		if (!connection) {
 			throw new NotFoundException('API connection not found');
@@ -161,9 +190,86 @@ export class SyncService {
 				data: { lastSyncStatus: 'IN_PROGRESS' },
 			});
 		}
+		return { ctx: { connection, contract, dispatcher, dryRun }, connectionBefore, runningLog };
+	}
 
-		const errors: SyncLogErrorEntryDto[] = [];
-		const counters = new SyncCounters();
+	/**
+	 * Phase A: resolve the bearer, fetch the users page(s), map + upsert rows. Returns `null` after
+	 * pushing the describing entry when the bearer or the users fetch fails — the orchestrator then
+	 * finalizes FAILED (null-return pattern; no flow-control exception). Row-level problems are
+	 * recorded per row and the run continues, unless StrictRowError aborts the whole run.
+	 */
+	private async fetchAndMapUsers(
+		ctx: SyncRunContext,
+		counters: SyncCounters,
+		errors: SyncErrors,
+	): Promise<{ processed: ProcessedUser[]; bearerToken: string } | null> {
+		const { connection, contract, dryRun } = ctx;
+		let bearerToken = await this.resolveBearer(connection, errors);
+		if (bearerToken == null) {
+			return null;
+		}
+
+		let usersBody: unknown[];
+		try {
+			let raw: unknown;
+			try {
+				raw = await this.identitySyncClient.fetchUsersRaw(
+					connection.baseUrl,
+					bearerToken,
+					contract,
+					ctx.dispatcher,
+				);
+			} catch (error) {
+				// OAuth: a 401 may mean a stale cached token — refresh once and retry.
+				if (
+					connection.authType === 'OAUTH2_CLIENT_CREDENTIALS' &&
+					error instanceof IdentitySyncHttpError &&
+					error.options.statusCode === 401
+				) {
+					bearerToken = await this.oauthTokenService.getAccessToken(connection, {
+						forceRefresh: true,
+					});
+					raw = await this.identitySyncClient.fetchUsersRaw(
+						connection.baseUrl,
+						bearerToken,
+						contract,
+						ctx.dispatcher,
+					);
+				} else {
+					throw error;
+				}
+			}
+			usersBody = assertUsersArrayWithinLimit(raw, this.identitySyncClient.getMaxUsersPerRun());
+			if (detectDuplicateUserIds(usersBody, contract.userFieldMap.id)) {
+				errors.add(
+					'parse_users',
+					'Duplicate user ids in external API response; last row wins per id',
+				);
+			}
+		} catch (error) {
+			pushFetchUsersError(errors, error);
+			return null;
+		}
+
+		const userRowsById = new Map<string, unknown>();
+		for (let rowIndex = 0; rowIndex < usersBody.length; rowIndex += 1) {
+			const rawRow = usersBody[rowIndex];
+			const idValue = getByPath(rawRow, contract.userFieldMap.id);
+			if (typeof idValue === 'string' && idValue.trim().length > 0) {
+				userRowsById.set(idValue.trim(), rawRow);
+			} else {
+				// §5.C: a dropped row would otherwise vanish silently AND its existing local user would be
+				// deactivated (not in seenUserExternalIds) — record an explicit, recoverable error.
+				errors.add(
+					'parse_users',
+					idValue == null
+						? `Row ${rowIndex}: missing user id at "${contract.userFieldMap.id}" — row skipped`
+						: `Row ${rowIndex}: non-string or empty user id at "${contract.userFieldMap.id}" — row skipped`,
+				);
+			}
+		}
+
 		// Cross-connection username collision policy: per-connection override → global default (Prompt 37).
 		// §5.C: the stored override is validated (not blind-cast) — an unknown value falls back to global.
 		const collisionPolicy: UsernameCollisionPolicy =
@@ -171,245 +277,175 @@ export class SyncService {
 			isUsernameCollisionPolicy(connection.usernameCollisionPolicy)
 				? connection.usernameCollisionPolicy
 				: this.multiSourceConfig.usernameCollisionPolicy();
-		const seenGroupExternalIds = new Set<string>();
-		const seenRoleExternalIds = new Set<string>();
-		const auditContext = {
-			adminId: options?.adminId,
-			adminUsername: options?.adminUsername,
-		};
 
-		try {
-			let bearerToken = await this.resolveBearer(connection, errors);
-			if (bearerToken == null) {
-				return this.finalizeRun({
-					status: 'FAILED',
-					connectionId,
-					connectionBefore,
-					logId: runningLog.id,
-					dryRun,
-					errors,
-					counters: counters.withoutCollisions(),
-					auditContext,
-				});
-			}
-
-			let usersBody: unknown[];
+		// --- Phase 1: map + upsert users (sequential, deterministic order) ---
+		const processed: ProcessedUser[] = [];
+		for (const [externalUserId, rawRow] of userRowsById) {
+			counters.seenUserExternalIds.add(externalUserId);
+			let user;
 			try {
-				let raw: unknown;
-				try {
-					raw = await this.identitySyncClient.fetchUsersRaw(
-						connection.baseUrl,
-						bearerToken,
-						contract,
-						dispatcher,
-					);
-				} catch (error) {
-					// OAuth: a 401 may mean a stale cached token — refresh once and retry.
-					if (
-						connection.authType === 'OAUTH2_CLIENT_CREDENTIALS' &&
-						error instanceof IdentitySyncHttpError &&
-						error.options.statusCode === 401
-					) {
-						bearerToken = await this.oauthTokenService.getAccessToken(connection, {
-							forceRefresh: true,
-						});
-						raw = await this.identitySyncClient.fetchUsersRaw(
-							connection.baseUrl,
-							bearerToken,
-							contract,
-							dispatcher,
-						);
-					} else {
-						throw error;
-					}
-				}
-				usersBody = assertUsersArrayWithinLimit(raw, this.identitySyncClient.getMaxUsersPerRun());
-				if (detectDuplicateUserIds(usersBody, contract.userFieldMap.id)) {
-					errors.push({
-						phase: 'parse_users',
-						message: 'Duplicate user ids in external API response; last row wins per id',
-					});
-				}
-			} catch (error) {
-				pushFetchUsersError(errors, error);
-				return this.finalizeRun({
-					status: 'FAILED',
-					connectionId,
-					connectionBefore,
-					logId: runningLog.id,
-					dryRun,
-					errors,
-					counters: counters.withoutCollisions(),
-					auditContext,
+				user = mapExternalUserRow(rawRow, {
+					fieldMap: contract.userFieldMap,
+					passwordHashAlgorithmConstant: contract.passwordHashAlgorithmConstant,
+					activeMapping: contract.activeMapping,
+					defaults: contract.defaults,
 				});
-			}
-
-			const seenUserExternalIds = new Set<string>();
-			const userRowsById = new Map<string, unknown>();
-			for (let rowIndex = 0; rowIndex < usersBody.length; rowIndex += 1) {
-				const rawRow = usersBody[rowIndex];
-				const idValue = getByPath(rawRow, contract.userFieldMap.id);
-				if (typeof idValue === 'string' && idValue.trim().length > 0) {
-					userRowsById.set(idValue.trim(), rawRow);
-				} else {
-					// §5.C: a dropped row would otherwise vanish silently AND its existing local user would be
-					// deactivated (not in seenUserExternalIds) — record an explicit, recoverable error.
-					errors.push({
-						phase: 'parse_users',
-						message:
-							idValue == null
-								? `Row ${rowIndex}: missing user id at "${contract.userFieldMap.id}" — row skipped`
-								: `Row ${rowIndex}: non-string or empty user id at "${contract.userFieldMap.id}" — row skipped`,
-					});
+			} catch (error) {
+				errors.add(
+					'parse_users',
+					error instanceof ExternalApiValidationError ? error.message : 'Invalid user row',
+					{ externalUserId },
+				);
+				if (contract.onRowError === 'fail') {
+					throw new StrictRowError();
 				}
+				continue;
 			}
 
-			// --- Phase 1: map + upsert users (sequential, deterministic order) ---
-			const processed: ProcessedUser[] = [];
-			for (const [externalUserId, rawRow] of userRowsById) {
-				seenUserExternalIds.add(externalUserId);
-				let user;
+			let localUserId: string | null = null;
+			if (dryRun) {
+				counters.addUser();
+			} else {
 				try {
-					user = mapExternalUserRow(rawRow, {
-						fieldMap: contract.userFieldMap,
-						passwordHashAlgorithmConstant: contract.passwordHashAlgorithmConstant,
-						activeMapping: contract.activeMapping,
-						defaults: contract.defaults,
+					const row = await this.identityRepository.upsertUser(connection.id, {
+						externalId: user.id,
+						username: user.username,
+						email: user.email ?? null,
+						displayName: user.displayName ?? null,
+						passwordHash: user.passwordHash,
+						passwordHashAlgorithm: user.passwordHashAlgorithm,
+						active: user.active,
 					});
+					localUserId = row.id;
+					counters.addUser();
 				} catch (error) {
-					errors.push({
-						phase: 'parse_users',
-						externalUserId,
-						message:
-							error instanceof ExternalApiValidationError ? error.message : 'Invalid user row',
-					});
-					if (contract.onRowError === 'fail') {
-						throw new StrictRowError();
+					if (error instanceof UsernameCollisionError) {
+						counters.addCollision();
+						await this.recordUsernameCollision(errors, error, connection.id);
+						// Strict deployments fail the whole connection run on any collision (Prompt 37).
+						if (collisionPolicy === 'fail_run') {
+							throw new StrictRowError();
+						}
+						continue;
 					}
+					pushUpsertUserError(errors, user.id);
 					continue;
 				}
-
-				let localUserId: string | null = null;
-				if (dryRun) {
-					counters.usersSynced += 1;
-				} else {
-					try {
-						const row = await this.identityRepository.upsertUser(connectionId, {
-							externalId: user.id,
-							username: user.username,
-							email: user.email ?? null,
-							displayName: user.displayName ?? null,
-							passwordHash: user.passwordHash,
-							passwordHashAlgorithm: user.passwordHashAlgorithm,
-							active: user.active,
-						});
-						localUserId = row.id;
-						counters.usersSynced += 1;
-					} catch (error) {
-						if (error instanceof UsernameCollisionError) {
-							counters.usersSkippedCollision += 1;
-							await this.recordUsernameCollision(errors, error, connectionId);
-							// Strict deployments fail the whole connection run on any collision (Prompt 37).
-							if (collisionPolicy === 'fail_run') {
-								throw new StrictRowError();
-							}
-							continue;
-						}
-						pushUpsertUserError(errors, user.id);
-						continue;
-					}
-				}
-				processed.push({ externalUserId, rawRow, localUserId });
 			}
-
-			const membershipKinds = this.buildMembershipKinds(
-				connectionId,
-				connection.baseUrl,
-				bearerToken,
-				contract,
-				dispatcher,
-				{ groups: seenGroupExternalIds, roles: seenRoleExternalIds },
-			);
-
-			// --- Phase 2: gather raw memberships (bounded-parallel HTTP for endpoint mode) ---
-			const memberships = await this.gatherMemberships(processed, membershipKinds);
-
-			// --- Phase 3: map + upsert memberships (sequential, original order) ---
-			for (const processedUser of processed) {
-				const m = memberships.get(processedUser.externalUserId);
-				for (const kind of membershipKinds) {
-					const fetchError = m?.errorByKind[kind.key];
-					if (fetchError) {
-						pushMembershipFetchError(
-							errors,
-							kind.fetchPhase,
-							processedUser.externalUserId,
-							fetchError,
-						);
-						continue;
-					}
-					const rawRows = m?.rawByKind[kind.key];
-					if (!rawRows) {
-						continue;
-					}
-					const memberIds = await this.applyMemberships(
-						processedUser,
-						rawRows,
-						kind,
-						{ dryRun, errors },
-						counters,
-					);
-					if (!dryRun && processedUser.localUserId) {
-						await kind.replace(processedUser.localUserId, memberIds);
-					}
-				}
-			}
-
-			if (!dryRun) {
-				await this.identityRepository.deactivateUsersNotInExternalIds(
-					connectionId,
-					seenUserExternalIds,
-				);
-				await this.identityRepository.deleteOrphanGroups(connectionId, seenGroupExternalIds);
-				await this.identityRepository.deleteOrphanRoles(connectionId, seenRoleExternalIds);
-			}
-
-			if (dryRun) {
-				errors.push({ phase: DRY_RUN_SUMMARY_PHASE, message: DRY_RUN_SUMMARY_MESSAGE });
-			}
-
-			return this.finalizeRun({
-				status: 'SUCCESS',
-				connectionId,
-				connectionBefore,
-				logId: runningLog.id,
-				dryRun,
-				errors,
-				counters: counters.snapshot(),
-				auditContext,
-			});
-		} catch (error) {
-			// §5.B3: a StrictRowError (onRowError='fail' / collision fail_run) has already pushed its
-			// describing entry before aborting. Any OTHER throw (e.g. in replaceUserGroups or
-			// deactivateUsersNotInExternalIds) would otherwise yield a FAILED log with no error entry —
-			// record an explicit internal error so the failure is self-describing.
-			if (!(error instanceof StrictRowError)) {
-				errors.push({
-					phase: 'internal',
-					message: error instanceof Error ? error.message : String(error),
-				});
-			}
-			return this.finalizeRun({
-				status: 'FAILED',
-				connectionId,
-				connectionBefore,
-				logId: runningLog.id,
-				dryRun,
-				errors,
-				counters: counters.snapshot(),
-				auditContext,
-			});
+			processed.push({ externalUserId, rawRow, localUserId });
 		}
+		return { processed, bearerToken };
+	}
+
+	/** Phase B: gather raw memberships (bounded-parallel), then map + upsert + replace per user. */
+	private async applyUserMemberships(
+		ctx: SyncRunContext,
+		fetched: { processed: ProcessedUser[]; bearerToken: string },
+		counters: SyncCounters,
+		errors: SyncErrors,
+	): Promise<void> {
+		const { processed, bearerToken } = fetched;
+		const { connection, contract, dispatcher, dryRun } = ctx;
+		const membershipKinds: readonly MembershipDescriptor[] = [
+			{
+				kind: 'group',
+				mapRow: mapExternalGroupRow,
+				fieldMap: contract.groupFieldMap,
+				embedded: contract.membershipSource.groups.mode === 'embedded',
+				embeddedPath: contract.membershipSource.groups.embeddedPath,
+				embeddedCap: contract.maxGroupsPerUser,
+				fetchRaw: (externalUserId) =>
+					this.identitySyncClient.fetchGroupsRawForUser(
+						connection.baseUrl,
+						bearerToken,
+						externalUserId,
+						contract,
+						dispatcher,
+					),
+				upsert: (mapped) => this.identityRepository.upsertGroup(connection.id, mapped),
+				replace: (localUserId, memberIds) =>
+					this.identityRepository.replaceUserGroups(localUserId, memberIds),
+				markSeen: (externalId) => {
+					counters.seenGroupExternalIds.add(externalId);
+				},
+				addOnce: (externalId) => counters.addGroupOnce(externalId),
+			} satisfies MembershipDescriptor,
+			{
+				kind: 'role',
+				mapRow: mapExternalRoleRow,
+				fieldMap: contract.roleFieldMap,
+				embedded: contract.membershipSource.roles.mode === 'embedded',
+				embeddedPath: contract.membershipSource.roles.embeddedPath,
+				embeddedCap: contract.maxRolesPerUser,
+				fetchRaw: (externalUserId) =>
+					this.identitySyncClient.fetchRolesRawForUser(
+						connection.baseUrl,
+						bearerToken,
+						externalUserId,
+						contract,
+						dispatcher,
+					),
+				upsert: (mapped) => this.identityRepository.upsertRole(connection.id, mapped),
+				replace: (localUserId, memberIds) =>
+					this.identityRepository.replaceUserRoles(localUserId, memberIds),
+				markSeen: (externalId) => {
+					counters.seenRoleExternalIds.add(externalId);
+				},
+				addOnce: (externalId) => counters.addRoleOnce(externalId),
+			} satisfies MembershipDescriptor,
+		];
+
+		// --- Phase 2: gather raw memberships (bounded-parallel HTTP for endpoint mode) ---
+		const memberships = await this.gatherMemberships(processed, membershipKinds);
+
+		// --- Phase 3: map + upsert memberships (sequential, original order) ---
+		for (const processedUser of processed) {
+			const m = memberships.get(processedUser.externalUserId);
+			for (const kind of membershipKinds) {
+				const fetchError = m?.errorByKind[kind.kind];
+				if (fetchError) {
+					pushMembershipFetchError(errors, kind.kind, processedUser.externalUserId, fetchError);
+					continue;
+				}
+				const rawRows = m?.rawByKind[kind.kind];
+				if (!rawRows) {
+					continue;
+				}
+				const memberIds = await this.applyMemberships(processedUser, rawRows, kind, {
+					dryRun,
+					errors,
+				});
+				if (!dryRun && processedUser.localUserId) {
+					await kind.replace(processedUser.localUserId, memberIds);
+				}
+			}
+		}
+	}
+
+	/** Phase C: deactivate users and delete orphan groups/roles not seen this run (real runs only). */
+	private async deactivateOrphans(
+		connectionId: string,
+		counters: SyncCounters,
+		dryRun: boolean,
+	): Promise<void> {
+		if (dryRun) {
+			return;
+		}
+		await this.identityRepository.deactivateUsersNotInExternalIds(
+			connectionId,
+			counters.seenUserExternalIds,
+		);
+		// TODO(Prompt 39 D5): the deactivation counts are captured on SyncCounters for diagnostics but
+		// not persisted — SyncLog has no groupsDeactivated/rolesDeactivated columns and adding them
+		// needs a Prisma schema migration plus DTO/UI plumbing, out of scope for this refactor.
+		counters.setDeactivated(
+			'group',
+			await this.identityRepository.deleteOrphanGroups(connectionId, counters.seenGroupExternalIds),
+		);
+		counters.setDeactivated(
+			'role',
+			await this.identityRepository.deleteOrphanRoles(connectionId, counters.seenRoleExternalIds),
+		);
 	}
 
 	/**
@@ -526,72 +562,15 @@ export class SyncService {
 		};
 	}
 
-	/** Bind the static group/role descriptors to this run's contract, token, sets and store. */
-	private buildMembershipKinds(
-		connectionId: string,
-		baseUrl: string,
-		bearerToken: string,
-		contract: ResolvedApiContract,
-		dispatcher: Dispatcher | undefined,
-		seen: { groups: Set<string>; roles: Set<string> },
-	): [MembershipKind, MembershipKind] {
-		return [
-			{
-				key: 'groups',
-				fetchPhase: 'fetch_groups',
-				errorDescriptor: GROUP_ERROR_DESCRIPTOR,
-				mapRow: mapExternalGroupRow,
-				fieldMap: contract.groupFieldMap,
-				embedded: contract.membershipSource.groups.mode === 'embedded',
-				embeddedPath: contract.membershipSource.groups.embeddedPath,
-				embeddedCap: contract.maxGroupsPerUser,
-				fetchRaw: (externalUserId) =>
-					this.identitySyncClient.fetchGroupsRawForUser(
-						baseUrl,
-						bearerToken,
-						externalUserId,
-						contract,
-						dispatcher,
-					),
-				upsert: (mapped) => this.identityRepository.upsertGroup(connectionId, mapped),
-				replace: (localUserId, memberIds) =>
-					this.identityRepository.replaceUserGroups(localUserId, memberIds),
-				counterKey: 'groupsSynced',
-				seen: seen.groups,
-				upserted: new Set<string>(),
-			},
-			{
-				key: 'roles',
-				fetchPhase: 'fetch_roles',
-				errorDescriptor: ROLE_ERROR_DESCRIPTOR,
-				mapRow: mapExternalRoleRow,
-				fieldMap: contract.roleFieldMap,
-				embedded: contract.membershipSource.roles.mode === 'embedded',
-				embeddedPath: contract.membershipSource.roles.embeddedPath,
-				embeddedCap: contract.maxRolesPerUser,
-				fetchRaw: (externalUserId) =>
-					this.identitySyncClient.fetchRolesRawForUser(
-						baseUrl,
-						bearerToken,
-						externalUserId,
-						contract,
-						dispatcher,
-					),
-				upsert: (mapped) => this.identityRepository.upsertRole(connectionId, mapped),
-				replace: (localUserId, memberIds) =>
-					this.identityRepository.replaceUserRoles(localUserId, memberIds),
-				counterKey: 'rolesSynced',
-				seen: seen.roles,
-				upserted: new Set<string>(),
-			},
-		];
-	}
-
 	/** Endpoint mode: bounded-parallel raw fetch. Embedded mode: synchronous extract. */
 	private async gatherMemberships(
 		processed: ProcessedUser[],
-		kinds: readonly MembershipKind[],
+		kinds: readonly MembershipDescriptor[],
 	): Promise<Map<string, MembershipRaw>> {
+		// runPoolMap (worker → R[]) was considered here (Prompt 39 D2) and rejected: the worker is
+		// shared with the embedded-mode serial path below and the results are keyed by externalUserId,
+		// so collecting an array and re-indexing it afterwards would add a step without removing the
+		// accumulator — the Map is the natural shape, not an incidental one.
 		const result = new Map<string, MembershipRaw>();
 
 		const worker = async (p: ProcessedUser): Promise<void> => {
@@ -602,16 +581,16 @@ export class SyncService {
 			};
 			for (const kind of kinds) {
 				if (kind.embedded) {
-					entry.rawByKind[kind.key] = this.extractEmbedded(
+					entry.rawByKind[kind.kind] = this.extractEmbedded(
 						p.rawRow,
 						kind.embeddedPath,
 						kind.embeddedCap,
 					);
 				} else {
 					try {
-						entry.rawByKind[kind.key] = await kind.fetchRaw(p.externalUserId);
+						entry.rawByKind[kind.kind] = await kind.fetchRaw(p.externalUserId);
 					} catch (error) {
-						entry.errorByKind[kind.key] = error;
+						entry.errorByKind[kind.kind] = error;
 					}
 				}
 			}
@@ -643,12 +622,11 @@ export class SyncService {
 	private async applyMemberships(
 		processedUser: ProcessedUser,
 		rawRows: unknown[],
-		kind: MembershipKind,
+		kind: MembershipDescriptor,
 		ctx: {
 			dryRun: boolean;
-			errors: SyncLogErrorEntryDto[];
+			errors: SyncErrors;
 		},
-		counters: SyncCounters,
 	): Promise<string[]> {
 		const memberIds: string[] = [];
 		for (const raw of rawRows) {
@@ -656,33 +634,23 @@ export class SyncService {
 			try {
 				mapped = kind.mapRow(raw, kind.fieldMap);
 			} catch (error) {
-				pushMembershipRowParseError(
-					ctx.errors,
-					kind.errorDescriptor,
-					processedUser.externalUserId,
-					error,
-				);
+				pushMembershipRowParseError(ctx.errors, kind.kind, processedUser.externalUserId, error);
 				continue;
 			}
-			kind.seen.add(mapped.id);
+			kind.markSeen(mapped.id);
 			if (ctx.dryRun) {
-				if (!kind.upserted.has(mapped.id)) {
-					kind.upserted.add(mapped.id);
-					counters[kind.counterKey] += 1;
-				}
+				// Dry run counts distinct upsert candidates without writing.
+				kind.addOnce(mapped.id);
 				continue;
 			}
 			try {
 				const row = await kind.upsert(mapped);
-				if (!kind.upserted.has(mapped.id)) {
-					kind.upserted.add(mapped.id);
-					counters[kind.counterKey] += 1;
-				}
+				kind.addOnce(mapped.id);
 				memberIds.push(row.id);
 			} catch (error) {
 				pushUpsertEntityError(
 					ctx.errors,
-					kind.errorDescriptor,
+					kind.kind,
 					processedUser.externalUserId,
 					mapped.id,
 					error,
@@ -774,35 +742,28 @@ export class SyncService {
 	/** Resolve the effective Bearer value per auth type (static token or OAuth access token). */
 	private async resolveBearer(
 		connection: ApiConnection,
-		errors: SyncLogErrorEntryDto[],
+		errors: SyncErrors,
 	): Promise<string | null> {
 		if (connection.authType === 'OAUTH2_CLIENT_CREDENTIALS') {
 			try {
 				return await this.oauthTokenService.getAccessToken(connection);
 			} catch (error) {
-				errors.push({
-					phase: 'oauth',
-					message:
-						error instanceof OAuthTokenError ? error.message : 'OAuth token acquisition failed',
-					httpStatus: error instanceof OAuthTokenError ? error.options.statusCode : undefined,
-				});
+				errors.add(
+					'oauth',
+					error instanceof OAuthTokenError ? error.message : 'OAuth token acquisition failed',
+					{ httpStatus: error instanceof OAuthTokenError ? error.options.statusCode : undefined },
+				);
 				return null;
 			}
 		}
 		return this.decryptCredentials(connection.authCredentialsEncrypted, errors);
 	}
 
-	private decryptCredentials(
-		authCredentialsEncrypted: string,
-		errors: SyncLogErrorEntryDto[],
-	): string | null {
+	private decryptCredentials(authCredentialsEncrypted: string, errors: SyncErrors): string | null {
 		try {
 			return this.encryption.decrypt(authCredentialsEncrypted);
 		} catch {
-			errors.push({
-				phase: 'decrypt_credentials',
-				message: 'Stored credentials could not be decrypted',
-			});
+			errors.add('decrypt_credentials', 'Stored credentials could not be decrypted');
 			return null;
 		}
 	}
@@ -828,7 +789,8 @@ export class SyncService {
 	 * (real runs only) and emit the completion/failure audit event. The success/failure asymmetries
 	 * are deliberate and preserved: a SUCCESS log stores `null` instead of an empty errors array and
 	 * clears the scheduled-failure backoff state; a FAILED run emits its audit event before the
-	 * connection update (the historical order).
+	 * connection update (the historical order). §5.B3: the full four-field counter snapshot is
+	 * carried on every terminal path — early exits report a genuine 0, never an omitted field.
 	 */
 	private async finalizeRun(params: {
 		status: 'SUCCESS' | 'FAILED';
@@ -836,16 +798,13 @@ export class SyncService {
 		connectionBefore: ApiConnection;
 		logId: string;
 		dryRun: boolean;
-		errors: SyncLogErrorEntryDto[];
-		counters: {
-			usersSynced: number;
-			groupsSynced: number;
-			rolesSynced: number;
-			usersSkippedCollision?: number;
-		};
+		errors: SyncErrors;
+		counters: SyncCounters;
 		auditContext?: { adminId?: string; adminUsername?: string };
 	}): Promise<TriggerSyncResponseDto> {
-		const { status, counters, errors, dryRun } = params;
+		const { status, dryRun } = params;
+		const errors = params.errors.toArray();
+		const counters = params.counters.toCounterSnapshot();
 		const finishedLog = await this.syncLogService.finishLog(
 			params.logId,
 			status,
@@ -854,7 +813,7 @@ export class SyncService {
 		);
 		const auditMetadata = {
 			usersSynced: counters.usersSynced,
-			usersSkippedCollision: counters.usersSkippedCollision ?? 0,
+			usersSkippedCollision: counters.usersSkippedCollision,
 			status,
 		};
 		let connectionAfter = params.connectionBefore;
@@ -868,7 +827,7 @@ export class SyncService {
 					data: {
 						lastSyncAt: finishedLog.finishedAt ?? new Date(),
 						lastSyncStatus: 'SUCCESS',
-						lastCollisionCount: counters.usersSkippedCollision ?? 0,
+						lastCollisionCount: counters.usersSkippedCollision,
 						scheduleConsecutiveFailures: 0,
 						scheduleAutoPausedAt: null,
 						scheduleLastError: null,
@@ -884,7 +843,7 @@ export class SyncService {
 					where: { id: params.connectionId },
 					data: {
 						lastSyncStatus: 'FAILED',
-						lastCollisionCount: counters.usersSkippedCollision ?? 0,
+						lastCollisionCount: counters.usersSkippedCollision,
 					},
 				});
 			}
@@ -919,7 +878,7 @@ export class SyncService {
 			await this.syncLogService.finishLog(
 				openLog.id,
 				'FAILED',
-				{ usersSynced: 0, groupsSynced: 0, rolesSynced: 0 },
+				{ usersSynced: 0, groupsSynced: 0, rolesSynced: 0, usersSkippedCollision: 0 },
 				[
 					{
 						phase: 'concurrency',
@@ -959,7 +918,7 @@ export class SyncService {
 	 * event. No secrets; the colliding record is skipped, the owner is never overwritten.
 	 */
 	private async recordUsernameCollision(
-		errors: SyncLogErrorEntryDto[],
+		errors: SyncErrors,
 		error: UsernameCollisionError,
 		connectionId: string,
 	): Promise<void> {
@@ -983,14 +942,16 @@ export class SyncService {
 				? 'Local directory'
 				: owner.apiConnection.name
 			: undefined;
-		errors.push({
-			phase: 'username_collision',
-			externalUserId: error.externalUserId,
-			username: error.username,
-			ownerApiConnectionId: owner?.apiConnectionId,
-			ownerLabel,
-			message: `Username "${error.username}" already owned by ${ownerLabel ?? 'another source'}`,
-		});
+		errors.add(
+			'username_collision',
+			`Username "${error.username}" already owned by ${ownerLabel ?? 'another source'}`,
+			{
+				externalUserId: error.externalUserId,
+				username: error.username,
+				ownerApiConnectionId: owner?.apiConnectionId,
+				ownerLabel,
+			},
+		);
 		this.audit.recordSafe({
 			category: 'sync',
 			event: 'identity_sync_username_collision',

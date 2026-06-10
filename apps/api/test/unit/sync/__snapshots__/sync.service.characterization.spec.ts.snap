@@ -1333,6 +1333,7 @@ exports[`SyncService characterization goldens (Prompt 38 §11) scenario 7: syncA
       {
         "groupsSynced": 0,
         "rolesSynced": 0,
+        "usersSkippedCollision": 0,
         "usersSynced": 0,
       },
       [
@@ -1525,6 +1526,7 @@ exports[`SyncService characterization goldens (Prompt 38 §11) scenario 8: users
       {
         "groupsSynced": 0,
         "rolesSynced": 0,
+        "usersSkippedCollision": 0,
         "usersSynced": 0,
       },
       [

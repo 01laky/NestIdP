@@ -51,4 +51,19 @@ describe('runPool (§5.C)', () => {
 		await runPool([], 5, worker);
 		expect(worker).not.toHaveBeenCalled();
 	});
+
+	it('RUNPOOL-05: concurrency <= 0 resolves without invoking the worker (no runners spawned)', async () => {
+		const worker = jest.fn();
+		await runPool([1, 2, 3], 0, worker);
+		await runPool([1, 2, 3], -1, worker);
+		expect(worker).not.toHaveBeenCalled();
+	});
+
+	it('RUNPOOL-06: items.length < concurrency still processes every item exactly once', async () => {
+		const seen: number[] = [];
+		await runPool([1, 2], 10, async (item) => {
+			seen.push(item);
+		});
+		expect(seen.sort()).toEqual([1, 2]);
+	});
 });
