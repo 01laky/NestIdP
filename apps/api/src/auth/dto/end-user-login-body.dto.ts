@@ -1,5 +1,5 @@
-import { Transform } from 'class-transformer';
 import { IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import { Trim } from '../../common/decorators/trim.decorator';
 
 const CUID_PATTERN = /^c[a-z0-9]{24,}$/i;
 
@@ -7,7 +7,7 @@ export class EndUserLoginBodyDto {
 	@IsString()
 	@IsNotEmpty()
 	@MaxLength(128)
-	@Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+	@Trim()
 	username!: string;
 
 	// bcrypt (the only supported synced-hash algorithm) truncates input at 72 bytes — a longer password is

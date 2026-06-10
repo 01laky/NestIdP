@@ -4,6 +4,7 @@ import type {
 	IdpSigningEcCurve,
 	IdpSigningKeyFamily,
 	IdpSigningRsaModulusBits,
+	StartIdpCertRotationRequestDto,
 } from '@nestidp/shared';
 import { IDP_CERT_EC_CURVES, IDP_CERT_RSA_MODULUS_BITS } from '@nestidp/shared';
 
@@ -51,4 +52,30 @@ export class StartIdpCertRotationBodyDto {
 	@IsString()
 	@Matches(/^\d{4}-\d{2}-\d{2}$/)
 	notAfter?: string;
+}
+
+/**
+ * §6.3: typed narrowing instead of a blind `as` cast — builds the correct member of the shared
+ * discriminated union. Under `mode: 'upload'` the `@ValidateIf` rules guarantee both PEMs; the `''`
+ * fallback is only reachable if validation was bypassed, and the service rejects an empty PEM the
+ * same way as a missing one.
+ */
+export function toStartIdpCertRotationRequest(
+	body: StartIdpCertRotationBodyDto,
+): StartIdpCertRotationRequestDto {
+	if (body.mode === 'upload') {
+		return {
+			mode: 'upload',
+			signingCertPem: body.signingCertPem ?? '',
+			signingPrivateKeyPem: body.signingPrivateKeyPem ?? '',
+		};
+	}
+	return {
+		mode: 'generate',
+		keyFamily: body.keyFamily,
+		rsaModulusBits: body.rsaModulusBits,
+		ecCurve: body.ecCurve,
+		signatureAlgorithmId: body.signatureAlgorithmId,
+		notAfter: body.notAfter,
+	};
 }

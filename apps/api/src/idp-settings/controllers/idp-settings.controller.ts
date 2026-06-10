@@ -3,16 +3,20 @@ import {
 	IDP_SETTINGS_API_PATH,
 	type IdpMetadataPreviewResponseDto,
 	type IdpSettingsPublicDto,
-	type StartIdpCertRotationRequestDto,
-	type StartIdpEncryptionCertRotationRequestDto,
 } from '@nestidp/shared';
 import { AdminAuthGuard } from '../../admin-auth/guards/admin-auth.guard';
 import { AdminCsrfGuard } from '../../admin-auth/guards/admin-csrf.guard';
 import { IdpSettingsService } from '../services/idp-settings.service';
 import { GenerateIdpEncryptionCertBodyDto } from '../dto/generate-idp-encryption-cert.dto';
 import { GenerateIdpSigningCertBodyDto } from '../dto/generate-idp-signing-cert.dto';
-import { StartIdpCertRotationBodyDto } from '../dto/start-idp-cert-rotation.dto';
-import { StartIdpEncryptionCertRotationBodyDto } from '../dto/start-idp-encryption-cert-rotation.dto';
+import {
+	StartIdpCertRotationBodyDto,
+	toStartIdpCertRotationRequest,
+} from '../dto/start-idp-cert-rotation.dto';
+import {
+	StartIdpEncryptionCertRotationBodyDto,
+	toStartIdpEncryptionCertRotationRequest,
+} from '../dto/start-idp-encryption-cert-rotation.dto';
 import { UpdateIdpSettingsBodyDto } from '../dto/update-idp-settings.dto';
 import { UploadIdpEncryptionCertBodyDto } from '../dto/upload-idp-encryption-cert.dto';
 import { UploadIdpSigningCertBodyDto } from '../dto/upload-idp-signing-cert.dto';
@@ -60,7 +64,7 @@ export class IdpSettingsController {
 		@Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
 		body: StartIdpCertRotationBodyDto,
 	): Promise<IdpSettingsPublicDto> {
-		return this.idpSettingsService.startRotation(body as StartIdpCertRotationRequestDto);
+		return this.idpSettingsService.startRotation(toStartIdpCertRotationRequest(body));
 	}
 
 	@Post('signing-cert/rotation/complete')
@@ -100,7 +104,7 @@ export class IdpSettingsController {
 		body: StartIdpEncryptionCertRotationBodyDto,
 	): Promise<IdpSettingsPublicDto> {
 		return this.idpSettingsService.startEncryptionRotation(
-			body as StartIdpEncryptionCertRotationRequestDto,
+			toStartIdpEncryptionCertRotationRequest(body),
 		);
 	}
 

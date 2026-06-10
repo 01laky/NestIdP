@@ -6,6 +6,8 @@ export type IdpCertKeyFamily = 'rsa' | 'ec';
 /** Accepted RSA key sizes for IdP certificates (signing + encryption). Single source for the §A20 dedup. */
 export const IDP_CERT_RSA_MODULUS_BITS = [2048, 3072, 4096] as const;
 export type IdpCertRsaModulusBits = (typeof IDP_CERT_RSA_MODULUS_BITS)[number];
+/** §A20: the one generation-default modulus, shared by the signing + encryption option resolvers. */
+export const DEFAULT_IDP_RSA_MODULUS_BITS: IdpCertRsaModulusBits = 2048;
 
 /** Accepted EC curves for IdP certificates (signing + encryption). */
 export const IDP_CERT_EC_CURVES = ['P-256', 'P-384', 'P-521'] as const;

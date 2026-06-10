@@ -1,6 +1,9 @@
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Matches, ValidateIf } from 'class-validator';
-import type { IdpCertRsaModulusBits } from '@nestidp/shared';
+import type {
+	IdpCertRsaModulusBits,
+	StartIdpEncryptionCertRotationRequestDto,
+} from '@nestidp/shared';
 import { IDP_CERT_RSA_MODULUS_BITS } from '@nestidp/shared';
 
 export class StartIdpEncryptionCertRotationBodyDto {
@@ -27,4 +30,25 @@ export class StartIdpEncryptionCertRotationBodyDto {
 	@IsString()
 	@Matches(/^\d{4}-\d{2}-\d{2}$/)
 	notAfter?: string;
+}
+
+/**
+ * §6.3: typed narrowing instead of a blind `as` cast — builds the correct member of the shared
+ * discriminated union (see toStartIdpCertRotationRequest for the upload-mode `''` rationale).
+ */
+export function toStartIdpEncryptionCertRotationRequest(
+	body: StartIdpEncryptionCertRotationBodyDto,
+): StartIdpEncryptionCertRotationRequestDto {
+	if (body.mode === 'upload') {
+		return {
+			mode: 'upload',
+			encryptionCertPem: body.encryptionCertPem ?? '',
+			encryptionPrivateKeyPem: body.encryptionPrivateKeyPem ?? '',
+		};
+	}
+	return {
+		mode: 'generate',
+		rsaModulusBits: body.rsaModulusBits,
+		notAfter: body.notAfter,
+	};
 }

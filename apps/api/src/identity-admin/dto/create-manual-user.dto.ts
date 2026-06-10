@@ -1,4 +1,3 @@
-import { Transform } from 'class-transformer';
 import {
 	ArrayMaxSize,
 	IsArray,
@@ -12,6 +11,7 @@ import {
 	ValidatorConstraintInterface,
 	ValidationArguments,
 } from 'class-validator';
+import { Trim } from '../../common/decorators/trim.decorator';
 
 @ValidatorConstraint({ name: 'passwordsMatch', async: false })
 class PasswordsMatchConstraint implements ValidatorConstraintInterface {
@@ -26,30 +26,20 @@ class PasswordsMatchConstraint implements ValidatorConstraintInterface {
 }
 
 export class CreateManualIdentityUserBodyDto {
-	@Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+	@Trim()
 	@IsString()
 	@MinLength(1)
 	@MaxLength(128)
 	username!: string;
 
 	@IsOptional()
-	@Transform(({ value }) => {
-		if (value === null || value === undefined) {
-			return value;
-		}
-		return typeof value === 'string' ? value.trim() : value;
-	})
+	@Trim()
 	@IsString()
 	@MaxLength(256)
 	email?: string | null;
 
 	@IsOptional()
-	@Transform(({ value }) => {
-		if (value === null || value === undefined) {
-			return value;
-		}
-		return typeof value === 'string' ? value.trim() : value;
-	})
+	@Trim()
 	@IsString()
 	@MaxLength(256)
 	displayName?: string | null;

@@ -2,6 +2,7 @@
 
 import type { IdpCertEcCurve, IdpCertKeyFamily, IdpCertRsaModulusBits } from './idp-cert-common.js';
 import {
+	DEFAULT_IDP_RSA_MODULUS_BITS,
 	defaultNotAfterCalendarDate,
 	IDP_CERT_DEFAULT_VALIDITY_DAYS,
 	IDP_CERT_EC_CURVES,
@@ -153,12 +154,12 @@ export function resolveGenerateIdpEncryptionCertRequest(
 	notAfter: string;
 } {
 	const keyFamily: IdpCertKeyFamily = input.keyFamily ?? 'rsa';
-	let rsaModulusBits: IdpCertRsaModulusBits = 2048;
+	let rsaModulusBits: IdpCertRsaModulusBits = DEFAULT_IDP_RSA_MODULUS_BITS;
 	let ecCurve: IdpCertEcCurve = 'P-256';
 	let keyTransportAlgorithmId: string | null = IDP_ENCRYPTION_DEFAULT_KEY_TRANSPORT_ALGORITHM_ID;
 
 	if (keyFamily === 'rsa') {
-		rsaModulusBits = input.rsaModulusBits ?? 2048;
+		rsaModulusBits = input.rsaModulusBits ?? DEFAULT_IDP_RSA_MODULUS_BITS;
 		if (!(IDP_CERT_RSA_MODULUS_BITS as readonly number[]).includes(rsaModulusBits)) {
 			throw new IdpEncryptionCryptoValidationError(
 				'rsaModulusBits must be 2048, 3072, or 4096',
@@ -233,7 +234,7 @@ export function getDefaultGenerateIdpEncryptionCertRequest(
 ): GenerateIdpEncryptionCertRequestDto {
 	return {
 		keyFamily: 'rsa',
-		rsaModulusBits: 2048,
+		rsaModulusBits: DEFAULT_IDP_RSA_MODULUS_BITS,
 		keyTransportAlgorithmId: IDP_ENCRYPTION_DEFAULT_KEY_TRANSPORT_ALGORITHM_ID,
 		notAfter: defaultNotAfterCalendarDate(now),
 	};

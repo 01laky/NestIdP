@@ -76,6 +76,16 @@ frontend de-duplication) and remaining items land in subsequent commits under th
   `admin/adminApi.ts` reduced to a re-export barrel. No call sites or tests changed — `import … from
 '../adminApi'` and the `vi.spyOn(adminApi, …)` pattern (~480 sites) keep working through the barrel.
 
+- **DTO boundary cleanups** (§6.3/§A20): one shared `@Trim()` decorator replaces the ten hand-copied
+  string-trim `@Transform` blocks across the admin-user / api-connection / end-user-login /
+  manual-identity / schedule DTOs (the long null-checking variant was behaviour-identical); the two
+  start-rotation controller endpoints replace their blind `as`-casts with typed `toStartIdp*RotationRequest`
+  mappers that build the correct member of the shared discriminated union; and the signing/encryption
+  generation defaults share one `DEFAULT_IDP_RSA_MODULUS_BITS` constant in `@nestidp/shared` instead of six
+  scattered `2048` literals. Assessed and intentionally left: `UpdateManualUser`/`UpdateAdminUser`/
+  `UpdateSchedule` are not `PartialType` candidates (different field sets/null semantics than their create
+  counterparts; schedule has no create), and the various coincidental `512` max-lengths stay independent
+  (entity-id vs user-agent vs URL bounds are unrelated — one constant would couple them artificially).
 - **Audit-event registry + naming convention** (§15): every persisted audit `event` name now comes from
   the single registry `apps/api/src/audit/audit-event-names.ts`, and `AuditRecordInput.event` is typed
   against it — the **compiler** rejects an event string built outside the registry. The scheme

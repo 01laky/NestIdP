@@ -1,4 +1,3 @@
-import { Transform } from 'class-transformer';
 import {
 	IsBoolean,
 	IsIn,
@@ -20,15 +19,16 @@ import {
 	OAUTH_CLIENT_AUTH_METHODS,
 	USERNAME_COLLISION_POLICIES,
 } from '@nestidp/shared';
+import { Trim } from '../../common/decorators/trim.decorator';
 
 export class CreateApiConnectionBodyDto {
-	@Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+	@Trim()
 	@IsString()
 	@IsNotEmpty()
 	@MaxLength(128)
 	name!: string;
 
-	@Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+	@Trim()
 	@IsString()
 	@IsNotEmpty()
 	@MaxLength(2048)

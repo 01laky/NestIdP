@@ -1,8 +1,8 @@
-import { Transform } from 'class-transformer';
 import { IsString, MaxLength, MinLength } from 'class-validator';
+import { Trim } from '../../common/decorators/trim.decorator';
 
 export class ManualNameBodyDto {
-	@Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+	@Trim()
 	@IsString()
 	@MinLength(1)
 	@MaxLength(128)

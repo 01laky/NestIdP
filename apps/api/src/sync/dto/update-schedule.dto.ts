@@ -1,5 +1,5 @@
-import { Transform } from 'class-transformer';
 import { IsBoolean, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
+import { Trim } from '../../common/decorators/trim.decorator';
 
 /**
  * PATCH body for a connection's schedule. Omitted fields are unchanged; an explicit `null`
@@ -13,14 +13,14 @@ export class UpdateScheduleBodyDto {
 
 	@IsOptional()
 	@ValidateIf((_, value) => value !== null)
-	@Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+	@Trim()
 	@IsString()
 	@MaxLength(256)
 	scheduleCron?: string | null;
 
 	@IsOptional()
 	@ValidateIf((_, value) => value !== null)
-	@Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+	@Trim()
 	@IsString()
 	@MaxLength(128)
 	scheduleTimezone?: string | null;

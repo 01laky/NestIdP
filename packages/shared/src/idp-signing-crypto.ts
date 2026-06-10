@@ -1,6 +1,7 @@
 /** IdP signing certificate generation — key types, XML-DSig algorithms, expiry (v1.4.7). */
 
 import {
+	DEFAULT_IDP_RSA_MODULUS_BITS,
 	defaultNotAfterCalendarDate,
 	IDP_CERT_DEFAULT_VALIDITY_DAYS,
 	IDP_CERT_EC_CURVES,
@@ -186,11 +187,11 @@ export function resolveGenerateIdpSigningCertRequest(
 		(keyFamily === 'ec' ? 'ecdsa-sha256' : IDP_SIGNING_DEFAULT_SIGNATURE_ALGORITHM_ID);
 	const signatureOption = assertCompatibleKeyAndSignature(keyFamily, signatureAlgorithmId);
 
-	let rsaModulusBits: IdpSigningRsaModulusBits = 2048;
+	let rsaModulusBits: IdpSigningRsaModulusBits = DEFAULT_IDP_RSA_MODULUS_BITS;
 	let ecCurve: IdpSigningEcCurve = 'P-256';
 
 	if (keyFamily === 'rsa') {
-		rsaModulusBits = input.rsaModulusBits ?? 2048;
+		rsaModulusBits = input.rsaModulusBits ?? DEFAULT_IDP_RSA_MODULUS_BITS;
 		if (!(IDP_CERT_RSA_MODULUS_BITS as readonly number[]).includes(rsaModulusBits)) {
 			throw new IdpSigningCryptoValidationError(
 				'rsaModulusBits must be 2048, 3072, or 4096',
@@ -250,7 +251,7 @@ export function getDefaultGenerateIdpSigningCertRequest(
 ): GenerateIdpSigningCertRequestDto {
 	return {
 		keyFamily: 'rsa',
-		rsaModulusBits: 2048,
+		rsaModulusBits: DEFAULT_IDP_RSA_MODULUS_BITS,
 		signatureAlgorithmId: IDP_SIGNING_DEFAULT_SIGNATURE_ALGORITHM_ID,
 		notAfter: defaultNotAfterCalendarDate(now),
 	};
