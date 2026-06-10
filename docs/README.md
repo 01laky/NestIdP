@@ -2,7 +2,7 @@
 
 Product and developer documentation. Visual assets live in [`img/`](./img/) (UI `.png` screenshots + Mermaid `.mmd` / `.svg` diagrams).
 
-**Current release:** v1.18.1
+**Current release:** v1.20.0
 
 ## Start here
 
@@ -25,15 +25,19 @@ All UI captures: [img/screenshots.md](./img/screenshots.md) · Guided tour: [tut
 
 ## Key diagrams
 
-| Topic                    | Diagram                                               |
-| ------------------------ | ----------------------------------------------------- |
-| Monolith layout          | ![Architecture](./img/architecture.svg)               |
-| API vs SP connections    | ![Connection types](./img/connection-types.svg)       |
-| SP-initiated SSO         | ![SSO flow](./img/sso-flow.svg)                       |
-| Sync contract (v1)       | ![Sync flow](./img/sync-flow.svg)                     |
-| Data model               | ![Schema](./img/schema-entities.svg)                  |
-| Confirm dialog UX        | ![Confirm dialog](./img/admin-confirm-dialog.svg)     |
-| Identity list pagination | ![Identity lists](./img/identity-list-pagination.svg) |
+| Topic                        | Diagram                                                |
+| ---------------------------- | ------------------------------------------------------ |
+| Monolith layout              | ![Architecture](./img/architecture.svg)                |
+| API vs SP connections        | ![Connection types](./img/connection-types.svg)        |
+| SP-initiated SSO             | ![SSO flow](./img/sso-flow.svg)                        |
+| Sync contract (v1)           | ![Sync flow](./img/sync-flow.svg)                      |
+| Multi-source sync            | ![Multi-source sync](./img/multi-source-sync-flow.svg) |
+| Back-channel SLO propagation | ![Backchannel SLO](./img/backchannel-slo-flow.svg)     |
+| Sync scheduler tick          | ![Sync scheduler](./img/sync-scheduler.svg)            |
+| Scheduler health gauges      | ![Scheduler overview](./img/scheduler-overview.svg)    |
+| Data model                   | ![Schema](./img/schema-entities.svg)                   |
+| Confirm dialog UX            | ![Confirm dialog](./img/admin-confirm-dialog.svg)      |
+| Identity list pagination     | ![Identity lists](./img/identity-list-pagination.svg)  |
 
 Full diagram index and regenerate commands: [img/README.md](./img/README.md)
 

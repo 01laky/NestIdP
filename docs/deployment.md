@@ -228,6 +228,9 @@ docker compose exec nestidp pnpm db:rekey -- "$NEW_KEY"
 | `SYNC_USERNAME_COLLISION_POLICY`                     | `skip`                      | Cross-connection username collision policy (`skip` keeps the run successful; `fail_run` fails the colliding run); per-connection override available                                                                                                                                                                                            |
 | `SYNC_ALL_CONCURRENCY`                               | `1`                         | Max connections synced concurrently by "Sync all"; `1` = sequential (deterministic collision winner); bounded `[1, 16]`. Values `> 1` are honoured only when **every** included connection uses the `fail_run` collision policy — otherwise clamped to `1` with a warning (the first-connection-wins order is only deterministic sequentially) |
 | `SYNC_SOURCE_STALE_FACTOR`                           | `3`                         | Dashboard marks a scheduled source "overdue" when `lastSyncAt` is older than cron interval × this factor; bounded `[1, 50]`                                                                                                                                                                                                                    |
+| `IDP_SETTINGS_CACHE_TTL_MS`                          | `5000`                      | In-process TTL for `GET /api/admin/idp/settings` cache (cert panel re-reads); `0` disables caching                                                                                                                                                                                                                                             |
+| `PORT`                                               | `3000`                      | HTTP port the NestJS server listens on; override when the container port mapping must differ                                                                                                                                                                                                                                                   |
+| `BUILD_GIT_SHA`                                      | _(none)_                    | Inject the build commit SHA (e.g. via `--build-arg`); appears as `gitSha` in `/health` responses                                                                                                                                                                                                                                               |
 
 > **Single-instance scheduling.** The scheduled-sync scheduler is **in-process** and assumes a single
 > NestIdP container. Running multiple replicas would **double-run** schedules (no HA leader election).
@@ -255,12 +258,47 @@ In `NODE_ENV=production`, the API enables **Helmet** (CSP, frame protection, etc
 
 ---
 
-## Health checks
+## Health and readiness probes
 
-| Endpoint      | Use                                 |
-| ------------- | ----------------------------------- |
-| `GET /health` | Liveness — always 200 if process up |
-| `GET /ready`  | Readiness — 200 when DB connected   |
+| Endpoint      | HTTP          | Use case                                                          |
+| ------------- | ------------- | ----------------------------------------------------------------- |
+| `GET /health` | `200`         | **Liveness** — always 200 if the process is alive; never calls DB |
+| `GET /ready`  | `200` / `503` | **Readiness** — 200 when DB connected, 503 otherwise              |
+
+Configure your load balancer or orchestrator to use `/ready` for traffic routing and `/health` for restart decisions.
+
+### `/health` response shape
+
+```json
+{
+	"status": "ok",
+	"version": "1.20.0",
+	"gitSha": "ddf82ce",
+	"uptimeSeconds": 3721,
+	"audit": {
+		"persistFailures": 0,
+		"lastPersistFailureAt": null
+	},
+	"schedulers": {
+		"sync": { "lastTickAt": "2026-05-20T08:16:00.000Z", "lastProcessed": 1 },
+		"certRotation": { "lastTickAt": "2026-05-20T08:00:00.000Z", "lastProcessed": 0 },
+		"backchannel": { "lastTickAt": "2026-05-20T08:16:00.000Z", "lastProcessed": 0 }
+	}
+}
+```
+
+`schedulers.*` fields are `null` before the first tick. Alert when `lastTickAt` is older than 2× the tick interval or is `null` after startup. `audit.persistFailures` incrementing means DB writes are silently failing — investigate connectivity.
+
+### `/ready` response shape
+
+```json
+{
+	"status": "connected",
+	"migrations": { "applied": 18, "available": 18, "upToDate": true }
+}
+```
+
+`status` is one of `connected`, `disconnected`, `not_configured`. `upToDate: false` means pending migrations — restart with a newer image or run `pnpm db:migrate:deploy`.
 
 Configure load balancers to use `/ready` for traffic routing.
 
@@ -285,6 +323,55 @@ pnpm dev
 ```
 
 See [development.md](./development.md) for details.
+
+---
+
+---
+
+## Troubleshooting
+
+### `/ready` returns 503 after startup
+
+The DB file is missing, `DATABASE_URL` is unset, or migrations have not run. Confirm:
+
+```bash
+# Check migration status
+curl http://localhost:3000/ready
+# Expected: { "status": "connected", "migrations": { "upToDate": true } }
+```
+
+If `status: disconnected`, verify `DATABASE_URL` points to a writable path and `DATABASE_ENCRYPTION_KEY` is set (required in production).
+
+### Admin login returns 401 "Invalid credentials"
+
+- `ADMIN_USERNAME` / `ADMIN_PASSWORD` bootstrap values were changed; use the password set on the admin account.
+- The bootstrap only runs when the `AdminUser` table is **empty**. If the admin was already created with a different password, use the login page to sign in or reset via `PATCH /api/admin/admin-users/:id`.
+
+### Users cannot log in after a successful sync
+
+- `passwordHashAlgorithm` returned by the external API is not `"bcrypt"` — check `SyncLog.errors` on the sync page.
+- `User.active` is `false` — the user was deactivated in the latest sync snapshot.
+- Username is case-sensitive: `Alice` ≠ `alice`. Verify the username entered matches the stored `User.username` exactly.
+
+### Account locked — user cannot log in
+
+Accounts lock after `LOGIN_LOCKOUT_THRESHOLD` consecutive failures. The lockout is DB-persisted (not in-memory) and survives restarts. It expires automatically after the backoff window. To recover immediately, operators can unlock an account from the admin console (if available) or wait for the lock to expire. The maximum lock duration is `LOGIN_LOCKOUT_MAX_MS` (default 24 h). To disable lockout entirely, set `LOGIN_LOCKOUT_THRESHOLD=0`.
+
+### SAML assertions rejected by the SP
+
+- The SP's trust store must include the IdP's current signing certificate fingerprint. Download the updated metadata from `{IDP_BASE_URL}/saml/metadata` and re-import into the SP.
+- During certificate rotation the metadata publishes **two** `KeyDescriptor` entries. Some SPs require a metadata re-import to pick up the pending cert before rotation completes.
+- Clock skew: IdP and SP clocks must be within `SAML_CLOCK_SKEW_SECONDS` (default 120 s) of each other.
+
+### Scheduled sync not running
+
+- Confirm `SYNC_SCHEDULER_TICK_MS` is not `0` (disabled).
+- Check the `/health` response: `schedulers.sync.lastTickAt` must be within the last 2× tick intervals.
+- On multi-replica deploys, only one instance should have `SYNC_SCHEDULER_TICK_MS > 0`.
+
+### Encrypted DB fails to open after key rotation
+
+A `DATABASE_ENCRYPTION_KEY` change requires re-keying the database before swapping the key. Use `pnpm db:rekey` **before** updating the env var, or restore from a backup taken with the old key. Losing the key makes the file permanently unreadable — store it in a secrets manager alongside a recent backup.
 
 ---
 

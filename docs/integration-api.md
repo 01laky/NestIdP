@@ -1,6 +1,6 @@
 # External identity API — v1 integration guide
 
-NestIdP **v1.0.0** syncs users, groups, roles, and password hashes from **one** configured API connection. The external REST API must implement the contract below exactly. NestIdP only prepends the operator-configured `baseUrl` — there is no field or endpoint mapping in v1.
+NestIdP syncs users, groups, roles, and password hashes from one or more configured API connections. Each connection has its own `baseUrl`, authentication credentials, sync schedule, and identity scope — syncing one source never touches another's records. The external REST API for each connection must implement the contract below exactly. NestIdP only prepends the operator-configured `baseUrl` — there is no field or endpoint mapping in v1.
 
 Product context: [proposal.MD §7](./proposal.MD) · operator setup: [development.md](./development.md) · mock server: [examples/mock-identity-api.mjs](./examples/mock-identity-api.mjs)
 
@@ -8,13 +8,39 @@ Product context: [proposal.MD §7](./proposal.MD) · operator setup: [developmen
 
 ## Authentication
 
-Every request from NestIdP includes:
+NestIdP supports two authentication methods per connection, configured in the admin console:
+
+### Bearer token (static)
 
 ```http
 Authorization: Bearer <token>
 ```
 
-The token is configured in the admin console (encrypted at rest). Only **Bearer** static tokens are supported in v1.
+The token is stored encrypted at rest. Configure `authType: BEARER` and supply the token; `hasBearerToken: true` in the API response confirms a token is stored.
+
+### OAuth 2.0 client credentials (v1.14.0)
+
+NestIdP obtains a short-lived access token from a configured token endpoint using the
+[OAuth 2.0 client credentials](https://www.rfc-editor.org/rfc/rfc6749#section-4.4) grant, then uses
+it as a `Bearer` token for the identity API calls:
+
+```http
+Authorization: Bearer <access_token>
+```
+
+Configure `authType: OAUTH2` and supply:
+
+| Field                   | Notes                                                           |
+| ----------------------- | --------------------------------------------------------------- |
+| Token URL               | `POST` endpoint for the client-credentials exchange             |
+| Client ID               | OAuth application identifier                                    |
+| Client secret           | Encrypted at rest; never returned to the browser                |
+| Scope (optional)        | Space-separated scopes                                          |
+| Audience (optional)     | Passed as `audience` in the token request body                  |
+| Auth method             | `client_secret_post` (default) or `client_secret_basic`         |
+| Extra params (optional) | Additional `key=value` pairs appended to the token request body |
+
+Tokens are cached in memory and refreshed automatically when they expire. A failed exchange fails the sync run and is audited as `api_connection_oauth_token_failed`.
 
 ---
 
@@ -193,10 +219,8 @@ target:
 
 ## v1 limits (not in this contract)
 
-- One API connection per deployment (second `POST` → **409**)
-- No custom paths or JSON field mapping (Phase 2)
-- No OAuth client credentials (Phase 2)
-- Argon2 / PBKDF2 hashes (Phase 3+)
+- No custom paths or JSON field mapping
+- Argon2 / PBKDF2 hashes (out of scope)
 
 ---
 

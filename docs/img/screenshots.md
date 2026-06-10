@@ -18,6 +18,8 @@ PNG captures of the NestIdP admin console and SAML login page (Evergreen UI). Us
 | `identity-roles-list.png`                  | Roles list                                                              |
 | `sp-connection-new-grafana.png`            | New SP connection (Grafana Cloud example)                               |
 | `sp-connections-list.png`                  | SP connections list                                                     |
+| `api-connections-list.png`                 | API connections list — all sources with sync status                     |
+| `audit-log-filters.png`                    | Audit log — filter controls and event table                             |
 | `saml-login.png`                           | End-user SAML login (`/login`)                                          |
 
 Regenerate by replacing PNGs in this folder; keep kebab-case names stable so links in docs do not break.

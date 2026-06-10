@@ -17,6 +17,17 @@ registry entries.
   `cert_rotation_tick_failed`, `backchannel_logout_sent`) are **not** audit rows and are not in the
   registry, but the same scheme regex is enforced on them by `AUDIT-REG-04`.
 
+### Additions in v1.19.0
+
+| Event                             | Actor  | Notes                                                                                                                              |
+| --------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `idp_<kind>_cert_unparseable`     | system | Active cert PEM unparseable at a rotation-check tick; deduped — fires **once per process per cert fingerprint**, not on every tick |
+| `idp_auto_rotation_deferred_boot` | system | A due rotation was skipped on the boot tick (outside `CERT_ROTATION_BOOT_GRACE_HOURS`); will auto-start on the next scheduler tick |
+
+`idp_<kind>_auto_rotation_due_soon` is also deduplicated in v1.19.0: it fires at most once per cert per process start, preventing repeated notifications when the scheduler ticks faster than the notify window.
+
+---
+
 ### Renames in v1.18.1 (§15 offender fixes)
 
 Historical rows keep the old names; new rows use the new ones. Update SIEM rules accordingly.

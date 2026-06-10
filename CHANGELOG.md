@@ -4,6 +4,60 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.20.0]
+
+Documentation overhaul (Prompt 40): professional README, screenshot spec, diagram, and docs update across all 14 deliverables.
+
+### Added
+
+- **Playwright docs-screenshot spec** (`apps/web/e2e/docs-screenshots.spec.ts`): 17 screenshots
+  with mocked API responses and a CI isolation guard (`DOCS_SCREENSHOTS=1`). Covers admin login,
+  dashboard, five IdP-settings states, API connection edit and sync, API connections list, identity
+  users/groups/roles lists, SP connections list, new SP connection form (Grafana example), audit log
+  with filters, and end-user SAML login. Writes directly to `docs/img/*.png`.
+- **`docs:screenshots` script** in `apps/web/package.json` and root `package.json`
+  (`pnpm build && pnpm --filter @nestidp/web docs:screenshots`).
+- **`docs/img/scheduler-overview.mmd`** — new Mermaid diagram showing the three in-process schedulers
+  (sync, cert-rotation, back-channel SLO) and how their `lastTickAt`/`lastProcessed` gauges surface in
+  `/health`.
+- **Two new screenshots**: `api-connections-list.png` (multi-source list with sync status) and
+  `audit-log-filters.png` (filter controls and event table); both added to `docs/img/README.md` and
+  `docs/img/screenshots.md`.
+
+### Changed
+
+- **Root `README.md`** (D1): full rewrite — `<div align="center">` hero with flat-square badges,
+  "Why NestIdP?" comparison table vs Keycloak/Authentik/Lemonldap-NG, three `<details>` quick-start
+  blocks (local dev, Docker, mock API), inline Mermaid SSO flow + connection-type + cert-roles
+  diagrams, HTML 2-per-row screenshot grid (10 images), health monitoring section, 10-entry docs
+  table, and developer commands table including `docs:screenshots`.
+- **`docs/development.md`** (D2): removed stale "v1.1.0 — Phase 1 complete" subtitle; removed
+  deprecated `v1 single-connection limit` note and "**v1: max 1**" annotation on the Create
+  connection row; updated "Phase 1 complete" footer to "What's included"; added
+  `IDP_SETTINGS_CACHE_TTL_MS` optional env table under the IdP settings section.
+- **`docs/integration-api.md`** (D3): removed "one configured API connection" constraint; replaced
+  the single-paragraph Auth section with full Bearer + OAuth 2.0 CC sub-sections (token URL,
+  client ID/secret, scope, audience, auth method, extra params); removed stale `v1 limits` bullet
+  "One API connection per deployment" and "No OAuth client credentials".
+- **`docs/audit-events.md`** (D4): added v1.19.0 additions table for `idp_<kind>_cert_unparseable`
+  and `idp_auto_rotation_deferred_boot`; added dedup note for `idp_<kind>_auto_rotation_due_soon`.
+- **`docs/deployment.md`** (D5): expanded Health section to full `/health` + `/ready` response
+  shape examples; added three missing env vars (`IDP_SETTINGS_CACHE_TTL_MS`, `PORT`,
+  `BUILD_GIT_SHA`); added 6-scenario **Troubleshooting** section (503 ready, admin login 401, users
+  can't log in post-sync, account lockout, SAML assertion rejection, scheduled sync not running,
+  encrypted DB after key rotation).
+- **`docs/RELEASE.md`** (D6): removed "v1.0.0" from title; replaced "Phase 2+ out of scope" section
+  with a **Monitoring checklist** (load-balancer alerts, `/health` field meanings, recommended
+  PagerDuty/Slack triggers).
+- **`docs/README.md`** (D7): updated version badge to v1.20.0; added four missing diagram rows
+  (multi-source-sync-flow, backchannel-slo-flow, sync-scheduler, scheduler-overview).
+- **`docs/img/README.md`**: added `scheduler-overview.mmd` diagram entry; added two new screenshot
+  entries (`api-connections-list.png`, `audit-log-filters.png`).
+- **`docs/img/screenshots.md`**: added two new screenshot entries.
+- **`docs/tutorial.md`** (D10): updated "v1 supports one external API connection" to multi-connection
+  phrasing; added section 9 "Audit log" with the new `audit-log-filters.png` screenshot and event
+  category descriptions; added audit-events.md and health monitoring cross-links in "Next steps".
+
 ## [1.19.0]
 
 The Prompt 38 §7 optional additions, re-cut as a minor release, plus the Prompt 39 D5 follow-up.

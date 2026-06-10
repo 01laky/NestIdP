@@ -1,4 +1,4 @@
-# NestIdP v1.0.0 — Production release checklist
+# NestIdP — Production release checklist
 
 Use this checklist before exposing the IdP to end users. Detailed deploy steps: [deployment.md](./deployment.md). Identity API contract: [integration-api.md](./integration-api.md).
 
@@ -56,12 +56,27 @@ Use this checklist before exposing the IdP to end users. Detailed deploy steps: 
 
 ---
 
-## Phase 2+ (not required for v1.0.0)
+## Monitoring checklist
 
-The following remain out of scope for this release:
+Verify these operational endpoints are reachable from your load balancer or monitoring system:
 
-- Scheduled sync, configurable API field mapping, outbound proxy
-- SAMLRequest signature verification, IdP-initiated SSO, SLO
-- OIDC, MFA, multi-tenant, multiple identity sources merged
+| Endpoint      | Expected | Meaning                                             |
+| ------------- | -------- | --------------------------------------------------- |
+| `GET /health` | `200`    | Process alive; includes `version`, `gitSha`, uptime |
+| `GET /ready`  | `200`    | DB connected, migrations applied (`upToDate: true`) |
 
-See [proposal.MD §13](./proposal.MD) Phase 2 roadmap.
+Useful `/health` response fields to alert on:
+
+| Field                                | Action when non-zero / non-null                               |
+| ------------------------------------ | ------------------------------------------------------------- |
+| `audit.persistFailures`              | Audit rows failing to persist — investigate DB connectivity   |
+| `schedulers.sync.lastTickAt`         | `null` after > 2× `SYNC_SCHEDULER_TICK_MS` → scheduler hung   |
+| `schedulers.certRotation.lastTickAt` | `null` after > 2× `CERT_ROTATION_SCHEDULER_TICK_MS`           |
+| `schedulers.backchannel.lastTickAt`  | `null` after > 2× `SAML_BACKCHANNEL_LOGOUT_SCHEDULER_TICK_MS` |
+
+Recommended alerts:
+
+- [ ] `/ready` returns non-200 for > 30 s → trigger PagerDuty / Slack alert
+- [ ] `audit.persistFailures` increases → notify on-call
+- [ ] Container restart detected (uptime counter resets)
+- [ ] Scheduler `lastTickAt` older than 2× tick interval

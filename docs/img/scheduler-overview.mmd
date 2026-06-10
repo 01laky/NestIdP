@@ -1,0 +1,19 @@
+---
+title: NestIdP — in-process schedulers and /health gauges
+---
+flowchart LR
+    subgraph schedulers["In-process schedulers (single instance)"]
+        SS["SyncSchedulerService\nSYNC_SCHEDULER_TICK_MS\n(default 30 s)"]
+        CS["CertRotationSchedulerService\nCERT_ROTATION_SCHEDULER_TICK_MS\n(default 1 h)"]
+        BL["BackchannelLogoutSchedulerService\nSAML_BACKCHANNEL_LOGOUT_SCHEDULER_TICK_MS\n(default 30 s)"]
+    end
+
+    SS -->|"per tick: lastTickAt\nlastProcessed"| gauge_sync["schedulers.sync\n{ lastTickAt, lastProcessed }"]
+    CS -->|"per tick: lastTickAt\nlastProcessed"| gauge_cert["schedulers.certRotation\n{ lastTickAt, lastProcessed }"]
+    BL -->|"per tick: lastTickAt\nlastProcessed"| gauge_bc["schedulers.backchannel\n{ lastTickAt, lastProcessed }"]
+
+    gauge_sync --> health["/health\n(always 200)"]
+    gauge_cert --> health
+    gauge_bc --> health
+
+    health -->|"null before first tick"| note["Alert when lastTickAt\nis null or stale\n> 2× tick interval"]

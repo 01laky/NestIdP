@@ -74,9 +74,9 @@ This is **not** the certificate used to encrypt SAML assertions **to** a service
 
 Copy signing options or download/copy the public encryption PEM from the panel. To encrypt assertions **to** a service provider, enable **Encrypt SAML assertions** on the SP connection and paste that SP’s public certificate PEM (uses AES-256-CBC; distinct from the IdP encryption cert in metadata).
 
-## 4. API connection (identity source)
+## 4. API connections (identity sources)
 
-v1 supports one external API connection for sync (plus a hidden local directory for manual users). Point it at your REST identity API.
+Register one or more external API connections for sync (plus a hidden local directory for manual users). Each connection has its own `baseUrl`, credentials, and sync schedule. Point it at your REST identity API.
 
 ![Edit API connection — base URL and bearer token](./img/api-connection-edit.png)
 
@@ -158,7 +158,22 @@ Flow (see also [sso-flow diagram](./img/sso-flow.svg)):
 
 Example dev user after mock sync: `user001` / `MockPass123!` (email `user001@mock.local`).
 
-## 9. Grafana Cloud checklist (optional)
+## 9. Audit log
+
+All authentication, configuration changes, and sync events are recorded in the persistent audit log. Browse or filter events at `/admin/audit`.
+
+![Audit log — filter controls and event table](./img/audit-log-filters.png)
+
+Use the filter bar to narrow by **category** (admin_auth, admin_config, sync, end_user_auth, saml, identity), **actor type**, **event name**, or time range. Export a filtered slice as JSON or CSV from the export button.
+
+Key event categories to monitor:
+
+- `admin_auth` — operator logins and lockouts
+- `admin_config` — cert rotation, SP/API connection changes
+- `sync` — sync run outcomes and schedule changes
+- `end_user_auth` — end-user login failures and lockouts
+
+## 10. Grafana Cloud checklist (optional)
 
 If the SP is [Grafana Cloud SAML](https://grafana.com/docs/grafana/latest/setup-grafana/configure-access/configure-authentication/saml/):
 
@@ -172,3 +187,5 @@ If the SP is [Grafana Cloud SAML](https://grafana.com/docs/grafana/latest/setup-
 - Production deploy: [deployment.md](./deployment.md) and [RELEASE.md](./RELEASE.md)
 - REST details: [development.md](./development.md)
 - External API contract: [integration-api.md](./integration-api.md)
+- Audit event reference: [audit-events.md](./audit-events.md)
+- Health monitoring: see the _Health and readiness probes_ section in [deployment.md](./deployment.md)

@@ -1,6 +1,6 @@
 # Development guide
 
-Companion to [proposal.MD](./proposal.MD) for local setup (**v1.1.0** — Phase 1 complete plus Evergreen operator UI: SAML SSO, admin console, Docker deploy, persistent audit log, admin account management).
+Companion to [proposal.MD](./proposal.MD) for local setup and development reference.
 
 Integration guide: [integration-api.md](./integration-api.md) · Deploy: [deployment.md](./deployment.md) · Go-live: [RELEASE.md](./RELEASE.md)
 
@@ -194,6 +194,12 @@ Three certificate roles (signing, optional IdP encryption, per-SP cert): see [id
 
 Shared constants: **`IDP_SETTINGS_API_PATH`**, **`IDP_SETTINGS_ROUTE_PREFIX`**, **`IDP_CERT_EXPIRY_WARNING_DAYS`** (30), **`IDP_ROTATION_STALE_WARNING_DAYS`** (7).
 
+Optional env:
+
+| Variable                    | Default | Purpose                                                                                   |
+| --------------------------- | ------- | ----------------------------------------------------------------------------------------- |
+| `IDP_SETTINGS_CACHE_TTL_MS` | `5000`  | In-process TTL for the `GET /api/admin/idp/settings` response cache; `0` disables caching |
+
 Private keys encrypted at rest (`EncryptionService`); admin JSON exposes fingerprints and `notAfter` only — never PEM private keys.
 
 **Rotation runbook (in-page checklist mirrors docs):**
@@ -243,7 +249,7 @@ Full operator surface:
 | GET    | `/api/admin/auth/me`                   | session | —     | Session + `csrfToken`                                                                                  |
 | GET    | `/api/admin`                           | session | —     | Dashboard (`AdminDashboardResponseDto`)                                                                |
 | GET    | `/api/admin/api-connections`           | session | —     | List API connections                                                                                   |
-| POST   | `/api/admin/api-connections`           | session | yes   | Create connection (**v1: max 1**)                                                                      |
+| POST   | `/api/admin/api-connections`           | session | yes   | Create connection                                                                                      |
 | GET    | `/api/admin/api-connections/:id`       | session | —     | Get connection                                                                                         |
 | PATCH  | `/api/admin/api-connections/:id`       | session | yes   | Update connection                                                                                      |
 | DELETE | `/api/admin/api-connections/:id`       | session | yes   | Delete connection                                                                                      |
@@ -462,8 +468,6 @@ Optional production / ops env:
 | `ADMIN_USER_CREATE_RATE_LIMIT_MAX`       | `5`        | Max `POST /admin-users` per window                      |
 | `ADMIN_USER_CREATE_RATE_LIMIT_WINDOW_MS` | `900000`   | Admin create rate window                                |
 | `MIGRATE_ONLY`                           | `0`        | `1` — migrate and exit (Docker init job)                |
-
-**v1 single-connection limit:** only one `ApiConnection` row may exist until multi-source sync (Phase 3). A second `POST` returns **409 Conflict**.
 
 **Production `baseUrl`:** when `NODE_ENV=production`, API connection `baseUrl` must use `https:`.
 
@@ -875,6 +879,6 @@ This sets `core.hooksPath=.githooks`. Hooks run on `prepare-commit-msg` and `com
 
 Copy `.env.docker.example` → `.env.docker` for compose secrets.
 
-## Phase 1 complete — what’s next
+## What’s included
 
-Phase 1 (MVP) is **done** in v1.0.0. Phase 2 items (scheduled sync, configurable API contract, outbound proxy, SAMLRequest signature verify, IdP-initiated SSO, SLO) are tracked in [proposal.MD §13](./proposal.MD).
+Fully operational self-hosted SAML 2.0 IdP: admin console, SAML SSO, multiple identity sources with scheduled sync, certificate lifecycle and auto-rotation, back-channel SLO propagation, configurable outbound proxy, audit log, rate limiting and brute-force protection. See [proposal.MD](./proposal.MD) for the complete feature inventory and roadmap.

@@ -20,6 +20,8 @@ Operator and login UI captures (`.png`) — index in [screenshots.md](./screensh
 | `identity-roles-list.png`                  | Roles list                                       |
 | `sp-connection-new-grafana.png`            | New SP connection (Grafana example)              |
 | `sp-connections-list.png`                  | SP connections list                              |
+| `api-connections-list.png`                 | API connections list                             |
+| `audit-log-filters.png`                    | Audit log with filters                           |
 | `saml-login.png`                           | End-user SAML login                              |
 
 ## Architecture diagrams
@@ -43,6 +45,7 @@ Mermaid sources (`.mmd`) and pre-rendered SVGs. GitHub does not execute Mermaid 
 | `identity-list-pagination.mmd` | TanStack paginated identity lists (users/groups/roles)         | [development.md](../development.md) § Identity lists                                                                |
 | `evergreen-ui.mmd`             | Evergreen tokens, `src/ui`, admin/login, responsive shell      | [development.md](../development.md) § Evergreen UI                                                                  |
 | `idp-certificates.mmd`         | Signing vs IdP encryption vs SP cert roles (v1.5.0)            | [proposal.MD](../proposal.MD) §8.4, [tutorial.md](../tutorial.md), [development.md](../development.md)              |
+| `scheduler-overview.mmd`       | Three in-process schedulers → `/health` gauge fields           | [docs/README.md](../README.md), [deployment.md](../deployment.md)                                                   |
 
 Regenerate after editing sources:
 

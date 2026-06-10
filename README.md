@@ -1,204 +1,343 @@
+<div align="center">
+
 # NestIdP
 
-**A deployable SAML Identity Provider you run yourself** — one Docker image, one admin console, identity from your REST API, SAML assertions to your apps.
+**A self-hosted SAML 2.0 Identity Provider you deploy in minutes**
 
-[![Version](https://img.shields.io/badge/version-1.17.0-blue)](package.json)
-[![Node](https://img.shields.io/badge/node-%3E%3D18-green)](package.json)
-[![pnpm](https://img.shields.io/badge/pnpm-%3E%3D9-orange)](package.json)
+[![Version](https://img.shields.io/badge/version-1.20.0-blue?style=flat-square)](package.json)
+[![Node](https://img.shields.io/badge/node-%3E%3D18-green?style=flat-square)](package.json)
+[![pnpm](https://img.shields.io/badge/pnpm-%3E%3D9-orange?style=flat-square)](package.json)
+[![License](https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square)](LICENSE)
+[![SAML 2.0](https://img.shields.io/badge/SAML-2.0-purple?style=flat-square)](docs/proposal.MD)
 
-> **SAML 2.0 Identity Provider** (NestJS + React + embedded encrypted libSQL) for teams that already have users in an internal API and need standards-based SSO to Grafana, custom apps, and other service providers.
+One Docker image. One admin console. Identity from your REST API. Assertions to your apps.
+
+</div>
+
+---
+
+## Why NestIdP?
+
+You need to add SSO to Grafana, a custom app, or a SaaS product — but you already have users in an internal REST API, Active Directory proxy, or HR system and don't want to migrate them or stand up a heavyweight platform.
+
+|                           | **NestIdP**                          | Keycloak                                   | Authentik                 | Lemonldap-NG           |
+| ------------------------- | ------------------------------------ | ------------------------------------------ | ------------------------- | ---------------------- |
+| **Deployment**            | Single Docker image, embedded DB     | Requires Postgres/MySQL, multiple services | Requires Postgres + Redis | Requires MySQL + Redis |
+| **Identity source**       | Pull from any JSON REST API via sync | LDAP/Kerberos/social, own user DB          | LDAP/social, own user DB  | LDAP, own user DB      |
+| **Encrypted embedded DB** | libSQL file, no DB server            | ✗                                          | ✗                         | ✗                      |
+| **Setup time**            | < 5 min (`docker compose up`)        | 30–60 min                                  | 20–40 min                 | 30–60 min              |
+| **Config surface**        | Purpose-built admin console          | Extensive realm settings                   | Python expressions        | Perl/YAML rules        |
+| **Protocol scope**        | SAML 2.0 only                        | SAML + OIDC + OAuth2                       | SAML + OIDC + OAuth2      | SAML + OIDC + CAS      |
+| **Cert auto-rotation**    | Built-in, per-cert                   | Plugin/manual                              | Manual                    | Manual                 |
+
+> **NestIdP is the right choice when:** you need SAML SSO, your users live in an existing REST API, and you want something you can `docker compose up` without a DBA on call.
 
 ---
 
 ## What you get
 
-|                                |                                                                                       |
-| ------------------------------ | ------------------------------------------------------------------------------------- |
-| **Admin console** (`/admin`)   | Configure identity sources, SP connections, IdP certificates, and browse synced users |
-| **SAML login** (`/login`)      | Branded end-user sign-in during SP-initiated SSO                                      |
-| **SAML endpoints** (`/saml/*`) | Metadata, HTTP-Redirect SSO, signed assertions (HTTP-POST to SP ACS)                  |
-| **Identity sync**              | Pull users, groups, roles, and bcrypt password hashes from a REST API                 |
-| **Single deployable unit**     | Monorepo → one production image; no microservices                                     |
+| Surface            | Path                | Description                                                                    |
+| ------------------ | ------------------- | ------------------------------------------------------------------------------ |
+| **Admin console**  | `/admin`            | Configure identity sources, SP connections, IdP certificates, audit log        |
+| **SAML login**     | `/login`            | End-user sign-in during SP-initiated SSO (no standing session after assertion) |
+| **SAML endpoints** | `/saml/*`           | Metadata, HTTP-Redirect SSO, signed + optionally encrypted assertions          |
+| **Identity sync**  | `/api/admin/sync/*` | Pull users, groups, roles, bcrypt hashes from one or more REST APIs            |
+| **Health probes**  | `/health` `/ready`  | Liveness + readiness for load balancers and Kubernetes                         |
 
-**Operator walkthrough with screenshots:** [docs/tutorial.md](docs/tutorial.md)
+### Feature highlights
+
+- **Multiple identity sources** — sync from several REST APIs independently; per-source scoping, collision handling, and scheduled cron runs
+- **Signing + encryption certificates** — separate independent lifecycles; auto-rotation scheduler (opt-in); dual-cert metadata during rotation so SPs upgrade without downtime
+- **Back-channel SLO** — propagate logout to every participating SP over SOAP with persistent retry queue
+- **OAuth 2.0 client-credentials** — authenticate outbound sync calls via CC grant in addition to static bearer tokens
+- **Per-connection outbound proxy** — route sync HTTP through a corporate proxy; per-connection no-proxy rules
+- **Brute-force protection** — per-IP + per-username rate limits, DB-persisted lockout (survives restarts), IP escalation/ban
+- **Full audit trail** — every auth, config change, sync run, and cert rotation recorded with actor, subject, and metadata; filterable and exportable
+- **Encrypted at rest** — DB file (libSQL), bearer tokens, private keys — three independent keys
 
 ---
 
 ## How it fits together
 
-Two connection types — never mixed:
+Two connection types that must never be confused:
 
-![API connection pulls identity in; SP connection sends SAML out](docs/img/connection-types.svg)
+```mermaid
+flowchart LR
+    API["Your REST\nIdentity API"]
+    IdP["NestIdP"]
+    SP1["Grafana Cloud"]
+    SP2["Your App"]
 
-| Connection         | Direction          | Purpose                                        |
-| ------------------ | ------------------ | ---------------------------------------------- |
-| **API connection** | External API → IdP | Sync users, groups, roles, password hashes     |
-| **SP connection**  | IdP → application  | SAML 2.0 login to Grafana, SaaS, or custom SPs |
+    API -->|"API connection\nbcrypt users/groups/roles"| IdP
+    IdP -->|"SP connection\nSAML assertion"| SP1
+    IdP -->|"SP connection\nSAML assertion"| SP2
+```
 
-SP-initiated SSO (typical flow):
+| Connection         | Direction          | What flows                                      |
+| ------------------ | ------------------ | ----------------------------------------------- |
+| **API connection** | External API → IdP | Users, groups, roles, password hashes (sync)    |
+| **SP connection**  | IdP → Application  | Signed (+ optionally encrypted) SAML assertions |
 
-![SP-initiated SSO sequence](docs/img/sso-flow.svg)
+### SP-initiated SSO flow
 
-Architecture overview: [docs/img/architecture.svg](docs/img/architecture.svg) · Full spec: [docs/proposal.MD](docs/proposal.MD)
+```mermaid
+sequenceDiagram
+    participant User
+    participant SP as Service Provider<br/>(Grafana, custom app)
+    participant IdP as NestIdP
+
+    User->>SP: Access protected resource
+    SP-->>User: 302 redirect with SAMLRequest
+    User->>IdP: GET /saml/sso?SAMLRequest=…
+    IdP-->>User: 302 → /login?samlSessionId=…
+    User->>IdP: POST /api/auth/login (username + password)
+    IdP->>IdP: Verify bcrypt hash, bind SAML session
+    IdP-->>User: HTML auto-post form (SAMLResponse)
+    User->>SP: POST to ACS URL
+    SP-->>User: Authenticated session
+```
+
+### Certificate roles (three distinct keys)
+
+```mermaid
+flowchart TD
+    S["IdP signing cert\n(required)\nSigns assertions + metadata\nRSA or EC · auto-rotate"]
+    E["IdP encryption cert\n(optional)\nKeyDescriptor use=encryption\nIndependent from signing"]
+    P["SP certificate\n(per SP)\nEncrypt assertion TO this SP\nSP's own public key"]
+
+    S -->|"published in"| META["SAML metadata\n/saml/metadata"]
+    E -->|"published in"| META
+    P -->|"used when\nEncrypt assertions = on"| AES["AES-256-CBC\nassertion encryption"]
+```
 
 ---
 
-## Certificates and SAML encryption
+## Screenshots
 
-NestIdP separates **three** kinds of X.509 material. They must not be mixed up when configuring production SSO.
+<table>
+<tr>
+<td width="49%">
 
-![Signing certificate, encryption certificate, and metadata on IdP settings](docs/img/idp-settings-signing-and-encryption.png)
-
-| Certificate        | Where configured                        | Role                                                                                                                                                                                                                                                                                                             |
-| ------------------ | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **IdP signing**    | IdP settings → Signing certificate      | Signs SAML assertions and IdP metadata. Required for real SSO. Generate in admin (RSA or EC, eight XML-DSig algorithms, expiry up to 10 years) or upload PEM. Supports **dual-cert rotation** (old + new keys in metadata until cutover), **manual or automatic** (opt-in scheduler that rotates before expiry). |
-| **IdP encryption** | IdP settings → Encryption certificate   | Optional second key pair published as `KeyDescriptor use="encryption"` in metadata. Independent lifecycle from signing: RSA or EC, RSA-OAEP key-transport catalog, generate/upload/rotation, copy or download public PEM. **Does not** encrypt assertions to a specific SP by itself.                            |
-| **SP certificate** | Each SP connection → SP certificate PEM | That application’s public key. Required when **Encrypt SAML assertions** is enabled — the IdP encrypts the signed assertion to this SP (AES-256-CBC + RSA-OAEP key transport). Distinct from the IdP encryption cert in metadata.                                                                                |
-
-**Assertion content encryption (when enabled):** fixed **AES-256-CBC** for SAML XML Encryption in v1. **Key transport** toward the SP uses the SP’s certificate, not the IdP encryption cert.
-
-**IdP encryption cert options** (generate panel): key type, EC curve or RSA modulus, key-transport algorithm, expiry, **Copy signing options**, and warnings when EC keys may not be accepted by all SPs.
-
-![Encryption certificate options — key type, transport algorithm, generate and upload](docs/img/idp-settings-encryption-cert-options.png)
-
-Diagram of how the three certificates relate: [docs/img/idp-certificates.svg](docs/img/idp-certificates.svg). Operator steps: [docs/tutorial.md#3-idp-settings-global-saml-idp](docs/tutorial.md#3-idp-settings-global-saml-idp).
-
----
-
-## Product tour
-
-Screens from a local dev stack. See [docs/tutorial.md](docs/tutorial.md) for the full guided path.
-
-### Dashboard
-
-Counts, last sync status, and IdP metadata/SSO URLs in one place.
+**Admin dashboard** — counts, last sync, IdP URLs
 
 ![Admin dashboard](docs/img/admin-dashboard.png)
 
-### Operator login
+</td>
+<td width="49%">
 
-Separate from end-user SAML — operators use `/admin/login`.
+**Operator login** — separate from SAML login
 
 ![Admin login](docs/img/admin-login.png)
 
-### IdP settings
+</td>
+</tr>
+<tr>
+<td width="49%">
 
-Entity ID, **signing** and **encryption** certificates (separate panels), metadata preview, and SAML URLs for service providers.
+**IdP settings** — signing + encryption panels
 
-![IdP settings overview](docs/img/idp-settings-overview.png)
+![IdP settings — signing and encryption](docs/img/idp-settings-signing-and-encryption.png)
 
-![Signing and encryption certificates on one page](docs/img/idp-settings-signing-and-encryption.png)
+</td>
+<td width="49%">
 
-![Encryption certificate — generate options and key transport](docs/img/idp-settings-encryption-cert-options.png)
+**Encryption cert options** — key type, transport algorithm
 
-### API connection and sync
+![Encryption certificate options](docs/img/idp-settings-encryption-cert-options.png)
 
-Point at your identity REST API, test connectivity, run full sync (optional dry run). Optionally
-schedule automatic syncs (cron) or route a connection's outbound traffic through a corporate HTTP/HTTPS
-proxy (per connection, off by default).
+</td>
+</tr>
+<tr>
+<td width="49%">
 
-![Edit API connection](docs/img/api-connection-edit.png)
+**API connections** — multiple sources with sync status
 
-![Run identity sync](docs/img/api-connection-sync.png)
+![API connections list](docs/img/api-connections-list.png)
 
-### Identity directory
+</td>
+<td width="49%">
 
-Users, groups, and roles after sync — paginated lists, manual records in local directory.
+**Identity sync** — run + logs, dry-run, collision counts
 
-![Users list](docs/img/identity-users-list.png)
+![Identity sync page](docs/img/api-connection-sync.png)
 
-### SP connections
+</td>
+</tr>
+<tr>
+<td width="49%">
 
-Register SAML apps (example: Grafana Cloud) with Entity ID, ACS URL, and attribute mapping.
+**SP connections** — register Grafana, SaaS, custom apps
 
 ![SP connections list](docs/img/sp-connections-list.png)
 
-### SAML login
+</td>
+<td width="49%">
 
-End users authenticate here when redirected from a service provider.
+**Audit log** — filterable event stream with export
 
-![SAML login page](docs/img/saml-login.png)
+![Audit log with filters](docs/img/audit-log-filters.png)
+
+</td>
+</tr>
+<tr>
+<td width="49%">
+
+**SAML login** — end-user sign-in page during SP SSO
+
+![SAML login](docs/img/saml-login.png)
+
+</td>
+<td width="49%">
+
+**Identity users** — paginated, multi-source, filterable
+
+![Users list](docs/img/identity-users-list.png)
+
+</td>
+</tr>
+</table>
+
+Full operator walkthrough: [docs/tutorial.md](docs/tutorial.md)
 
 ---
 
 ## Quick start
 
-**Prerequisites:** Node.js ≥ 18, pnpm ≥ 9. No database server needed — the datastore is an embedded encrypted libSQL file. Docker is optional for dev, recommended for production-like Compose.
+<details>
+<summary><strong>Local dev (Node + pnpm, no Docker)</strong></summary>
 
-### Local dev
+**Prerequisites:** Node.js ≥ 18, pnpm ≥ 9
 
 ```bash
 git clone <your-repo-url> NestIdP && cd NestIdP
 cp .env.example .env
+# Edit .env: set ADMIN_USERNAME, ADMIN_PASSWORD, and ENCRYPTION_KEY
 mkdir -p apps/api/data
-pnpm install && pnpm db:migrate:deploy && pnpm dev
+pnpm install
+pnpm db:migrate:deploy
+pnpm dev
 ```
 
-| What           | URL                                                               |
-| -------------- | ----------------------------------------------------------------- |
-| Admin UI       | http://localhost:5173/admin/login                                 |
-| SAML login     | http://localhost:5173/login                                       |
-| API / metadata | http://localhost:3000 (Vite proxies `/api` and `/saml` from 5173) |
+| URL                                 | What                 |
+| ----------------------------------- | -------------------- |
+| http://localhost:5173/admin/login   | Admin console        |
+| http://localhost:5173/login         | SAML end-user login  |
+| http://localhost:3000/saml/metadata | IdP metadata for SPs |
+| http://localhost:3000/health        | Liveness probe       |
+| http://localhost:3000/ready         | Readiness probe      |
 
-Bootstrap admin: set `ADMIN_USERNAME` and `ADMIN_PASSWORD` in `.env` before first start ([details](docs/database.md#first-admin-bootstrap-v030)).
+Vite proxies `/api` and `/saml` to the NestJS API (port 3000) — use port 5173 for everything.
 
-### Docker (production-like)
+</details>
+
+<details>
+<summary><strong>Docker Compose (production-like)</strong></summary>
 
 ```bash
 cp .env.docker.example .env.docker
-# Set SESSION_SECRET, ENCRYPTION_KEY, DATABASE_ENCRYPTION_KEY, ADMIN_PASSWORD, IDP_BASE_URL
-pnpm dev:docker
-# or: docker compose -f docker-compose.dev.yml up
+# Edit .env.docker — set strong values for:
+#   SESSION_SECRET, ENCRYPTION_KEY, DATABASE_ENCRYPTION_KEY (openssl rand -hex 32 for each)
+#   ADMIN_USERNAME, ADMIN_PASSWORD (min 12 chars in prod)
+#   IDP_BASE_URL=https://idp.your-domain.com
+docker compose up --build -d
+docker compose ps      # wait for healthy
+curl -sf http://localhost:3000/ready
 ```
 
-Open http://localhost:5173 — same paths as above. See [docs/deployment.md](docs/deployment.md).
+Open http://localhost:3000/admin/login (or your `IDP_BASE_URL`).
 
-### Try sync with the mock API
+For local hot-reload with Docker: `pnpm dev:docker` — Nest watch + Vite HMR at http://localhost:5173.
+
+</details>
+
+<details>
+<summary><strong>Try sync with the mock identity API</strong></summary>
 
 ```bash
-cd mock-app && pnpm install && pnpm start   # http://localhost:4010
+cd mock-app && npm install && npm start
+# → http://localhost:4010  (40 users, groups, roles, bcrypt passwords)
 ```
 
-In admin: API connection → base URL `http://localhost:4010`, bearer `mock-sync-dev-token` → **Run full sync** → sign in on `/login` as `user001` / `MockPass123!`.
+In the admin console:
+
+1. **API connection** → New → Name: `Mock HR`, Base URL: `http://localhost:4010`, Bearer: `mock-sync-dev-token` → **Test** → **Save**
+2. **Sync** → **Run full sync** — expect ~40 users, 10 groups, 5 roles
+3. SAML login → sign in as `user001` / `MockPass123!`
+
+Users `user039` and `user040` are inactive and cannot sign in.
+
+</details>
+
+---
+
+## Health monitoring
+
+| Endpoint      | Always 200?            | DB call? | Key fields                                                                    |
+| ------------- | ---------------------- | -------- | ----------------------------------------------------------------------------- |
+| `GET /health` | Yes                    | No       | `version`, `gitSha`, `uptimeSeconds`, `audit.persistFailures`, `schedulers.*` |
+| `GET /ready`  | Only when DB connected | Yes      | `status`, `migrations.upToDate`                                               |
+
+Use `/health` for liveness (restart if down) and `/ready` for readiness (stop traffic if not ready).
+
+```bash
+# Quick check
+curl http://localhost:3000/health | jq .
+curl http://localhost:3000/ready | jq .
+```
+
+Alert when:
+
+- `/ready` returns non-200
+- `audit.persistFailures` increases
+- `schedulers.sync.lastTickAt` is `null` or stale
 
 ---
 
 ## Documentation
 
-| Guide                                              | For                                                |
-| -------------------------------------------------- | -------------------------------------------------- |
-| [docs/tutorial.md](docs/tutorial.md)               | First-time operators — UI screenshots step by step |
-| [docs/development.md](docs/development.md)         | Routing, REST API, tests, Evergreen UI             |
-| [docs/integration-api.md](docs/integration-api.md) | External identity API contract (v1)                |
-| [docs/database.md](docs/database.md)               | Encrypted libSQL file, migrations, rekey/backup    |
-| [docs/deployment.md](docs/deployment.md)           | Docker, env, operations                            |
-| [docs/RELEASE.md](docs/RELEASE.md)                 | Production go-live checklist                       |
-| [docs/README.md](docs/README.md)                   | Full doc index + diagrams                          |
-
-**Diagrams:** `pnpm diagrams:build` · **Screenshots index:** [docs/img/screenshots.md](docs/img/screenshots.md)
+| Guide                                              | Description                                                             |
+| -------------------------------------------------- | ----------------------------------------------------------------------- |
+| [docs/tutorial.md](docs/tutorial.md)               | **Operator walkthrough** — admin UI with screenshots, step by step      |
+| [docs/proposal.MD](docs/proposal.MD)               | Product scope, architecture, data model, full roadmap                   |
+| [docs/development.md](docs/development.md)         | Local setup, routing, REST API reference, Evergreen UI, test registries |
+| [docs/integration-api.md](docs/integration-api.md) | External identity API contract (Bearer + OAuth2 CC)                     |
+| [docs/database.md](docs/database.md)               | Encrypted libSQL, migrations, rekey, backup, bootstrap admin            |
+| [docs/deployment.md](docs/deployment.md)           | Docker, env vars, health probes, troubleshooting                        |
+| [docs/audit-events.md](docs/audit-events.md)       | Full audit event catalogue by category                                  |
+| [docs/RELEASE.md](docs/RELEASE.md)                 | Production go-live checklist + monitoring                               |
+| [docs/README.md](docs/README.md)                   | Full doc + diagram index                                                |
+| [mock-app/README.md](mock-app/README.md)           | Mock identity API for local testing                                     |
 
 ---
 
 ## Developer commands
 
-| Command                  | Description                           |
-| ------------------------ | ------------------------------------- |
-| `pnpm dev`               | Shared package watch + API + Vite web |
-| `pnpm dev:docker`        | Hot-reload stack in Docker            |
-| `pnpm build`             | Production build                      |
-| `pnpm test`              | Monorepo tests                        |
-| `pnpm lint`              | ESLint + TypeScript                   |
-| `pnpm db:migrate:deploy` | Apply pending migrations              |
-| `pnpm db:new-migration`  | Author a new migration                |
+| Command                  | Description                                                      |
+| ------------------------ | ---------------------------------------------------------------- |
+| `pnpm dev`               | Shared types watch + API (port 3000) + Vite (port 5173)          |
+| `pnpm dev:docker`        | Hot-reload stack in Docker (Nest watch + Vite HMR)               |
+| `pnpm build`             | Production build of all packages                                 |
+| `pnpm test`              | Monorepo tests (shared + API + web)                              |
+| `pnpm lint`              | ESLint + TypeScript check                                        |
+| `pnpm diagrams:build`    | Regenerate `.mmd` → `.svg` in `docs/img/`                        |
+| `pnpm docs:screenshots`  | Build + run Playwright screenshot spec (writes `docs/img/*.png`) |
+| `pnpm db:migrate:deploy` | Apply pending DB migrations                                      |
+| `pnpm db:new-migration`  | Author a new Prisma migration                                    |
 
 ---
 
 ## Tech stack
 
-NestJS · React (Vite) · Prisma + encrypted libSQL · SAML 2.0 (signed assertions) · pnpm workspaces · Docker
+**Backend:** NestJS · Prisma · TypeScript · libSQL (encrypted)
+
+**Frontend:** React · Vite · TanStack Query · react-hook-form
+
+**SAML:** xmlbuilder2 · xml-crypto · @xmldom/xmldom · xpath _(no samlify, no @node-saml)_
+
+**Package manager:** pnpm workspaces · Docker
 
 ---
 
-## Scope and roadmap
+## Scope
 
-v1 is SAML-only (no OIDC/LDAP), single-tenant, one API sync source. Full product boundaries: [docs/proposal.MD](docs/proposal.MD).
+SAML 2.0 only (no OIDC, OAuth2 server, LDAP), single-tenant, REST identity sync. Full boundaries and roadmap: [docs/proposal.MD](docs/proposal.MD).
