@@ -113,7 +113,7 @@ describe('AuditPersistenceService', () => {
 	it('API-AUD-PERS-06: nullable actor and subject fields default to null in persist', async () => {
 		service.recordSafe({
 			category: 'saml',
-			event: 'saml_sso_success',
+			event: 'saml_response_issued',
 			actorType: 'end_user',
 		});
 

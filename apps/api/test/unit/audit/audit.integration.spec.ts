@@ -187,7 +187,7 @@ describe('audit integration (SQLite)', () => {
 		const middle = await prisma.auditEvent.create({
 			data: {
 				category: 'admin_auth',
-				event: 'range_probe',
+				event: 'range_probe' as never,
 				actorType: 'admin',
 				createdAt: new Date('2026-03-15T12:00:00.000Z'),
 			},
@@ -195,7 +195,7 @@ describe('audit integration (SQLite)', () => {
 		await prisma.auditEvent.create({
 			data: {
 				category: 'admin_auth',
-				event: 'outside_range',
+				event: 'outside_range' as never,
 				actorType: 'admin',
 				createdAt: new Date('2026-01-01T00:00:00.000Z'),
 			},
@@ -216,7 +216,7 @@ describe('audit integration (SQLite)', () => {
 		const audit = app.get(AuditPersistenceService);
 		audit.recordSafe({
 			category: 'saml',
-			event: 'saml_sso_success',
+			event: 'saml_response_issued',
 			actorType: 'end_user',
 		});
 		await flushPromises();
@@ -228,7 +228,7 @@ describe('audit integration (SQLite)', () => {
 
 		expect(exported.body.exportedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
 		expect(
-			exported.body.items.some((row: { event: string }) => row.event === 'saml_sso_success'),
+			exported.body.items.some((row: { event: string }) => row.event === 'saml_response_issued'),
 		).toBe(true);
 	});
 
@@ -236,7 +236,7 @@ describe('audit integration (SQLite)', () => {
 		const audit = app.get(AuditPersistenceService);
 		audit.recordSafe({
 			category: 'sync',
-			event: 'sync_started',
+			event: 'sync_scheduled_run_started',
 			actorType: 'system',
 		});
 		await flushPromises();
@@ -250,7 +250,7 @@ describe('audit integration (SQLite)', () => {
 		expect(String(exported.text).split('\n')[0]).toBe(
 			'id,createdAt,category,event,actorType,actorLabel,subjectType,subjectId,clientIp,metadata',
 		);
-		expect(String(exported.text)).toContain('sync_started');
+		expect(String(exported.text)).toContain('sync_scheduled_run_started');
 	});
 
 	it('API-AUD-08: export csv sets Content-Disposition attachment filename', async () => {
@@ -282,7 +282,7 @@ describe('audit integration (SQLite)', () => {
 		const audit = app.get(AuditPersistenceService);
 		audit.recordSafe({
 			category: 'admin_config',
-			event: 'metadata_sanitize_probe',
+			event: 'metadata_sanitize_probe' as never,
 			actorType: 'admin',
 			metadata: {
 				name: 'Corp',
@@ -301,7 +301,7 @@ describe('audit integration (SQLite)', () => {
 		const old = await prisma.auditEvent.create({
 			data: {
 				category: 'admin_auth',
-				event: 'stale_event',
+				event: 'stale_event' as never,
 				actorType: 'admin',
 			},
 		});
@@ -312,7 +312,7 @@ describe('audit integration (SQLite)', () => {
 		await prisma.auditEvent.create({
 			data: {
 				category: 'admin_auth',
-				event: 'fresh_event',
+				event: 'fresh_event' as never,
 				actorType: 'admin',
 			},
 		});
@@ -331,7 +331,7 @@ describe('audit integration (SQLite)', () => {
 			Array.from({ length: AUDIT_EXPORT_MAX_ROWS }, (_, index) => ({
 				id: `export-cap-${index}`,
 				category: 'admin_config',
-				event: 'export_cap_probe',
+				event: 'export_cap_probe' as never,
 				actorType: 'admin',
 				actorId: null,
 				actorLabel: null,
@@ -410,10 +410,10 @@ describe('audit integration (SQLite)', () => {
 
 	it('API-AUD-19: export json respects category filter', async () => {
 		await prisma.auditEvent.create({
-			data: { category: 'saml', event: 'saml_only', actorType: 'system' },
+			data: { category: 'saml', event: 'saml_only' as never, actorType: 'system' },
 		});
 		await prisma.auditEvent.create({
-			data: { category: 'sync', event: 'sync_only', actorType: 'system' },
+			data: { category: 'sync', event: 'sync_only' as never, actorType: 'system' },
 		});
 
 		const agent = request.agent(app.getHttpServer() as App);
@@ -442,7 +442,7 @@ describe('audit integration (SQLite)', () => {
 		const audit = app.get(AuditPersistenceService);
 		audit.recordSafe({
 			category: 'admin_config',
-			event: 'list_metadata_probe',
+			event: 'list_metadata_probe' as never,
 			actorType: 'admin',
 			metadata: { safe: 'ok', password: 'hidden', bearerToken: 'hidden' },
 		});
@@ -469,7 +469,7 @@ describe('audit integration (SQLite)', () => {
 		await prisma.auditEvent.create({
 			data: {
 				category: 'admin_auth',
-				event: 'old_probe',
+				event: 'old_probe' as never,
 				actorType: 'admin',
 				createdAt: new Date('2020-01-01T00:00:00.000Z'),
 			},
@@ -477,7 +477,7 @@ describe('audit integration (SQLite)', () => {
 		await prisma.auditEvent.create({
 			data: {
 				category: 'admin_auth',
-				event: 'new_probe',
+				event: 'new_probe' as never,
 				actorType: 'admin',
 				createdAt: new Date('2026-06-01T00:00:00.000Z'),
 			},
@@ -521,10 +521,10 @@ describe('audit integration (SQLite)', () => {
 
 	it('API-AUD-EXP-02: export csv contains only filtered events', async () => {
 		await prisma.auditEvent.create({
-			data: { category: 'sync', event: 'sync_csv', actorType: 'system' },
+			data: { category: 'sync', event: 'sync_csv' as never, actorType: 'system' },
 		});
 		await prisma.auditEvent.create({
-			data: { category: 'admin_auth', event: 'auth_csv', actorType: 'admin' },
+			data: { category: 'admin_auth', event: 'auth_csv' as never, actorType: 'admin' },
 		});
 
 		const agent = request.agent(app.getHttpServer() as App);
@@ -548,7 +548,7 @@ describe('audit integration (SQLite)', () => {
 		await prisma.auditEvent.create({
 			data: {
 				category: 'admin_auth',
-				event: 'until_old',
+				event: 'until_old' as never,
 				actorType: 'admin',
 				createdAt: new Date('2025-01-01T00:00:00.000Z'),
 			},
@@ -556,7 +556,7 @@ describe('audit integration (SQLite)', () => {
 		await prisma.auditEvent.create({
 			data: {
 				category: 'admin_auth',
-				event: 'until_new',
+				event: 'until_new' as never,
 				actorType: 'admin',
 				createdAt: new Date('2027-01-01T00:00:00.000Z'),
 			},
@@ -577,7 +577,7 @@ describe('audit integration (SQLite)', () => {
 		await prisma.auditEvent.create({
 			data: {
 				category: 'admin_auth',
-				event: 'csv_label',
+				event: 'csv_label' as never,
 				actorType: 'admin',
 				actorLabel: 'operator',
 			},
@@ -596,7 +596,7 @@ describe('audit integration (SQLite)', () => {
 		await prisma.auditEvent.create({
 			data: {
 				category: 'saml',
-				event: 'shape_probe',
+				event: 'shape_probe' as never,
 				actorType: 'end_user',
 				actorId: 'u1',
 				actorLabel: 'alice',
@@ -612,7 +612,7 @@ describe('audit integration (SQLite)', () => {
 
 		expect(exported.body.items[0]).toMatchObject({
 			category: 'saml',
-			event: 'shape_probe',
+			event: 'shape_probe' as never,
 			actorType: 'end_user',
 			actorLabel: 'alice',
 			clientIp: '10.0.0.5',

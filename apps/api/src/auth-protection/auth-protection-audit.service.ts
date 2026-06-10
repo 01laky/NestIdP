@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import type { AuditEventName } from '../audit/audit-event-names';
 import { AuditPersistenceService } from '../audit/services/audit-persistence.service';
 import type { LoginScope } from './brute-force-notifier';
 
@@ -56,7 +57,8 @@ export class AuthProtectionAuditService {
 		retryAfterMs: number,
 		usernameKey?: string,
 	): void {
-		const event = surface === 'sso' ? 'saml_sso_rate_limited' : `${surface}_login_rate_limited`;
+		const event: AuditEventName =
+			surface === 'sso' ? 'saml_sso_rate_limited' : `${surface}_login_rate_limited`;
 		this.audit.recordSafe({
 			category: categoryFor(surface),
 			event,

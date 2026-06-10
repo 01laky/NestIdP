@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { LogoutPropagationInput, LogoutPropagationPort } from '@nestidp/shared';
 import { PrismaService } from '../../prisma/services/prisma.service';
+import type { AuditEventName } from '../../audit/audit-event-names';
 import { AuditPersistenceService } from '../../audit/services/audit-persistence.service';
 import { redactSecrets } from '../../encryption/utils/redact-secret.util';
 import { errorMessage as messageOf } from '../../common/utils/error-message.util';
@@ -389,7 +390,7 @@ export class LogoutPropagationService implements LogoutPropagationPort {
 	}
 
 	private recordAudit(
-		event: string,
+		event: AuditEventName,
 		spConnectionId: string,
 		spEntityId: string | undefined,
 		reason: string,

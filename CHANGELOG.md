@@ -76,6 +76,17 @@ frontend de-duplication) and remaining items land in subsequent commits under th
   `admin/adminApi.ts` reduced to a re-export barrel. No call sites or tests changed — `import … from
 '../adminApi'` and the `vi.spyOn(adminApi, …)` pattern (~480 sites) keep working through the barrel.
 
+- **Audit-event registry + naming convention** (§15): every persisted audit `event` name now comes from
+  the single registry `apps/api/src/audit/audit-event-names.ts`, and `AuditRecordInput.event` is typed
+  against it — the **compiler** rejects an event string built outside the registry. The scheme
+  (`snake_case`, `<subject>_<action>[_<qualifier>]`) is documented in the new `docs/audit-events.md`
+  (full catalogue with category + actor type) and enforced by the `AUDIT-REG-*` tests, which also reject
+  dead registry entries and hold stdout-only log events to the same scheme. Three inconsistent families
+  were renamed (historical rows keep their old names — update SIEM rules): the dotted
+  `identity.user.created` family → `identity_user_created` (9 events), the external-DB **connect** path no
+  longer mis-emits `identity_db_test` → `identity_db_connected`, and the flipped
+  `idp_<kind>_rotation_auto_started/_completed` → `idp_<kind>_auto_rotation_started/_completed` (aligning
+  with the rest of the `auto_rotation_*` family).
 - **Injectable clock/randomness in cert-rotation time paths** (§18): `isCertExpiringSoon` takes an
   injectable `now` (tests run against a fixed clock), and the scheduler's `applyJitter` uses injectable
   randomness instead of `Date.now() % range` — which was a deterministic, predictable function of

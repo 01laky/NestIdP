@@ -62,7 +62,7 @@ describe('AuditQueryService', () => {
 			Array.from({ length: AUDIT_EXPORT_MAX_ROWS }, (_, index) => ({
 				id: `e-${index}`,
 				category: 'admin_auth',
-				event: 'probe',
+				event: 'probe' as never,
 				actorType: 'admin',
 				actorId: null,
 				actorLabel: null,
@@ -91,7 +91,7 @@ describe('AuditQueryService', () => {
 			{
 				id: 'e1',
 				category: 'admin_config',
-				event: 'csv_escape_probe',
+				event: 'csv_escape_probe' as never,
 				actorType: 'admin',
 				actorId: 'a1',
 				actorLabel: 'admin',
@@ -116,7 +116,7 @@ describe('AuditQueryService', () => {
 			{
 				id: 'e7',
 				category: 'admin_auth',
-				event: 'login_failure',
+				event: 'login_failure' as never,
 				actorType: 'admin',
 				actorId: null,
 				// attacker-chosen username that begins with `=` (a formula trigger in Excel/Sheets)

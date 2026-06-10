@@ -209,7 +209,7 @@ export class ExternalIdentityDatabaseService implements OnModuleInit, OnModuleDe
 			this.audit.recordSafe({
 				category: 'identity',
 				actorType: 'admin',
-				event: 'identity_db_test',
+				event: 'identity_db_connected',
 				actorId: actor?.id,
 				actorLabel: actor?.label,
 			});

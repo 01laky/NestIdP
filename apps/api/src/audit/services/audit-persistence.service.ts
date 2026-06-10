@@ -1,11 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { AuditActorType, AuditCategory, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/services/prisma.service';
+import type { AuditEventName } from '../audit-event-names';
 import { sanitizeAuditMetadata } from '../utils/audit-metadata.util';
 
 export interface AuditRecordInput {
 	category: AuditCategory;
-	event: string;
+	// §15: typed against the registry — a new event name must be added to audit-event-names.ts
+	// first, so an event string can never be built outside the registry.
+	event: AuditEventName;
 	actorType: AuditActorType;
 	actorId?: string | null;
 	actorLabel?: string | null;

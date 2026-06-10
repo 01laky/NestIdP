@@ -52,7 +52,7 @@ describe('recordAndLog (§6.2)', () => {
 		recordSpy.mockImplementation(() => order.push('record'));
 		recordAndLog(audit, logger, {
 			category: 'admin_config',
-			event: 'e',
+			event: 'e' as never, // synthetic — the util is registry-agnostic
 			actorType: 'admin',
 			subjectId: 'x',
 		});
@@ -90,14 +90,14 @@ describe('recordAndLog (§6.2)', () => {
 		const { logger, audit, logSpy } = harness();
 		recordAndLog(audit, logger, {
 			category: 'saml',
-			event: 'base_event',
+			event: 'base_event' as never, // synthetic — the util is registry-agnostic
 			actorType: 'system',
 			subjectId: 'base-id',
-			metadata: { event: 'shadowed', id: 'shadowed-id', extra: 1 },
+			metadata: { event: 'shadowed' as never, id: 'shadowed-id', extra: 1 },
 		});
 		// Documents that metadata is spread LAST and therefore wins — callers must not collide on these keys.
 		expect(JSON.parse(String(logSpy.mock.calls[0][0]))).toEqual({
-			event: 'shadowed',
+			event: 'shadowed' as never,
 			id: 'shadowed-id',
 			extra: 1,
 		});
@@ -107,7 +107,7 @@ describe('recordAndLog (§6.2)', () => {
 		const { logger, audit, logSpy } = harness();
 		recordAndLog(audit, logger, {
 			category: 'saml',
-			event: 'e',
+			event: 'e' as never, // synthetic — the util is registry-agnostic
 			actorType: 'system',
 			subjectId: null,
 		});

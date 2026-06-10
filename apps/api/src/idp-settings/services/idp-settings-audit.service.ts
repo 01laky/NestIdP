@@ -193,7 +193,7 @@ export class IdpSettingsAuditService {
 		dryRun: boolean,
 		meta?: Record<string, unknown>,
 	): void {
-		const event = `idp_${kind}_rotation_auto_started`;
+		const event = `idp_${kind}_auto_rotation_started` as const;
 		const metadata = { dryRun, ...meta };
 		this.logger.log(JSON.stringify({ event, ...metadata }));
 		this.audit.recordSafe({
@@ -207,7 +207,7 @@ export class IdpSettingsAuditService {
 	}
 
 	logAutoRotationCompleted(kind: 'signing' | 'encryption', dryRun: boolean): void {
-		const event = `idp_${kind}_rotation_auto_completed`;
+		const event = `idp_${kind}_auto_rotation_completed` as const;
 		this.logger.log(JSON.stringify({ event, dryRun }));
 		this.audit.recordSafe({
 			category: 'admin_config',
@@ -220,7 +220,7 @@ export class IdpSettingsAuditService {
 	}
 
 	logAutoRotationDueSoon(kind: 'signing' | 'encryption', notAfter: string | null): void {
-		const event = `idp_${kind}_auto_rotation_due_soon`;
+		const event = `idp_${kind}_auto_rotation_due_soon` as const;
 		this.logger.log(JSON.stringify({ event, notAfter }));
 		this.audit.recordSafe({
 			category: 'admin_config',
@@ -237,7 +237,7 @@ export class IdpSettingsAuditService {
 		reason: string,
 		consecutiveFailures: number,
 	): void {
-		const event = `idp_${kind}_auto_rotation_failed`;
+		const event = `idp_${kind}_auto_rotation_failed` as const;
 		this.logger.warn(JSON.stringify({ event, reason, consecutiveFailures }));
 		this.audit.recordSafe({
 			category: 'admin_config',
@@ -250,7 +250,7 @@ export class IdpSettingsAuditService {
 	}
 
 	logAutoRotationAutodisabled(kind: 'signing' | 'encryption', consecutiveFailures: number): void {
-		const event = `idp_${kind}_auto_rotation_autodisabled`;
+		const event = `idp_${kind}_auto_rotation_autodisabled` as const;
 		this.logger.warn(JSON.stringify({ event, consecutiveFailures }));
 		this.audit.recordSafe({
 			category: 'admin_config',
