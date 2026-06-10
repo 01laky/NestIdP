@@ -59,6 +59,12 @@ frontend de-duplication) and remaining items land in subsequent commits under th
   search field + info callout, lazy paginated table, section nav). Each page is a thin wrapper supplying its
   columns, fetcher, routes and i18n keys; the user page additionally enables the search box and callout. The
   evergreen/responsive/pagination static guards were repointed at the shell where the toolbar UI now lives.
+- **IdP cert-action handlers unified** (§6.9 / §A17): the ten near-identical signing/encryption handlers in
+  `IdpSettingsPage` (generate / upload / start-rotation / complete / cancel × 2) now flow through one
+  `useCertActions(config, ctx)` helper driven by a per-kind descriptor (the `adminApi` calls, options object,
+  confirm-summary builder and i18n keys). Behaviour-preserving — the same REPLACE/COMPLETE type-to-confirm
+  challenges, reload + metadata-refresh sequencing and success/toast messaging; the 48-test IdpSettingsPage
+  suite (signing and encryption flows) stays green.
 
 ### Security
 

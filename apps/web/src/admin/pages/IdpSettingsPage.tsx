@@ -44,6 +44,7 @@ import { AdminBreadcrumbs } from '../components/layout/AdminBreadcrumbs';
 import { AdminPageHeader } from '../components/layout/AdminPageHeader';
 import { ErrorBanner } from '../components/common/ErrorBanner';
 import { LoadingState } from '../components/common/LoadingState';
+import { type CertActionContext, useCertActions } from '../hooks/useCertActions';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
 import { mapAdminError } from '../../i18n/api-error-messages';
 import {
@@ -247,111 +248,110 @@ export function IdpSettingsPage() {
 		setMetadataPreview(preview.xml);
 	}
 
-	async function handleGeneratePrimary() {
-		const ok = await confirm({
-			title: t('confirmGeneratePrimaryTitle'),
-			description: `${t('confirmGeneratePrimary')}\n\n${buildCertOptionsConfirmSummary(certOptions, t)}`,
-			tone: 'warning',
-			showAuditNote: true,
-			typeToConfirm: { challenge: 'REPLACE', label: t('typeReplaceToConfirm') },
-			confirmLabel: t('generateCertificate'),
-		});
-		if (!ok) {
-			return;
-		}
-		await runMutation(async () => {
-			await generateIdpSigningCert(certOptions);
-			await reload();
-			await refreshMetadataPreview();
-			setSuccess(t('successPrimaryGenerated'));
-			showToast(t('toastCertGeneratedViewMetadata'));
-		});
-	}
+	const certActionContext: CertActionContext = {
+		t,
+		confirm,
+		runMutation,
+		reload,
+		refreshMetadataPreview,
+		setSuccess,
+		showToast,
+	};
 
-	async function handleUploadPrimary(event: FormEvent) {
-		event.preventDefault();
-		const ok = await confirm({
-			title: t('confirmUploadPrimaryTitle'),
-			description: t('confirmUploadPrimary'),
-			tone: 'warning',
-			showAuditNote: true,
-			typeToConfirm: { challenge: 'REPLACE', label: t('typeReplaceToConfirm') },
-			confirmLabel: t('uploadPrimary'),
-		});
-		if (!ok) {
-			return;
-		}
-		await runMutation(async () => {
-			await uploadIdpSigningCert({
-				signingCertPem: uploadCert,
-				signingPrivateKeyPem: uploadKey,
-			});
-			setShowUpload(false);
-			setUploadCert('');
-			setUploadKey('');
-			await reload();
-			setSuccess(t('successPrimaryUploaded'));
-			showToast(t('toastPrimaryUploaded'));
-		});
-	}
+	const signingActions = useCertActions<GenerateIdpSigningCertRequestDto>(
+		{
+			options: certOptions,
+			buildSummary: buildCertOptionsConfirmSummary,
+			generate: (options) => generateIdpSigningCert(options),
+			startRotation: (options) => startIdpCertRotation({ mode: 'generate', ...options }),
+			upload: () =>
+				uploadIdpSigningCert({ signingCertPem: uploadCert, signingPrivateKeyPem: uploadKey }),
+			onUploadSuccess: () => {
+				setShowUpload(false);
+				setUploadCert('');
+				setUploadKey('');
+			},
+			complete: () => completeIdpCertRotation(),
+			cancel: () => cancelIdpCertRotation(),
+			keys: {
+				confirmGenerateTitle: 'confirmGeneratePrimaryTitle',
+				confirmGenerate: 'confirmGeneratePrimary',
+				generateLabel: 'generateCertificate',
+				successGenerated: 'successPrimaryGenerated',
+				toastGenerated: 'toastCertGeneratedViewMetadata',
+				confirmUploadTitle: 'confirmUploadPrimaryTitle',
+				confirmUpload: 'confirmUploadPrimary',
+				uploadLabel: 'uploadPrimary',
+				successUploaded: 'successPrimaryUploaded',
+				toastUploaded: 'toastPrimaryUploaded',
+				confirmStartRotationTitle: 'confirmStartRotationTitle',
+				confirmStartRotation: 'confirmStartRotation',
+				startRotationLabel: 'startRotationGenerate',
+				successRotationStarted: 'successRotationStarted',
+				toastRotationStarted: 'toastRotationStarted',
+				confirmCompleteTitle: 'confirmCompleteRotationTitle',
+				confirmComplete: 'confirmCompleteRotation',
+				completeLabel: 'completeRotation',
+				successCompleted: 'successRotationCompleted',
+				toastCompleted: 'toastRotationCompleted',
+				confirmCancelTitle: 'confirmCancelRotationTitle',
+				confirmCancel: 'confirmCancelRotation',
+				cancelLabel: 'cancelRotation',
+				successCancelled: 'successRotationCancelled',
+				toastCancelled: 'toastRotationCancelled',
+			},
+		},
+		certActionContext,
+	);
 
-	async function handleStartRotationGenerate() {
-		const ok = await confirm({
-			title: t('confirmStartRotationTitle'),
-			description: `${t('confirmStartRotation')}\n\n${buildCertOptionsConfirmSummary(certOptions, t)}`,
-			tone: 'warning',
-			showAuditNote: true,
-			confirmLabel: t('startRotationGenerate'),
-		});
-		if (!ok) {
-			return;
-		}
-		await runMutation(async () => {
-			await startIdpCertRotation({ mode: 'generate', ...certOptions });
-			await reload();
-			await refreshMetadataPreview();
-			setSuccess(t('successRotationStarted'));
-			showToast(t('toastRotationStarted'));
-		});
-	}
-
-	async function handleCompleteRotation() {
-		const ok = await confirm({
-			title: t('confirmCompleteRotationTitle'),
-			description: t('confirmCompleteRotation'),
-			tone: 'warning',
-			showAuditNote: true,
-			typeToConfirm: { challenge: 'COMPLETE', label: t('typeCompleteToConfirm') },
-			confirmLabel: t('completeRotation'),
-		});
-		if (!ok) {
-			return;
-		}
-		await runMutation(async () => {
-			await completeIdpCertRotation();
-			await reload();
-			setSuccess(t('successRotationCompleted'));
-			showToast(t('toastRotationCompleted'));
-		});
-	}
-
-	async function handleCancelRotation() {
-		const ok = await confirm({
-			title: t('confirmCancelRotationTitle'),
-			description: t('confirmCancelRotation'),
-			tone: 'warning',
-			confirmLabel: t('cancelRotation'),
-		});
-		if (!ok) {
-			return;
-		}
-		await runMutation(async () => {
-			await cancelIdpCertRotation();
-			await reload();
-			setSuccess(t('successRotationCancelled'));
-			showToast(t('toastRotationCancelled'));
-		});
-	}
+	const encryptionActions = useCertActions<GenerateIdpEncryptionCertRequestDto>(
+		{
+			options: encCertOptions,
+			buildSummary: buildEncryptionCertOptionsConfirmSummary,
+			generate: (options) => generateIdpEncryptionCert(options),
+			startRotation: (options) => startIdpEncryptionCertRotation({ mode: 'generate', ...options }),
+			upload: () =>
+				uploadIdpEncryptionCert({
+					encryptionCertPem: uploadEncCert,
+					encryptionPrivateKeyPem: uploadEncKey,
+				}),
+			onUploadSuccess: () => {
+				setShowEncUpload(false);
+				setUploadEncCert('');
+				setUploadEncKey('');
+			},
+			complete: () => completeIdpEncryptionCertRotation(),
+			cancel: () => cancelIdpEncryptionCertRotation(),
+			keys: {
+				confirmGenerateTitle: 'encryption.confirmGeneratePrimaryTitle',
+				confirmGenerate: 'encryption.confirmGeneratePrimary',
+				generateLabel: 'encryption.generateCertificate',
+				successGenerated: 'encryption.successPrimaryGenerated',
+				toastGenerated: 'encryption.toastPrimaryGenerated',
+				confirmUploadTitle: 'encryption.confirmUploadPrimaryTitle',
+				confirmUpload: 'encryption.confirmUploadPrimary',
+				uploadLabel: 'encryption.uploadPrimary',
+				successUploaded: 'encryption.successPrimaryUploaded',
+				toastUploaded: 'encryption.toastPrimaryUploaded',
+				confirmStartRotationTitle: 'encryption.confirmStartRotationTitle',
+				confirmStartRotation: 'encryption.confirmStartRotation',
+				startRotationLabel: 'encryption.startRotationGenerate',
+				successRotationStarted: 'encryption.successRotationStarted',
+				toastRotationStarted: 'encryption.toastRotationStarted',
+				confirmCompleteTitle: 'encryption.confirmCompleteRotationTitle',
+				confirmComplete: 'encryption.confirmCompleteRotation',
+				completeLabel: 'encryption.completeRotation',
+				successCompleted: 'encryption.successRotationCompleted',
+				toastCompleted: 'encryption.toastRotationCompleted',
+				confirmCancelTitle: 'encryption.confirmCancelRotationTitle',
+				confirmCancel: 'encryption.confirmCancelRotation',
+				cancelLabel: 'encryption.cancelRotation',
+				successCancelled: 'encryption.successRotationCancelled',
+				toastCancelled: 'encryption.toastRotationCancelled',
+			},
+		},
+		certActionContext,
+	);
 
 	async function handleRefreshMetadataPreview() {
 		await runMutation(async () => {
@@ -370,112 +370,6 @@ export function IdpSettingsPage() {
 				family === 'rsa' ? IDP_ENCRYPTION_DEFAULT_KEY_TRANSPORT_ALGORITHM_ID : undefined,
 		});
 		showToast(t('encryption.toastCopiedSigningOptions'));
-	}
-
-	async function handleGenerateEncryptionPrimary() {
-		const ok = await confirm({
-			title: t('encryption.confirmGeneratePrimaryTitle'),
-			description: `${t('encryption.confirmGeneratePrimary')}\n\n${buildEncryptionCertOptionsConfirmSummary(encCertOptions, t)}`,
-			tone: 'warning',
-			showAuditNote: true,
-			typeToConfirm: { challenge: 'REPLACE', label: t('typeReplaceToConfirm') },
-			confirmLabel: t('encryption.generateCertificate'),
-		});
-		if (!ok) {
-			return;
-		}
-		await runMutation(async () => {
-			await generateIdpEncryptionCert(encCertOptions);
-			await reload();
-			await refreshMetadataPreview();
-			setSuccess(t('encryption.successPrimaryGenerated'));
-			showToast(t('encryption.toastPrimaryGenerated'));
-		});
-	}
-
-	async function handleUploadEncryptionPrimary(event: FormEvent) {
-		event.preventDefault();
-		const ok = await confirm({
-			title: t('encryption.confirmUploadPrimaryTitle'),
-			description: t('encryption.confirmUploadPrimary'),
-			tone: 'warning',
-			showAuditNote: true,
-			typeToConfirm: { challenge: 'REPLACE', label: t('typeReplaceToConfirm') },
-			confirmLabel: t('encryption.uploadPrimary'),
-		});
-		if (!ok) {
-			return;
-		}
-		await runMutation(async () => {
-			await uploadIdpEncryptionCert({
-				encryptionCertPem: uploadEncCert,
-				encryptionPrivateKeyPem: uploadEncKey,
-			});
-			setShowEncUpload(false);
-			setUploadEncCert('');
-			setUploadEncKey('');
-			await reload();
-			setSuccess(t('encryption.successPrimaryUploaded'));
-			showToast(t('encryption.toastPrimaryUploaded'));
-		});
-	}
-
-	async function handleStartEncryptionRotationGenerate() {
-		const ok = await confirm({
-			title: t('encryption.confirmStartRotationTitle'),
-			description: `${t('encryption.confirmStartRotation')}\n\n${buildEncryptionCertOptionsConfirmSummary(encCertOptions, t)}`,
-			tone: 'warning',
-			showAuditNote: true,
-			confirmLabel: t('encryption.startRotationGenerate'),
-		});
-		if (!ok) {
-			return;
-		}
-		await runMutation(async () => {
-			await startIdpEncryptionCertRotation({ mode: 'generate', ...encCertOptions });
-			await reload();
-			await refreshMetadataPreview();
-			setSuccess(t('encryption.successRotationStarted'));
-			showToast(t('encryption.toastRotationStarted'));
-		});
-	}
-
-	async function handleCompleteEncryptionRotation() {
-		const ok = await confirm({
-			title: t('encryption.confirmCompleteRotationTitle'),
-			description: t('encryption.confirmCompleteRotation'),
-			tone: 'warning',
-			showAuditNote: true,
-			typeToConfirm: { challenge: 'COMPLETE', label: t('typeCompleteToConfirm') },
-			confirmLabel: t('encryption.completeRotation'),
-		});
-		if (!ok) {
-			return;
-		}
-		await runMutation(async () => {
-			await completeIdpEncryptionCertRotation();
-			await reload();
-			setSuccess(t('encryption.successRotationCompleted'));
-			showToast(t('encryption.toastRotationCompleted'));
-		});
-	}
-
-	async function handleCancelEncryptionRotation() {
-		const ok = await confirm({
-			title: t('encryption.confirmCancelRotationTitle'),
-			description: t('encryption.confirmCancelRotation'),
-			tone: 'warning',
-			confirmLabel: t('encryption.cancelRotation'),
-		});
-		if (!ok) {
-			return;
-		}
-		await runMutation(async () => {
-			await cancelIdpEncryptionCertRotation();
-			await reload();
-			setSuccess(t('encryption.successRotationCancelled'));
-			showToast(t('encryption.toastRotationCancelled'));
-		});
 	}
 
 	async function handleCopyEncryptionPublicPem() {
@@ -764,7 +658,7 @@ export function IdpSettingsPage() {
 						type="button"
 						variant="secondary"
 						disabled={busy || settings.rotation.active}
-						onClick={() => void handleGeneratePrimary()}
+						onClick={() => void signingActions.generatePrimary()}
 					>
 						{t('generateCertificate')}
 					</Button>
@@ -780,7 +674,7 @@ export function IdpSettingsPage() {
 						type="button"
 						variant="secondary"
 						disabled={busy || settings.rotation.active || !settings.hasSigningCertificate}
-						onClick={() => void handleStartRotationGenerate()}
+						onClick={() => void signingActions.startRotationGenerate()}
 					>
 						{t('startRotationGenerate')}
 					</Button>
@@ -792,7 +686,7 @@ export function IdpSettingsPage() {
 					<form
 						className="evg-stack"
 						aria-busy={busy}
-						onSubmit={(event) => void handleUploadPrimary(event)}
+						onSubmit={(event) => { event.preventDefault(); void signingActions.uploadPrimary(); }}
 					>
 						<fieldset className="evg-stack" disabled={busy}>
 							<TextArea
@@ -873,7 +767,7 @@ export function IdpSettingsPage() {
 							type="button"
 							variant="primary"
 							disabled={busy}
-							onClick={() => void handleCompleteRotation()}
+							onClick={() => void signingActions.completeRotation()}
 						>
 							{t('completeRotation')}
 						</Button>
@@ -881,7 +775,7 @@ export function IdpSettingsPage() {
 							type="button"
 							variant="danger"
 							disabled={busy}
-							onClick={() => void handleCancelRotation()}
+							onClick={() => void signingActions.cancelRotation()}
 						>
 							{t('cancelRotation')}
 						</Button>
@@ -955,7 +849,7 @@ export function IdpSettingsPage() {
 						type="button"
 						variant="secondary"
 						disabled={busy || settings.encryptionRotation.active}
-						onClick={() => void handleGenerateEncryptionPrimary()}
+						onClick={() => void encryptionActions.generatePrimary()}
 					>
 						{t('encryption.generateCertificate')}
 					</Button>
@@ -973,7 +867,7 @@ export function IdpSettingsPage() {
 						disabled={
 							busy || settings.encryptionRotation.active || !settings.hasEncryptionCertificate
 						}
-						onClick={() => void handleStartEncryptionRotationGenerate()}
+						onClick={() => void encryptionActions.startRotationGenerate()}
 					>
 						{t('encryption.startRotationGenerate')}
 					</Button>
@@ -1001,7 +895,7 @@ export function IdpSettingsPage() {
 					<form
 						className="evg-stack"
 						aria-busy={busy}
-						onSubmit={(event) => void handleUploadEncryptionPrimary(event)}
+						onSubmit={(event) => { event.preventDefault(); void encryptionActions.uploadPrimary(); }}
 					>
 						<fieldset className="evg-stack" disabled={busy}>
 							<TextArea
@@ -1086,7 +980,7 @@ export function IdpSettingsPage() {
 							type="button"
 							variant="primary"
 							disabled={busy}
-							onClick={() => void handleCompleteEncryptionRotation()}
+							onClick={() => void encryptionActions.completeRotation()}
 						>
 							{t('encryption.completeRotation')}
 						</Button>
@@ -1094,7 +988,7 @@ export function IdpSettingsPage() {
 							type="button"
 							variant="danger"
 							disabled={busy}
-							onClick={() => void handleCancelEncryptionRotation()}
+							onClick={() => void encryptionActions.cancelRotation()}
 						>
 							{t('encryption.cancelRotation')}
 						</Button>
