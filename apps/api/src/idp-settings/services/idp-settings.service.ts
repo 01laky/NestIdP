@@ -64,6 +64,11 @@ import {
 	toDashboardIdpStatus,
 	toIdpSettingsPublicDto,
 } from '../mappers/idp-settings.mapper';
+import {
+	type CertKindDescriptor,
+	ENCRYPTION_DESCRIPTOR,
+	SIGNING_DESCRIPTOR,
+} from '../cert-kind/cert-kind-descriptor';
 
 export interface SigningCertGeneratedAuditMeta {
 	keyFamily: string;
@@ -284,31 +289,7 @@ export class IdpSettingsService {
 	}
 
 	async completeRotation(): Promise<IdpSettingsPublicDto> {
-		const settings = await this.findSettingsOrThrow();
-		if (!settings.pendingSigningCertPem || !settings.pendingSigningKeyEncrypted) {
-			throw new ConflictException('No certificate rotation in progress');
-		}
-
-		const updated = await this.prisma.idpSettings.update({
-			where: { id: 'default' },
-			data: {
-				signingCertPem: settings.pendingSigningCertPem,
-				signingKeyEncrypted: settings.pendingSigningKeyEncrypted,
-				signingKeyFamily: settings.pendingSigningKeyFamily,
-				signingSignatureAlgorithmId: settings.pendingSigningSignatureAlgorithmId,
-				signingRsaModulusBits: settings.pendingSigningRsaModulusBits,
-				signingEcCurve: settings.pendingSigningEcCurve,
-				pendingSigningCertPem: null,
-				pendingSigningKeyEncrypted: null,
-				pendingSigningKeyFamily: null,
-				pendingSigningSignatureAlgorithmId: null,
-				pendingSigningRsaModulusBits: null,
-				pendingSigningEcCurve: null,
-				rotationStartedAt: null,
-			},
-		});
-		this.audit.logRotationCompleted();
-		return toIdpSettingsPublicDto(updated, this.getIdpBaseUrl());
+		return this.completeRotationFor(SIGNING_DESCRIPTOR);
 	}
 
 	async generatePrimaryEncryptionCert(
@@ -407,53 +388,11 @@ export class IdpSettingsService {
 	}
 
 	async completeEncryptionRotation(): Promise<IdpSettingsPublicDto> {
-		const settings = await this.findSettingsOrThrow();
-		if (!settings.pendingEncryptionCertPem || !settings.pendingEncryptionKeyEncrypted) {
-			throw new ConflictException('No encryption certificate rotation in progress');
-		}
-
-		const updated = await this.prisma.idpSettings.update({
-			where: { id: 'default' },
-			data: {
-				encryptionCertPem: settings.pendingEncryptionCertPem,
-				encryptionKeyEncrypted: settings.pendingEncryptionKeyEncrypted,
-				encryptionKeyFamily: settings.pendingEncryptionKeyFamily,
-				encryptionKeyTransportAlgorithmId: settings.pendingEncryptionKeyTransportAlgorithmId,
-				encryptionRsaModulusBits: settings.pendingEncryptionRsaModulusBits,
-				encryptionEcCurve: settings.pendingEncryptionEcCurve,
-				pendingEncryptionCertPem: null,
-				pendingEncryptionKeyEncrypted: null,
-				pendingEncryptionKeyFamily: null,
-				pendingEncryptionKeyTransportAlgorithmId: null,
-				pendingEncryptionRsaModulusBits: null,
-				pendingEncryptionEcCurve: null,
-				encryptionRotationStartedAt: null,
-			},
-		});
-		this.audit.logEncryptionRotationCompleted();
-		return toIdpSettingsPublicDto(updated, this.getIdpBaseUrl());
+		return this.completeRotationFor(ENCRYPTION_DESCRIPTOR);
 	}
 
 	async cancelEncryptionRotation(): Promise<IdpSettingsPublicDto> {
-		const settings = await this.findSettingsOrThrow();
-		if (!settings.pendingEncryptionCertPem || !settings.pendingEncryptionKeyEncrypted) {
-			throw new ConflictException('No encryption certificate rotation in progress');
-		}
-
-		const updated = await this.prisma.idpSettings.update({
-			where: { id: 'default' },
-			data: {
-				pendingEncryptionCertPem: null,
-				pendingEncryptionKeyEncrypted: null,
-				pendingEncryptionKeyFamily: null,
-				pendingEncryptionKeyTransportAlgorithmId: null,
-				pendingEncryptionRsaModulusBits: null,
-				pendingEncryptionEcCurve: null,
-				encryptionRotationStartedAt: null,
-			},
-		});
-		this.audit.logEncryptionRotationCancelled();
-		return toIdpSettingsPublicDto(updated, this.getIdpBaseUrl());
+		return this.cancelRotationFor(ENCRYPTION_DESCRIPTOR);
 	}
 
 	async getEncryptionCertPublicPem(): Promise<{ certPem: string }> {
@@ -465,24 +404,46 @@ export class IdpSettingsService {
 	}
 
 	async cancelRotation(): Promise<IdpSettingsPublicDto> {
-		const settings = await this.findSettingsOrThrow();
-		if (!settings.pendingSigningCertPem || !settings.pendingSigningKeyEncrypted) {
-			throw new ConflictException('No certificate rotation in progress');
-		}
+		return this.cancelRotationFor(SIGNING_DESCRIPTOR);
+	}
 
+	/** Promote the pending cert to active and clear the pending slot (Prompt 38 §6.6). */
+	private async completeRotationFor(
+		descriptor: CertKindDescriptor<unknown>,
+	): Promise<IdpSettingsPublicDto> {
+		const settings = await this.findSettingsOrThrow();
+		if (!descriptor.hasPending(settings)) {
+			throw new ConflictException(descriptor.messages.noRotationInProgress);
+		}
 		const updated = await this.prisma.idpSettings.update({
 			where: { id: 'default' },
-			data: {
-				pendingSigningCertPem: null,
-				pendingSigningKeyEncrypted: null,
-				pendingSigningKeyFamily: null,
-				pendingSigningSignatureAlgorithmId: null,
-				pendingSigningRsaModulusBits: null,
-				pendingSigningEcCurve: null,
-				rotationStartedAt: null,
-			},
+			data: descriptor.completeData(settings),
 		});
-		this.audit.logRotationCancelled();
+		if (descriptor.kind === 'signing') {
+			this.audit.logRotationCompleted();
+		} else {
+			this.audit.logEncryptionRotationCompleted();
+		}
+		return toIdpSettingsPublicDto(updated, this.getIdpBaseUrl());
+	}
+
+	/** Discard the pending cert without promoting it (Prompt 38 §6.6). */
+	private async cancelRotationFor(
+		descriptor: CertKindDescriptor<unknown>,
+	): Promise<IdpSettingsPublicDto> {
+		const settings = await this.findSettingsOrThrow();
+		if (!descriptor.hasPending(settings)) {
+			throw new ConflictException(descriptor.messages.noRotationInProgress);
+		}
+		const updated = await this.prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: descriptor.clearPendingData(),
+		});
+		if (descriptor.kind === 'signing') {
+			this.audit.logRotationCancelled();
+		} else {
+			this.audit.logEncryptionRotationCancelled();
+		}
 		return toIdpSettingsPublicDto(updated, this.getIdpBaseUrl());
 	}
 
