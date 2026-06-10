@@ -61,10 +61,10 @@ export function detectKeyFamily(keyObject: KeyObject): IdpSigningKeyFamily {
 }
 
 function detectRsaModulusBits(keyObject: KeyObject): number {
-	const details = keyObject.asymmetricKeyDetails;
-	const length = details?.modulusLength;
+	const length = keyObject.asymmetricKeyDetails?.modulusLength;
 	if (!length) {
-		return 2048;
+		// Don't silently store 2048 for a key whose size we can't read — it would mislabel the metadata.
+		throw new IdpCertValidationError('Unable to determine the RSA modulus size from the key');
 	}
 	return length;
 }
@@ -78,7 +78,10 @@ export function namedCurveToLabel(namedCurve: string | undefined): IdpSigningEcC
 		case 'secp521r1':
 			return 'P-521';
 		default:
-			return 'P-256';
+			// Reject unknown curves instead of mislabelling them as P-256.
+			throw new IdpCertValidationError(
+				`Unsupported EC curve${namedCurve ? ` '${namedCurve}'` : ''} (expected P-256, P-384 or P-521)`,
+			);
 	}
 }
 

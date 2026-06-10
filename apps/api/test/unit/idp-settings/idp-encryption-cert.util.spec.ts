@@ -23,6 +23,14 @@ describe('idp-encryption-cert.util', () => {
 		expect(() => assertEncryptionCertNotSigningOnly(certPem)).toThrow();
 	});
 
+	it('API-ENC-UTIL-02b: certHasEncryptionKeyUsage is false for a non-certificate input, not a throw (§B8)', () => {
+		// The native DER parser (no openssl subprocess) must fail closed on garbage.
+		expect(certHasEncryptionKeyUsage('-----BEGIN CERTIFICATE-----\nnope\n-----END CERTIFICATE-----')).toBe(
+			false,
+		);
+		expect(certHasEncryptionKeyUsage('not a pem at all')).toBe(false);
+	});
+
 	it('API-ENC-UTIL-03: validateEncryptionKeyPair infers rsa-oaep-mgf1p default transport', () => {
 		const { certPem, privateKeyPem } = generateTestRsaEncryptionCert(
 			'https://enc-default.example.com',

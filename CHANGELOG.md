@@ -83,6 +83,16 @@ frontend de-duplication) and remaining items land in subsequent commits under th
   can no longer inject a command (`apps/api/src/saml/utils/openssl.util.ts`).
 - **Signed assertions never fall back to unsigned** — if signing or signed-fragment extraction fails, the
   IdP now throws instead of silently emitting an unsigned `<saml2:Assertion>`.
+- **Encryption-cert key-usage check is Node-native, not an `openssl` subprocess** (§B8) —
+  `certHasEncryptionKeyUsage` now parses the X.509 KeyUsage extension (OID 2.5.29.15) directly from the
+  certificate DER instead of shelling out to `openssl x509 -ext keyUsage` per upload. This removes the
+  synchronous event-loop block, the temp-file write, and the dependency on the `openssl` binary and its
+  locale-specific output (any failure of which previously rejected a valid cert). It fails closed on
+  non-certificate input. (`X509Certificate.keyUsage` is unusable here — Node exposes the *extended* key
+  usage there, not the basic KeyUsage bits.)
+- **Certificate crypto metadata is no longer silently mislabelled** (§B8) — `detectRsaModulusBits` now
+  throws when the RSA modulus size can't be read (instead of storing a wrong `2048`), and `namedCurveToLabel`
+  throws on an unknown EC curve (instead of mislabelling it `P-256`); both surface as a `400`.
 - **Admin logout CSRF check is constant-time** (`timingSafeEqual` via `AdminCsrfService`) and the logout is
   now actually audited (the previous `req.adminUser` guard was dead, so logouts went unrecorded).
 - **Login-failure poisoning fixed** — a _correct_ password that then fails to bind to the SAML session

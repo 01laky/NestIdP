@@ -4,6 +4,7 @@ import {
 	fingerprintSha256Hex,
 	inferStoredSigningCryptoFromPem,
 	isCertExpiringSoon,
+	namedCurveToLabel,
 	parseCertNotAfterIso,
 	validateSigningCertPair,
 	IdpCertValidationError,
@@ -136,5 +137,17 @@ describe('idp-cert.util', () => {
 		expect(() => inferStoredSigningCryptoFromPem(certPem, ec.privateKeyPem)).toThrow(
 			/different key types/,
 		);
+	});
+
+	it('API-IDP-VAL-19: namedCurveToLabel maps the three supported OpenSSL curve names (§B8)', () => {
+		expect(namedCurveToLabel('prime256v1')).toBe('P-256');
+		expect(namedCurveToLabel('secp384r1')).toBe('P-384');
+		expect(namedCurveToLabel('secp521r1')).toBe('P-521');
+	});
+
+	it('API-IDP-VAL-20: namedCurveToLabel throws on an unknown/missing curve instead of defaulting to P-256 (§B8)', () => {
+		expect(() => namedCurveToLabel('secp256k1')).toThrow(IdpCertValidationError);
+		expect(() => namedCurveToLabel('secp256k1')).toThrow(/Unsupported EC curve 'secp256k1'/);
+		expect(() => namedCurveToLabel(undefined)).toThrow(IdpCertValidationError);
 	});
 });

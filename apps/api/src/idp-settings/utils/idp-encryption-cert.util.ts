@@ -1,14 +1,11 @@
-import { execSync } from 'node:child_process';
 import {
 	createPublicKey,
 	publicEncrypt,
 	privateDecrypt,
 	constants,
+	X509Certificate,
 	type KeyObject,
 } from 'node:crypto';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import type { StoredEncryptionCrypto } from '@nestidp/shared';
 import { IDP_ENCRYPTION_DEFAULT_KEY_TRANSPORT_ALGORITHM_ID } from '@nestidp/shared';
 import {
@@ -51,8 +48,11 @@ export function assertValidEncryptionPrivateKeyPem(value: string): string {
 }
 
 function detectRsaModulusBits(keyObject: KeyObject): number {
-	const details = keyObject.asymmetricKeyDetails;
-	return details?.modulusLength ?? 2048;
+	const length = keyObject.asymmetricKeyDetails?.modulusLength;
+	if (!length) {
+		throw new IdpCertValidationError('Unable to determine the RSA modulus size from the key');
+	}
+	return length;
 }
 
 function probeEncryptDecrypt(certPem: string, privateKeyPem: string): boolean {
@@ -73,24 +73,55 @@ function probeEncryptDecrypt(certPem: string, privateKeyPem: string): boolean {
 	}
 }
 
+// KeyUsage extension: OID 2.5.29.15 (DER OID body `55 1D 0F`); its value is an OCTET STRING wrapping a
+// BIT STRING whose first content byte carries the usage flags (keyEncipherment = bit 2 = 0x20,
+// dataEncipherment = bit 3 = 0x10). The extension is only a handful of bytes, so the length octets are
+// always short-form.
+const KEY_USAGE_KEY_ENCIPHERMENT = 0x20;
+const KEY_USAGE_DATA_ENCIPHERMENT = 0x10;
+
+/**
+ * True when the certificate's X.509 KeyUsage extension asserts Key Encipherment or Data Encipherment
+ * (i.e. it is not signing-only). Parsed natively from the certificate DER — no `openssl` subprocess, so it
+ * doesn't block the event loop or depend on the binary / its locale-specific output (Prompt 38 §B8).
+ * `X509Certificate.keyUsage` cannot be used here: Node exposes the *extended* key usage there, not the
+ * basic KeyUsage bit string.
+ */
 export function certHasEncryptionKeyUsage(certPem: string): boolean {
-	const tmp = mkdtempSync(join(tmpdir(), 'nestidp-ku-'));
+	let der: Buffer;
 	try {
-		const certPath = join(tmp, 'cert.pem');
-		writeFileSync(certPath, certPem);
-		const out = execSync(`openssl x509 -in "${certPath}" -ext keyUsage -noout`, {
-			encoding: 'utf8',
-			stdio: ['pipe', 'pipe', 'pipe'],
-		});
-		if (/No extensions in certificate/i.test(out)) {
-			return false;
-		}
-		return /Key Encipherment|Data Encipherment/i.test(out);
+		der = new X509Certificate(certPem).raw;
 	} catch {
 		return false;
-	} finally {
-		rmSync(tmp, { recursive: true, force: true });
 	}
+	let i = -1;
+	for (let k = 0; k + 5 <= der.length; k++) {
+		if (
+			der[k] === 0x06 &&
+			der[k + 1] === 0x03 &&
+			der[k + 2] === 0x55 &&
+			der[k + 3] === 0x1d &&
+			der[k + 4] === 0x0f
+		) {
+			i = k + 5;
+			break;
+		}
+	}
+	if (i < 0) {
+		return false;
+	}
+	// optional `critical` BOOLEAN (01 01 xx)
+	if (der[i] === 0x01 && der[i + 1] === 0x01) {
+		i += 3;
+	}
+	// OCTET STRING (04 len) wrapping a BIT STRING (03 len unusedBits flags…)
+	if (der[i] !== 0x04 || der[i + 2] !== 0x03) {
+		return false;
+	}
+	const flags = der[i + 5]; // 04 <len> 03 <len> <unusedBits> <flags>
+	return (
+		(flags & KEY_USAGE_KEY_ENCIPHERMENT) !== 0 || (flags & KEY_USAGE_DATA_ENCIPHERMENT) !== 0
+	);
 }
 
 export function assertEncryptionCertNotSigningOnly(certPem: string): void {
