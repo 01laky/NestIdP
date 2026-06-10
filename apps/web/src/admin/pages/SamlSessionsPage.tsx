@@ -12,7 +12,6 @@ import {
 import {
 	AdminApiError,
 	getBackchannelQueueHealth,
-	listIdentitySources,
 	listSamlSessions,
 	listSpConnections,
 	processBackchannelQueue,
@@ -23,6 +22,7 @@ import {
 	terminateSamlSessionsByUser,
 } from '../adminApi';
 import { AdminPageHeader } from '../components/layout/AdminPageHeader';
+import { useIdentitySources } from '../hooks/useIdentitySources';
 import { ErrorBanner } from '../components/common/ErrorBanner';
 import { LoadingState } from '../components/common/LoadingState';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
@@ -79,7 +79,7 @@ export function SamlSessionsPage() {
 	const [status, setStatus] = useState<SamlSsoSessionStatusFilter>('active');
 	const [spConnectionId, setSpConnectionId] = useState('');
 	const [apiConnectionId, setApiConnectionId] = useState('');
-	const [sources, setSources] = useState<{ apiConnectionId: string; label: string }[]>([]);
+	const { sources } = useIdentitySources();
 	const [q, setQ] = useState('');
 	const [page, setPage] = useState(1);
 	const [data, setData] = useState<SamlSsoSessionListResponseDto | null>(null);
@@ -138,12 +138,6 @@ export function SamlSessionsPage() {
 		void listSpConnections()
 			.then((res) => setSpOptions(res.items.map((s) => ({ id: s.id, name: s.name }))))
 			.catch(() => setSpOptions([]));
-	}, []);
-
-	useEffect(() => {
-		void listIdentitySources()
-			.then((res) => setSources(res.sources))
-			.catch(() => setSources([]));
 	}, []);
 
 	const activeIds = useMemo(
