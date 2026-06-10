@@ -152,10 +152,28 @@ export function toDashboardIdpStatus(settings: IdpSettings): AdminDashboardIdpSt
 	};
 }
 
+/** Resolved per-kind auto-rotation lead/overlap windows (in days), reflecting any env overrides. */
+export interface IdpAutoRotationDays {
+	signing: { leadDays: number; overlapDays: number };
+	encryption: { leadDays: number; overlapDays: number };
+}
+
+/** Fallback windows = the shared defaults; used when no resolved config is threaded in (e.g. unit tests). */
+const DEFAULT_ROTATION_DAYS: IdpAutoRotationDays = {
+	signing: {
+		leadDays: CERT_ROTATION_DEFAULT_LEAD_DAYS,
+		overlapDays: CERT_ROTATION_DEFAULT_OVERLAP_DAYS,
+	},
+	encryption: {
+		leadDays: CERT_ROTATION_DEFAULT_LEAD_DAYS,
+		overlapDays: CERT_ROTATION_DEFAULT_OVERLAP_DAYS,
+	},
+};
+
 /**
- * Compute the non-secret auto-rotation status for one cert. `willAutoStartBy` / `willAutoCompleteAt`
- * use the shared default lead/overlap days (exact for the default config; approximate when an operator
- * overrides them via env).
+ * Compute the non-secret auto-rotation status for one cert. `willAutoStartBy` / `willAutoCompleteAt` use
+ * the resolved lead/overlap days for the kind (threaded from {@link CertRotationConfig} by the service), so
+ * the projection stays correct when an operator overrides the per-cert env knobs (Prompt 38 §B9).
  */
 function buildAutoRotationStatus(opts: {
 	enabled: boolean;
@@ -165,18 +183,20 @@ function buildAutoRotationStatus(opts: {
 	activeNotAfter: string | null;
 	rotationActive: boolean;
 	rotationStartedAt: Date | null;
+	leadDays: number;
+	overlapDays: number;
 }): IdpAutoRotationStatusDto {
 	const live = opts.enabled && !opts.disabledAt;
 	let willAutoStartBy: string | null = null;
 	if (live && !opts.rotationActive && opts.activeNotAfter) {
 		willAutoStartBy = new Date(
-			new Date(opts.activeNotAfter).getTime() - CERT_ROTATION_DEFAULT_LEAD_DAYS * MS_PER_DAY,
+			new Date(opts.activeNotAfter).getTime() - opts.leadDays * MS_PER_DAY,
 		).toISOString();
 	}
 	let willAutoCompleteAt: string | null = null;
 	if (live && opts.rotationActive && opts.rotationStartedAt) {
 		willAutoCompleteAt = new Date(
-			opts.rotationStartedAt.getTime() + CERT_ROTATION_DEFAULT_OVERLAP_DAYS * MS_PER_DAY,
+			opts.rotationStartedAt.getTime() + opts.overlapDays * MS_PER_DAY,
 		).toISOString();
 	}
 	return {
@@ -192,6 +212,7 @@ function buildAutoRotationStatus(opts: {
 export function toIdpSettingsPublicDto(
 	settings: IdpSettings,
 	idpBaseUrl: string,
+	rotationDays: IdpAutoRotationDays = DEFAULT_ROTATION_DAYS,
 ): IdpSettingsPublicDto {
 	const urls = buildIdpUrls(idpBaseUrl);
 	const rotationActive = Boolean(
@@ -238,6 +259,8 @@ export function toIdpSettingsPublicDto(
 				activeNotAfter: parseCertNotAfterIso(settings.signingCertPem),
 				rotationActive,
 				rotationStartedAt: settings.rotationStartedAt,
+				leadDays: rotationDays.signing.leadDays,
+				overlapDays: rotationDays.signing.overlapDays,
 			}),
 		},
 		encryptionRotation: {
@@ -261,6 +284,8 @@ export function toIdpSettingsPublicDto(
 				activeNotAfter: parseCertNotAfterIso(settings.encryptionCertPem),
 				rotationActive: encryptionRotationActive,
 				rotationStartedAt: settings.encryptionRotationStartedAt,
+				leadDays: rotationDays.encryption.leadDays,
+				overlapDays: rotationDays.encryption.overlapDays,
 			}),
 		},
 		lastAutoRotationCheckAt: settings.lastAutoRotationCheckAt?.toISOString() ?? null,

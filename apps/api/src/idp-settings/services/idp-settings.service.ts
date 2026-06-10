@@ -55,6 +55,7 @@ import {
 import { IdpSettingsAuditService } from './idp-settings-audit.service';
 import {
 	buildMetadataUrlResponse,
+	type IdpAutoRotationDays,
 	toDashboardIdpStatus,
 	toIdpSettingsPublicDto,
 } from '../mappers/idp-settings.mapper';
@@ -104,7 +105,7 @@ export class IdpSettingsService {
 
 	async getSettings(): Promise<IdpSettingsPublicDto> {
 		const settings = await this.findSettingsOrThrow();
-		return toIdpSettingsPublicDto(settings, this.getIdpBaseUrl());
+		return this.toPublicDto(settings);
 	}
 
 	async updateSettings(body: UpdateIdpSettingsRequestDto): Promise<IdpSettingsPublicDto> {
@@ -196,7 +197,7 @@ export class IdpSettingsService {
 		if (autoRotationFields.length > 0) {
 			this.audit.logAutoRotationSettingChanged(autoRotationFields);
 		}
-		return toIdpSettingsPublicDto(updated, this.getIdpBaseUrl());
+		return this.toPublicDto(updated);
 	}
 
 	async generatePrimaryCert(
@@ -218,7 +219,7 @@ export class IdpSettingsService {
 			false,
 			this.auditMetaFromGenerated(body, generated.metadata),
 		);
-		return toIdpSettingsPublicDto(updated, this.getIdpBaseUrl());
+		return this.toPublicDto(updated);
 	}
 
 	async uploadPrimaryCert(body: UploadIdpSigningCertRequestDto): Promise<IdpSettingsPublicDto> {
@@ -235,7 +236,7 @@ export class IdpSettingsService {
 			),
 		});
 		this.audit.logSigningCertUploaded(false);
-		return toIdpSettingsPublicDto(updated, this.getIdpBaseUrl());
+		return this.toPublicDto(updated);
 	}
 
 	async startRotation(body: StartIdpCertRotationRequestDto): Promise<IdpSettingsPublicDto> {
@@ -279,7 +280,7 @@ export class IdpSettingsService {
 				new Date(),
 			),
 		});
-		return toIdpSettingsPublicDto(updated, this.getIdpBaseUrl());
+		return this.toPublicDto(updated);
 	}
 
 	async completeRotation(): Promise<IdpSettingsPublicDto> {
@@ -305,7 +306,7 @@ export class IdpSettingsService {
 			false,
 			this.auditMetaFromEncryptionGenerated(body, generated.metadata),
 		);
-		return toIdpSettingsPublicDto(updated, this.getIdpBaseUrl());
+		return this.toPublicDto(updated);
 	}
 
 	async uploadPrimaryEncryptionCert(
@@ -328,7 +329,7 @@ export class IdpSettingsService {
 			),
 		});
 		this.audit.logEncryptionCertUploaded(false);
-		return toIdpSettingsPublicDto(updated, this.getIdpBaseUrl());
+		return this.toPublicDto(updated);
 	}
 
 	async startEncryptionRotation(
@@ -378,7 +379,7 @@ export class IdpSettingsService {
 				new Date(),
 			),
 		});
-		return toIdpSettingsPublicDto(updated, this.getIdpBaseUrl());
+		return this.toPublicDto(updated);
 	}
 
 	async completeEncryptionRotation(): Promise<IdpSettingsPublicDto> {
@@ -423,7 +424,7 @@ export class IdpSettingsService {
 		} else {
 			this.audit.logEncryptionRotationCompleted();
 		}
-		return toIdpSettingsPublicDto(updated, this.getIdpBaseUrl());
+		return this.toPublicDto(updated);
 	}
 
 	/** Discard the pending cert without promoting it (Prompt 38 §6.6). */
@@ -443,7 +444,7 @@ export class IdpSettingsService {
 		} else {
 			this.audit.logEncryptionRotationCancelled();
 		}
-		return toIdpSettingsPublicDto(updated, this.getIdpBaseUrl());
+		return this.toPublicDto(updated);
 	}
 
 	async getMetadataPreview(): Promise<IdpMetadataPreviewResponseDto> {
@@ -508,7 +509,7 @@ export class IdpSettingsService {
 				where: { id: 'default' },
 				data: { lastAutoRotationCheckAt: now },
 			});
-			return toIdpSettingsPublicDto(updated, this.getIdpBaseUrl());
+			return this.toPublicDto(updated);
 		} finally {
 			this.autoRotationInFlight = false;
 		}
@@ -840,5 +841,23 @@ export class IdpSettingsService {
 
 	private getIdpBaseUrl(): string {
 		return this.configService.get<string>('IDP_BASE_URL') ?? '';
+	}
+
+	/** Resolved per-kind auto-rotation lead/overlap windows (honours env overrides) for the public DTO. */
+	private rotationDays(): IdpAutoRotationDays {
+		return {
+			signing: {
+				leadDays: this.certRotationConfig.leadDays('signing'),
+				overlapDays: this.certRotationConfig.overlapDays('signing'),
+			},
+			encryption: {
+				leadDays: this.certRotationConfig.leadDays('encryption'),
+				overlapDays: this.certRotationConfig.overlapDays('encryption'),
+			},
+		};
+	}
+
+	private toPublicDto(settings: IdpSettings): IdpSettingsPublicDto {
+		return toIdpSettingsPublicDto(settings, this.getIdpBaseUrl(), this.rotationDays());
 	}
 }

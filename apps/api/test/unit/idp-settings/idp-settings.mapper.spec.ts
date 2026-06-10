@@ -302,6 +302,37 @@ describe('idp-settings.mapper', () => {
 		expect(dto.rotation.auto.willAutoStartBy).toBeNull(); // not computed while rotating
 	});
 
+	it('CERT-ROT-API-02e: willAutoStartBy/CompleteAt honour the threaded per-kind override windows (§B9)', () => {
+		const { certPem: signingCert } = getTestSigningMaterialWithDays('http://localhost:3000', 200);
+		const started = new Date('2026-03-01T00:00:00.000Z');
+		// Operator-overridden windows: signing not-rotating (→ willAutoStartBy uses leadDays 90),
+		// encryption mid-rotation (→ willAutoCompleteAt uses overlapDays 21).
+		const dto = toIdpSettingsPublicDto(
+			settingsRow({
+				signingCertPem: signingCert,
+				autoRotateSigningEnabled: true,
+				encryptionCertPem: certPem,
+				encryptionKeyEncrypted: 'enc',
+				autoRotateEncryptionEnabled: true,
+				pendingEncryptionCertPem: certPem,
+				pendingEncryptionKeyEncrypted: 'pending',
+				encryptionRotationStartedAt: started,
+			}),
+			'http://localhost:3000',
+			{
+				signing: { leadDays: 90, overlapDays: 3 },
+				encryption: { leadDays: 45, overlapDays: 21 },
+			},
+		);
+		const signingNotAfter = new Date(dto.signingCertNotAfter!).getTime();
+		expect(dto.rotation.auto.willAutoStartBy).toBe(
+			new Date(signingNotAfter - 90 * 86_400_000).toISOString(),
+		);
+		expect(dto.encryptionRotation.auto.willAutoCompleteAt).toBe(
+			new Date(started.getTime() + 21 * 86_400_000).toISOString(),
+		);
+	});
+
 	it('CERT-ROT-API-02d: a backoff-disabled cert reports disabledAt and stops computing willAutoStartBy', () => {
 		const disabledAt = new Date('2026-02-15T08:00:00.000Z');
 		const dto = toIdpSettingsPublicDto(

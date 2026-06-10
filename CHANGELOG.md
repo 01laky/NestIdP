@@ -109,6 +109,11 @@ frontend de-duplication) and remaining items land in subsequent commits under th
 
 ### Fixed
 
+- **Auto-rotation projection honours operator env overrides** (§B9) — the IdP settings DTO's
+  `willAutoStartBy` / `willAutoCompleteAt` were computed from the default lead/overlap-day constants, so the
+  displayed "will auto-start/complete by" dates were wrong whenever an operator overrode the per-cert
+  `CERT_ROTATION_*_LEAD_DAYS` / `_OVERLAP_DAYS` knobs. The service now threads the resolved per-kind
+  `CertRotationConfig` windows into the mapper (defaulting to the shared constants when none is supplied).
 - **Concurrency races made atomic** (with real-libSQL regression tests): the per-account lockout counter
   (atomic `increment` instead of read-then-write), the last-admin/self delete guard (count-after-delete in a
   transaction — can no longer drop the system to zero admins), and the SAML session→user bind (atomic
