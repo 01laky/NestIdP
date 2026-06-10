@@ -10,6 +10,9 @@ const HOUR_MS = 3_600_000;
 const DAY_MS = MS_PER_DAY;
 const FIFTEEN_MIN_MS = 15 * 60 * 1000;
 
+/** Hard ceiling on the failed-login tarpit delay — both the per-failure base and the total are capped here. */
+export const MAX_TARPIT_DELAY_MS = 5_000;
+
 /**
  * Bounded env config for the brute-force protection layer (Prompt 35). Mirrors the bounded-int style of
  * {@link CertRotationConfig}. Per-scope lockout knobs (`ADMIN_…` / `END_USER_…`) fall back to the shared
@@ -131,7 +134,7 @@ export class RateLimitConfig {
 
 	/** Incremental delay before a failed-login response; `0` disables the tarpit. */
 	tarpitBaseMs(): number {
-		return this.boundedInt('LOGIN_TARPIT_BASE_MS', 0, 0, 5000);
+		return this.boundedInt('LOGIN_TARPIT_BASE_MS', 0, 0, MAX_TARPIT_DELAY_MS);
 	}
 
 	// --- helpers ---------------------------------------------------------------------------------

@@ -16,7 +16,7 @@ import {
 	type LoginScope,
 } from './brute-force-notifier';
 import { IpBanService } from './ip-ban.service';
-import { RateLimitConfig } from './rate-limit.config';
+import { MAX_TARPIT_DELAY_MS, RateLimitConfig } from './rate-limit.config';
 
 /**
  * Why an attempt is being blocked. `lockout` carries a `retryAfterMs`; the others may too. The reason is
@@ -215,7 +215,7 @@ export class LoginProtectionService {
 		if (base <= 0 || failedCount <= 0) {
 			return;
 		}
-		const delay = Math.min(base * failedCount, 5000);
+		const delay = Math.min(base * failedCount, MAX_TARPIT_DELAY_MS);
 		await new Promise((resolve) => setTimeout(resolve, delay));
 	}
 
