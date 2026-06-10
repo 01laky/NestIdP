@@ -1,0 +1,1595 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`SyncService characterization goldens (Prompt 38 §11) scenario 1: clean run — 2 users with group + role memberships: clean run 1`] = `
+{
+  "auditEvents": [
+    {
+      "actorId": "admin-1",
+      "actorLabel": "admin",
+      "actorType": "admin",
+      "category": "sync",
+      "event": "sync_completed",
+      "metadata": {
+        "status": "SUCCESS",
+        "syncLogId": "log-c1234567890123456789012345",
+        "usersSkippedCollision": 0,
+        "usersSynced": 2,
+      },
+    },
+  ],
+  "connectionUpdates": [
+    {
+      "data": {
+        "lastSyncStatus": "IN_PROGRESS",
+      },
+      "where": {
+        "id": "c1234567890123456789012345",
+      },
+    },
+    {
+      "data": {
+        "lastCollisionCount": 0,
+        "lastSyncAt": 2026-01-01T00:00:01.000Z,
+        "lastSyncStatus": "SUCCESS",
+        "scheduleAutoPausedAt": null,
+        "scheduleConsecutiveFailures": 0,
+        "scheduleLastError": null,
+      },
+      "where": {
+        "id": "c1234567890123456789012345",
+      },
+    },
+  ],
+  "finishLogCalls": [
+    [
+      "log-c1234567890123456789012345",
+      "SUCCESS",
+      {
+        "groupsSynced": 2,
+        "rolesSynced": 2,
+        "usersSkippedCollision": 0,
+        "usersSynced": 2,
+      },
+      null,
+    ],
+  ],
+  "result": {
+    "connection": {
+      "apiContractConfig": null,
+      "authType": "BEARER",
+      "baseUrl": "https://identity.example.com",
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "hasBearerToken": true,
+      "hasOauthClientSecret": false,
+      "hasProxyPassword": false,
+      "id": "c1234567890123456789012345",
+      "includeInSyncAll": undefined,
+      "isLocalDirectory": undefined,
+      "lastCollisionCount": 0,
+      "lastProxyCheckAt": null,
+      "lastProxyCheckStatus": null,
+      "lastSyncAt": "2026-01-01T00:00:01.000Z",
+      "lastSyncStatus": "SUCCESS",
+      "name": "Test API",
+      "noProxyHosts": null,
+      "oauthAudience": null,
+      "oauthClientAuthMethod": null,
+      "oauthClientId": null,
+      "oauthLastTokenAt": null,
+      "oauthScope": null,
+      "oauthTokenRequestParams": null,
+      "oauthTokenUrl": null,
+      "proxyEnabled": undefined,
+      "proxyUrl": null,
+      "proxyUsername": null,
+      "updatedAt": "2026-01-01T00:00:00.000Z",
+      "usernameCollisionPolicy": null,
+    },
+    "syncLog": {
+      "apiConnectionId": "c1234567890123456789012345",
+      "dryRun": false,
+      "durationMs": 1000,
+      "errors": null,
+      "finishedAt": "2026-01-01T00:00:01.000Z",
+      "groupsSynced": 2,
+      "id": "log-c1234567890123456789012345",
+      "rolesSynced": 2,
+      "startedAt": "2026-01-01T00:00:00.000Z",
+      "status": "SUCCESS",
+      "triggerSource": "manual",
+      "usersSkippedCollision": 0,
+      "usersSynced": 2,
+    },
+  },
+  "storeCalls": [
+    {
+      "args": [
+        "c1234567890123456789012345",
+        {
+          "active": true,
+          "displayName": null,
+          "email": null,
+          "externalId": "ext-u1",
+          "passwordHash": "$2b$12$test.hash.for.integration.tests.only",
+          "passwordHashAlgorithm": "bcrypt",
+          "username": "alice",
+        },
+      ],
+      "method": "upsertUser",
+    },
+    {
+      "args": [
+        "c1234567890123456789012345",
+        {
+          "active": true,
+          "displayName": null,
+          "email": null,
+          "externalId": "ext-u2",
+          "passwordHash": "$2b$12$test.hash.for.integration.tests.only",
+          "passwordHashAlgorithm": "bcrypt",
+          "username": "bob",
+        },
+      ],
+      "method": "upsertUser",
+    },
+    {
+      "args": [
+        "c1234567890123456789012345",
+        {
+          "id": "g1",
+          "name": "Engineering",
+        },
+      ],
+      "method": "upsertGroup",
+    },
+    {
+      "args": [
+        "local-ext-u1",
+        [
+          "local-g1",
+        ],
+      ],
+      "method": "replaceUserGroups",
+    },
+    {
+      "args": [
+        "c1234567890123456789012345",
+        {
+          "id": "r1",
+          "name": "Admin",
+        },
+      ],
+      "method": "upsertRole",
+    },
+    {
+      "args": [
+        "c1234567890123456789012345",
+        {
+          "id": "r2",
+          "name": "Viewer",
+        },
+      ],
+      "method": "upsertRole",
+    },
+    {
+      "args": [
+        "local-ext-u1",
+        [
+          "local-r1",
+          "local-r2",
+        ],
+      ],
+      "method": "replaceUserRoles",
+    },
+    {
+      "args": [
+        "c1234567890123456789012345",
+        {
+          "id": "g2",
+          "name": "Sales",
+        },
+      ],
+      "method": "upsertGroup",
+    },
+    {
+      "args": [
+        "local-ext-u2",
+        [
+          "local-g2",
+        ],
+      ],
+      "method": "replaceUserGroups",
+    },
+    {
+      "args": [
+        "c1234567890123456789012345",
+        {
+          "id": "r2",
+          "name": "Viewer",
+        },
+      ],
+      "method": "upsertRole",
+    },
+    {
+      "args": [
+        "local-ext-u2",
+        [
+          "local-r2",
+        ],
+      ],
+      "method": "replaceUserRoles",
+    },
+    {
+      "args": [
+        "c1234567890123456789012345",
+        Set {
+          "ext-u1",
+          "ext-u2",
+        },
+      ],
+      "method": "deactivateUsersNotInExternalIds",
+    },
+    {
+      "args": [
+        "c1234567890123456789012345",
+        Set {
+          "g1",
+          "g2",
+        },
+      ],
+      "method": "deleteOrphanGroups",
+    },
+    {
+      "args": [
+        "c1234567890123456789012345",
+        Set {
+          "r1",
+          "r2",
+        },
+      ],
+      "method": "deleteOrphanRoles",
+    },
+  ],
+}
+`;
+
+exports[`SyncService characterization goldens (Prompt 38 §11) scenario 2: username collision under 'skip' policy — counter, error entry, owner audit: collision skip 1`] = `
+{
+  "auditEvents": [
+    {
+      "actorType": "system",
+      "category": "sync",
+      "event": "identity_sync_username_collision",
+      "metadata": {
+        "externalId": "ext-u1",
+        "ownerApiConnectionId": "conn-owner",
+        "username": "alice",
+      },
+      "subjectId": "c1234567890123456789012345",
+      "subjectType": "ApiConnection",
+    },
+    {
+      "actorId": "admin-1",
+      "actorLabel": "admin",
+      "actorType": "admin",
+      "category": "sync",
+      "event": "sync_completed",
+      "metadata": {
+        "status": "SUCCESS",
+        "syncLogId": "log-c1234567890123456789012345",
+        "usersSkippedCollision": 1,
+        "usersSynced": 1,
+      },
+    },
+  ],
+  "connectionUpdates": [
+    {
+      "data": {
+        "lastSyncStatus": "IN_PROGRESS",
+      },
+      "where": {
+        "id": "c1234567890123456789012345",
+      },
+    },
+    {
+      "data": {
+        "lastCollisionCount": 1,
+        "lastSyncAt": 2026-01-01T00:00:01.000Z,
+        "lastSyncStatus": "SUCCESS",
+        "scheduleAutoPausedAt": null,
+        "scheduleConsecutiveFailures": 0,
+        "scheduleLastError": null,
+      },
+      "where": {
+        "id": "c1234567890123456789012345",
+      },
+    },
+  ],
+  "finishLogCalls": [
+    [
+      "log-c1234567890123456789012345",
+      "SUCCESS",
+      {
+        "groupsSynced": 1,
+        "rolesSynced": 1,
+        "usersSkippedCollision": 1,
+        "usersSynced": 1,
+      },
+      [
+        {
+          "externalUserId": "ext-u1",
+          "message": "Username "alice" already owned by Other API",
+          "ownerApiConnectionId": "conn-owner",
+          "ownerLabel": "Other API",
+          "phase": "username_collision",
+          "username": "alice",
+        },
+      ],
+    ],
+  ],
+  "result": {
+    "connection": {
+      "apiContractConfig": null,
+      "authType": "BEARER",
+      "baseUrl": "https://identity.example.com",
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "hasBearerToken": true,
+      "hasOauthClientSecret": false,
+      "hasProxyPassword": false,
+      "id": "c1234567890123456789012345",
+      "includeInSyncAll": undefined,
+      "isLocalDirectory": undefined,
+      "lastCollisionCount": 1,
+      "lastProxyCheckAt": null,
+      "lastProxyCheckStatus": null,
+      "lastSyncAt": "2026-01-01T00:00:01.000Z",
+      "lastSyncStatus": "SUCCESS",
+      "name": "Test API",
+      "noProxyHosts": null,
+      "oauthAudience": null,
+      "oauthClientAuthMethod": null,
+      "oauthClientId": null,
+      "oauthLastTokenAt": null,
+      "oauthScope": null,
+      "oauthTokenRequestParams": null,
+      "oauthTokenUrl": null,
+      "proxyEnabled": undefined,
+      "proxyUrl": null,
+      "proxyUsername": null,
+      "updatedAt": "2026-01-01T00:00:00.000Z",
+      "usernameCollisionPolicy": null,
+    },
+    "syncLog": {
+      "apiConnectionId": "c1234567890123456789012345",
+      "dryRun": false,
+      "durationMs": 1000,
+      "errors": [
+        {
+          "externalUserId": "ext-u1",
+          "message": "Username "alice" already owned by Other API",
+          "ownerApiConnectionId": "conn-owner",
+          "ownerLabel": "Other API",
+          "phase": "username_collision",
+          "username": "alice",
+        },
+      ],
+      "finishedAt": "2026-01-01T00:00:01.000Z",
+      "groupsSynced": 1,
+      "id": "log-c1234567890123456789012345",
+      "rolesSynced": 1,
+      "startedAt": "2026-01-01T00:00:00.000Z",
+      "status": "SUCCESS",
+      "triggerSource": "manual",
+      "usersSkippedCollision": 1,
+      "usersSynced": 1,
+    },
+  },
+  "storeCalls": [
+    {
+      "args": [
+        "c1234567890123456789012345",
+        {
+          "active": true,
+          "displayName": null,
+          "email": null,
+          "externalId": "ext-u1",
+          "passwordHash": "$2b$12$test.hash.for.integration.tests.only",
+          "passwordHashAlgorithm": "bcrypt",
+          "username": "alice",
+        },
+      ],
+      "method": "upsertUser",
+    },
+    {
+      "args": [
+        "c1234567890123456789012345",
+        {
+          "active": true,
+          "displayName": null,
+          "email": null,
+          "externalId": "ext-u2",
+          "passwordHash": "$2b$12$test.hash.for.integration.tests.only",
+          "passwordHashAlgorithm": "bcrypt",
+          "username": "bob",
+        },
+      ],
+      "method": "upsertUser",
+    },
+    {
+      "args": [
+        "c1234567890123456789012345",
+        {
+          "id": "g2",
+          "name": "Sales",
+        },
+      ],
+      "method": "upsertGroup",
+    },
+    {
+      "args": [
+        "local-ext-u2",
+        [
+          "local-g2",
+        ],
+      ],
+      "method": "replaceUserGroups",
+    },
+    {
+      "args": [
+        "c1234567890123456789012345",
+        {
+          "id": "r2",
+          "name": "Viewer",
+        },
+      ],
+      "method": "upsertRole",
+    },
+    {
+      "args": [
+        "local-ext-u2",
+        [
+          "local-r2",
+        ],
+      ],
+      "method": "replaceUserRoles",
+    },
+    {
+      "args": [
+        "c1234567890123456789012345",
+        Set {
+          "ext-u1",
+          "ext-u2",
+        },
+      ],
+      "method": "deactivateUsersNotInExternalIds",
+    },
+    {
+      "args": [
+        "c1234567890123456789012345",
+        Set {
+          "g2",
+        },
+      ],
+      "method": "deleteOrphanGroups",
+    },
+    {
+      "args": [
+        "c1234567890123456789012345",
+        Set {
+          "r2",
+        },
+      ],
+      "method": "deleteOrphanRoles",
+    },
+  ],
+}
+`;
+
+exports[`SyncService characterization goldens (Prompt 38 §11) scenario 3: username collision under 'fail_run' policy — run FAILED: collision fail_run 1`] = `
+{
+  "auditEvents": [
+    {
+      "actorType": "system",
+      "category": "sync",
+      "event": "identity_sync_username_collision",
+      "metadata": {
+        "externalId": "ext-u1",
+        "ownerApiConnectionId": "conn-owner",
+        "username": "alice",
+      },
+      "subjectId": "c1234567890123456789012345",
+      "subjectType": "ApiConnection",
+    },
+    {
+      "actorId": "admin-1",
+      "actorLabel": "admin",
+      "actorType": "admin",
+      "category": "sync",
+      "event": "sync_failed",
+      "metadata": {
+        "status": "FAILED",
+        "syncLogId": "log-c1234567890123456789012345",
+        "usersSkippedCollision": 1,
+        "usersSynced": 0,
+      },
+    },
+  ],
+  "connectionUpdates": [
+    {
+      "data": {
+        "lastSyncStatus": "IN_PROGRESS",
+      },
+      "where": {
+        "id": "c1234567890123456789012345",
+      },
+    },
+    {
+      "data": {
+        "lastCollisionCount": 1,
+        "lastSyncStatus": "FAILED",
+      },
+      "where": {
+        "id": "c1234567890123456789012345",
+      },
+    },
+  ],
+  "finishLogCalls": [
+    [
+      "log-c1234567890123456789012345",
+      "FAILED",
+      {
+        "groupsSynced": 0,
+        "rolesSynced": 0,
+        "usersSkippedCollision": 1,
+        "usersSynced": 0,
+      },
+      [
+        {
+          "externalUserId": "ext-u1",
+          "message": "Username "alice" already owned by Other API",
+          "ownerApiConnectionId": "conn-owner",
+          "ownerLabel": "Other API",
+          "phase": "username_collision",
+          "username": "alice",
+        },
+      ],
+    ],
+  ],
+  "result": {
+    "connection": {
+      "apiContractConfig": null,
+      "authType": "BEARER",
+      "baseUrl": "https://identity.example.com",
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "hasBearerToken": true,
+      "hasOauthClientSecret": false,
+      "hasProxyPassword": false,
+      "id": "c1234567890123456789012345",
+      "includeInSyncAll": undefined,
+      "isLocalDirectory": undefined,
+      "lastCollisionCount": 1,
+      "lastProxyCheckAt": null,
+      "lastProxyCheckStatus": null,
+      "lastSyncAt": null,
+      "lastSyncStatus": "FAILED",
+      "name": "Test API",
+      "noProxyHosts": null,
+      "oauthAudience": null,
+      "oauthClientAuthMethod": null,
+      "oauthClientId": null,
+      "oauthLastTokenAt": null,
+      "oauthScope": null,
+      "oauthTokenRequestParams": null,
+      "oauthTokenUrl": null,
+      "proxyEnabled": undefined,
+      "proxyUrl": null,
+      "proxyUsername": null,
+      "updatedAt": "2026-01-01T00:00:00.000Z",
+      "usernameCollisionPolicy": null,
+    },
+    "syncLog": {
+      "apiConnectionId": "c1234567890123456789012345",
+      "dryRun": false,
+      "durationMs": 1000,
+      "errors": [
+        {
+          "externalUserId": "ext-u1",
+          "message": "Username "alice" already owned by Other API",
+          "ownerApiConnectionId": "conn-owner",
+          "ownerLabel": "Other API",
+          "phase": "username_collision",
+          "username": "alice",
+        },
+      ],
+      "finishedAt": "2026-01-01T00:00:01.000Z",
+      "groupsSynced": 0,
+      "id": "log-c1234567890123456789012345",
+      "rolesSynced": 0,
+      "startedAt": "2026-01-01T00:00:00.000Z",
+      "status": "FAILED",
+      "triggerSource": "manual",
+      "usersSkippedCollision": 1,
+      "usersSynced": 0,
+    },
+  },
+  "storeCalls": [
+    {
+      "args": [
+        "c1234567890123456789012345",
+        {
+          "active": true,
+          "displayName": null,
+          "email": null,
+          "externalId": "ext-u1",
+          "passwordHash": "$2b$12$test.hash.for.integration.tests.only",
+          "passwordHashAlgorithm": "bcrypt",
+          "username": "alice",
+        },
+      ],
+      "method": "upsertUser",
+    },
+  ],
+}
+`;
+
+exports[`SyncService characterization goldens (Prompt 38 §11) scenario 4: membership-phase failure — groups fetch rejects for one user: membership fetch failure 1`] = `
+{
+  "auditEvents": [
+    {
+      "actorId": "admin-1",
+      "actorLabel": "admin",
+      "actorType": "admin",
+      "category": "sync",
+      "event": "sync_completed",
+      "metadata": {
+        "status": "SUCCESS",
+        "syncLogId": "log-c1234567890123456789012345",
+        "usersSkippedCollision": 0,
+        "usersSynced": 2,
+      },
+    },
+  ],
+  "connectionUpdates": [
+    {
+      "data": {
+        "lastSyncStatus": "IN_PROGRESS",
+      },
+      "where": {
+        "id": "c1234567890123456789012345",
+      },
+    },
+    {
+      "data": {
+        "lastCollisionCount": 0,
+        "lastSyncAt": 2026-01-01T00:00:01.000Z,
+        "lastSyncStatus": "SUCCESS",
+        "scheduleAutoPausedAt": null,
+        "scheduleConsecutiveFailures": 0,
+        "scheduleLastError": null,
+      },
+      "where": {
+        "id": "c1234567890123456789012345",
+      },
+    },
+  ],
+  "finishLogCalls": [
+    [
+      "log-c1234567890123456789012345",
+      "SUCCESS",
+      {
+        "groupsSynced": 1,
+        "rolesSynced": 2,
+        "usersSkippedCollision": 0,
+        "usersSynced": 2,
+      },
+      [
+        {
+          "externalUserId": "ext-u2",
+          "httpStatus": 503,
+          "message": "Identity API returned HTTP 503",
+          "phase": "fetch_groups",
+        },
+      ],
+    ],
+  ],
+  "result": {
+    "connection": {
+      "apiContractConfig": null,
+      "authType": "BEARER",
+      "baseUrl": "https://identity.example.com",
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "hasBearerToken": true,
+      "hasOauthClientSecret": false,
+      "hasProxyPassword": false,
+      "id": "c1234567890123456789012345",
+      "includeInSyncAll": undefined,
+      "isLocalDirectory": undefined,
+      "lastCollisionCount": 0,
+      "lastProxyCheckAt": null,
+      "lastProxyCheckStatus": null,
+      "lastSyncAt": "2026-01-01T00:00:01.000Z",
+      "lastSyncStatus": "SUCCESS",
+      "name": "Test API",
+      "noProxyHosts": null,
+      "oauthAudience": null,
+      "oauthClientAuthMethod": null,
+      "oauthClientId": null,
+      "oauthLastTokenAt": null,
+      "oauthScope": null,
+      "oauthTokenRequestParams": null,
+      "oauthTokenUrl": null,
+      "proxyEnabled": undefined,
+      "proxyUrl": null,
+      "proxyUsername": null,
+      "updatedAt": "2026-01-01T00:00:00.000Z",
+      "usernameCollisionPolicy": null,
+    },
+    "syncLog": {
+      "apiConnectionId": "c1234567890123456789012345",
+      "dryRun": false,
+      "durationMs": 1000,
+      "errors": [
+        {
+          "externalUserId": "ext-u2",
+          "httpStatus": 503,
+          "message": "Identity API returned HTTP 503",
+          "phase": "fetch_groups",
+        },
+      ],
+      "finishedAt": "2026-01-01T00:00:01.000Z",
+      "groupsSynced": 1,
+      "id": "log-c1234567890123456789012345",
+      "rolesSynced": 2,
+      "startedAt": "2026-01-01T00:00:00.000Z",
+      "status": "SUCCESS",
+      "triggerSource": "manual",
+      "usersSkippedCollision": 0,
+      "usersSynced": 2,
+    },
+  },
+  "storeCalls": [
+    {
+      "args": [
+        "c1234567890123456789012345",
+        {
+          "active": true,
+          "displayName": null,
+          "email": null,
+          "externalId": "ext-u1",
+          "passwordHash": "$2b$12$test.hash.for.integration.tests.only",
+          "passwordHashAlgorithm": "bcrypt",
+          "username": "alice",
+        },
+      ],
+      "method": "upsertUser",
+    },
+    {
+      "args": [
+        "c1234567890123456789012345",
+        {
+          "active": true,
+          "displayName": null,
+          "email": null,
+          "externalId": "ext-u2",
+          "passwordHash": "$2b$12$test.hash.for.integration.tests.only",
+          "passwordHashAlgorithm": "bcrypt",
+          "username": "bob",
+        },
+      ],
+      "method": "upsertUser",
+    },
+    {
+      "args": [
+        "c1234567890123456789012345",
+        {
+          "id": "g1",
+          "name": "Engineering",
+        },
+      ],
+      "method": "upsertGroup",
+    },
+    {
+      "args": [
+        "local-ext-u1",
+        [
+          "local-g1",
+        ],
+      ],
+      "method": "replaceUserGroups",
+    },
+    {
+      "args": [
+        "c1234567890123456789012345",
+        {
+          "id": "r1",
+          "name": "Admin",
+        },
+      ],
+      "method": "upsertRole",
+    },
+    {
+      "args": [
+        "c1234567890123456789012345",
+        {
+          "id": "r2",
+          "name": "Viewer",
+        },
+      ],
+      "method": "upsertRole",
+    },
+    {
+      "args": [
+        "local-ext-u1",
+        [
+          "local-r1",
+          "local-r2",
+        ],
+      ],
+      "method": "replaceUserRoles",
+    },
+    {
+      "args": [
+        "c1234567890123456789012345",
+        {
+          "id": "r2",
+          "name": "Viewer",
+        },
+      ],
+      "method": "upsertRole",
+    },
+    {
+      "args": [
+        "local-ext-u2",
+        [
+          "local-r2",
+        ],
+      ],
+      "method": "replaceUserRoles",
+    },
+    {
+      "args": [
+        "c1234567890123456789012345",
+        Set {
+          "ext-u1",
+          "ext-u2",
+        },
+      ],
+      "method": "deactivateUsersNotInExternalIds",
+    },
+    {
+      "args": [
+        "c1234567890123456789012345",
+        Set {
+          "g1",
+        },
+      ],
+      "method": "deleteOrphanGroups",
+    },
+    {
+      "args": [
+        "c1234567890123456789012345",
+        Set {
+          "r1",
+          "r2",
+        },
+      ],
+      "method": "deleteOrphanRoles",
+    },
+  ],
+}
+`;
+
+exports[`SyncService characterization goldens (Prompt 38 §11) scenario 5: deactivation snapshot — dropped bad-id row recorded, valid ids deactivation set: deactivation with dropped bad-id row 1`] = `
+{
+  "auditEvents": [
+    {
+      "actorId": "admin-1",
+      "actorLabel": "admin",
+      "actorType": "admin",
+      "category": "sync",
+      "event": "sync_completed",
+      "metadata": {
+        "status": "SUCCESS",
+        "syncLogId": "log-c1234567890123456789012345",
+        "usersSkippedCollision": 0,
+        "usersSynced": 2,
+      },
+    },
+  ],
+  "connectionUpdates": [
+    {
+      "data": {
+        "lastSyncStatus": "IN_PROGRESS",
+      },
+      "where": {
+        "id": "c1234567890123456789012345",
+      },
+    },
+    {
+      "data": {
+        "lastCollisionCount": 0,
+        "lastSyncAt": 2026-01-01T00:00:01.000Z,
+        "lastSyncStatus": "SUCCESS",
+        "scheduleAutoPausedAt": null,
+        "scheduleConsecutiveFailures": 0,
+        "scheduleLastError": null,
+      },
+      "where": {
+        "id": "c1234567890123456789012345",
+      },
+    },
+  ],
+  "finishLogCalls": [
+    [
+      "log-c1234567890123456789012345",
+      "SUCCESS",
+      {
+        "groupsSynced": 2,
+        "rolesSynced": 2,
+        "usersSkippedCollision": 0,
+        "usersSynced": 2,
+      },
+      [
+        {
+          "message": "Row 2: non-string or empty user id at "id" — row skipped",
+          "phase": "parse_users",
+        },
+      ],
+    ],
+  ],
+  "result": {
+    "connection": {
+      "apiContractConfig": null,
+      "authType": "BEARER",
+      "baseUrl": "https://identity.example.com",
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "hasBearerToken": true,
+      "hasOauthClientSecret": false,
+      "hasProxyPassword": false,
+      "id": "c1234567890123456789012345",
+      "includeInSyncAll": undefined,
+      "isLocalDirectory": undefined,
+      "lastCollisionCount": 0,
+      "lastProxyCheckAt": null,
+      "lastProxyCheckStatus": null,
+      "lastSyncAt": "2026-01-01T00:00:01.000Z",
+      "lastSyncStatus": "SUCCESS",
+      "name": "Test API",
+      "noProxyHosts": null,
+      "oauthAudience": null,
+      "oauthClientAuthMethod": null,
+      "oauthClientId": null,
+      "oauthLastTokenAt": null,
+      "oauthScope": null,
+      "oauthTokenRequestParams": null,
+      "oauthTokenUrl": null,
+      "proxyEnabled": undefined,
+      "proxyUrl": null,
+      "proxyUsername": null,
+      "updatedAt": "2026-01-01T00:00:00.000Z",
+      "usernameCollisionPolicy": null,
+    },
+    "syncLog": {
+      "apiConnectionId": "c1234567890123456789012345",
+      "dryRun": false,
+      "durationMs": 1000,
+      "errors": [
+        {
+          "message": "Row 2: non-string or empty user id at "id" — row skipped",
+          "phase": "parse_users",
+        },
+      ],
+      "finishedAt": "2026-01-01T00:00:01.000Z",
+      "groupsSynced": 2,
+      "id": "log-c1234567890123456789012345",
+      "rolesSynced": 2,
+      "startedAt": "2026-01-01T00:00:00.000Z",
+      "status": "SUCCESS",
+      "triggerSource": "manual",
+      "usersSkippedCollision": 0,
+      "usersSynced": 2,
+    },
+  },
+  "storeCalls": [
+    {
+      "args": [
+        "c1234567890123456789012345",
+        {
+          "active": true,
+          "displayName": null,
+          "email": null,
+          "externalId": "ext-u1",
+          "passwordHash": "$2b$12$test.hash.for.integration.tests.only",
+          "passwordHashAlgorithm": "bcrypt",
+          "username": "alice",
+        },
+      ],
+      "method": "upsertUser",
+    },
+    {
+      "args": [
+        "c1234567890123456789012345",
+        {
+          "active": true,
+          "displayName": null,
+          "email": null,
+          "externalId": "ext-u2",
+          "passwordHash": "$2b$12$test.hash.for.integration.tests.only",
+          "passwordHashAlgorithm": "bcrypt",
+          "username": "bob",
+        },
+      ],
+      "method": "upsertUser",
+    },
+    {
+      "args": [
+        "c1234567890123456789012345",
+        {
+          "id": "g1",
+          "name": "Engineering",
+        },
+      ],
+      "method": "upsertGroup",
+    },
+    {
+      "args": [
+        "local-ext-u1",
+        [
+          "local-g1",
+        ],
+      ],
+      "method": "replaceUserGroups",
+    },
+    {
+      "args": [
+        "c1234567890123456789012345",
+        {
+          "id": "r1",
+          "name": "Admin",
+        },
+      ],
+      "method": "upsertRole",
+    },
+    {
+      "args": [
+        "c1234567890123456789012345",
+        {
+          "id": "r2",
+          "name": "Viewer",
+        },
+      ],
+      "method": "upsertRole",
+    },
+    {
+      "args": [
+        "local-ext-u1",
+        [
+          "local-r1",
+          "local-r2",
+        ],
+      ],
+      "method": "replaceUserRoles",
+    },
+    {
+      "args": [
+        "c1234567890123456789012345",
+        {
+          "id": "g2",
+          "name": "Sales",
+        },
+      ],
+      "method": "upsertGroup",
+    },
+    {
+      "args": [
+        "local-ext-u2",
+        [
+          "local-g2",
+        ],
+      ],
+      "method": "replaceUserGroups",
+    },
+    {
+      "args": [
+        "c1234567890123456789012345",
+        {
+          "id": "r2",
+          "name": "Viewer",
+        },
+      ],
+      "method": "upsertRole",
+    },
+    {
+      "args": [
+        "local-ext-u2",
+        [
+          "local-r2",
+        ],
+      ],
+      "method": "replaceUserRoles",
+    },
+    {
+      "args": [
+        "c1234567890123456789012345",
+        Set {
+          "ext-u1",
+          "ext-u2",
+        },
+      ],
+      "method": "deactivateUsersNotInExternalIds",
+    },
+    {
+      "args": [
+        "c1234567890123456789012345",
+        Set {
+          "g1",
+          "g2",
+        },
+      ],
+      "method": "deleteOrphanGroups",
+    },
+    {
+      "args": [
+        "c1234567890123456789012345",
+        Set {
+          "r1",
+          "r2",
+        },
+      ],
+      "method": "deleteOrphanRoles",
+    },
+  ],
+}
+`;
+
+exports[`SyncService characterization goldens (Prompt 38 §11) scenario 6: dry run — no store mutations, dry-run summary entry: dry run 1`] = `
+{
+  "auditEvents": [
+    {
+      "actorId": "admin-1",
+      "actorLabel": "admin",
+      "actorType": "admin",
+      "category": "sync",
+      "event": "sync_completed",
+      "metadata": {
+        "status": "SUCCESS",
+        "syncLogId": "log-c1234567890123456789012345",
+        "usersSkippedCollision": 0,
+        "usersSynced": 2,
+      },
+    },
+  ],
+  "connectionUpdates": [],
+  "finishLogCalls": [
+    [
+      "log-c1234567890123456789012345",
+      "SUCCESS",
+      {
+        "groupsSynced": 2,
+        "rolesSynced": 2,
+        "usersSkippedCollision": 0,
+        "usersSynced": 2,
+      },
+      [
+        {
+          "message": "Dry run completed; no identity rows were modified",
+          "phase": "dry_run_summary",
+        },
+      ],
+    ],
+  ],
+  "result": {
+    "connection": {
+      "apiContractConfig": null,
+      "authType": "BEARER",
+      "baseUrl": "https://identity.example.com",
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "hasBearerToken": true,
+      "hasOauthClientSecret": false,
+      "hasProxyPassword": false,
+      "id": "c1234567890123456789012345",
+      "includeInSyncAll": undefined,
+      "isLocalDirectory": undefined,
+      "lastCollisionCount": undefined,
+      "lastProxyCheckAt": null,
+      "lastProxyCheckStatus": null,
+      "lastSyncAt": null,
+      "lastSyncStatus": "NEVER",
+      "name": "Test API",
+      "noProxyHosts": null,
+      "oauthAudience": null,
+      "oauthClientAuthMethod": null,
+      "oauthClientId": null,
+      "oauthLastTokenAt": null,
+      "oauthScope": null,
+      "oauthTokenRequestParams": null,
+      "oauthTokenUrl": null,
+      "proxyEnabled": undefined,
+      "proxyUrl": null,
+      "proxyUsername": null,
+      "updatedAt": "2026-01-01T00:00:00.000Z",
+      "usernameCollisionPolicy": null,
+    },
+    "syncLog": {
+      "apiConnectionId": "c1234567890123456789012345",
+      "dryRun": true,
+      "durationMs": 1000,
+      "errors": [
+        {
+          "message": "Dry run completed; no identity rows were modified",
+          "phase": "dry_run_summary",
+        },
+      ],
+      "finishedAt": "2026-01-01T00:00:01.000Z",
+      "groupsSynced": 2,
+      "id": "log-c1234567890123456789012345",
+      "rolesSynced": 2,
+      "startedAt": "2026-01-01T00:00:00.000Z",
+      "status": "SUCCESS",
+      "triggerSource": "manual",
+      "usersSkippedCollision": 0,
+      "usersSynced": 2,
+    },
+  },
+  "storeCalls": [],
+}
+`;
+
+exports[`SyncService characterization goldens (Prompt 38 §11) scenario 7: syncAll aggregate — success + failure + excluded connection: syncAll aggregate 1`] = `
+{
+  "auditEvents": [
+    {
+      "actorId": "admin-1",
+      "actorLabel": "admin",
+      "actorType": "admin",
+      "category": "sync",
+      "event": "sync_completed",
+      "metadata": {
+        "status": "SUCCESS",
+        "syncLogId": "log-conn-a",
+        "usersSkippedCollision": 0,
+        "usersSynced": 1,
+      },
+    },
+    {
+      "actorId": "admin-1",
+      "actorLabel": "admin",
+      "actorType": "admin",
+      "category": "sync",
+      "event": "sync_failed",
+      "metadata": {
+        "status": "FAILED",
+        "syncLogId": "log-conn-b",
+        "usersSkippedCollision": 0,
+        "usersSynced": 0,
+      },
+    },
+    {
+      "actorId": "admin-1",
+      "actorType": "admin",
+      "category": "sync",
+      "event": "identity_sync_all_triggered",
+      "metadata": {
+        "connections": 3,
+        "dryRun": false,
+      },
+    },
+  ],
+  "connectionUpdates": [
+    {
+      "data": {
+        "lastSyncStatus": "IN_PROGRESS",
+      },
+      "where": {
+        "id": "conn-a",
+      },
+    },
+    {
+      "data": {
+        "lastCollisionCount": 0,
+        "lastSyncAt": 2026-01-01T00:00:01.000Z,
+        "lastSyncStatus": "SUCCESS",
+        "scheduleAutoPausedAt": null,
+        "scheduleConsecutiveFailures": 0,
+        "scheduleLastError": null,
+      },
+      "where": {
+        "id": "conn-a",
+      },
+    },
+    {
+      "data": {
+        "lastSyncStatus": "IN_PROGRESS",
+      },
+      "where": {
+        "id": "conn-b",
+      },
+    },
+    {
+      "data": {
+        "lastCollisionCount": 0,
+        "lastSyncStatus": "FAILED",
+      },
+      "where": {
+        "id": "conn-b",
+      },
+    },
+  ],
+  "finishLogCalls": [
+    [
+      "log-conn-a",
+      "SUCCESS",
+      {
+        "groupsSynced": 1,
+        "rolesSynced": 2,
+        "usersSkippedCollision": 0,
+        "usersSynced": 1,
+      },
+      null,
+    ],
+    [
+      "log-conn-b",
+      "FAILED",
+      {
+        "groupsSynced": 0,
+        "rolesSynced": 0,
+        "usersSynced": 0,
+      },
+      [
+        {
+          "httpStatus": 503,
+          "message": "Identity API returned HTTP 503",
+          "phase": "fetch_users",
+        },
+      ],
+    ],
+  ],
+  "response": {
+    "dryRun": false,
+    "results": [
+      {
+        "connectionId": "conn-a",
+        "groupsSynced": 1,
+        "name": "Source A",
+        "rolesSynced": 2,
+        "status": "succeeded",
+        "usersSkippedCollision": 0,
+        "usersSynced": 1,
+      },
+      {
+        "connectionId": "conn-b",
+        "groupsSynced": 0,
+        "name": "Source B",
+        "rolesSynced": 0,
+        "status": "failed",
+        "usersSkippedCollision": 0,
+        "usersSynced": 0,
+      },
+      {
+        "connectionId": "conn-c",
+        "groupsSynced": 0,
+        "name": "Opted out",
+        "rolesSynced": 0,
+        "status": "excluded",
+        "usersSkippedCollision": 0,
+        "usersSynced": 0,
+      },
+    ],
+    "totals": {
+      "connections": 3,
+      "excluded": 1,
+      "failed": 1,
+      "skippedInProgress": 0,
+      "succeeded": 1,
+      "usersSkippedCollision": 0,
+      "usersSynced": 1,
+    },
+  },
+  "storeCalls": [
+    {
+      "args": [
+        "conn-a",
+        {
+          "active": true,
+          "displayName": null,
+          "email": null,
+          "externalId": "ext-u1",
+          "passwordHash": "$2b$12$test.hash.for.integration.tests.only",
+          "passwordHashAlgorithm": "bcrypt",
+          "username": "alice",
+        },
+      ],
+      "method": "upsertUser",
+    },
+    {
+      "args": [
+        "conn-a",
+        {
+          "id": "g1",
+          "name": "Engineering",
+        },
+      ],
+      "method": "upsertGroup",
+    },
+    {
+      "args": [
+        "local-ext-u1",
+        [
+          "local-g1",
+        ],
+      ],
+      "method": "replaceUserGroups",
+    },
+    {
+      "args": [
+        "conn-a",
+        {
+          "id": "r1",
+          "name": "Admin",
+        },
+      ],
+      "method": "upsertRole",
+    },
+    {
+      "args": [
+        "conn-a",
+        {
+          "id": "r2",
+          "name": "Viewer",
+        },
+      ],
+      "method": "upsertRole",
+    },
+    {
+      "args": [
+        "local-ext-u1",
+        [
+          "local-r1",
+          "local-r2",
+        ],
+      ],
+      "method": "replaceUserRoles",
+    },
+    {
+      "args": [
+        "conn-a",
+        Set {
+          "ext-u1",
+        },
+      ],
+      "method": "deactivateUsersNotInExternalIds",
+    },
+    {
+      "args": [
+        "conn-a",
+        Set {
+          "g1",
+        },
+      ],
+      "method": "deleteOrphanGroups",
+    },
+    {
+      "args": [
+        "conn-a",
+        Set {
+          "r1",
+          "r2",
+        },
+      ],
+      "method": "deleteOrphanRoles",
+    },
+  ],
+}
+`;
+
+exports[`SyncService characterization goldens (Prompt 38 §11) scenario 8: users fetch failure — FAILED log with fetch_users phase entry: fetch users failure 1`] = `
+{
+  "auditEvents": [
+    {
+      "actorId": "admin-1",
+      "actorLabel": "admin",
+      "actorType": "admin",
+      "category": "sync",
+      "event": "sync_failed",
+      "metadata": {
+        "status": "FAILED",
+        "syncLogId": "log-c1234567890123456789012345",
+        "usersSkippedCollision": 0,
+        "usersSynced": 0,
+      },
+    },
+  ],
+  "connectionUpdates": [
+    {
+      "data": {
+        "lastSyncStatus": "IN_PROGRESS",
+      },
+      "where": {
+        "id": "c1234567890123456789012345",
+      },
+    },
+    {
+      "data": {
+        "lastCollisionCount": 0,
+        "lastSyncStatus": "FAILED",
+      },
+      "where": {
+        "id": "c1234567890123456789012345",
+      },
+    },
+  ],
+  "finishLogCalls": [
+    [
+      "log-c1234567890123456789012345",
+      "FAILED",
+      {
+        "groupsSynced": 0,
+        "rolesSynced": 0,
+        "usersSynced": 0,
+      },
+      [
+        {
+          "httpStatus": 503,
+          "message": "Identity API returned HTTP 503",
+          "phase": "fetch_users",
+        },
+      ],
+    ],
+  ],
+  "result": {
+    "connection": {
+      "apiContractConfig": null,
+      "authType": "BEARER",
+      "baseUrl": "https://identity.example.com",
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "hasBearerToken": true,
+      "hasOauthClientSecret": false,
+      "hasProxyPassword": false,
+      "id": "c1234567890123456789012345",
+      "includeInSyncAll": undefined,
+      "isLocalDirectory": undefined,
+      "lastCollisionCount": 0,
+      "lastProxyCheckAt": null,
+      "lastProxyCheckStatus": null,
+      "lastSyncAt": null,
+      "lastSyncStatus": "FAILED",
+      "name": "Test API",
+      "noProxyHosts": null,
+      "oauthAudience": null,
+      "oauthClientAuthMethod": null,
+      "oauthClientId": null,
+      "oauthLastTokenAt": null,
+      "oauthScope": null,
+      "oauthTokenRequestParams": null,
+      "oauthTokenUrl": null,
+      "proxyEnabled": undefined,
+      "proxyUrl": null,
+      "proxyUsername": null,
+      "updatedAt": "2026-01-01T00:00:00.000Z",
+      "usernameCollisionPolicy": null,
+    },
+    "syncLog": {
+      "apiConnectionId": "c1234567890123456789012345",
+      "dryRun": false,
+      "durationMs": 1000,
+      "errors": [
+        {
+          "httpStatus": 503,
+          "message": "Identity API returned HTTP 503",
+          "phase": "fetch_users",
+        },
+      ],
+      "finishedAt": "2026-01-01T00:00:01.000Z",
+      "groupsSynced": 0,
+      "id": "log-c1234567890123456789012345",
+      "rolesSynced": 0,
+      "startedAt": "2026-01-01T00:00:00.000Z",
+      "status": "FAILED",
+      "triggerSource": "manual",
+      "usersSkippedCollision": 0,
+      "usersSynced": 0,
+    },
+  },
+  "storeCalls": [],
+}
+`;
