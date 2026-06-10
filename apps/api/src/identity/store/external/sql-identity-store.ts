@@ -7,6 +7,7 @@ import {
 	RoleNameCollisionError,
 	UsernameCollisionError,
 } from '../../identity.repository';
+import type { AccountLockoutService } from '../../../auth-protection/account-lockout.service';
 import { manualExternalId } from '../../utils/local-directory.util';
 import { normalizeSyncedEmail } from '../../utils/normalize-synced-email.util';
 import type { ExternalDialect } from './external-connection';
@@ -41,6 +42,10 @@ import type {
 	UserProfileForAuth,
 	UserWithMemberships,
 } from '../identity-store';
+
+// Bound `in` / `not in` lists so a large source can't blow the driver's bind-parameter limit
+// (SQLite caps at 999; Postgres far higher). 500 is safe on every supported dialect.
+const IN_CHUNK_SIZE = 500;
 
 function chunk<T>(items: T[], size: number): T[][] {
 	const out: T[][] = [];
@@ -104,6 +109,9 @@ export class SqlIdentityStore implements IdentityStore {
 	constructor(
 		private readonly db: Kysely<ExternalIdentityDB>,
 		private readonly dialect: ExternalDialect,
+		// Optional (tests `new SqlIdentityStore(db, dialect)`); the active-store activation threads it in so a
+		// stale brute-force lockout is cleared on upstream credential rotation, parity with the local repo.
+		private readonly accountLockout?: AccountLockoutService,
 	) {
 		this.likeOp = dialect === 'postgres' ? 'ilike' : 'like';
 	}
@@ -193,7 +201,7 @@ export class SqlIdentityStore implements IdentityStore {
 	async upsertUser(connectionId: string, user: UpsertUserInput): Promise<{ id: string }> {
 		const existingByUsername = await this.db
 			.selectFrom(T_USER)
-			.select(['id', 'api_connection_id', 'external_id'])
+			.select(['id', 'api_connection_id', 'external_id', 'password_hash'])
 			.where('username', '=', user.username)
 			.executeTakeFirst();
 		if (
@@ -203,6 +211,10 @@ export class SqlIdentityStore implements IdentityStore {
 		) {
 			throw new UsernameCollisionError(user.externalId, user.username);
 		}
+		// Upstream credential rotated → clear any stale brute-force lockout, parity with the local repo.
+		const credentialRotated = Boolean(
+			existingByUsername && existingByUsername.password_hash !== user.passwordHash,
+		);
 
 		let email = user.email;
 		if (email != null) {
@@ -237,6 +249,9 @@ export class SqlIdentityStore implements IdentityStore {
 				})
 				.where('id', '=', existing.id)
 				.execute();
+			if (credentialRotated) {
+				await this.accountLockout?.recordSuccess('end_user', user.username.trim());
+			}
 			return { id: existing.id };
 		}
 
@@ -1089,47 +1104,52 @@ export class SqlIdentityStore implements IdentityStore {
 		apiConnectionId: string,
 		mode: 'deactivate' | 'delete',
 	): Promise<{ usersRemoved: number; groupsRemoved: number; rolesRemoved: number }> {
-		if (mode === 'deactivate') {
-			const users = await this.db
-				.selectFrom(T_USER)
-				.select(['id'])
-				.where('api_connection_id', '=', apiConnectionId)
-				.where('origin', '=', IdentityOrigin.SYNCED)
-				.execute();
-			const ids = users.map((u) => u.id as string);
-			if (ids.length > 0) {
-				await this.db.deleteFrom(T_USER_GROUP).where('user_id', 'in', ids).execute();
-				await this.db.deleteFrom(T_USER_ROLE).where('user_id', 'in', ids).execute();
-				await this.db
-					.updateTable(T_USER)
-					.set({ active: false, updated_at: this.now() })
-					.where('id', 'in', ids)
-					.execute();
-			}
-			return { usersRemoved: ids.length, groupsRemoved: 0, rolesRemoved: 0 };
-		}
-		// Count then delete (driver-agnostic: some drivers don't report numDeletedRows).
-		const del = async (table: typeof T_USER | typeof T_GROUP | typeof T_ROLE) => {
-			const countRow = await this.db
-				.selectFrom(table)
-				.select((eb) => eb.fn.countAll().as('n'))
-				.where('api_connection_id', '=', apiConnectionId)
-				.where('origin', '=', IdentityOrigin.SYNCED)
-				.executeTakeFirst();
-			const n = Number(countRow?.n ?? 0);
-			if (n > 0) {
-				await this.db
-					.deleteFrom(table)
+		// Both branches run in one transaction so a crash can't leave a half-removed source (memberships
+		// gone but users still active, or users deleted but groups/roles lingering) — parity with the local
+		// repo and `deleteOrphans`. The membership `in` list is chunked to stay under the bind-param limit.
+		return this.db.transaction().execute(async (trx) => {
+			if (mode === 'deactivate') {
+				const users = await trx
+					.selectFrom(T_USER)
+					.select(['id'])
 					.where('api_connection_id', '=', apiConnectionId)
 					.where('origin', '=', IdentityOrigin.SYNCED)
 					.execute();
+				const ids = users.map((u) => u.id as string);
+				for (const part of chunk(ids, IN_CHUNK_SIZE)) {
+					await trx.deleteFrom(T_USER_GROUP).where('user_id', 'in', part).execute();
+					await trx.deleteFrom(T_USER_ROLE).where('user_id', 'in', part).execute();
+					await trx
+						.updateTable(T_USER)
+						.set({ active: false, updated_at: this.now() })
+						.where('id', 'in', part)
+						.execute();
+				}
+				return { usersRemoved: ids.length, groupsRemoved: 0, rolesRemoved: 0 };
 			}
-			return n;
-		};
-		return {
-			usersRemoved: await del(T_USER),
-			groupsRemoved: await del(T_GROUP),
-			rolesRemoved: await del(T_ROLE),
-		};
+			// Count then delete (driver-agnostic: some drivers don't report numDeletedRows).
+			const del = async (table: typeof T_USER | typeof T_GROUP | typeof T_ROLE) => {
+				const countRow = await trx
+					.selectFrom(table)
+					.select((eb) => eb.fn.countAll().as('n'))
+					.where('api_connection_id', '=', apiConnectionId)
+					.where('origin', '=', IdentityOrigin.SYNCED)
+					.executeTakeFirst();
+				const n = Number(countRow?.n ?? 0);
+				if (n > 0) {
+					await trx
+						.deleteFrom(table)
+						.where('api_connection_id', '=', apiConnectionId)
+						.where('origin', '=', IdentityOrigin.SYNCED)
+						.execute();
+				}
+				return n;
+			};
+			return {
+				usersRemoved: await del(T_USER),
+				groupsRemoved: await del(T_GROUP),
+				rolesRemoved: await del(T_ROLE),
+			};
+		});
 	}
 }

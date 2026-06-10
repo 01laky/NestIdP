@@ -92,6 +92,7 @@ describe('ExternalIdentityDatabaseService (PGlite)', () => {
 			encryption,
 			factory,
 			audit as never,
+			{ recordSuccess: jest.fn() } as never,
 		);
 
 		const conn = await createTestApiConnection(prisma);
@@ -322,9 +323,14 @@ describe('ExternalIdentityDatabaseService (PGlite)', () => {
 		const encryption2 = new EncryptionService({
 			get: () => 'encryption-key-32-chars-min!!!',
 		} as unknown as ConfigService);
-		const service2 = new ExternalIdentityDatabaseService(prisma, active2, encryption2, factory, {
-			recordSafe: jest.fn(),
-		} as never);
+		const service2 = new ExternalIdentityDatabaseService(
+			prisma,
+			active2,
+			encryption2,
+			factory,
+			{ recordSafe: jest.fn() } as never,
+			{ recordSuccess: jest.fn() } as never,
+		);
 		try {
 			await service2.onModuleInit();
 			expect(active2.mode()).toBe('external');

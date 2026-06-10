@@ -914,9 +914,13 @@ export class IdentityRepository implements IdentityStore {
 			}
 			return { usersRemoved: users.length, groupsRemoved: 0, rolesRemoved: 0 };
 		}
-		const u = await this.prisma.user.deleteMany({ where });
-		const g = await this.prisma.group.deleteMany({ where });
-		const r = await this.prisma.role.deleteMany({ where });
+		// Atomic so a crash can't leave a half-removed source (users gone, groups/roles lingering); the
+		// membership rows cascade on user/group/role delete. Parity with the transactional deactivate branch.
+		const [u, g, r] = await this.prisma.$transaction([
+			this.prisma.user.deleteMany({ where }),
+			this.prisma.group.deleteMany({ where }),
+			this.prisma.role.deleteMany({ where }),
+		]);
 		return { usersRemoved: u.count, groupsRemoved: g.count, rolesRemoved: r.count };
 	}
 

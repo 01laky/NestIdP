@@ -36,6 +36,7 @@ import { classifyOwnership, ensureSchema } from './external-schema';
 import { createMirroringStore } from './mirroring-identity-store';
 import { CircuitBreaker, withResilience } from './resilience';
 import { SqlIdentityStore } from './sql-identity-store';
+import { AccountLockoutService } from '../../../auth-protection/account-lockout.service';
 
 const CONFIG_ID = 'default';
 
@@ -56,6 +57,7 @@ export class ExternalIdentityDatabaseService implements OnModuleInit, OnModuleDe
 		@Inject(CREDENTIALS_ENCRYPTION) private readonly encryption: CredentialsEncryptionPort,
 		@Inject(EXTERNAL_KYSELY_FACTORY) private readonly factory: ExternalKyselyFactory,
 		private readonly audit: AuditPersistenceService,
+		private readonly accountLockout: AccountLockoutService,
 	) {}
 
 	async onModuleInit(): Promise<void> {
@@ -373,7 +375,7 @@ export class ExternalIdentityDatabaseService implements OnModuleInit, OnModuleDe
 		);
 		this.breaker = new CircuitBreaker();
 		this.activeDialect = cfg.dialect as 'postgres' | 'mysql';
-		const sql = new SqlIdentityStore(this.active.db, this.activeDialect);
+		const sql = new SqlIdentityStore(this.active.db, this.activeDialect, this.accountLockout);
 		const resilient = withResilience(sql, this.breaker, cfg.queryTimeoutMs);
 		if (cfg.mode === 'mirror') {
 			this.store.setActive(

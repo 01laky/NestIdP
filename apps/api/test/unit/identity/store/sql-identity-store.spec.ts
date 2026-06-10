@@ -9,7 +9,7 @@ import {
 	getMetaValue,
 	runExternalMigrations,
 } from '@api/identity/store/external/external-schema';
-import type { SqlIdentityStore } from '@api/identity/store/external/sql-identity-store';
+import { SqlIdentityStore } from '@api/identity/store/external/sql-identity-store';
 import {
 	createPgliteKysely,
 	createPgliteStore,
@@ -381,13 +381,22 @@ describe('SqlIdentityStore (external, PGlite)', () => {
 	});
 
 	it('STORE-SEARCH-ESCAPE: LIKE wildcards in a search term match literally, parity with local (§B7)', async () => {
-		await store.upsertUser(CONN, upsertInput({ externalId: 'e1', username: 'a%b', email: 'a@x.com' }));
+		await store.upsertUser(
+			CONN,
+			upsertInput({ externalId: 'e1', username: 'a%b', email: 'a@x.com' }),
+		);
 		await store.upsertUser(
 			CONN,
 			upsertInput({ externalId: 'e2', username: 'axxb', email: 'b@x.com' }),
 		);
-		await store.upsertUser(CONN, upsertInput({ externalId: 'e3', username: 'a_b', email: 'c@x.com' }));
-		await store.upsertUser(CONN, upsertInput({ externalId: 'e4', username: 'azb', email: 'd@x.com' }));
+		await store.upsertUser(
+			CONN,
+			upsertInput({ externalId: 'e3', username: 'a_b', email: 'c@x.com' }),
+		);
+		await store.upsertUser(
+			CONN,
+			upsertInput({ externalId: 'e4', username: 'azb', email: 'd@x.com' }),
+		);
 
 		// '%' must match only the literal 'a%b' — not 'axxb' (which an unescaped '%' wildcard would match).
 		const pct = await store.listUsers({ limit: 50, offset: 0, search: 'a%b' });
@@ -396,5 +405,23 @@ describe('SqlIdentityStore (external, PGlite)', () => {
 		// '_' must match only the literal 'a_b' — not 'azb' (which an unescaped '_' wildcard would match).
 		const us = await store.listUsers({ limit: 50, offset: 0, search: 'a_b' });
 		expect(us.items.map((u) => u.username)).toEqual(['a_b']);
+	});
+
+	it('STORE-LOCKOUT-CLEAR: upstream credential rotation clears the brute-force lockout, parity with local (§B7)', async () => {
+		const recordSuccess = jest.fn().mockResolvedValue(undefined);
+		const lockoutStore = new SqlIdentityStore(handle.db, 'postgres', {
+			recordSuccess,
+		} as never);
+		const hashA = '$2b$12$AAAAAAAAAAAAAAAAAAAAAA';
+		await lockoutStore.upsertUser(CONN, upsertInput({ passwordHash: hashA }));
+		// Re-sync with the same hash → nothing to clear.
+		await lockoutStore.upsertUser(CONN, upsertInput({ passwordHash: hashA }));
+		expect(recordSuccess).not.toHaveBeenCalled();
+		// Re-sync with a rotated hash → clear the lockout for this account.
+		await lockoutStore.upsertUser(
+			CONN,
+			upsertInput({ passwordHash: '$2b$12$BBBBBBBBBBBBBBBBBBBBBB' }),
+		);
+		expect(recordSuccess).toHaveBeenCalledWith('end_user', 'alice');
 	});
 });
