@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { parseNoProxyHosts } from '@nestidp/shared';
+import { MS_PER_DAY, parseNoProxyHosts } from '@nestidp/shared';
 import { boundedInt as boundedIntFromRaw } from '../common/config/bounded-int.util';
 import type { LoginScope } from './brute-force-notifier';
 
 export type LoginLockoutResponseMode = 'retry_after' | 'opaque';
 
 const HOUR_MS = 3_600_000;
-const DAY_MS = 86_400_000;
+const DAY_MS = MS_PER_DAY;
 const FIFTEEN_MIN_MS = 15 * 60 * 1000;
 
 /**

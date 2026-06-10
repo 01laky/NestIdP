@@ -19,6 +19,7 @@ import type {
 	UploadIdpEncryptionCertRequestDto,
 	UploadIdpSigningCertRequestDto,
 } from '@nestidp/shared';
+import { MS_PER_DAY } from '@nestidp/shared';
 import type { AdminDashboardIdpStatusDto } from '@nestidp/shared';
 import {
 	IdpEncryptionCryptoValidationError,
@@ -587,7 +588,7 @@ export class IdpSettingsService {
 		if (rotationActive) {
 			const startedAt =
 				kind === 'signing' ? settings.rotationStartedAt : settings.encryptionRotationStartedAt;
-			const overlapMs = this.effectiveOverlapDays(kind, activeCertPem, now) * 86_400_000;
+			const overlapMs = this.effectiveOverlapDays(kind, activeCertPem, now) * MS_PER_DAY;
 			if (startedAt && now.getTime() >= startedAt.getTime() + overlapMs) {
 				return this.autoCompleteKind(kind, now, dryRun);
 			}
@@ -775,7 +776,7 @@ export class IdpSettingsService {
 		if (!notAfter) {
 			return configured;
 		}
-		const daysLeft = Math.floor((new Date(notAfter).getTime() - now.getTime()) / 86_400_000);
+		const daysLeft = Math.floor((new Date(notAfter).getTime() - now.getTime()) / MS_PER_DAY);
 		if (daysLeft <= 0) {
 			return 0;
 		}
@@ -793,7 +794,7 @@ export class IdpSettingsService {
 	}
 
 	private notAfterFromDays(days: number, now: Date): string {
-		return new Date(now.getTime() + days * 86_400_000).toISOString().slice(0, 10);
+		return new Date(now.getTime() + days * MS_PER_DAY).toISOString().slice(0, 10);
 	}
 
 	private generateWithOptions(entityId: string, options: GenerateIdpSigningCertRequestDto) {

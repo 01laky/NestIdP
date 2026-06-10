@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { MS_PER_DAY } from '@nestidp/shared';
 import { PrismaService } from '../../prisma/services/prisma.service';
 import { positiveIntOrDefault } from '../../common/config/positive-int.util';
 
@@ -32,7 +33,7 @@ export class AuditRetentionCleanupService implements OnModuleInit, OnModuleDestr
 
 	async purgeExpired(): Promise<number> {
 		const retentionDays = this.getRetentionDays();
-		const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
+		const cutoff = new Date(Date.now() - retentionDays * MS_PER_DAY);
 		const result = await this.prisma.auditEvent.deleteMany({
 			where: { createdAt: { lt: cutoff } },
 		});
@@ -54,7 +55,7 @@ export class AuditRetentionCleanupService implements OnModuleInit, OnModuleDestr
 
 	private getIntervalMs(): number {
 		const raw = this.configService.get<string>('AUDIT_CLEANUP_INTERVAL_MS');
-		const parsed = Number.parseInt(String(raw ?? '86400000'), 10);
-		return Number.isFinite(parsed) ? parsed : 86400000;
+		const parsed = Number.parseInt(String(raw ?? MS_PER_DAY), 10);
+		return Number.isFinite(parsed) ? parsed : MS_PER_DAY;
 	}
 }

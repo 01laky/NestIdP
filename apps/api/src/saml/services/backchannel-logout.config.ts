@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { MS_PER_DAY } from '@nestidp/shared';
 import { boundedInt as boundedIntFromRaw } from '../../common/config/bounded-int.util';
 
 const MIN = 60_000;
 const HOUR = 3_600_000;
-const DAY = 86_400_000;
+const DAY = MS_PER_DAY;
 
 /**
  * Bounded env config for back-channel (SOAP) SLO delivery (Prompt 36). Mirrors the bounded-int style of

@@ -1,4 +1,5 @@
 /** Shared IdP X.509 certificate validity helpers (signing + encryption). */
+import { MS_PER_DAY } from './time.js';
 
 export type IdpCertKeyFamily = 'rsa' | 'ec';
 export type IdpCertRsaModulusBits = 2048 | 3072 | 4096;
@@ -86,7 +87,7 @@ export function daysFromTodayUntilNotAfter(isoDate: string, now = new Date()): n
 	const end = parseUtcCalendarDate(isoDate);
 	const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
 	const endDay = Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate());
-	const diff = Math.round((endDay - today) / (24 * 60 * 60 * 1000));
+	const diff = Math.round((endDay - today) / MS_PER_DAY);
 	return Math.max(1, diff);
 }
 

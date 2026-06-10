@@ -10,6 +10,7 @@ import type { IdpSigningEcCurve, IdpSigningKeyFamily, StoredSigningCrypto } from
 import {
 	defaultSignatureAlgorithmIdForKeyFamily,
 	getIdpSigningSignatureOption,
+	MS_PER_DAY,
 } from '@nestidp/shared';
 import { MAX_PEM_LENGTH } from '../../common/constants/crypto-limits';
 
@@ -191,7 +192,7 @@ export function isCertExpiringSoon(notAfterIso: string | null, warningDays: numb
 	if (Number.isNaN(notAfter)) {
 		return false;
 	}
-	const threshold = Date.now() + warningDays * 24 * 60 * 60 * 1000;
+	const threshold = Date.now() + warningDays * MS_PER_DAY;
 	return notAfter <= threshold;
 }
 

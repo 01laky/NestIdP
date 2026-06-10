@@ -7,6 +7,7 @@ import {
 	CERT_ROTATION_DEFAULT_NOTIFY_LEAD_DAYS,
 	CERT_ROTATION_DEFAULT_OVERLAP_DAYS,
 	CERT_ROTATION_DEFAULT_VALIDITY_DAYS,
+	MS_PER_DAY,
 } from '@nestidp/shared';
 import type { CertRotationKind } from './cert-rotation-notifier';
 
@@ -26,7 +27,7 @@ export class CertRotationConfig {
 			'CERT_ROTATION_SCHEDULER_TICK_MS',
 			DEFAULT_CERT_ROTATION_TICK_MS,
 			0,
-			86_400_000,
+			MS_PER_DAY,
 		);
 	}
 

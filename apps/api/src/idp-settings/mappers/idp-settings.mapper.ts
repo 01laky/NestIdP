@@ -13,6 +13,7 @@ import {
 	CERT_ROTATION_DEFAULT_OVERLAP_DAYS,
 	IDP_CERT_EXPIRY_WARNING_DAYS,
 	IDP_SETTINGS_ROUTE_PREFIX,
+	MS_PER_DAY,
 	SAML_METADATA_PATH,
 	SAML_SSO_PATH,
 } from '@nestidp/shared';
@@ -169,13 +170,13 @@ function buildAutoRotationStatus(opts: {
 	let willAutoStartBy: string | null = null;
 	if (live && !opts.rotationActive && opts.activeNotAfter) {
 		willAutoStartBy = new Date(
-			new Date(opts.activeNotAfter).getTime() - CERT_ROTATION_DEFAULT_LEAD_DAYS * 86_400_000,
+			new Date(opts.activeNotAfter).getTime() - CERT_ROTATION_DEFAULT_LEAD_DAYS * MS_PER_DAY,
 		).toISOString();
 	}
 	let willAutoCompleteAt: string | null = null;
 	if (live && opts.rotationActive && opts.rotationStartedAt) {
 		willAutoCompleteAt = new Date(
-			opts.rotationStartedAt.getTime() + CERT_ROTATION_DEFAULT_OVERLAP_DAYS * 86_400_000,
+			opts.rotationStartedAt.getTime() + CERT_ROTATION_DEFAULT_OVERLAP_DAYS * MS_PER_DAY,
 		).toISOString();
 	}
 	return {
