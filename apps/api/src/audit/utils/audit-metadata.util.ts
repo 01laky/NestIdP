@@ -13,6 +13,8 @@ const SECRET_KEY_SUBSTRINGS = [
 	'pem',
 	'credential',
 	'encrypted',
+	// `encryptionKey`-style names are not covered by 'encrypted' — caught by the §16 leak guard.
+	'encryptionkey',
 	'apikey',
 	'bearer',
 ];

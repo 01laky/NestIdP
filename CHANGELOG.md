@@ -94,6 +94,15 @@ frontend de-duplication) and remaining items land in subsequent commits under th
 
 ### Added
 
+- **End-to-end secret-leak guard test** (§16): the `SLG-*` suite drives sentinel secrets (a bcrypt hash,
+  an `ENCRYPTION_KEY`-shaped string, an OAuth client secret, a proxy password, a session cookie, a
+  private-key PEM) through every formatting path that can reach logs or HTTP clients — audit metadata
+  (top-level **and** nested), the `redactSecrets` string scrubber in its production wire shapes, and the
+  global `RedactingExceptionFilter` (string, object and nested payloads; plain `Error` stays a generic
+  500) — and asserts none of them survive. A boundary test pins that key-name-based metadata redaction
+  does NOT catch a secret under an innocuous key (proving the guard bites). Writing the guard immediately
+  caught a real hole: `encryptionKey`-style metadata keys slipped past the `encrypted` substring — the
+  denylist now also covers `encryptionkey`.
 - **Migration-safety guard** (§17): `assertSplittableSql` in the boot migrator rejects any
   `migration.sql` the naive `;`-splitter cannot apply safely — `CREATE TRIGGER`, standalone
   `BEGIN`/`END`, a `;` inside a string literal, or an unterminated literal — with a
