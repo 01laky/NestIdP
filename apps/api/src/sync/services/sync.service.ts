@@ -27,11 +27,7 @@ import {
 	CREDENTIALS_ENCRYPTION,
 	type CredentialsEncryptionPort,
 } from '../../encryption/credentials-encryption.port';
-import {
-	GroupNameCollisionError,
-	RoleNameCollisionError,
-	UsernameCollisionError,
-} from '../../identity/identity.repository';
+import { UsernameCollisionError } from '../../identity/identity.repository';
 import { ActiveIdentityStore } from '../../identity/store/active-identity-store';
 import { runPool } from '../../common/utils/run-pool.util';
 import { PrismaService } from '../../prisma/services/prisma.service';
@@ -50,6 +46,17 @@ import { IdentitySyncHttpError } from '../identity-sync.errors';
 import { OAuthTokenError, OAuthTokenService } from './oauth-token.service';
 import { ProxyDispatcherService } from './proxy-dispatcher.service';
 import { AuditPersistenceService } from '../../audit/services/audit-persistence.service';
+import { SyncCounters } from './sync-counters';
+import {
+	GROUP_ERROR_DESCRIPTOR,
+	ROLE_ERROR_DESCRIPTOR,
+	type MembershipErrorDescriptor,
+	pushFetchUsersError,
+	pushMembershipFetchError,
+	pushMembershipRowParseError,
+	pushUpsertEntityError,
+	pushUpsertUserError,
+} from './sync-error-entries.util';
 import { SyncLogService } from './sync-log.service';
 import {
 	DRY_RUN_SUMMARY_MESSAGE,
@@ -69,10 +76,31 @@ interface ProcessedUser {
 
 interface MembershipRaw {
 	externalUserId: string;
-	groupsRaw?: unknown[];
-	rolesRaw?: unknown[];
-	groupsError?: unknown;
-	rolesError?: unknown;
+	rawByKind: Partial<Record<MembershipKindKey, unknown[]>>;
+	errorByKind: Partial<Record<MembershipKindKey, unknown>>;
+}
+
+type MembershipKindKey = 'groups' | 'roles';
+
+/**
+ * Per-run descriptor for one membership kind (Prompt 38 §6.8c): the groups and roles paths are
+ * mirrors of each other — everything that differs between them lives here.
+ */
+interface MembershipKind {
+	key: MembershipKindKey;
+	fetchPhase: 'fetch_groups' | 'fetch_roles';
+	errorDescriptor: MembershipErrorDescriptor;
+	mapRow: (raw: unknown, fieldMap: { id: string; name: string }) => ExternalGroupDto | ExternalRoleDto;
+	fieldMap: { id: string; name: string };
+	embedded: boolean;
+	embeddedPath?: string;
+	embeddedCap: number | null;
+	fetchRaw: (externalUserId: string) => Promise<unknown[]>;
+	upsert: (mapped: ExternalGroupDto | ExternalRoleDto) => Promise<{ id: string }>;
+	replace: (localUserId: string, memberIds: string[]) => Promise<void>;
+	counterKey: 'groupsSynced' | 'rolesSynced';
+	seen: Set<string>;
+	upserted: Set<string>;
 }
 
 @Injectable()
@@ -132,10 +160,7 @@ export class SyncService {
 		}
 
 		const errors: SyncLogErrorEntryDto[] = [];
-		let usersSynced = 0;
-		let groupsSynced = 0;
-		let rolesSynced = 0;
-		let usersSkippedCollision = 0;
+		const counters = new SyncCounters();
 		// Cross-connection username collision policy: per-connection override → global default (Prompt 37).
 		// §5.C: the stored override is validated (not blind-cast) — an unknown value falls back to global.
 		const collisionPolicy: UsernameCollisionPolicy =
@@ -145,8 +170,6 @@ export class SyncService {
 				: this.multiSourceConfig.usernameCollisionPolicy();
 		const seenGroupExternalIds = new Set<string>();
 		const seenRoleExternalIds = new Set<string>();
-		const upsertedGroupExternalIds = new Set<string>();
-		const upsertedRoleExternalIds = new Set<string>();
 		const auditContext = {
 			adminId: options?.adminId,
 			adminUsername: options?.adminUsername,
@@ -155,15 +178,16 @@ export class SyncService {
 		try {
 			let bearerToken = await this.resolveBearer(connection, errors);
 			if (bearerToken == null) {
-				return this.finishFailedTrigger(
+				return this.finalizeRun({
+					status: 'FAILED',
 					connectionId,
 					connectionBefore,
-					runningLog.id,
+					logId: runningLog.id,
 					dryRun,
 					errors,
-					{ usersSynced, groupsSynced, rolesSynced },
+					counters: counters.withoutCollisions(),
 					auditContext,
-				);
+				});
 			}
 
 			let usersBody: unknown[];
@@ -204,16 +228,17 @@ export class SyncService {
 					});
 				}
 			} catch (error) {
-				this.pushFetchUsersError(errors, error);
-				return this.finishFailedTrigger(
+				pushFetchUsersError(errors, error);
+				return this.finalizeRun({
+					status: 'FAILED',
 					connectionId,
 					connectionBefore,
-					runningLog.id,
+					logId: runningLog.id,
 					dryRun,
 					errors,
-					{ usersSynced, groupsSynced, rolesSynced },
+					counters: counters.withoutCollisions(),
 					auditContext,
-				);
+				});
 			}
 
 			const seenUserExternalIds = new Set<string>();
@@ -263,7 +288,7 @@ export class SyncService {
 
 				let localUserId: string | null = null;
 				if (dryRun) {
-					usersSynced += 1;
+					counters.usersSynced += 1;
 				} else {
 					try {
 						const row = await this.identityRepository.upsertUser(connectionId, {
@@ -276,10 +301,10 @@ export class SyncService {
 							active: user.active,
 						});
 						localUserId = row.id;
-						usersSynced += 1;
+						counters.usersSynced += 1;
 					} catch (error) {
 						if (error instanceof UsernameCollisionError) {
-							usersSkippedCollision += 1;
+							counters.usersSkippedCollision += 1;
 							await this.recordUsernameCollision(errors, error, connectionId);
 							// Strict deployments fail the whole connection run on any collision (Prompt 37).
 							if (collisionPolicy === 'fail_run') {
@@ -287,61 +312,52 @@ export class SyncService {
 							}
 							continue;
 						}
-						this.pushUpsertUserError(errors, user.id);
+						pushUpsertUserError(errors, user.id);
 						continue;
 					}
 				}
 				processed.push({ externalUserId, rawRow, localUserId });
 			}
 
-			// --- Phase 2: gather raw memberships (bounded-parallel HTTP for endpoint mode) ---
-			const memberships = await this.gatherMemberships(
+			const membershipKinds = this.buildMembershipKinds(
+				connectionId,
 				connection.baseUrl,
 				bearerToken,
 				contract,
-				processed,
 				dispatcher,
+				{ groups: seenGroupExternalIds, roles: seenRoleExternalIds },
 			);
+
+			// --- Phase 2: gather raw memberships (bounded-parallel HTTP for endpoint mode) ---
+			const memberships = await this.gatherMemberships(processed, membershipKinds);
 
 			// --- Phase 3: map + upsert memberships (sequential, original order) ---
 			for (const processedUser of processed) {
 				const m = memberships.get(processedUser.externalUserId);
-				// Groups
-				if (m?.groupsError) {
-					this.pushFetchGroupsError(errors, processedUser.externalUserId, m.groupsError);
-				} else if (m?.groupsRaw) {
-					const groupIds = await this.applyMemberships(
-						connectionId,
-						processedUser,
-						m.groupsRaw,
-						contract.groupFieldMap,
-						'group',
-						{ dryRun, seen: seenGroupExternalIds, upserted: upsertedGroupExternalIds, errors },
-						(count) => {
-							groupsSynced += count;
-						},
-					);
-					if (!dryRun && processedUser.localUserId) {
-						await this.identityRepository.replaceUserGroups(processedUser.localUserId, groupIds);
+				for (const kind of membershipKinds) {
+					const fetchError = m?.errorByKind[kind.key];
+					if (fetchError) {
+						pushMembershipFetchError(
+							errors,
+							kind.fetchPhase,
+							processedUser.externalUserId,
+							fetchError,
+						);
+						continue;
 					}
-				}
-				// Roles
-				if (m?.rolesError) {
-					this.pushFetchRolesError(errors, processedUser.externalUserId, m.rolesError);
-				} else if (m?.rolesRaw) {
-					const roleIds = await this.applyMemberships(
-						connectionId,
+					const rawRows = m?.rawByKind[kind.key];
+					if (!rawRows) {
+						continue;
+					}
+					const memberIds = await this.applyMemberships(
 						processedUser,
-						m.rolesRaw,
-						contract.roleFieldMap,
-						'role',
-						{ dryRun, seen: seenRoleExternalIds, upserted: upsertedRoleExternalIds, errors },
-						(count) => {
-							rolesSynced += count;
-						},
+						rawRows,
+						kind,
+						{ dryRun, errors },
+						counters,
 					);
 					if (!dryRun && processedUser.localUserId) {
-						await this.identityRepository.replaceUserRoles(processedUser.localUserId, roleIds);
+						await kind.replace(processedUser.localUserId, memberIds);
 					}
 				}
 			}
@@ -359,41 +375,16 @@ export class SyncService {
 				errors.push({ phase: DRY_RUN_SUMMARY_PHASE, message: DRY_RUN_SUMMARY_MESSAGE });
 			}
 
-			const finishedLog = await this.syncLogService.finishLog(
-				runningLog.id,
-				'SUCCESS',
-				{ usersSynced, groupsSynced, rolesSynced, usersSkippedCollision },
-				errors.length > 0 ? errors : null,
-			);
-
-			let connectionAfter = connectionBefore;
-			if (!dryRun) {
-				// A successful real run clears any scheduled-failure backoff state and lifts an auto-pause
-				// (Prompt 32, deliverable 13) — both for scheduled runs and for a manual "Run now" recovery.
-				const clearAutoPause = connectionBefore.scheduleAutoPausedAt != null;
-				connectionAfter = await this.prisma.apiConnection.update({
-					where: { id: connectionId },
-					data: {
-						lastSyncAt: finishedLog.finishedAt ?? new Date(),
-						lastSyncStatus: 'SUCCESS',
-						lastCollisionCount: usersSkippedCollision,
-						scheduleConsecutiveFailures: 0,
-						scheduleAutoPausedAt: null,
-						scheduleLastError: null,
-						...(clearAutoPause ? { schedulePaused: false } : {}),
-					},
-				});
-			}
-
-			this.recordSyncAudit('sync_completed', finishedLog.id, options, {
-				usersSynced,
-				usersSkippedCollision,
+			return this.finalizeRun({
 				status: 'SUCCESS',
+				connectionId,
+				connectionBefore,
+				logId: runningLog.id,
+				dryRun,
+				errors,
+				counters: counters.snapshot(),
+				auditContext,
 			});
-			return {
-				syncLog: toSyncLogDto(finishedLog),
-				connection: toApiConnectionDto(connectionAfter),
-			};
 		} catch (error) {
 			// §5.B3: a StrictRowError (onRowError='fail' / collision fail_run) has already pushed its
 			// describing entry before aborting. Any OTHER throw (e.g. in replaceUserGroups or
@@ -405,15 +396,16 @@ export class SyncService {
 					message: error instanceof Error ? error.message : String(error),
 				});
 			}
-			return this.finishFailedTrigger(
+			return this.finalizeRun({
+				status: 'FAILED',
 				connectionId,
 				connectionBefore,
-				runningLog.id,
+				logId: runningLog.id,
 				dryRun,
 				errors,
-				{ usersSynced, groupsSynced, rolesSynced, usersSkippedCollision },
+				counters: counters.snapshot(),
 				auditContext,
-			);
+			});
 		}
 	}
 
@@ -531,64 +523,99 @@ export class SyncService {
 		};
 	}
 
-	/** Endpoint mode: bounded-parallel raw fetch. Embedded mode: synchronous extract. */
-	private async gatherMemberships(
+	/** Bind the static group/role descriptors to this run's contract, token, sets and store. */
+	private buildMembershipKinds(
+		connectionId: string,
 		baseUrl: string,
 		bearerToken: string,
 		contract: ResolvedApiContract,
+		dispatcher: Dispatcher | undefined,
+		seen: { groups: Set<string>; roles: Set<string> },
+	): [MembershipKind, MembershipKind] {
+		return [
+			{
+				key: 'groups',
+				fetchPhase: 'fetch_groups',
+				errorDescriptor: GROUP_ERROR_DESCRIPTOR,
+				mapRow: mapExternalGroupRow,
+				fieldMap: contract.groupFieldMap,
+				embedded: contract.membershipSource.groups.mode === 'embedded',
+				embeddedPath: contract.membershipSource.groups.embeddedPath,
+				embeddedCap: contract.maxGroupsPerUser,
+				fetchRaw: (externalUserId) =>
+					this.identitySyncClient.fetchGroupsRawForUser(
+						baseUrl,
+						bearerToken,
+						externalUserId,
+						contract,
+						dispatcher,
+					),
+				upsert: (mapped) => this.identityRepository.upsertGroup(connectionId, mapped),
+				replace: (localUserId, memberIds) =>
+					this.identityRepository.replaceUserGroups(localUserId, memberIds),
+				counterKey: 'groupsSynced',
+				seen: seen.groups,
+				upserted: new Set<string>(),
+			},
+			{
+				key: 'roles',
+				fetchPhase: 'fetch_roles',
+				errorDescriptor: ROLE_ERROR_DESCRIPTOR,
+				mapRow: mapExternalRoleRow,
+				fieldMap: contract.roleFieldMap,
+				embedded: contract.membershipSource.roles.mode === 'embedded',
+				embeddedPath: contract.membershipSource.roles.embeddedPath,
+				embeddedCap: contract.maxRolesPerUser,
+				fetchRaw: (externalUserId) =>
+					this.identitySyncClient.fetchRolesRawForUser(
+						baseUrl,
+						bearerToken,
+						externalUserId,
+						contract,
+						dispatcher,
+					),
+				upsert: (mapped) => this.identityRepository.upsertRole(connectionId, mapped),
+				replace: (localUserId, memberIds) =>
+					this.identityRepository.replaceUserRoles(localUserId, memberIds),
+				counterKey: 'rolesSynced',
+				seen: seen.roles,
+				upserted: new Set<string>(),
+			},
+		];
+	}
+
+	/** Endpoint mode: bounded-parallel raw fetch. Embedded mode: synchronous extract. */
+	private async gatherMemberships(
 		processed: ProcessedUser[],
-		dispatcher?: Dispatcher,
+		kinds: readonly MembershipKind[],
 	): Promise<Map<string, MembershipRaw>> {
 		const result = new Map<string, MembershipRaw>();
-		const groupsEmbedded = contract.membershipSource.groups.mode === 'embedded';
-		const rolesEmbedded = contract.membershipSource.roles.mode === 'embedded';
 
 		const worker = async (p: ProcessedUser): Promise<void> => {
-			const entry: MembershipRaw = { externalUserId: p.externalUserId };
-			// Groups
-			if (groupsEmbedded) {
-				entry.groupsRaw = this.extractEmbedded(
-					p.rawRow,
-					contract.membershipSource.groups.embeddedPath,
-					contract.maxGroupsPerUser,
-				);
-			} else {
-				try {
-					entry.groupsRaw = await this.identitySyncClient.fetchGroupsRawForUser(
-						baseUrl,
-						bearerToken,
-						p.externalUserId,
-						contract,
-						dispatcher,
+			const entry: MembershipRaw = {
+				externalUserId: p.externalUserId,
+				rawByKind: {},
+				errorByKind: {},
+			};
+			for (const kind of kinds) {
+				if (kind.embedded) {
+					entry.rawByKind[kind.key] = this.extractEmbedded(
+						p.rawRow,
+						kind.embeddedPath,
+						kind.embeddedCap,
 					);
-				} catch (error) {
-					entry.groupsError = error;
-				}
-			}
-			// Roles
-			if (rolesEmbedded) {
-				entry.rolesRaw = this.extractEmbedded(
-					p.rawRow,
-					contract.membershipSource.roles.embeddedPath,
-					contract.maxRolesPerUser,
-				);
-			} else {
-				try {
-					entry.rolesRaw = await this.identitySyncClient.fetchRolesRawForUser(
-						baseUrl,
-						bearerToken,
-						p.externalUserId,
-						contract,
-						dispatcher,
-					);
-				} catch (error) {
-					entry.rolesError = error;
+				} else {
+					try {
+						entry.rawByKind[kind.key] = await kind.fetchRaw(p.externalUserId);
+					} catch (error) {
+						entry.errorByKind[kind.key] = error;
+					}
 				}
 			}
 			result.set(p.externalUserId, entry);
 		};
 
-		if (groupsEmbedded && rolesEmbedded) {
+		if (kinds.every((kind) => kind.embedded)) {
 			// No HTTP — extract inline, order irrelevant.
 			for (const p of processed) {
 				await worker(p);
@@ -611,63 +638,55 @@ export class SyncService {
 	}
 
 	private async applyMemberships(
-		connectionId: string,
 		processedUser: ProcessedUser,
 		rawRows: unknown[],
-		fieldMap: { id: string; name: string },
-		entity: 'group' | 'role',
+		kind: MembershipKind,
 		ctx: {
 			dryRun: boolean;
-			seen: Set<string>;
-			upserted: Set<string>;
 			errors: SyncLogErrorEntryDto[];
 		},
-		addCount: (n: number) => void,
+		counters: SyncCounters,
 	): Promise<string[]> {
-		const ids: string[] = [];
+		const memberIds: string[] = [];
 		for (const raw of rawRows) {
 			let mapped: ExternalGroupDto | ExternalRoleDto;
 			try {
-				mapped =
-					entity === 'group'
-						? mapExternalGroupRow(raw, fieldMap)
-						: mapExternalRoleRow(raw, fieldMap);
+				mapped = kind.mapRow(raw, kind.fieldMap);
 			} catch (error) {
-				ctx.errors.push({
-					phase: entity === 'group' ? 'upsert_group' : 'upsert_role',
-					externalUserId: processedUser.externalUserId,
-					message:
-						error instanceof ExternalApiValidationError ? error.message : `Invalid ${entity} row`,
-				});
+				pushMembershipRowParseError(
+					ctx.errors,
+					kind.errorDescriptor,
+					processedUser.externalUserId,
+					error,
+				);
 				continue;
 			}
-			ctx.seen.add(mapped.id);
+			kind.seen.add(mapped.id);
 			if (ctx.dryRun) {
-				if (!ctx.upserted.has(mapped.id)) {
-					ctx.upserted.add(mapped.id);
-					addCount(1);
+				if (!kind.upserted.has(mapped.id)) {
+					kind.upserted.add(mapped.id);
+					counters[kind.counterKey] += 1;
 				}
 				continue;
 			}
 			try {
-				const row =
-					entity === 'group'
-						? await this.identityRepository.upsertGroup(connectionId, mapped)
-						: await this.identityRepository.upsertRole(connectionId, mapped);
-				if (!ctx.upserted.has(mapped.id)) {
-					ctx.upserted.add(mapped.id);
-					addCount(1);
+				const row = await kind.upsert(mapped);
+				if (!kind.upserted.has(mapped.id)) {
+					kind.upserted.add(mapped.id);
+					counters[kind.counterKey] += 1;
 				}
-				ids.push(row.id);
+				memberIds.push(row.id);
 			} catch (error) {
-				if (entity === 'group') {
-					this.pushUpsertGroupError(ctx.errors, processedUser.externalUserId, mapped.id, error);
-				} else {
-					this.pushUpsertRoleError(ctx.errors, processedUser.externalUserId, mapped.id, error);
-				}
+				pushUpsertEntityError(
+					ctx.errors,
+					kind.errorDescriptor,
+					processedUser.externalUserId,
+					mapped.id,
+					error,
+				);
 			}
 		}
-		return ids;
+		return memberIds;
 	}
 
 	/**
@@ -801,35 +820,71 @@ export class SyncService {
 		});
 	}
 
-	private async finishFailedTrigger(
-		connectionId: string,
-		connectionBefore: ApiConnection,
-		logId: string,
-		dryRun: boolean,
-		errors: SyncLogErrorEntryDto[],
+	/**
+	 * Shared run-finish shape (Prompt 38 §6.8d): finish the log, update the connection status row
+	 * (real runs only) and emit the completion/failure audit event. The success/failure asymmetries
+	 * are deliberate and preserved: a SUCCESS log stores `null` instead of an empty errors array and
+	 * clears the scheduled-failure backoff state; a FAILED run emits its audit event before the
+	 * connection update (the historical order).
+	 */
+	private async finalizeRun(params: {
+		status: 'SUCCESS' | 'FAILED';
+		connectionId: string;
+		connectionBefore: ApiConnection;
+		logId: string;
+		dryRun: boolean;
+		errors: SyncLogErrorEntryDto[];
 		counters: {
 			usersSynced: number;
 			groupsSynced: number;
 			rolesSynced: number;
 			usersSkippedCollision?: number;
-		},
-		options?: { adminId?: string; adminUsername?: string },
-	): Promise<TriggerSyncResponseDto> {
-		const finishedLog = await this.syncLogService.finishLog(logId, 'FAILED', counters, errors);
-		this.recordSyncAudit('sync_failed', finishedLog.id, options, {
+		};
+		auditContext?: { adminId?: string; adminUsername?: string };
+	}): Promise<TriggerSyncResponseDto> {
+		const { status, counters, errors, dryRun } = params;
+		const finishedLog = await this.syncLogService.finishLog(
+			params.logId,
+			status,
+			counters,
+			status === 'SUCCESS' ? (errors.length > 0 ? errors : null) : errors,
+		);
+		const auditMetadata = {
 			usersSynced: counters.usersSynced,
 			usersSkippedCollision: counters.usersSkippedCollision ?? 0,
-			status: 'FAILED',
-		});
-		let connectionAfter = connectionBefore;
-		if (!dryRun) {
-			connectionAfter = await this.prisma.apiConnection.update({
-				where: { id: connectionId },
-				data: {
-					lastSyncStatus: 'FAILED',
-					lastCollisionCount: counters.usersSkippedCollision ?? 0,
-				},
-			});
+			status,
+		};
+		let connectionAfter = params.connectionBefore;
+		if (status === 'SUCCESS') {
+			if (!dryRun) {
+				// A successful real run clears any scheduled-failure backoff state and lifts an auto-pause
+				// (Prompt 32, deliverable 13) — both for scheduled runs and for a manual "Run now" recovery.
+				const clearAutoPause = params.connectionBefore.scheduleAutoPausedAt != null;
+				connectionAfter = await this.prisma.apiConnection.update({
+					where: { id: params.connectionId },
+					data: {
+						lastSyncAt: finishedLog.finishedAt ?? new Date(),
+						lastSyncStatus: 'SUCCESS',
+						lastCollisionCount: counters.usersSkippedCollision ?? 0,
+						scheduleConsecutiveFailures: 0,
+						scheduleAutoPausedAt: null,
+						scheduleLastError: null,
+						...(clearAutoPause ? { schedulePaused: false } : {}),
+					},
+				});
+			}
+			this.recordSyncAudit('sync_completed', finishedLog.id, params.auditContext, auditMetadata);
+		} else {
+			this.recordSyncAudit('sync_failed', finishedLog.id, params.auditContext, auditMetadata);
+			if (!dryRun) {
+				connectionAfter = await this.prisma.apiConnection.update({
+					where: { id: params.connectionId },
+					data: {
+						lastSyncStatus: 'FAILED',
+						lastCollisionCount: counters.usersSkippedCollision ?? 0,
+					},
+				});
+			}
 		}
 		return {
 			syncLog: toSyncLogDto(finishedLog),
@@ -895,36 +950,6 @@ export class SyncService {
 		return ageMs > staleMinutes * 60_000;
 	}
 
-	private pushFetchUsersError(errors: SyncLogErrorEntryDto[], error: unknown): void {
-		if (error instanceof ExternalApiValidationError) {
-			errors.push({
-				phase: error.message.includes('limit') ? 'user_limit' : 'fetch_users',
-				message: error.message,
-			});
-			return;
-		}
-		if (error instanceof IdentitySyncHttpError) {
-			const phase: SyncLogErrorEntryDto['phase'] = error.message.includes('limit')
-				? 'user_limit'
-				: 'fetch_users';
-			errors.push({
-				phase,
-				message: error.message,
-				httpStatus: error.options.statusCode,
-			});
-			return;
-		}
-		errors.push({ phase: 'fetch_users', message: 'Failed to fetch users' });
-	}
-
-	private pushUpsertUserError(errors: SyncLogErrorEntryDto[], externalUserId: string): void {
-		errors.push({
-			phase: 'upsert_user',
-			externalUserId,
-			message: 'Failed to upsert user',
-		});
-	}
-
 	/**
 	 * Record a cross-connection username collision as a first-class outcome (Prompt 37): a distinct
 	 * `username_collision` error entry that names the current owner (the record kept), plus a system audit
@@ -974,60 +999,6 @@ export class SyncService {
 				externalId: error.externalUserId,
 				ownerApiConnectionId: owner?.apiConnectionId,
 			},
-		});
-	}
-
-	private pushFetchGroupsError(
-		errors: SyncLogErrorEntryDto[],
-		externalUserId: string,
-		error: unknown,
-	): void {
-		errors.push({
-			phase: 'fetch_groups',
-			externalUserId,
-			message: error instanceof IdentitySyncHttpError ? error.message : 'Failed to fetch groups',
-			httpStatus: error instanceof IdentitySyncHttpError ? error.options.statusCode : undefined,
-		});
-	}
-
-	private pushFetchRolesError(
-		errors: SyncLogErrorEntryDto[],
-		externalUserId: string,
-		error: unknown,
-	): void {
-		errors.push({
-			phase: 'fetch_roles',
-			externalUserId,
-			message: error instanceof IdentitySyncHttpError ? error.message : 'Failed to fetch roles',
-			httpStatus: error instanceof IdentitySyncHttpError ? error.options.statusCode : undefined,
-		});
-	}
-
-	private pushUpsertGroupError(
-		errors: SyncLogErrorEntryDto[],
-		externalUserId: string,
-		externalGroupId: string,
-		error: unknown,
-	): void {
-		errors.push({
-			phase: 'upsert_group',
-			externalUserId,
-			externalGroupId,
-			message: error instanceof GroupNameCollisionError ? error.message : 'Failed to upsert group',
-		});
-	}
-
-	private pushUpsertRoleError(
-		errors: SyncLogErrorEntryDto[],
-		externalUserId: string,
-		externalRoleId: string,
-		error: unknown,
-	): void {
-		errors.push({
-			phase: 'upsert_role',
-			externalUserId,
-			externalRoleId,
-			message: error instanceof RoleNameCollisionError ? error.message : 'Failed to upsert role',
 		});
 	}
 }

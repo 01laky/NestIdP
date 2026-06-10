@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { getByPath, type ResolvedApiContract } from '@nestidp/shared';
+import type { ResolvedApiContract } from '@nestidp/shared';
 import { boundedInt as boundedIntFromRaw } from '../../common/config/bounded-int.util';
 import type { Dispatcher } from 'undici';
-import { normalizeBaseUrl } from '../../api-connections/utils/base-url.util';
+import { buildOutboundUrl, extractArrayAt, outboundFetch } from '../utils/outbound-http.util';
 import { ExternalApiValidationError } from '../validators/external-api.validator';
 import { IdentitySyncHttpError } from '../identity-sync.errors';
 
@@ -110,24 +110,17 @@ export class IdentitySyncClientService {
 		queryParams: Record<string, string>,
 		extra?: Record<string, string | number>,
 	): string {
-		const normalized = normalizeBaseUrl(baseUrl);
-		const url = new URL(path, `${normalized}/`);
-		for (const [k, v] of Object.entries(queryParams)) {
-			url.searchParams.set(k, v);
-		}
-		if (extra) {
-			for (const [k, v] of Object.entries(extra)) {
-				url.searchParams.set(k, String(v));
-			}
-		}
-		// Defense-in-depth: a stored path must not redirect off the base origin.
-		if (url.origin !== new URL(normalized).origin) {
-			throw new IdentitySyncHttpError('Resolved request URL left the base origin', {
-				url: url.toString(),
-				reachable: false,
-			});
-		}
-		return url.toString();
+		return buildOutboundUrl({
+			baseUrl,
+			path,
+			queryParams,
+			extraParams: extra,
+			onOriginViolation: (resolvedUrl) =>
+				new IdentitySyncHttpError('Resolved request URL left the base origin', {
+					url: resolvedUrl,
+					reachable: false,
+				}),
+		});
 	}
 
 	private async fetchJson(
@@ -137,16 +130,13 @@ export class IdentitySyncClientService {
 		dispatcher?: Dispatcher,
 	): Promise<unknown> {
 		try {
-			const response = await fetch(url, {
-				method: 'GET',
-				headers: {
-					...headers,
-					Authorization: `Bearer ${bearerToken}`,
-					Accept: 'application/json',
-				},
-				signal: AbortSignal.timeout(this.getHttpTimeoutMs()),
-				...(dispatcher ? { dispatcher } : {}),
-			} as RequestInit & { dispatcher?: Dispatcher });
+			const response = await outboundFetch({
+				url,
+				bearerToken,
+				headers,
+				timeoutMs: this.getHttpTimeoutMs(),
+				dispatcher,
+			});
 			if (response.status < 200 || response.status >= 300) {
 				throw new IdentitySyncHttpError(`Identity API returned HTTP ${response.status}`, {
 					statusCode: response.status,
@@ -173,17 +163,8 @@ export class IdentitySyncClientService {
 		}
 	}
 
-	private extractArray(body: unknown, responseRoot: string, url: string): unknown[] {
-		const value = responseRoot ? getByPath(body, responseRoot) : body;
-		if (!Array.isArray(value)) {
-			throw new ExternalApiValidationError(
-				responseRoot
-					? `Response did not contain an array at "${responseRoot}"`
-					: 'Response must be a JSON array',
-			);
-		}
-		void url;
-		return value;
+	private extractArray(body: unknown, responseRoot: string): unknown[] {
+		return extractArrayAt(body, responseRoot, 'Response must be a JSON array');
 	}
 
 	private async fetchCollectionRaw(
@@ -206,7 +187,6 @@ export class IdentitySyncClientService {
 			return this.extractArray(
 				await this.fetchJson(url, bearerToken, headers, opts.dispatcher),
 				opts.responseRoot,
-				url,
 			);
 		}
 
@@ -233,7 +213,6 @@ export class IdentitySyncClientService {
 			const pageRows = this.extractArray(
 				await this.fetchJson(url, bearerToken, headers, opts.dispatcher),
 				opts.responseRoot,
-				url,
 			);
 			// §5.C: a server that ignores the page/offset params returns the same page forever — an
 			// identical first row to the previous page means we are not advancing, so stop. (An empty

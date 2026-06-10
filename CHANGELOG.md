@@ -76,6 +76,18 @@ frontend de-duplication) and remaining items land in subsequent commits under th
   `admin/adminApi.ts` reduced to a re-export barrel. No call sites or tests changed — `import … from
 '../adminApi'` and the `vi.spyOn(adminApi, …)` pattern (~480 sites) keep working through the barrel.
 
+- **`SyncService` decomposed behind characterization goldens** (§11/§6.8): before touching the ~1000-line
+  service, 8 golden scenarios (clean run, collision-skip/fail_run, membership-phase failure, deactivation
+  with dropped-row entry, dry-run, `syncAll` aggregate, fetch failure) snapshot the ordered `finishLog`
+  args, the ordered identity-store mutation sequence, the audit events and the returned DTOs — committed
+  first, then the refactor landed with the fixtures **byte-identical**. The decomposition: a `SyncCounters`
+  object (preserving the historical 3-field vs 4-field `finishLog` asymmetry), pure error-entry pushers in
+  `sync-error-entries.util.ts` (groups/roles mirrors collapsed behind per-kind descriptors), the remaining
+  groups-vs-roles membership mirrors unified behind a `MembershipKind` descriptor (asymmetries — collision
+  error classes, entry field names, per-kind caps — encoded, not papered over), one `finalizeRun` for the
+  success/failure finishes (deliberate ordering asymmetries documented in place), and a shared
+  `outbound-http.util` (URL build + fetch + array extraction) de-duplicating the sync client and the
+  connection-test service (dead `url` param dropped, per-caller timeouts kept).
 - **DTO boundary cleanups** (§6.3/§A20): one shared `@Trim()` decorator replaces the ten hand-copied
   string-trim `@Transform` blocks across the admin-user / api-connection / end-user-login /
   manual-identity / schedule DTOs (the long null-checking variant was behaviour-identical); the two

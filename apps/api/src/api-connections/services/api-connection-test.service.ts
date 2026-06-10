@@ -8,7 +8,7 @@ import type {
 	ProxyCheckResultDto,
 	ResolvedApiContract,
 } from '@nestidp/shared';
-import { getByPath, resolveApiContract } from '@nestidp/shared';
+import { resolveApiContract } from '@nestidp/shared';
 import type { Dispatcher } from 'undici';
 import {
 	CREDENTIALS_ENCRYPTION,
@@ -19,6 +19,7 @@ import { PrismaService } from '../../prisma/services/prisma.service';
 import { IdentitySyncClientService } from '../../sync/services/identity-sync-client.service';
 import { OAuthTokenService } from '../../sync/services/oauth-token.service';
 import { ProxyDispatcherService } from '../../sync/services/proxy-dispatcher.service';
+import { buildOutboundUrl, extractArrayAt, outboundFetch } from '../../sync/utils/outbound-http.util';
 import { annotateIfProxied, classifyProxyError } from '../../sync/utils/proxy-error.util';
 import { ApiConnectionsAuditService } from './api-connections-audit.service';
 import { normalizeBaseUrl } from '../utils/base-url.util';
@@ -301,21 +302,17 @@ export class ApiConnectionTestService {
 		contract: ResolvedApiContract,
 		applyLimit: boolean,
 	): string {
-		const normalized = normalizeBaseUrl(baseUrl);
-		const url = new URL(path, `${normalized}/`);
-		for (const [k, v] of Object.entries(contract.queryParams)) {
-			url.searchParams.set(k, v);
-		}
-		if (applyLimit && contract.pagination.limitParam) {
-			url.searchParams.set(
-				contract.pagination.limitParam,
-				String(contract.pagination.pageSize ?? 50),
-			);
-		}
-		if (url.origin !== new URL(normalized).origin) {
-			throw new ExternalApiValidationError('Resolved request URL left the base origin');
-		}
-		return url.toString();
+		return buildOutboundUrl({
+			baseUrl,
+			path,
+			queryParams: contract.queryParams,
+			extraParams:
+				applyLimit && contract.pagination.limitParam
+					? { [contract.pagination.limitParam]: contract.pagination.pageSize ?? 50 }
+					: undefined,
+			onOriginViolation: () =>
+				new ExternalApiValidationError('Resolved request URL left the base origin'),
+		});
 	}
 
 	private async fetch(
@@ -324,28 +321,17 @@ export class ApiConnectionTestService {
 		contract: ResolvedApiContract,
 		dispatcher?: Dispatcher,
 	): Promise<Response> {
-		return fetch(url, {
-			method: 'GET',
-			headers: {
-				...contract.headers,
-				Authorization: `Bearer ${token}`,
-				Accept: 'application/json',
-			},
-			signal: AbortSignal.timeout(TEST_TIMEOUT_MS),
-			...(dispatcher ? { dispatcher } : {}),
-		} as RequestInit & { dispatcher?: Dispatcher });
+		return outboundFetch({
+			url,
+			bearerToken: token,
+			headers: contract.headers,
+			timeoutMs: TEST_TIMEOUT_MS,
+			dispatcher,
+		});
 	}
 
 	private extractArray(body: unknown, responseRoot: string): unknown[] {
-		const value = responseRoot ? getByPath(body, responseRoot) : body;
-		if (!Array.isArray(value)) {
-			throw new ExternalApiValidationError(
-				responseRoot
-					? `Response did not contain an array at "${responseRoot}"`
-					: 'Users response must be a JSON array',
-			);
-		}
-		return value;
+		return extractArrayAt(body, responseRoot, 'Users response must be a JSON array');
 	}
 
 	private unreachable(id: string, error: unknown, proxied = false): ApiConnectionTestResponseDto {
