@@ -1,12 +1,13 @@
-import { FormEvent, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, Suspense, useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { ColumnDef } from '@tanstack/react-table';
-import type { IdentityRoleListItemDto, IdentitySourceOptionDto } from '@nestidp/shared';
+import type { IdentityRoleListItemDto } from '@nestidp/shared';
 import { IDENTITY_ROLE_NEW_ROUTE, identityRoleDetailRoute } from '@nestidp/shared';
-import { AdminApiError, listIdentityRoles, listIdentitySources } from '../adminApi';
+import { AdminApiError, listIdentityRoles } from '../adminApi';
 import { AdminPageHeader } from '../components/layout/AdminPageHeader';
 import { IdentitySectionNav } from '../components/identity/IdentitySectionNav';
+import { useIdentitySources } from '../hooks/useIdentitySources';
 import { createLazyIdentityListTable } from '../components/identity/identityListTableLazy';
 import { EmptyState } from '../components/common/EmptyState';
 import { ErrorBanner } from '../components/common/ErrorBanner';
@@ -27,17 +28,7 @@ export function IdentityRolesPage() {
 	useAdminDocumentTitle(t('rolesTitle'));
 	const [origin, setOrigin] = useState('');
 	const [source, setSource] = useState('');
-	const [sources, setSources] = useState<IdentitySourceOptionDto[]>([]);
-
-	useEffect(() => {
-		void listIdentitySources()
-			.then((res) => setSources(res.sources))
-			.catch(() => setSources([]));
-	}, []);
-	const sourceLabel = useMemo(() => {
-		const map = new Map(sources.map((s) => [s.apiConnectionId, s.label]));
-		return (id: string) => map.get(id) ?? id;
-	}, [sources]);
+	const { sources, sourceLabel } = useIdentitySources();
 
 	const mapError = useCallback(
 		(err: unknown) =>

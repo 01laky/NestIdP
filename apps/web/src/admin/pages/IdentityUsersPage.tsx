@@ -1,16 +1,17 @@
-import { FormEvent, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, Suspense, useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { ColumnDef } from '@tanstack/react-table';
-import type { IdentitySourceOptionDto, IdentityUserListItemDto } from '@nestidp/shared';
+import type { IdentityUserListItemDto } from '@nestidp/shared';
 import {
 	API_CONNECTION_ROUTE_PREFIX,
 	IDENTITY_USER_NEW_ROUTE,
 	identityUserDetailRoute,
 } from '@nestidp/shared';
-import { AdminApiError, listIdentityUsers, listIdentitySources } from '../adminApi';
+import { AdminApiError, listIdentityUsers } from '../adminApi';
 import { AdminPageHeader } from '../components/layout/AdminPageHeader';
 import { IdentitySectionNav } from '../components/identity/IdentitySectionNav';
+import { useIdentitySources } from '../hooks/useIdentitySources';
 import { createLazyIdentityListTable } from '../components/identity/identityListTableLazy';
 import { EmptyState } from '../components/common/EmptyState';
 import { ErrorBanner } from '../components/common/ErrorBanner';
@@ -32,17 +33,7 @@ export function IdentityUsersPage() {
 	const [search, setSearch] = useState('');
 	const [origin, setOrigin] = useState('');
 	const [source, setSource] = useState('');
-	const [sources, setSources] = useState<IdentitySourceOptionDto[]>([]);
-
-	useEffect(() => {
-		void listIdentitySources()
-			.then((res) => setSources(res.sources))
-			.catch(() => setSources([]));
-	}, []);
-	const sourceLabel = useMemo(() => {
-		const map = new Map(sources.map((s) => [s.apiConnectionId, s.label]));
-		return (id: string) => map.get(id) ?? id;
-	}, [sources]);
+	const { sources, sourceLabel } = useIdentitySources();
 
 	const mapError = useCallback(
 		(err: unknown) =>
