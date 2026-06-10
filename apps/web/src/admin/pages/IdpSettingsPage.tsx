@@ -40,6 +40,7 @@ import {
 	buildCertOptionsConfirmSummary,
 	IdpSigningCertOptionsFields,
 } from '../components/idp-cert/IdpSigningCertOptionsFields';
+import { CertificateSection } from '../components/idp-cert/CertificateSection';
 import { AdminBreadcrumbs } from '../components/layout/AdminBreadcrumbs';
 import { AdminPageHeader } from '../components/layout/AdminPageHeader';
 import { ErrorBanner } from '../components/common/ErrorBanner';
@@ -54,7 +55,6 @@ import {
 	CodeBlock,
 	Panel,
 	Select,
-	TextArea,
 	TextInput,
 	useConfirm,
 	useToast,
@@ -605,136 +605,102 @@ export function IdpSettingsPage() {
 				</fieldset>
 			</Panel>
 
-			<Panel title={t('signingCertificate')}>
-				<p>
-					<span className="evg-badge evg-badge--info">{t(certStatusKey(settings))}</span>
-				</p>
-				<dl className="evg-dl">
-					<div className="evg-dl__row">
-						<dt>{t('fingerprint')}</dt>
-						<dd>
-							<code>{settings.signingCertFingerprintSha256 ?? tCommon('emDash')}</code>
-						</dd>
-					</div>
-					<div className="evg-dl__row">
-						<dt>{t('notAfter')}</dt>
-						<dd>
-							<code>{settings.signingCertNotAfter ?? tCommon('emDash')}</code>
-						</dd>
-					</div>
-					{settings.signingKeyFamily ? (
-						<div className="evg-dl__row">
-							<dt>{t('crypto.keyFamily')}</dt>
-							<dd>
-								<code>
-									{settings.signingKeyFamily === 'rsa'
-										? `RSA ${settings.signingRsaModulusBits ?? 2048}`
-										: `EC ${settings.signingEcCurve ?? 'P-256'}`}
-								</code>
-							</dd>
-						</div>
-					) : null}
-					{settings.signingSignatureAlgorithmId ? (
-						<div className="evg-dl__row">
-							<dt>{t('crypto.signatureAlgorithm')}</dt>
-							<dd>
-								<code>
-									{t(`crypto.algorithms.${settings.signingSignatureAlgorithmId}`, {
-										defaultValue: settings.signingSignatureAlgorithmId,
-									})}
-								</code>
-							</dd>
-						</div>
-					) : null}
-				</dl>
-				<hr className="evg-divider" />
-				<IdpSigningCertOptionsFields
-					value={certOptions}
-					onChange={setCertOptions}
-					disabled={busy || settings.rotation.active}
-				/>
-				<div className="evg-cluster">
-					<Button
-						type="button"
-						variant="secondary"
-						disabled={busy || settings.rotation.active}
-						onClick={() => void signingActions.generatePrimary()}
-					>
-						{t('generateCertificate')}
-					</Button>
-					<Button
-						type="button"
-						variant="secondary"
-						disabled={busy || settings.rotation.active}
-						onClick={() => setShowUpload(true)}
-					>
-						{t('uploadCertificate')}
-					</Button>
-					<Button
-						type="button"
-						variant="secondary"
-						disabled={busy || settings.rotation.active || !settings.hasSigningCertificate}
-						onClick={() => void signingActions.startRotationGenerate()}
-					>
-						{t('startRotationGenerate')}
-					</Button>
-				</div>
-			</Panel>
-
-			{showUpload ? (
-				<Panel title={t('uploadPrimary')}>
-					<form
-						className="evg-stack"
-						aria-busy={busy}
-						onSubmit={(event) => { event.preventDefault(); void signingActions.uploadPrimary(); }}
-					>
-						<fieldset className="evg-stack" disabled={busy}>
-							<TextArea
-								label={t('signingCertPem')}
-								rows={6}
-								hint={t('signingCertHint')}
-								value={uploadCert}
-								onChange={(event) => setUploadCert(event.target.value)}
-							/>
-							<TextArea
-								label={t('privateKeyPem')}
-								rows={6}
-								hint={t('privateKeyHint')}
-								value={uploadKey}
-								onChange={(event) => setUploadKey(event.target.value)}
-							/>
-							<div className="evg-cluster">
-								<Button type="submit" variant="primary" disabled={busy}>
-									{tCommon('upload')}
-								</Button>
-								<Button
-									type="button"
-									variant="secondary"
-									disabled={busy}
-									onClick={() => setShowUpload(false)}
-								>
-									{tCommon('cancel')}
-								</Button>
+			<CertificateSection
+				t={t}
+				tCommon={tCommon}
+				busy={busy}
+				panelTitle={t('signingCertificate')}
+				statusBadge={t(certStatusKey(settings))}
+				fingerprint={settings.signingCertFingerprintSha256}
+				notAfter={settings.signingCertNotAfter}
+				cryptoRows={
+					<>
+						{settings.signingKeyFamily ? (
+							<div className="evg-dl__row">
+								<dt>{t('crypto.keyFamily')}</dt>
+								<dd>
+									<code>
+										{settings.signingKeyFamily === 'rsa'
+											? `RSA ${settings.signingRsaModulusBits ?? 2048}`
+											: `EC ${settings.signingEcCurve ?? 'P-256'}`}
+									</code>
+								</dd>
 							</div>
-						</fieldset>
-					</form>
-				</Panel>
-			) : null}
-
-			{settings.rotation.active ? (
-				<Panel title={t('certificateRotation')}>
-					{isStaleRotation(settings.rotation.startedAt) ? (
-						<p className="evg-callout evg-callout--info">
-							{t('rotationStale', { date: settings.rotation.startedAt })}
-						</p>
-					) : null}
-					<h3 className="evg-panel__title">{t('pendingCertTitle')}</h3>
-					<p className="evg-muted">
-						{t('pendingFingerprint', {
-							fingerprint: settings.rotation.pendingCertFingerprintSha256 ?? tCommon('emDash'),
-						})}
-					</p>
-					{settings.rotation.pendingSigningKeyFamily ? (
+						) : null}
+						{settings.signingSignatureAlgorithmId ? (
+							<div className="evg-dl__row">
+								<dt>{t('crypto.signatureAlgorithm')}</dt>
+								<dd>
+									<code>
+										{t(`crypto.algorithms.${settings.signingSignatureAlgorithmId}`, {
+											defaultValue: settings.signingSignatureAlgorithmId,
+										})}
+									</code>
+								</dd>
+							</div>
+						) : null}
+					</>
+				}
+				optionsFields={
+					<IdpSigningCertOptionsFields
+						value={certOptions}
+						onChange={setCertOptions}
+						disabled={busy || settings.rotation.active}
+					/>
+				}
+				actions={
+					<div className="evg-cluster">
+						<Button
+							type="button"
+							variant="secondary"
+							disabled={busy || settings.rotation.active}
+							onClick={() => void signingActions.generatePrimary()}
+						>
+							{t('generateCertificate')}
+						</Button>
+						<Button
+							type="button"
+							variant="secondary"
+							disabled={busy || settings.rotation.active}
+							onClick={() => setShowUpload(true)}
+						>
+							{t('uploadCertificate')}
+						</Button>
+						<Button
+							type="button"
+							variant="secondary"
+							disabled={busy || settings.rotation.active || !settings.hasSigningCertificate}
+							onClick={() => void signingActions.startRotationGenerate()}
+						>
+							{t('startRotationGenerate')}
+						</Button>
+					</div>
+				}
+				showUpload={showUpload}
+				uploadTitle={t('uploadPrimary')}
+				uploadCertLabel={t('signingCertPem')}
+				uploadCertHint={t('signingCertHint')}
+				uploadCertValue={uploadCert}
+				onUploadCertChange={setUploadCert}
+				uploadKeyLabel={t('privateKeyPem')}
+				uploadKeyHint={t('privateKeyHint')}
+				uploadKeyValue={uploadKey}
+				onUploadKeyChange={setUploadKey}
+				onUploadSubmit={() => void signingActions.uploadPrimary()}
+				onUploadCancel={() => setShowUpload(false)}
+				rotationActive={settings.rotation.active}
+				rotationTitle={t('certificateRotation')}
+				rotationStaleText={
+					isStaleRotation(settings.rotation.startedAt)
+						? t('rotationStale', { date: settings.rotation.startedAt })
+						: null
+				}
+				pendingCertTitle={t('pendingCertTitle')}
+				pendingFingerprintText={t('pendingFingerprint', {
+					fingerprint: settings.rotation.pendingCertFingerprintSha256 ?? tCommon('emDash'),
+				})}
+				pendingCrypto={
+					settings.rotation.pendingSigningKeyFamily ? (
 						<p className="evg-muted">
 							{t('crypto.keyFamily')}: {settings.rotation.pendingSigningKeyFamily}
 							{settings.rotation.pendingSigningKeyFamily === 'rsa'
@@ -746,205 +712,160 @@ export function IdpSettingsPage() {
 							{' · '}
 							{t('notAfter')}: {settings.rotation.pendingSigningCertNotAfter ?? tCommon('emDash')}
 						</p>
-					) : null}
-					{settings.rotation.pendingSigningSignatureAlgorithmId &&
+					) : null
+				}
+				mismatchWarning={
+					settings.rotation.pendingSigningSignatureAlgorithmId &&
 					settings.signingSignatureAlgorithmId &&
 					settings.rotation.pendingSigningSignatureAlgorithmId !==
 						settings.signingSignatureAlgorithmId ? (
 						<Callout variant="warning">{t('rotationAlgorithmMismatchWarning')}</Callout>
-					) : null}
-					<ol className="evg-checklist">
-						<li>{t('rotationStep1')}</li>
-						<li>
-							{t('rotationStep2')}{' '}
-							<Link to={SP_CONNECTION_ROUTE_PREFIX}>{t('openSpConnections')}</Link>
-						</li>
-						<li>{t('rotationStep3')}</li>
-						<li>{t('rotationStep4')}</li>
-					</ol>
-					<div className="evg-cluster">
-						<Button
-							type="button"
-							variant="primary"
-							disabled={busy}
-							onClick={() => void signingActions.completeRotation()}
-						>
-							{t('completeRotation')}
-						</Button>
-						<Button
-							type="button"
-							variant="danger"
-							disabled={busy}
-							onClick={() => void signingActions.cancelRotation()}
-						>
-							{t('cancelRotation')}
-						</Button>
-					</div>
-				</Panel>
-			) : null}
+					) : null
+				}
+				rotationSteps={[
+					t('rotationStep1'),
+					t('rotationStep2'),
+					t('rotationStep3'),
+					t('rotationStep4'),
+				]}
+				openSpConnectionsLabel={t('openSpConnections')}
+				completeLabel={t('completeRotation')}
+				cancelLabel={t('cancelRotation')}
+				onComplete={() => void signingActions.completeRotation()}
+				onCancel={() => void signingActions.cancelRotation()}
+			/>
 
-			<Panel title={t('encryption.encryptionCertificate')}>
-				<p>
-					<span className="evg-badge evg-badge--info">{t(encryptionCertStatusKey(settings))}</span>
-				</p>
-				<p className="evg-muted">{t('encryption.panelHint')}</p>
-				<dl className="evg-dl">
-					<div className="evg-dl__row">
-						<dt>{t('fingerprint')}</dt>
-						<dd>
-							<code>{settings.encryptionCertFingerprintSha256 ?? tCommon('emDash')}</code>
-						</dd>
-					</div>
-					<div className="evg-dl__row">
-						<dt>{t('notAfter')}</dt>
-						<dd>
-							<code>{settings.encryptionCertNotAfter ?? tCommon('emDash')}</code>
-						</dd>
-					</div>
-					{settings.encryptionKeyFamily ? (
-						<div className="evg-dl__row">
-							<dt>{t('encryption.crypto.keyFamily')}</dt>
-							<dd>
-								<code>
-									{settings.encryptionKeyFamily === 'rsa'
-										? `RSA ${settings.encryptionRsaModulusBits ?? 2048}`
-										: `EC ${settings.encryptionEcCurve ?? 'P-256'}`}
-								</code>
-							</dd>
-						</div>
-					) : null}
-					{settings.encryptionKeyTransportAlgorithmId ? (
-						<div className="evg-dl__row">
-							<dt>{t('encryption.crypto.keyTransportAlgorithm')}</dt>
-							<dd>
-								<code>
-									{t(`encryption.crypto.algorithms.${settings.encryptionKeyTransportAlgorithmId}`, {
-										defaultValue: settings.encryptionKeyTransportAlgorithmId,
-									})}
-								</code>
-							</dd>
-						</div>
-					) : null}
-				</dl>
-				{settings.encryptionKeyFamily === 'ec' ? (
-					<Callout variant="info">{t('encryptionEcKeyAgreementInfo')}</Callout>
-				) : null}
-				<hr className="evg-divider" />
-				<IdpEncryptionCertOptionsFields
-					value={encCertOptions}
-					onChange={setEncCertOptions}
-					disabled={busy || settings.encryptionRotation.active}
-				/>
-				<div className="evg-cluster evg-cluster--wrap">
-					<Button
-						type="button"
-						variant="secondary"
-						size="sm"
-						disabled={busy || settings.encryptionRotation.active}
-						onClick={copySigningOptionsToEncryption}
-					>
-						{t('encryption.copySigningOptions')}
-					</Button>
-					<Button
-						type="button"
-						variant="secondary"
-						disabled={busy || settings.encryptionRotation.active}
-						onClick={() => void encryptionActions.generatePrimary()}
-					>
-						{t('encryption.generateCertificate')}
-					</Button>
-					<Button
-						type="button"
-						variant="secondary"
-						disabled={busy || settings.encryptionRotation.active}
-						onClick={() => setShowEncUpload(true)}
-					>
-						{t('encryption.uploadCertificate')}
-					</Button>
-					<Button
-						type="button"
-						variant="secondary"
-						disabled={
-							busy || settings.encryptionRotation.active || !settings.hasEncryptionCertificate
-						}
-						onClick={() => void encryptionActions.startRotationGenerate()}
-					>
-						{t('encryption.startRotationGenerate')}
-					</Button>
-					<Button
-						type="button"
-						variant="secondary"
-						disabled={busy || !settings.hasEncryptionCertificate}
-						onClick={() => void handleCopyEncryptionPublicPem()}
-					>
-						{t('encryption.copyPublicPem')}
-					</Button>
-					<Button
-						type="button"
-						variant="secondary"
-						disabled={busy || !settings.hasEncryptionCertificate}
-						onClick={() => void handleDownloadEncryptionPublicPem()}
-					>
-						{t('encryption.downloadPublicPem')}
-					</Button>
-				</div>
-			</Panel>
-
-			{showEncUpload ? (
-				<Panel title={t('encryption.uploadPrimary')}>
-					<form
-						className="evg-stack"
-						aria-busy={busy}
-						onSubmit={(event) => { event.preventDefault(); void encryptionActions.uploadPrimary(); }}
-					>
-						<fieldset className="evg-stack" disabled={busy}>
-							<TextArea
-								label={t('encryption.encryptionCertPem')}
-								rows={6}
-								hint={t('encryption.encryptionCertHint')}
-								value={uploadEncCert}
-								onChange={(event) => setUploadEncCert(event.target.value)}
-							/>
-							<TextArea
-								label={t('encryption.privateKeyPem')}
-								rows={6}
-								hint={t('encryption.privateKeyHint')}
-								value={uploadEncKey}
-								onChange={(event) => setUploadEncKey(event.target.value)}
-							/>
-							<div className="evg-cluster">
-								<Button type="submit" variant="primary" disabled={busy}>
-									{tCommon('upload')}
-								</Button>
-								<Button
-									type="button"
-									variant="secondary"
-									disabled={busy}
-									onClick={() => setShowEncUpload(false)}
-								>
-									{tCommon('cancel')}
-								</Button>
+			<CertificateSection
+				t={t}
+				tCommon={tCommon}
+				busy={busy}
+				panelTitle={t('encryption.encryptionCertificate')}
+				statusBadge={t(encryptionCertStatusKey(settings))}
+				panelHint={t('encryption.panelHint')}
+				fingerprint={settings.encryptionCertFingerprintSha256}
+				notAfter={settings.encryptionCertNotAfter}
+				cryptoRows={
+					<>
+						{settings.encryptionKeyFamily ? (
+							<div className="evg-dl__row">
+								<dt>{t('encryption.crypto.keyFamily')}</dt>
+								<dd>
+									<code>
+										{settings.encryptionKeyFamily === 'rsa'
+											? `RSA ${settings.encryptionRsaModulusBits ?? 2048}`
+											: `EC ${settings.encryptionEcCurve ?? 'P-256'}`}
+									</code>
+								</dd>
 							</div>
-						</fieldset>
-					</form>
-				</Panel>
-			) : null}
-
-			{settings.encryptionRotation.active ? (
-				<Panel title={t('encryption.certificateRotation')}>
-					{isStaleEncryptionRotation(settings.encryptionRotation.startedAt) ? (
-						<p className="evg-callout evg-callout--info">
-							{t('encryption.rotationStale', { date: settings.encryptionRotation.startedAt })}
-						</p>
-					) : null}
-					<h3 className="evg-panel__title">{t('encryption.pendingCertTitle')}</h3>
-					<p className="evg-muted">
-						{t('encryption.pendingFingerprint', {
-							fingerprint:
-								settings.encryptionRotation.pendingCertFingerprintSha256 ?? tCommon('emDash'),
-						})}
-					</p>
-					{settings.encryptionRotation.pendingEncryptionKeyFamily ? (
+						) : null}
+						{settings.encryptionKeyTransportAlgorithmId ? (
+							<div className="evg-dl__row">
+								<dt>{t('encryption.crypto.keyTransportAlgorithm')}</dt>
+								<dd>
+									<code>
+										{t(
+											`encryption.crypto.algorithms.${settings.encryptionKeyTransportAlgorithmId}`,
+											{ defaultValue: settings.encryptionKeyTransportAlgorithmId },
+										)}
+									</code>
+								</dd>
+							</div>
+						) : null}
+					</>
+				}
+				afterDetailList={
+					settings.encryptionKeyFamily === 'ec' ? (
+						<Callout variant="info">{t('encryptionEcKeyAgreementInfo')}</Callout>
+					) : null
+				}
+				optionsFields={
+					<IdpEncryptionCertOptionsFields
+						value={encCertOptions}
+						onChange={setEncCertOptions}
+						disabled={busy || settings.encryptionRotation.active}
+					/>
+				}
+				actions={
+					<div className="evg-cluster evg-cluster--wrap">
+						<Button
+							type="button"
+							variant="secondary"
+							size="sm"
+							disabled={busy || settings.encryptionRotation.active}
+							onClick={copySigningOptionsToEncryption}
+						>
+							{t('encryption.copySigningOptions')}
+						</Button>
+						<Button
+							type="button"
+							variant="secondary"
+							disabled={busy || settings.encryptionRotation.active}
+							onClick={() => void encryptionActions.generatePrimary()}
+						>
+							{t('encryption.generateCertificate')}
+						</Button>
+						<Button
+							type="button"
+							variant="secondary"
+							disabled={busy || settings.encryptionRotation.active}
+							onClick={() => setShowEncUpload(true)}
+						>
+							{t('encryption.uploadCertificate')}
+						</Button>
+						<Button
+							type="button"
+							variant="secondary"
+							disabled={
+								busy || settings.encryptionRotation.active || !settings.hasEncryptionCertificate
+							}
+							onClick={() => void encryptionActions.startRotationGenerate()}
+						>
+							{t('encryption.startRotationGenerate')}
+						</Button>
+						<Button
+							type="button"
+							variant="secondary"
+							disabled={busy || !settings.hasEncryptionCertificate}
+							onClick={() => void handleCopyEncryptionPublicPem()}
+						>
+							{t('encryption.copyPublicPem')}
+						</Button>
+						<Button
+							type="button"
+							variant="secondary"
+							disabled={busy || !settings.hasEncryptionCertificate}
+							onClick={() => void handleDownloadEncryptionPublicPem()}
+						>
+							{t('encryption.downloadPublicPem')}
+						</Button>
+					</div>
+				}
+				showUpload={showEncUpload}
+				uploadTitle={t('encryption.uploadPrimary')}
+				uploadCertLabel={t('encryption.encryptionCertPem')}
+				uploadCertHint={t('encryption.encryptionCertHint')}
+				uploadCertValue={uploadEncCert}
+				onUploadCertChange={setUploadEncCert}
+				uploadKeyLabel={t('encryption.privateKeyPem')}
+				uploadKeyHint={t('encryption.privateKeyHint')}
+				uploadKeyValue={uploadEncKey}
+				onUploadKeyChange={setUploadEncKey}
+				onUploadSubmit={() => void encryptionActions.uploadPrimary()}
+				onUploadCancel={() => setShowEncUpload(false)}
+				rotationActive={settings.encryptionRotation.active}
+				rotationTitle={t('encryption.certificateRotation')}
+				rotationStaleText={
+					isStaleEncryptionRotation(settings.encryptionRotation.startedAt)
+						? t('encryption.rotationStale', { date: settings.encryptionRotation.startedAt })
+						: null
+				}
+				pendingCertTitle={t('encryption.pendingCertTitle')}
+				pendingFingerprintText={t('encryption.pendingFingerprint', {
+					fingerprint:
+						settings.encryptionRotation.pendingCertFingerprintSha256 ?? tCommon('emDash'),
+				})}
+				pendingCrypto={
+					settings.encryptionRotation.pendingEncryptionKeyFamily ? (
 						<p className="evg-muted">
 							{t('encryption.crypto.keyFamily')}:{' '}
 							{settings.encryptionRotation.pendingEncryptionKeyFamily}
@@ -959,42 +880,28 @@ export function IdpSettingsPage() {
 							{t('notAfter')}:{' '}
 							{settings.encryptionRotation.pendingEncryptionCertNotAfter ?? tCommon('emDash')}
 						</p>
-					) : null}
-					{settings.encryptionRotation.pendingEncryptionKeyTransportAlgorithmId &&
+					) : null
+				}
+				mismatchWarning={
+					settings.encryptionRotation.pendingEncryptionKeyTransportAlgorithmId &&
 					settings.encryptionKeyTransportAlgorithmId &&
 					settings.encryptionRotation.pendingEncryptionKeyTransportAlgorithmId !==
 						settings.encryptionKeyTransportAlgorithmId ? (
 						<Callout variant="warning">{t('encryption.rotationTransportMismatchWarning')}</Callout>
-					) : null}
-					<ol className="evg-checklist">
-						<li>{t('encryption.rotationStep1')}</li>
-						<li>
-							{t('encryption.rotationStep2')}{' '}
-							<Link to={SP_CONNECTION_ROUTE_PREFIX}>{t('openSpConnections')}</Link>
-						</li>
-						<li>{t('encryption.rotationStep3')}</li>
-						<li>{t('encryption.rotationStep4')}</li>
-					</ol>
-					<div className="evg-cluster">
-						<Button
-							type="button"
-							variant="primary"
-							disabled={busy}
-							onClick={() => void encryptionActions.completeRotation()}
-						>
-							{t('encryption.completeRotation')}
-						</Button>
-						<Button
-							type="button"
-							variant="danger"
-							disabled={busy}
-							onClick={() => void encryptionActions.cancelRotation()}
-						>
-							{t('encryption.cancelRotation')}
-						</Button>
-					</div>
-				</Panel>
-			) : null}
+					) : null
+				}
+				rotationSteps={[
+					t('encryption.rotationStep1'),
+					t('encryption.rotationStep2'),
+					t('encryption.rotationStep3'),
+					t('encryption.rotationStep4'),
+				]}
+				openSpConnectionsLabel={t('openSpConnections')}
+				completeLabel={t('encryption.completeRotation')}
+				cancelLabel={t('encryption.cancelRotation')}
+				onComplete={() => void encryptionActions.completeRotation()}
+				onCancel={() => void encryptionActions.cancelRotation()}
+			/>
 
 			<Panel title={t('metadataPreview')} id="idp-metadata-preview">
 				<Button

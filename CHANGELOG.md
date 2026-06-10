@@ -65,6 +65,11 @@ frontend de-duplication) and remaining items land in subsequent commits under th
   confirm-summary builder and i18n keys). Behaviour-preserving — the same REPLACE/COMPLETE type-to-confirm
   challenges, reload + metadata-refresh sequencing and success/toast messaging; the 48-test IdpSettingsPage
   suite (signing and encryption flows) stays green.
+- **IdP cert panels share one `<CertificateSection>`** (§6.9 / §A17): the signing and encryption sections of
+  `IdpSettingsPage` shared a three-panel scaffold (active-cert panel, PEM-upload panel, rotation checklist)
+  but diverged in the crypto rows, action buttons and pending-rotation summary. Those divergent bits are now
+  passed as slots to one `<CertificateSection>` component so the rendered DOM is byte-identical; the page
+  drops ~200 lines overall (1120 → ~920). Behaviour-preserving — the full IdpSettingsPage suite stays green.
 
 ### Security
 
