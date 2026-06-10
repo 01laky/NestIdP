@@ -257,7 +257,7 @@ export class LogoutPropagationService implements LogoutPropagationPort {
 				row.reason,
 				attempts,
 			);
-			void this.notifier.onSent(this.notification(row, sp.spEntityId, attempts));
+			this.notifySafe(() => this.notifier.onSent(this.notification(row, sp.spEntityId, attempts)));
 
 			const result = await this.soap.deliver({
 				soapUrl: sp.sloSoapUrl,
@@ -307,7 +307,7 @@ export class LogoutPropagationService implements LogoutPropagationPort {
 				? 'saml_backchannel_logout_partial'
 				: 'saml_backchannel_logout_succeeded';
 		this.recordAudit(event, row.spConnectionId, spEntityId, row.reason, attempts);
-		void this.notifier.onSucceeded(this.notification(row, spEntityId, attempts));
+		this.notifySafe(() => this.notifier.onSucceeded(this.notification(row, spEntityId, attempts)));
 	}
 
 	private async finishFailure(
@@ -332,7 +332,9 @@ export class LogoutPropagationService implements LogoutPropagationPort {
 				attempts,
 				reason,
 			);
-			void this.notifier.onGivenUp(this.notification(row, spEntityId, attempts, reason));
+			this.notifySafe(() =>
+				this.notifier.onGivenUp(this.notification(row, spEntityId, attempts, reason)),
+			);
 			return;
 		}
 		const backoff = Math.min(
@@ -361,7 +363,9 @@ export class LogoutPropagationService implements LogoutPropagationPort {
 			attempts,
 			reason,
 		);
-		void this.notifier.onFailed(this.notification(row, spEntityId, attempts, reason));
+		this.notifySafe(() =>
+			this.notifier.onFailed(this.notification(row, spEntityId, attempts, reason)),
+		);
 	}
 
 	private async updateSpStatus(spConnectionId: string, status: string): Promise<void> {
@@ -387,6 +391,25 @@ export class LogoutPropagationService implements LogoutPropagationPort {
 			attempts,
 			error,
 		};
+	}
+
+	/**
+	 * Notifier hooks are best-effort observers: a sync throw must not abort/corrupt the delivery
+	 * state machine (an onSucceeded throw previously flipped an already-succeeded row to failed via
+	 * the caller's catch), and an async rejection must not become an unhandled rejection.
+	 */
+	private notifySafe(notify: () => Promise<void> | void): void {
+		try {
+			Promise.resolve(notify()).catch((error) => {
+				this.logger.warn(
+					JSON.stringify({ event: 'backchannel_notifier_error', message: messageOf(error) }),
+				);
+			});
+		} catch (error) {
+			this.logger.warn(
+				JSON.stringify({ event: 'backchannel_notifier_error', message: messageOf(error) }),
+			);
+		}
 	}
 
 	private recordAudit(
