@@ -11,6 +11,7 @@ import {
 import { AdminApiError, listIdentityUsers } from '../adminApi';
 import { AdminPageHeader } from '../components/layout/AdminPageHeader';
 import { IdentitySectionNav } from '../components/identity/IdentitySectionNav';
+import { SourceFilterSelect } from '../components/identity/SourceFilterSelect';
 import { useIdentitySources } from '../hooks/useIdentitySources';
 import { createLazyIdentityListTable } from '../components/identity/identityListTableLazy';
 import { EmptyState } from '../components/common/EmptyState';
@@ -179,20 +180,12 @@ export function IdentityUsersPage() {
 					<option value="manual">{identityOriginFilterLabel('manual', resolveI18nKey)}</option>
 					<option value="synced">{identityOriginFilterLabel('synced', resolveI18nKey)}</option>
 				</Select>
-				<Select
-					label={t('sourceFilter')}
-					fieldClassName="evg-field--fixed"
+				<SourceFilterSelect
+					sources={sources}
 					value={source}
-					onChange={(e) => setSource(e.target.value)}
+					onChange={setSource}
 					disabled={filterDisabled}
-				>
-					<option value="">{t('sourceAll')}</option>
-					{sources.map((s) => (
-						<option key={s.apiConnectionId} value={s.apiConnectionId}>
-							{s.label}
-						</option>
-					))}
-				</Select>
+				/>
 				<Button type="submit" variant="secondary" disabled={filterDisabled}>
 					{tCommon('apply')}
 				</Button>
