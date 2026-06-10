@@ -70,6 +70,11 @@ frontend de-duplication) and remaining items land in subsequent commits under th
   but diverged in the crypto rows, action buttons and pending-rotation summary. Those divergent bits are now
   passed as slots to one `<CertificateSection>` component so the rendered DOM is byte-identical; the page
   drops ~200 lines overall (1120 → ~920). Behaviour-preserving — the full IdpSettingsPage suite stays green.
+- **`adminApi.ts` split into domain modules** (§6.9): the 873-line client is now ten focused modules under
+  `admin/adminApi/` (`core` — `adminFetch`/`AdminApiError`/CSRF/`toQuery`; then `auth`, `api-connections`,
+  `sp-connections`, `sync`, `saml-sessions`, `identity`, `idp-settings`, `audit`, `external-db`), with
+  `admin/adminApi.ts` reduced to a re-export barrel. No call sites or tests changed — `import … from
+  '../adminApi'` and the `vi.spyOn(adminApi, …)` pattern (~480 sites) keep working through the barrel.
 
 ### Security
 
