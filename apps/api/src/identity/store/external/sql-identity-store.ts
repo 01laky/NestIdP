@@ -1,5 +1,5 @@
 import cuid from 'cuid';
-import type { Kysely } from 'kysely';
+import { sql, type Kysely, type SqlBool } from 'kysely';
 import { IdentityOrigin } from '@prisma/client';
 import {
 	GroupNameCollisionError,
@@ -48,6 +48,15 @@ function chunk<T>(items: T[], size: number): T[][] {
 		out.push(items.slice(i, i + size));
 	}
 	return out;
+}
+
+/**
+ * Escape the LIKE/ILIKE metacharacters `\`, `%`, `_` in a user-supplied search term so they match
+ * literally (Prompt 38 §B7). Without this the external store treats `a%b` as a wildcard, diverging from
+ * the local store (Prisma `contains` escapes them). Used with an explicit `ESCAPE '\'` clause.
+ */
+function escapeLike(term: string): string {
+	return term.replace(/[\\%_]/g, (c) => `\\${c}`);
 }
 
 function isUniqueViolation(error: unknown): boolean {
@@ -453,6 +462,13 @@ export class SqlIdentityStore implements IdentityStore {
 
 	// --- admin: users ---
 
+	/** Case-insensitive username/email LIKE match with literal `%`/`_` (escaped), parity with the local store. */
+	private userSearchExpr(term: string) {
+		const pattern = `%${escapeLike(term)}%`;
+		const op = sql.raw(this.likeOp); // 'ilike' | 'like' — internal constant, not user input
+		return sql<SqlBool>`(${sql.ref('username')} ${op} ${pattern} escape '\\' or ${sql.ref('email')} ${op} ${pattern} escape '\\')`;
+	}
+
 	async listUsers(query: ListQuery): Promise<ListResult<StoreUser>> {
 		const term = query.search?.trim();
 		const origin = query.origin;
@@ -462,11 +478,7 @@ export class SqlIdentityStore implements IdentityStore {
 			.selectAll()
 			.$if(!!origin, (qb) => qb.where('origin', '=', origin as string))
 			.$if(!!conn, (qb) => qb.where('api_connection_id', '=', conn as string))
-			.$if(!!term, (qb) =>
-				qb.where((eb) =>
-					eb.or([eb('username', this.likeOp, `%${term}%`), eb('email', this.likeOp, `%${term}%`)]),
-				),
-			)
+			.$if(!!term, (qb) => qb.where(this.userSearchExpr(term as string)))
 			.orderBy('username', 'asc')
 			.limit(query.limit)
 			.offset(query.offset)
@@ -476,11 +488,7 @@ export class SqlIdentityStore implements IdentityStore {
 			.select((eb) => eb.fn.countAll().as('n'))
 			.$if(!!origin, (qb) => qb.where('origin', '=', origin as string))
 			.$if(!!conn, (qb) => qb.where('api_connection_id', '=', conn as string))
-			.$if(!!term, (qb) =>
-				qb.where((eb) =>
-					eb.or([eb('username', this.likeOp, `%${term}%`), eb('email', this.likeOp, `%${term}%`)]),
-				),
-			)
+			.$if(!!term, (qb) => qb.where(this.userSearchExpr(term as string)))
 			.executeTakeFirst();
 		return { items: rows.map(mapUser), total: Number(totalRow?.n ?? 0) };
 	}

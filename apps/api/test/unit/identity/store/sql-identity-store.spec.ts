@@ -379,4 +379,22 @@ describe('SqlIdentityStore (external, PGlite)', () => {
 		expect(await store.groupsAllInConnection([own.id, foreign.id], CONN)).toBe(false);
 		expect(await store.groupsAllInConnection([], CONN)).toBe(true);
 	});
+
+	it('STORE-SEARCH-ESCAPE: LIKE wildcards in a search term match literally, parity with local (§B7)', async () => {
+		await store.upsertUser(CONN, upsertInput({ externalId: 'e1', username: 'a%b', email: 'a@x.com' }));
+		await store.upsertUser(
+			CONN,
+			upsertInput({ externalId: 'e2', username: 'axxb', email: 'b@x.com' }),
+		);
+		await store.upsertUser(CONN, upsertInput({ externalId: 'e3', username: 'a_b', email: 'c@x.com' }));
+		await store.upsertUser(CONN, upsertInput({ externalId: 'e4', username: 'azb', email: 'd@x.com' }));
+
+		// '%' must match only the literal 'a%b' — not 'axxb' (which an unescaped '%' wildcard would match).
+		const pct = await store.listUsers({ limit: 50, offset: 0, search: 'a%b' });
+		expect(pct.items.map((u) => u.username)).toEqual(['a%b']);
+
+		// '_' must match only the literal 'a_b' — not 'azb' (which an unescaped '_' wildcard would match).
+		const us = await store.listUsers({ limit: 50, offset: 0, search: 'a_b' });
+		expect(us.items.map((u) => u.username)).toEqual(['a_b']);
+	});
 });
