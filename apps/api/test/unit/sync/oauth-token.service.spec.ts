@@ -443,6 +443,56 @@ describe('OAuthTokenService', () => {
 		expect(body).toContain('tenant=t');
 	});
 
+	it('OAUTH-B13-01: cache hit does not decrypt the stored secret', async () => {
+		jest
+			.spyOn(global, 'fetch')
+			.mockResolvedValue(jsonResponse({ access_token: 'AT', expires_in: 3600 }));
+		await service.getAccessToken(makeConn());
+		encryption.decrypt.mockClear();
+		await expect(service.getAccessToken(makeConn())).resolves.toBe('AT');
+		expect(encryption.decrypt).not.toHaveBeenCalled();
+	});
+
+	it('OAUTH-B13-02: forceRefresh joins an in-flight exchange instead of double-POSTing', async () => {
+		let resolveFetch: (r: Response) => void = () => undefined;
+		const fetchMock = jest.spyOn(global, 'fetch').mockReturnValue(
+			new Promise<Response>((r) => {
+				resolveFetch = r;
+			}),
+		);
+		const conn = makeConn();
+		const p1 = service.getAccessToken(conn);
+		const p2 = service.getAccessToken(conn, { forceRefresh: true });
+		resolveFetch(jsonResponse({ access_token: 'NEW', expires_in: 3600 }));
+		expect(await Promise.all([p1, p2])).toEqual(['NEW', 'NEW']);
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+	});
+
+	it('OAUTH-B13-03: two concurrent forceRefresh calls perform a single exchange', async () => {
+		let resolveFetch: (r: Response) => void = () => undefined;
+		const fetchMock = jest.spyOn(global, 'fetch').mockReturnValue(
+			new Promise<Response>((r) => {
+				resolveFetch = r;
+			}),
+		);
+		const conn = makeConn();
+		const p1 = service.getAccessToken(conn, { forceRefresh: true });
+		const p2 = service.getAccessToken(conn, { forceRefresh: true });
+		resolveFetch(jsonResponse({ access_token: 'NEW', expires_in: 3600 }));
+		expect(await Promise.all([p1, p2])).toEqual(['NEW', 'NEW']);
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+	});
+
+	it('OAUTH-B13-04: forceRefresh with a warm cache and no in-flight exchange re-POSTs', async () => {
+		const fetchMock = jest
+			.spyOn(global, 'fetch')
+			.mockResolvedValueOnce(jsonResponse({ access_token: 'OLD', expires_in: 3600 }))
+			.mockResolvedValueOnce(jsonResponse({ access_token: 'NEW', expires_in: 3600 }));
+		await expect(service.getAccessToken(makeConn())).resolves.toBe('OLD');
+		await expect(service.getAccessToken(makeConn(), { forceRefresh: true })).resolves.toBe('NEW');
+		expect(fetchMock).toHaveBeenCalledTimes(2);
+	});
+
 	it('OAUTH-X14: undecryptable stored secret throws a clear error, no network call', async () => {
 		const failing = new OAuthTokenService(
 			config,

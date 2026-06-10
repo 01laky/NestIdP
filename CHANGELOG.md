@@ -136,6 +136,12 @@ frontend de-duplication) and remaining items land in subsequent commits under th
   the retry counter, and failed-delivery backoff has jitter (no synchronised retry herd against a down SP).
 - **OAuth token cache invalidation** — deleting or updating an API connection now evicts its cached token /
   in-flight exchange / last-token timestamp (`OAuthTokenService.invalidate`).
+- **OAuth token cache: no decrypt on hit + `forceRefresh` single-flight** (§B13) — the cache key is now
+  derived from the *encrypted* client-secret blob, so a cache hit no longer decrypts the stored secret on
+  every sync request (re-encryption of the same secret is a conservative miss, never a stale hit); and
+  `forceRefresh` now joins an already-in-flight exchange instead of starting a competing one (the in-flight
+  exchange already returns a brand-new token), eliminating the double token-endpoint hit and the orphaned
+  in-flight entry it left behind.
 - **Sync runs are self-describing on failure** — an unexpected throw in the membership/deactivation phase now
   records an `internal` error entry instead of producing a `FAILED` log with no explanation.
 - **Boot/runtime hardening** — `app.enableShutdownHooks()` (clean Prisma `$disconnect` + interval cleanup on

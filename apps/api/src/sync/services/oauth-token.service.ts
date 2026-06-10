@@ -117,8 +117,10 @@ export class OAuthTokenService {
 		connection: ApiConnection,
 		opts?: { forceRefresh?: boolean },
 	): Promise<string> {
-		const cfg = this.resolveConfig(connection);
-		const key = this.cacheKey(connection.id, cfg);
+		this.assertOAuthConfigured(connection);
+		// §5.B13: the key is derived without decrypting the stored secret, so a cache hit costs no
+		// decrypt call (the secret is only decrypted when an actual exchange is needed).
+		const key = this.cacheKey(connection);
 
 		if (opts?.forceRefresh) {
 			this.cache.delete(key);
@@ -127,19 +129,23 @@ export class OAuthTokenService {
 			if (cached && Date.now() < cached.expiresAt) {
 				return cached.token;
 			}
-			const existing = this.inflight.get(key);
-			if (existing) {
-				return existing;
-			}
+		}
+		// §5.B13: forceRefresh joins an in-flight exchange too — that exchange already yields a
+		// brand-new token; starting a second one would double-hit the token endpoint and orphan
+		// the first inflight entry.
+		const existing = this.inflight.get(key);
+		if (existing) {
+			return existing;
 		}
 
-		const promise = this.exchangeAndCache(connection, cfg, key)
-			.then((r) => r.token)
-			.finally(() => {
-				if (this.inflight.get(key) === promise) {
-					this.inflight.delete(key);
-				}
-			});
+		const promise = (async () => {
+			const cfg = this.resolveConfig(connection);
+			return (await this.exchangeAndCache(connection, cfg, key)).token;
+		})().finally(() => {
+			if (this.inflight.get(key) === promise) {
+				this.inflight.delete(key);
+			}
+		});
 		this.inflight.set(key, promise);
 		return promise;
 	}
@@ -154,7 +160,7 @@ export class OAuthTokenService {
 		} catch (error) {
 			return { diag: this.errorToDiag(error) };
 		}
-		const key = this.cacheKey(connection.id, cfg);
+		const key = this.cacheKey(connection);
 		try {
 			const result = await this.exchangeAndCache(connection, cfg, key);
 			return {
@@ -326,6 +332,31 @@ export class OAuthTokenService {
 		return Math.max(this.minTtlSeconds(), Math.min(this.maxTtlSeconds(), Math.floor(base)));
 	}
 
+	private assertOAuthConfigured(connection: ApiConnection): void {
+		if (
+			!connection.oauthTokenUrl?.trim() ||
+			!connection.oauthClientId?.trim() ||
+			!connection.oauthClientSecretEncrypted
+		) {
+			throw new OAuthTokenError(
+				'OAuth configuration is incomplete (token URL, client id, or secret missing)',
+			);
+		}
+	}
+
+	private resolveAuthMethod(connection: ApiConnection): OAuthClientAuthMethod {
+		return connection.oauthClientAuthMethod === 'client_secret_basic'
+			? 'client_secret_basic'
+			: OAUTH_DEFAULT_CLIENT_AUTH_METHOD;
+	}
+
+	private resolveParams(connection: ApiConnection): Record<string, string> {
+		return connection.oauthTokenRequestParams &&
+			typeof connection.oauthTokenRequestParams === 'object'
+			? (connection.oauthTokenRequestParams as Record<string, string>)
+			: {};
+	}
+
 	private resolveConfig(connection: ApiConnection): ResolvedOAuthConfig {
 		const tokenUrl = connection.oauthTokenUrl?.trim();
 		const clientId = connection.oauthClientId?.trim();
@@ -340,40 +371,38 @@ export class OAuthTokenService {
 		} catch {
 			throw new OAuthTokenError('Stored OAuth client secret could not be decrypted');
 		}
-		const authMethod: OAuthClientAuthMethod =
-			connection.oauthClientAuthMethod === 'client_secret_basic'
-				? 'client_secret_basic'
-				: OAUTH_DEFAULT_CLIENT_AUTH_METHOD;
-		const params =
-			connection.oauthTokenRequestParams && typeof connection.oauthTokenRequestParams === 'object'
-				? (connection.oauthTokenRequestParams as Record<string, string>)
-				: {};
 		return {
 			tokenUrl,
 			clientId,
 			clientSecret,
 			scope: connection.oauthScope?.trim() || null,
 			audience: connection.oauthAudience?.trim() || null,
-			authMethod,
-			params,
+			authMethod: this.resolveAuthMethod(connection),
+			params: this.resolveParams(connection),
 		};
 	}
 
-	private cacheKey(connectionId: string, cfg: ResolvedOAuthConfig): string {
-		const secretHash = createHash('sha256').update(cfg.clientSecret).digest('hex');
+	private cacheKey(connection: ApiConnection): string {
+		// §5.B13: hash the ENCRYPTED secret blob, not the plaintext, so the key can be computed
+		// without a decrypt. Re-encrypting the same secret changes the ciphertext → a conservative
+		// cache miss (one extra exchange), never a stale hit; invalidate() evicts on credential
+		// updates anyway.
+		const secretHash = createHash('sha256')
+			.update(connection.oauthClientSecretEncrypted ?? '')
+			.digest('hex');
 		const material = JSON.stringify({
-			connectionId,
-			tokenUrl: cfg.tokenUrl,
-			clientId: cfg.clientId,
-			scope: cfg.scope,
-			audience: cfg.audience,
-			authMethod: cfg.authMethod,
-			params: cfg.params,
+			connectionId: connection.id,
+			tokenUrl: connection.oauthTokenUrl?.trim() ?? '',
+			clientId: connection.oauthClientId?.trim() ?? '',
+			scope: connection.oauthScope?.trim() || null,
+			audience: connection.oauthAudience?.trim() || null,
+			authMethod: this.resolveAuthMethod(connection),
+			params: this.resolveParams(connection),
 			secretHash,
 		});
 		// §5.B13: prefix with the connection id so all of a connection's cache/inflight entries can be
 		// found and evicted by invalidate() (the hash alone is opaque).
-		return `${connectionId}:${createHash('sha256').update(material).digest('hex')}`;
+		return `${connection.id}:${createHash('sha256').update(material).digest('hex')}`;
 	}
 
 	private errorToDiag(error: unknown): OAuthTokenDiagnosticsDto {
