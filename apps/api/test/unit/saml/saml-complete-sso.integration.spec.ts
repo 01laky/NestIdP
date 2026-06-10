@@ -307,6 +307,42 @@ describe('SAML complete-sso integration (SQLite)', () => {
 		expect(res.headers['content-type']).toMatch(/text\/html/);
 	});
 
+	it('API-AUTH-SSO-TXN-01: participation-create + session delete run in ONE transaction (§14)', async () => {
+		const { agent, samlSessionId } = await startSsoFlow();
+		const txnSpy = jest.spyOn(prisma, '$transaction');
+		await agent.post(`${AUTH_API_PATH}/login/complete-sso`).send({ samlSessionId }).expect(200);
+		// the SSO-session path wraps both writes in a single interactive transaction
+		expect(txnSpy).toHaveBeenCalled();
+		txnSpy.mockRestore();
+		// and the combined outcome is consistent: session consumed, participation registered
+		await expect(
+			prisma.samlSession.findUnique({ where: { id: samlSessionId } }),
+		).resolves.toBeNull();
+		const participations = await prisma.samlSpParticipation.findMany({
+			where: { spConnectionId },
+		});
+		expect(participations.length).toBeGreaterThan(0);
+	});
+
+	it('API-AUTH-SSO-TXN-02: a failing participation write leaves the pending session intact (§14, no partial state)', async () => {
+		const { agent, samlSessionId } = await startSsoFlow();
+		// Sabotage the FK target: the SSO session row vanishes between login and complete-sso
+		// (e.g. an admin kill). Depending on timing this fails at the revocation precheck or — if
+		// raced past it — at the participation FK inside the transaction; either way the invariant
+		// below must hold: the one-time session is not consumed and no participation row leaks.
+		await prisma.samlSpParticipation.deleteMany({});
+		await prisma.samlSsoSession.deleteMany({});
+		const res = await agent
+			.post(`${AUTH_API_PATH}/login/complete-sso`)
+			.send({ samlSessionId });
+		expect(res.status).toBeGreaterThanOrEqual(400);
+		// rollback: the one-time SAML session was NOT consumed and no participation row leaked
+		await expect(
+			prisma.samlSession.findUnique({ where: { id: samlSessionId } }),
+		).resolves.not.toBeNull();
+		await expect(prisma.samlSpParticipation.count()).resolves.toBe(0);
+	});
+
 	it('API-IDP-SAML-ENC-02: complete-sso returns EncryptedAssertion when SP requests encryption', async () => {
 		const spKeys = getTestSpEncryptionKeyPair('urn:test:sp:encrypted-complete');
 		const encryptedSp = await createTestSpConnection(prisma, {

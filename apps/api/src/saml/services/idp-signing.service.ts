@@ -59,8 +59,11 @@ export class IdpSigningService {
 		}
 
 		const generated = this.generateKeyPairAndCert(settings.entityId);
-		await this.prisma.idpSettings.update({
-			where: { id: 'default' },
+		// §14: atomic conditional claim — two concurrent first-use callers must not both persist
+		// material (the loser's published cert would not match the winner's signing key). Only the
+		// caller that still sees an empty slot writes; the loser re-reads and uses the winner's pair.
+		const claimed = await this.prisma.idpSettings.updateMany({
+			where: { id: 'default', signingCertPem: null, signingKeyEncrypted: null },
 			data: {
 				signingCertPem: generated.certPem,
 				signingKeyEncrypted: this.encryptionService.encrypt(generated.privateKeyPem),
@@ -70,6 +73,9 @@ export class IdpSigningService {
 				signingEcCurve: generated.metadata.signingEcCurve,
 			},
 		});
+		if (claimed.count === 0) {
+			return this.ensureSigningMaterial();
+		}
 		this.audit.logSigningKeyGenerated();
 		return {
 			certPem: generated.certPem,

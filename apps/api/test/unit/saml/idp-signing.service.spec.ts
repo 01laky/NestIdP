@@ -8,6 +8,7 @@ import { PrismaService } from '@api/prisma/services/prisma.service';
 import { EncryptionService } from '@api/encryption/services/encryption.service';
 import { encrypt } from '@api/encryption/utils/encryption.util';
 import { runMigrationsOnTestDb } from '@test/support/prisma/test-db.helper';
+import { runConcurrently } from '@test/support/concurrency/race.helper';
 import {
 	createTestIdpSettings,
 	getTestSigningMaterial,

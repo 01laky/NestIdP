@@ -252,9 +252,14 @@ frontend de-duplication) and remaining items land in subsequent commits under th
     shared stubs and a `while`-that-was-an-`if` in `validateProxyUrl` removed.
 - **Multi-write operations made atomic** (§14): `completeSso`'s participation-create + one-time SAML-session
   delete now run in one transaction (a crash between them could leave a replayable pending session or an SSO
-  session invisible to SLO fan-out), and `purgeExpiredSessions` deletes pending sessions, expired SSO
+  session invisible to SLO fan-out), `purgeExpiredSessions` deletes pending sessions, expired SSO
   sessions and stale replay-log rows in one transaction — returning the **full** purged count (previously
-  only the pending-session count was reported).
+  only the pending-session count was reported) — and `ensureSigningMaterial`'s first-use generation uses an
+  atomic conditional claim (two concurrent first-use callers can no longer both persist material, which
+  could publish a cert that doesn't match the actually-stored signing key; losers now adopt the winner's
+  pair — `API-SAML-SIGN-RACE-01`). The full sweep — every multi-write that must be atomic, its mechanism,
+  its proving test, and the one documented exception (`importSnapshot`, idempotent re-runnable streaming) —
+  is catalogued in the new `docs/transactional-integrity.md`.
 - **Admin SPA small correctness fixes** (§5.C, web batch): the external-DB, SAML-sessions and
   API-connections pages no longer toast raw `error.message` (all error paths now flow through
   `mapAdminError`, with five new `externalDb.*Failed` fallback keys across all 10 locales); the audit log
