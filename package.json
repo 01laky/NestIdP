@@ -14,7 +14,7 @@
 		"dev:docker:down": "docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile dev down",
 		"dev:docker:reset": "docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile dev down -v",
 		"build": "pnpm --filter @nestidp/shared build && pnpm --filter @nestidp/web build && pnpm --filter @nestidp/api build",
-		"lint": "eslint . && pnpm --filter @nestidp/shared lint && pnpm --filter @nestidp/api lint && pnpm --filter @nestidp/web lint",
+		"lint": "eslint . && node scripts/check-config-access.mjs && pnpm --filter @nestidp/shared lint && pnpm --filter @nestidp/api lint && pnpm --filter @nestidp/web lint",
 		"test": "node scripts/run-monorepo-tests.mjs",
 		"test:cleanup": "node scripts/cleanup-test-processes.mjs",
 		"format": "prettier --write \"**/*.{ts,tsx,js,json,md}\"",

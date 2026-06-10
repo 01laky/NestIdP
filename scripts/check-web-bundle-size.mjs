@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 /**
- * Enforces max raw size of the main Vite JS chunk after web build.
- * Fonts (woff2) are excluded from this budget.
+ * Enforces max raw size of the main Vite JS chunk after web build,
+ * and (§19) that server-only dependencies do not leak into ANY SPA chunk.
+ * Fonts (woff2) are excluded from the size budget.
  */
-import { readdirSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 /** Monolith SPA + i18next (en catalog in main chunk); locale JSON lazy-loaded. */
@@ -43,5 +44,40 @@ if (largest.size > BUDGET_BYTES) {
 	);
 	process.exit(1);
 }
+
+// §19 bundle hygiene: server-only deps must not appear in any SPA chunk. Markers are distinctive
+// literals from each dependency's source (package names are mangled away by minification).
+// NOTE: cron-parser is deliberately NOT on this list — it is a legitimate CLIENT dependency too:
+// the admin ScheduleSection uses @nestidp/shared's validateCronSchedule/nextCronRuns for
+// client-side cron validation and the "next runs" preview (Prompt 32). Its ~30 KB is inside the
+// 700 KB budget above.
+const SERVER_ONLY_MARKERS = [
+	// @prisma/client is api-only.
+	{ dep: '@prisma/client', marker: 'PrismaClientKnownRequestError' },
+	// @libsql/client is api-only (local DB driver).
+	{ dep: '@libsql/client', marker: 'SQLITE_BUSY' },
+	// xmlbuilder2 is api-only (SAML XML construction).
+	{ dep: 'xmlbuilder2', marker: 'An attribute can only be assigned to an element node.' },
+];
+
+let leaked = false;
+for (const name of readdirSync(distAssets)) {
+	if (!name.endsWith('.js')) {
+		continue;
+	}
+	const content = readFileSync(join(distAssets, name), 'utf8');
+	for (const { dep, marker } of SERVER_ONLY_MARKERS) {
+		if (content.includes(marker)) {
+			console.error(
+				`Bundle hygiene: server-only dependency "${dep}" leaked into SPA chunk ${name} (marker: ${JSON.stringify(marker)})`,
+			);
+			leaked = true;
+		}
+	}
+}
+if (leaked) {
+	process.exit(1);
+}
+console.log('Bundle hygiene: no server-only dependency markers found in SPA chunks.');
 
 process.exit(0);
