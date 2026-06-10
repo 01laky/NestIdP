@@ -9,7 +9,12 @@ const MIGRATIONS_TABLE = '__app_migrations';
 export class DbMigrationError extends Error {
 	constructor(
 		message: string,
-		public readonly code: 'wrong_key_or_corrupt' | 'integrity_failed' | 'drift' | 'apply_failed',
+		public readonly code:
+			| 'wrong_key_or_corrupt'
+			| 'integrity_failed'
+			| 'drift'
+			| 'apply_failed'
+			| 'unsafe_migration',
 	) {
 		super(message);
 		this.name = 'DbMigrationError';
@@ -30,9 +35,10 @@ function defaultMigrationsDir(): string {
 
 /**
  * Split a migration.sql into individual statements. Our migrations are plain additive SQLite DDL
- * (no triggers, no PRAGMA, no string literals containing ';'), so a comment-stripped split on ';'
- * is safe — and necessary because libSQL's executeMultiple manages its own transaction and cannot
- * run inside the BEGIN IMMEDIATE lock we hold while applying.
+ * (no triggers, no BEGIN/END blocks, no string literals containing ';'), so a comment-stripped
+ * split on ';' is safe — and necessary because libSQL's executeMultiple manages its own transaction
+ * and cannot run inside the BEGIN IMMEDIATE lock we hold while applying. assertSplittableSql (§17)
+ * enforces these assumptions before anything is applied.
  */
 export function splitSqlStatements(sql: string): string[] {
 	return sql
@@ -44,6 +50,72 @@ export function splitSqlStatements(sql: string): string[] {
 		.filter((s) => s.length > 0);
 }
 
+/**
+ * §17 migration-safety guard: reject any migration the naive `;`-splitter above cannot handle, so
+ * the foot-gun fails loudly at boot/test time instead of silently corrupting a statement at
+ * runtime. Enforced constraints (also documented in docs/migrations.md):
+ *  - no `CREATE TRIGGER` (its `BEGIN…END` body contains `;` the splitter would cut),
+ *  - no standalone `BEGIN`/`END` (the migrator owns the surrounding transaction),
+ *  - no `;` inside a string literal, and no unterminated string literal.
+ * `PRAGMA` is allowed: Prisma's SQLite table-rebuild pattern emits defer_foreign_keys/foreign_keys
+ * pragmas and they split/execute fine as single statements.
+ */
+export function assertSplittableSql(name: string, sql: string): void {
+	const stripped = sql
+		.split('\n')
+		.filter((line) => !line.trim().startsWith('--'))
+		.join('\n');
+
+	// Walk the SQL once: detect `;` inside '…' literals and build a copy with literal contents
+	// blanked out so keyword checks cannot be fooled by strings like 'CREATE TRIGGER'.
+	let inString = false;
+	let blanked = '';
+	for (let i = 0; i < stripped.length; i += 1) {
+		const ch = stripped[i];
+		if (ch === "'") {
+			if (inString && stripped[i + 1] === "'") {
+				i += 1; // escaped '' inside a literal
+				blanked += '  ';
+				continue;
+			}
+			inString = !inString;
+			blanked += ch;
+			continue;
+		}
+		if (inString) {
+			if (ch === ';') {
+				throw new DbMigrationError(
+					`Migration "${name}" contains a ';' inside a string literal — the migrator splits statements on ';' and would corrupt it. Rewrite the statement (one statement per ';', no ';' in literals).`,
+					'unsafe_migration',
+				);
+			}
+			blanked += ch === '\n' ? '\n' : ' ';
+			continue;
+		}
+		blanked += ch;
+	}
+	if (inString) {
+		throw new DbMigrationError(
+			`Migration "${name}" contains an unterminated string literal.`,
+			'unsafe_migration',
+		);
+	}
+
+	const offenders: Array<{ pattern: RegExp; label: string }> = [
+		{ pattern: /\bCREATE\s+(TEMP(ORARY)?\s+)?TRIGGER\b/i, label: 'CREATE TRIGGER' },
+		{ pattern: /(^|[^\w])BEGIN($|[^\w])/i, label: 'BEGIN' },
+		{ pattern: /(^|[^\w])END($|[^\w])/i, label: 'END' },
+	];
+	for (const { pattern, label } of offenders) {
+		if (pattern.test(blanked)) {
+			throw new DbMigrationError(
+				`Migration "${name}" contains "${label}", which the simple ';'-splitting migrator cannot apply safely (see docs/migrations.md). Use plain additive DDL — one statement per ';'.`,
+				'unsafe_migration',
+			);
+		}
+	}
+}
+
 function listMigrations(dir: string): Array<{ name: string; sql: string; checksum: string }> {
 	if (!existsSync(dir)) {
 		return [];
@@ -53,6 +125,7 @@ function listMigrations(dir: string): Array<{ name: string; sql: string; checksu
 		.sort()
 		.map((name) => {
 			const sql = readFileSync(join(dir, name, 'migration.sql'), 'utf8');
+			assertSplittableSql(name, sql); // §17: fail loud on splitter-unsafe SQL before touching the DB
 			return { name, sql, checksum: createHash('sha256').update(sql).digest('hex') };
 		});
 }

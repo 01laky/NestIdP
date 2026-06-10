@@ -6,6 +6,7 @@ import { createClient } from '@libsql/client';
 import {
 	appliedMigrationCount,
 	applyMigrations,
+	assertSplittableSql,
 	DbMigrationError,
 	runMigrations,
 	splitSqlStatements,
@@ -333,6 +334,106 @@ describe('db-migrator', () => {
 		} finally {
 			client.close();
 			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+});
+
+describe('migration-safety guard (MIG-GUARD, §17)', () => {
+	const expectUnsafe = (name: string, sql: string, match: RegExp) => {
+		expect(() => assertSplittableSql(name, sql)).toThrow(DbMigrationError);
+		try {
+			assertSplittableSql(name, sql);
+		} catch (e) {
+			expect((e as DbMigrationError).code).toBe('unsafe_migration');
+			expect((e as DbMigrationError).message).toMatch(match);
+			expect((e as DbMigrationError).message).toContain(name);
+		}
+	};
+
+	it('MIG-GUARD-01: CREATE TRIGGER is rejected (its BEGIN…END body would be split apart)', () => {
+		expectUnsafe(
+			'20990101000000_trigger',
+			'CREATE TRIGGER t AFTER INSERT ON a FOR EACH ROW SELECT 1;',
+			/CREATE TRIGGER/,
+		);
+		expectUnsafe('20990101000000_trig2', 'create temporary trigger t2 ...', /CREATE TRIGGER/);
+	});
+
+	it('MIG-GUARD-02: standalone BEGIN / END are rejected (the migrator owns the transaction)', () => {
+		expectUnsafe('20990101000000_begin', 'BEGIN;\nCREATE TABLE a (id INT);\nCOMMIT;', /BEGIN/);
+		expectUnsafe('20990101000000_end', 'CREATE TABLE a (id INT);\nEND', /END/);
+	});
+
+	it('MIG-GUARD-03: a ";" inside a string literal is rejected with the file named', () => {
+		expectUnsafe(
+			'20990101000000_semicolon',
+			"INSERT INTO t (v) VALUES ('a;b');",
+			/';' inside a string literal/,
+		);
+	});
+
+	it('MIG-GUARD-04: PRAGMA is allowed (Prisma SQLite table-rebuilds emit it; splitter-safe)', () => {
+		expect(() =>
+			assertSplittableSql(
+				'20990101000000_pragma',
+				'PRAGMA defer_foreign_keys=ON;\nCREATE TABLE a (id INT);\nPRAGMA defer_foreign_keys=OFF;',
+			),
+		).not.toThrow();
+	});
+
+	it('MIG-GUARD-05: an unterminated string literal is rejected', () => {
+		expectUnsafe('20990101000000_unterminated', "INSERT INTO t (v) VALUES ('abc", /unterminated/);
+	});
+
+	it('MIG-GUARD-06: keywords inside string literals or comments do NOT trip the guard', () => {
+		expect(() =>
+			assertSplittableSql(
+				'20990101000000_ok',
+				[
+					'-- this CREATE TRIGGER mention is a comment; BEGIN END',
+					"INSERT INTO t (v) VALUES ('CREATE TRIGGER BEGIN END');",
+					"INSERT INTO t (v) VALUES ('it''s quoted');",
+					'CREATE TABLE ending (id INT);', // identifier containing "end" must not match END
+				].join('\n'),
+			),
+		).not.toThrow();
+	});
+
+	it('MIG-GUARD-07: a migration dir containing an unsafe file fails before touching the DB', async () => {
+		const dir = makeMigrationsDir([
+			{ name: '20260101000000_ok', sql: 'CREATE TABLE ok (id INTEGER PRIMARY KEY);' },
+			{
+				name: '20260102000000_bad_trigger',
+				sql: 'CREATE TRIGGER tr AFTER INSERT ON ok FOR EACH ROW SELECT 1;',
+			},
+		]);
+		const { url } = tmpDbUrl();
+		const client = createClient({ url });
+		try {
+			await expect(applyMigrations(client, { migrationsDir: dir })).rejects.toMatchObject({
+				code: 'unsafe_migration',
+			});
+			// Listing happens before any DDL — nothing applied, not even the safe first migration.
+			const tables = await client.execute(
+				"SELECT name FROM sqlite_master WHERE type='table' AND name='ok'",
+			);
+			expect(tables.rows.length).toBe(0);
+		} finally {
+			client.close();
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	it('MIG-GUARD-08: every real migration in prisma/migrations passes the guard', () => {
+		const real = join(__dirname, '../../../prisma/migrations');
+		expect(existsSync(real)).toBe(true);
+		const { readdirSync, readFileSync, statSync } =
+			jest.requireActual<typeof import('node:fs')>('node:fs');
+		const names = readdirSync(real).filter((n) => statSync(join(real, n)).isDirectory());
+		expect(names.length).toBeGreaterThan(0);
+		for (const name of names) {
+			const sql = readFileSync(join(real, name, 'migration.sql'), 'utf8');
+			expect(() => assertSplittableSql(name, sql)).not.toThrow();
 		}
 	});
 });
