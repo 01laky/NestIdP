@@ -71,13 +71,15 @@ export class CertRotationSchedulerService implements OnModuleInit, OnModuleDestr
 		}
 	}
 
-	private async applyJitter(): Promise<void> {
+	// §18: injectable randomness — the old `Date.now() % range` was a deterministic function of
+	// wall-clock (predictable, and instances ticking at aligned times collide), i.e. not jitter.
+	// Tests pass a fixed `random` for determinism instead.
+	private async applyJitter(random: () => number = Math.random): Promise<void> {
 		const maxSeconds = this.config.jitterMaxSeconds();
 		if (maxSeconds <= 0) {
 			return;
 		}
-		// Vary by elapsed time (no Math.random dependency for determinism in tests with fake timers).
-		const delayMs = Date.now() % (maxSeconds * 1000 + 1);
+		const delayMs = Math.floor(random() * (maxSeconds * 1000 + 1));
 		await new Promise((resolve) => setTimeout(resolve, delayMs));
 	}
 

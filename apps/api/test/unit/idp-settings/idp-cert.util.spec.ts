@@ -86,6 +86,15 @@ describe('idp-cert.util', () => {
 		expect(isCertExpiringSoon(far, 30)).toBe(false);
 	});
 
+	it('API-IDP-VAL-CLK-01: isCertExpiringSoon is exact against an injected fixed clock (§18)', () => {
+		const fixedNow = Date.parse('2026-06-01T00:00:00.000Z');
+		const notAfter = '2026-06-30T00:00:00.000Z'; // 29 days after fixedNow
+		expect(isCertExpiringSoon(notAfter, 30, fixedNow)).toBe(true); // inside the 30-day window
+		expect(isCertExpiringSoon(notAfter, 28, fixedNow)).toBe(false); // outside the 28-day window
+		// Boundary: threshold is inclusive (notAfter === now + warningDays).
+		expect(isCertExpiringSoon('2026-07-01T00:00:00.000Z', 30, fixedNow)).toBe(true);
+	});
+
 	it('API-IDP-VAL-14: rejects oversized PEM', () => {
 		const huge = `-----BEGIN CERTIFICATE-----\n${'A'.repeat(20_000)}\n-----END CERTIFICATE-----`;
 		expect(() => assertValidSigningCertPem(huge)).toThrow('too large');

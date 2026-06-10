@@ -187,7 +187,12 @@ export function parseCertNotAfterIso(certPem: string | null | undefined): string
 	}
 }
 
-export function isCertExpiringSoon(notAfterIso: string | null, warningDays: number): boolean {
+// §18: `now` is injectable so expiry logic can be tested against a fixed clock.
+export function isCertExpiringSoon(
+	notAfterIso: string | null,
+	warningDays: number,
+	now: number = Date.now(),
+): boolean {
 	if (!notAfterIso) {
 		return false;
 	}
@@ -195,7 +200,7 @@ export function isCertExpiringSoon(notAfterIso: string | null, warningDays: numb
 	if (Number.isNaN(notAfter)) {
 		return false;
 	}
-	const threshold = Date.now() + warningDays * MS_PER_DAY;
+	const threshold = now + warningDays * MS_PER_DAY;
 	return notAfter <= threshold;
 }
 
