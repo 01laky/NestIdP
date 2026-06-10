@@ -40,6 +40,11 @@ function chunk<T>(items: T[], size: number): T[][] {
 	return out;
 }
 
+/** Escape LIKE metacharacters so `%`/`_` in a search term match literally (used with `ESCAPE '\'`, §B7). */
+function escapeLike(term: string): string {
+	return term.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
 // Re-exported for backward-compatible imports across the codebase. The collision errors now live in a
 // neutral store module (Prompt 38 §A18) so the external store needn't import this Prisma-bound file.
 export type { UserProfileForAuth, UpsertUserInput } from './store/identity-store';
@@ -372,8 +377,11 @@ export class IdentityRepository implements IdentityStore {
 	// --- admin: users ---
 
 	async listUsers(query: ListQuery): Promise<ListResult<StoreUser>> {
+		const term = query.search?.trim();
+		if (term) {
+			return this.listUsersWithSearch(term, query);
+		}
 		const where: Prisma.UserWhereInput = {
-			...this.userSearchWhere(query.search),
 			...(query.origin ? { origin: query.origin } : {}),
 			...(query.apiConnectionId ? { apiConnectionId: query.apiConnectionId } : {}),
 		};
@@ -387,6 +395,37 @@ export class IdentityRepository implements IdentityStore {
 			this.prisma.user.count({ where }),
 		]);
 		return { items, total };
+	}
+
+	/**
+	 * libSQL search path: Prisma `contains` translates to `LIKE '%term%'` with no `ESCAPE` clause, so a
+	 * `%`/`_` in the term would act as a wildcard — diverging from the external store (Prompt 38 §B7). This
+	 * resolves the matching ids with an escaped raw `LIKE … ESCAPE '\'`, then re-reads typed rows via Prisma
+	 * (preserving the username-asc order) so callers still get fully-mapped `StoreUser`s.
+	 */
+	private async listUsersWithSearch(
+		term: string,
+		query: ListQuery,
+	): Promise<ListResult<StoreUser>> {
+		const pat = `%${escapeLike(term)}%`;
+		const origin = query.origin ? Prisma.sql` AND "origin" = ${query.origin}` : Prisma.empty;
+		const conn = query.apiConnectionId
+			? Prisma.sql` AND "apiConnectionId" = ${query.apiConnectionId}`
+			: Prisma.empty;
+		const filter = Prisma.sql`("username" LIKE ${pat} ESCAPE '\\' OR "email" LIKE ${pat} ESCAPE '\\')${origin}${conn}`;
+		const [idRows, countRows] = await Promise.all([
+			this.prisma.$queryRaw<{ id: string }[]>(
+				Prisma.sql`SELECT "id" FROM "User" WHERE ${filter} ORDER BY "username" ASC LIMIT ${query.limit} OFFSET ${query.offset}`,
+			),
+			this.prisma.$queryRaw<{ n: number | bigint }[]>(
+				Prisma.sql`SELECT COUNT(*) AS n FROM "User" WHERE ${filter}`,
+			),
+		]);
+		const ids = idRows.map((r) => r.id);
+		const rows = ids.length ? await this.prisma.user.findMany({ where: { id: { in: ids } } }) : [];
+		const byId = new Map(rows.map((r) => [r.id, r]));
+		const items = ids.map((id) => byId.get(id)).filter((u): u is StoreUser => Boolean(u));
+		return { items, total: Number(countRows[0]?.n ?? 0) };
 	}
 
 	getUserById(id: string): Promise<StoreUser | null> {
@@ -700,14 +739,6 @@ export class IdentityRepository implements IdentityStore {
 			where: { apiConnectionId_name: { apiConnectionId, name } },
 		});
 		return row !== null && row.id !== excludeId;
-	}
-
-	private userSearchWhere(search?: string): Prisma.UserWhereInput {
-		if (!search || search.trim().length === 0) {
-			return {};
-		}
-		const term = search.trim();
-		return { OR: [{ username: { contains: term } }, { email: { contains: term } }] };
 	}
 
 	// --- replication / migration ---
