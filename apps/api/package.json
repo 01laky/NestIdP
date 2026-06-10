@@ -7,7 +7,7 @@
 		"build": "nest build",
 		"start": "node dist/main.js",
 		"start:prod": "node dist/main.js",
-		"lint": "tsc -p tsconfig.json --noEmit",
+		"lint": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
 		"pretest": "node ../../scripts/cleanup-test-processes.mjs",
 		"posttest": "node ../../scripts/cleanup-test-processes.mjs",
 		"test": "node scripts/run-jest-tests.mjs",
