@@ -4,6 +4,12 @@ import { normalizeSyncedEmail } from './utils/normalize-synced-email.util';
 import { manualExternalId } from './utils/local-directory.util';
 import { PrismaService } from '../prisma/services/prisma.service';
 import { AccountLockoutService } from '../auth-protection/account-lockout.service';
+import {
+	GroupNameCollisionError,
+	MembershipCrossConnectionError,
+	RoleNameCollisionError,
+	UsernameCollisionError,
+} from './store/identity-store-errors';
 import type {
 	CreateManualUserInput,
 	IdentityCountsByConnection,
@@ -34,46 +40,15 @@ function chunk<T>(items: T[], size: number): T[][] {
 	return out;
 }
 
-// Re-exported for backward-compatible imports across the codebase.
+// Re-exported for backward-compatible imports across the codebase. The collision errors now live in a
+// neutral store module (Prompt 38 §A18) so the external store needn't import this Prisma-bound file.
 export type { UserProfileForAuth, UpsertUserInput } from './store/identity-store';
-
-export class UsernameCollisionError extends Error {
-	constructor(
-		public readonly externalUserId: string,
-		public readonly username: string,
-	) {
-		super(`Username already in use: ${username}`);
-		this.name = 'UsernameCollisionError';
-	}
-}
-
-export class GroupNameCollisionError extends Error {
-	constructor(
-		public readonly externalGroupId: string,
-		public readonly name: string,
-	) {
-		super(`Group name already in use: ${name}`);
-		this.name = 'GroupNameCollisionError';
-	}
-}
-
-export class RoleNameCollisionError extends Error {
-	constructor(
-		public readonly externalRoleId: string,
-		public readonly name: string,
-	) {
-		super(`Role name already in use: ${name}`);
-		this.name = 'RoleNameCollisionError';
-	}
-}
-
-/** A membership would cross identity sources — a user may only belong to its own source's groups/roles. */
-export class MembershipCrossConnectionError extends Error {
-	constructor(public readonly kind: 'group' | 'role') {
-		super(`Cannot assign a ${kind} from a different identity source`);
-		this.name = 'MembershipCrossConnectionError';
-	}
-}
+export {
+	GroupNameCollisionError,
+	MembershipCrossConnectionError,
+	RoleNameCollisionError,
+	UsernameCollisionError,
+};
 
 /** Local (libSQL/Prisma) implementation of {@link IdentityStore}. */
 @Injectable()

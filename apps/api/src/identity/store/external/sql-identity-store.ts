@@ -6,7 +6,7 @@ import {
 	MembershipCrossConnectionError,
 	RoleNameCollisionError,
 	UsernameCollisionError,
-} from '../../identity.repository';
+} from '../identity-store-errors';
 import type { AccountLockoutService } from '../../../auth-protection/account-lockout.service';
 import { manualExternalId } from '../../utils/local-directory.util';
 import { normalizeSyncedEmail } from '../../utils/normalize-synced-email.util';

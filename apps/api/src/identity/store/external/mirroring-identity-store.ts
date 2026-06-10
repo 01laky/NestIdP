@@ -1,28 +1,48 @@
 import type { IdentityStore } from '../identity-store';
 
-const MUTATING_METHODS = new Set<string>([
-	'upsertUser',
-	'replaceUserGroups',
-	'replaceUserRoles',
-	'upsertGroup',
-	'upsertRole',
-	'deactivateUsersNotInExternalIds',
-	'deleteOrphanGroups',
-	'deleteOrphanRoles',
-	'createManualUser',
-	'updateManualUser',
-	'deleteUser',
-	'createManualGroup',
-	'updateGroupName',
-	'deleteGroup',
-	'createManualRole',
-	'updateRoleName',
-	'deleteRole',
-	'importSnapshot',
-	'wipeAll',
-	// §5.B5: Prompt 37 added removeConnectionIdentities but did not register it here, so a source-removal
-	// in mirror mode mutated local without flagging the external copy stale → silent divergence.
-	'removeConnectionIdentities',
+/**
+ * The read-only {@link IdentityStore} methods. This is an inverted allowlist (Prompt 38 §A18): the
+ * mirroring proxy treats every store method NOT listed here as a mutation, so a newly added method flags
+ * external drift by default (fail-safe) instead of silently diverging — the failure mode that left
+ * `removeConnectionIdentities` unregistered in the previous mutating-method allowlist (§5.B5).
+ *
+ * Keep in sync with the read methods of {@link IdentityStore}; the `mirroring-identity-store.spec`
+ * enumeration test fails if a real store method is neither listed here nor wrapped as a mutation.
+ */
+export const READ_ONLY_METHODS: ReadonlySet<string> = new Set([
+	// counts
+	'countUsers',
+	'countGroups',
+	'countRoles',
+	'countsByConnection',
+	'syncedUserIdsForConnection',
+	// auth / SAML reads
+	'findUserByUsername',
+	'findUserProfileById',
+	// admin: users (reads)
+	'listUsers',
+	'getUserById',
+	'getUserWithMemberships',
+	'isUsernameTaken',
+	'groupsExistAll',
+	'rolesExistAll',
+	'groupsAllInConnection',
+	'rolesAllInConnection',
+	// admin: groups (reads)
+	'listGroups',
+	'getGroupById',
+	'getGroupMembers',
+	'groupMemberCount',
+	'isGroupNameTaken',
+	// admin: roles (reads)
+	'listRoles',
+	'getRoleById',
+	'getRoleMembers',
+	'roleMemberCount',
+	'isRoleNameTaken',
+	// replication / integrity reads
+	'exportAll',
+	'connectionHasIdentityRows',
 ]);
 
 /**
@@ -38,10 +58,14 @@ export function createMirroringStore(local: IdentityStore, onMutate: () => void)
 			if (typeof value !== 'function') {
 				return value;
 			}
+			const propStr = String(prop);
+			// Never wrap JS machinery (toString/valueOf/constructor/…) or read-only store methods.
+			const isBuiltin = typeof prop === 'symbol' || propStr in Object.prototype;
 			const fn = value as (...args: unknown[]) => unknown;
-			if (!MUTATING_METHODS.has(String(prop))) {
+			if (isBuiltin || READ_ONLY_METHODS.has(propStr)) {
 				return fn.bind(target);
 			}
+			// Fail-safe: anything else is treated as a mutation and flags the external mirror stale.
 			return async (...args: unknown[]) => {
 				const result = await fn.apply(target, args);
 				try {
