@@ -260,6 +260,7 @@ describe('HARD-OVERVIEW-01 (web): schedules overview page', () => {
 			schedulerEnabled: true,
 			manualRunCount: 6,
 			scheduledRunCount: 4,
+			manualAllRunCount: 0,
 			schedules: [
 				{
 					connectionId: 'c1',

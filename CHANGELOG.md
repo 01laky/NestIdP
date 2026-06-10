@@ -115,6 +115,15 @@ frontend de-duplication) and remaining items land in subsequent commits under th
 
 ### Fixed
 
+- **Admin SPA small correctness fixes** (§5.C, web batch): the external-DB, SAML-sessions and
+  API-connections pages no longer toast raw `error.message` (all error paths now flow through
+  `mapAdminError`, with five new `externalDb.*Failed` fallback keys across all 10 locales); the audit log
+  gained offset-based pagination (Previous/Next + page indicator — entries beyond the first 50 were
+  unreachable) and lost a dead `getCsrfToken()` expression; the sync-page log-source filter got an
+  out-of-order response guard (a slow earlier response can no longer overwrite a newer selection); the dead
+  `ConfirmDialog.confirmDisabled` prop was removed; and `TextInput` now renders a translated required
+  suffix (`common.required`), sets `aria-required`, and falls back to `useId()` so duplicate labels can't
+  produce colliding input ids.
 - **"Sync all" parallelism no longer breaks collision determinism** (§B3) — the "first connection
   (createdAt order) wins a cross-source username collision" guarantee only holds when sources run
   sequentially, but `SYNC_ALL_CONCURRENCY` could be raised to 16 and silently produce a racy winner.

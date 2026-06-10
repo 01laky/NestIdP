@@ -81,6 +81,33 @@ describe('Evergreen UI primitives — edge cases', () => {
 		expect((screen.getByLabelText(/Host/i) as HTMLInputElement).disabled).toBe(true);
 	});
 
+	it('WEB-EVG-179: TextInput sets aria-required for required and requiredMark inputs', () => {
+		render(
+			<>
+				<TextInput label="Host" name="host" required />
+				<TextInput label="Token" name="token" requiredMark />
+				<TextInput label="Note" name="note" />
+			</>,
+		);
+		expect(screen.getByLabelText(/Host/i).getAttribute('aria-required')).toBe('true');
+		expect(screen.getByLabelText(/Token/i).getAttribute('aria-required')).toBe('true');
+		expect(screen.getByLabelText(/Note/i).getAttribute('aria-required')).toBeNull();
+	});
+
+	it('WEB-EVG-180: TextInput generates unique fallback ids for duplicate labels', () => {
+		const { container } = render(
+			<>
+				<TextInput label="Value" />
+				<TextInput label="Value" />
+			</>,
+		);
+		const inputs = container.querySelectorAll('input');
+		expect(inputs.length).toBe(2);
+		expect(inputs[0].id).toBeTruthy();
+		expect(inputs[1].id).toBeTruthy();
+		expect(inputs[0].id).not.toBe(inputs[1].id);
+	});
+
 	it('WEB-EVG-29: Select and TextArea render field errors', () => {
 		render(
 			<>

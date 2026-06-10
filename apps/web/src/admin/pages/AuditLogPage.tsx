@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AUDIT_CATEGORIES } from '@nestidp/shared';
-import { auditExportUrl, getCsrfToken, listAuditEvents } from '../adminApi';
+import { auditExportUrl, listAuditEvents } from '../adminApi';
 import { AdminPageHeader } from '../components/layout/AdminPageHeader';
 import { ErrorBanner } from '../components/common/ErrorBanner';
 import { LoadingState } from '../components/common/LoadingState';
@@ -11,6 +11,8 @@ import { mapAdminError, resolveI18nKey } from '../../i18n/api-error-messages';
 import { auditEventLabel } from '../../i18n/audit-event-labels';
 import { auditCategoryLabel } from '../../i18n/enum-labels';
 import { Button, Select, Table, TextInput, useToast } from '../../ui';
+
+const PAGE_SIZE = 50;
 
 export function AuditLogPage() {
 	const { t } = useTranslation('audit');
@@ -22,29 +24,36 @@ export function AuditLogPage() {
 	const [category, setCategory] = useState('');
 	const [event, setEvent] = useState('');
 	const [data, setData] = useState<Awaited<ReturnType<typeof listAuditEvents>> | null>(null);
+	const [page, setPage] = useState(1);
 	const { showToast } = useToast();
 
-	async function load() {
+	async function load(nextPage: number) {
 		setLoading(true);
 		setError(null);
-		const params: Record<string, string> = { limit: '50', offset: '0' };
-		if (category) {
-			params.category = category;
+		try {
+			const params: Record<string, string> = {
+				limit: String(PAGE_SIZE),
+				offset: String((nextPage - 1) * PAGE_SIZE),
+			};
+			if (category) {
+				params.category = category;
+			}
+			if (event.trim()) {
+				params.event = event.trim();
+			}
+			const result = await listAuditEvents(params);
+			setData(result);
+			setPage(nextPage);
+		} catch (err) {
+			setError(mapAdminError(err, 'audit.loadFailed'));
+		} finally {
+			setLoading(false);
 		}
-		if (event.trim()) {
-			params.event = event.trim();
-		}
-		const result = await listAuditEvents(params);
-		setData(result);
-		setLoading(false);
 	}
 
 	useEffect(() => {
-		void load().catch((err) => {
-			setError(mapAdminError(err, 'audit.loadFailed'));
-			setLoading(false);
-		});
-		// Initial load only; Filter button calls load() explicitly.
+		void load(1);
+		// Initial load only; Filter button and pagination call load() explicitly.
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
@@ -59,6 +68,8 @@ export function AuditLogPage() {
 		window.open(auditExportUrl(params), '_blank');
 		showToast(t('toastExportDownloaded'));
 	}
+
+	const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / PAGE_SIZE));
 
 	return (
 		<section>
@@ -83,7 +94,7 @@ export function AuditLogPage() {
 					className="evg-stack inline"
 					onSubmit={(e) => {
 						e.preventDefault();
-						void load();
+						void load(1);
 					}}
 				>
 					<Select
@@ -155,9 +166,29 @@ export function AuditLogPage() {
 							</tbody>
 						</Table>
 					</div>
+					<div className="evg-stack inline">
+						<Button
+							type="button"
+							variant="ghost"
+							disabled={page <= 1}
+							onClick={() => void load(page - 1)}
+						>
+							{tCommon('paginationPrevious')}
+						</Button>
+						<span className="evg-muted">
+							{tCommon('paginationPage', { current: page, totalPages })}
+						</span>
+						<Button
+							type="button"
+							variant="ghost"
+							disabled={page >= totalPages}
+							onClick={() => void load(page + 1)}
+						>
+							{tCommon('paginationNext')}
+						</Button>
+					</div>
 				</>
 			) : null}
-			{getCsrfToken() ? null : null}
 		</section>
 	);
 }

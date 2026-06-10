@@ -16,7 +16,6 @@ export interface ConfirmDialogProps {
 	tone: ConfirmTone;
 	showAuditNote: boolean;
 	typeToConfirm?: TypeToConfirmOptions;
-	confirmDisabled?: boolean;
 	onConfirm: () => void;
 	onCancel: () => void;
 }
@@ -31,7 +30,6 @@ export function ConfirmDialog({
 	tone,
 	showAuditNote,
 	typeToConfirm,
-	confirmDisabled = false,
 	onConfirm,
 	onCancel,
 }: ConfirmDialogProps) {
@@ -73,20 +71,17 @@ export function ConfirmDialog({
 					return;
 				}
 				event.preventDefault();
-				if (!confirmDisabled) {
-					onConfirm();
-				}
+				onConfirm();
 			}
 		};
 		window.addEventListener('keydown', onKeyDown);
 		return () => window.removeEventListener('keydown', onKeyDown);
-	}, [open, tone, typeToConfirm, confirmDisabled, typed, onConfirm, onCancel]);
+	}, [open, tone, typeToConfirm, typed, onConfirm, onCancel]);
 
 	if (!open) {
 		return null;
 	}
 
-	const confirmBlocked = confirmDisabled || typeMismatch;
 	const panelToneClass =
 		tone === 'danger' ? 'evg-modal--danger' : tone === 'warning' ? 'evg-modal--warning' : '';
 	const confirmVariant = tone === 'danger' ? 'danger' : 'primary';
@@ -144,7 +139,7 @@ export function ConfirmDialog({
 					<Button
 						type="button"
 						variant={confirmVariant}
-						disabled={confirmBlocked}
+						disabled={typeMismatch}
 						onClick={onConfirm}
 					>
 						{confirmLabel}

@@ -16,6 +16,7 @@ import {
 	resyncExternalIdentityDb,
 	testExternalIdentityDb,
 } from '../adminApi';
+import { mapAdminError } from '../../i18n/api-error-messages';
 import {
 	Button,
 	Callout,
@@ -103,7 +104,7 @@ export function ExternalIdentityDatabasePage() {
 			const res = await testExternalIdentityDb(buildRequest(form));
 			showToast(res.ok ? t('testOk') : t('testFailed', { error: res.error ?? '' }));
 		} catch (error) {
-			showToast(error instanceof Error ? error.message : String(error));
+			showToast(mapAdminError(error, 'externalDb.connectionTestFailed'));
 		} finally {
 			setBusy(false);
 		}
@@ -115,7 +116,7 @@ export function ExternalIdentityDatabasePage() {
 		try {
 			setPreview(await previewExternalIdentityDb(buildRequest(form)));
 		} catch (error) {
-			showToast(error instanceof Error ? error.message : String(error));
+			showToast(mapAdminError(error, 'externalDb.previewFailed'));
 		} finally {
 			setBusy(false);
 		}
@@ -136,7 +137,7 @@ export function ExternalIdentityDatabasePage() {
 			setPreview(null);
 			setStatus(res.status);
 		} catch (error) {
-			showToast(error instanceof Error ? error.message : String(error));
+			showToast(mapAdminError(error, 'externalDb.connectFailed'));
 		} finally {
 			setBusy(false);
 		}
@@ -148,7 +149,7 @@ export function ExternalIdentityDatabasePage() {
 			setStatus(await resyncExternalIdentityDb());
 			showToast(t('resynced'));
 		} catch (error) {
-			showToast(error instanceof Error ? error.message : String(error));
+			showToast(mapAdminError(error, 'externalDb.resyncFailed'));
 		} finally {
 			setBusy(false);
 		}
@@ -171,7 +172,7 @@ export function ExternalIdentityDatabasePage() {
 			setStatus(await disconnectExternalIdentityDb({ moveDataToLocal: true }));
 			showToast(t('disconnected'));
 		} catch (error) {
-			showToast(error instanceof Error ? error.message : String(error));
+			showToast(mapAdminError(error, 'externalDb.disconnectFailed'));
 		} finally {
 			setBusy(false);
 		}

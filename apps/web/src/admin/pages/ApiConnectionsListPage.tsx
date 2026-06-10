@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { API_CONNECTION_ROUTE_PREFIX } from '@nestidp/shared';
-import { AdminApiError, listApiConnections, syncAllSources } from '../adminApi';
+import { listApiConnections, syncAllSources } from '../adminApi';
 import { AdminPageHeader } from '../components/layout/AdminPageHeader';
 import { EmptyState } from '../components/common/EmptyState';
 import { ErrorBanner } from '../components/common/ErrorBanner';
@@ -44,7 +44,7 @@ export function ApiConnectionsListPage() {
 				await reload();
 			}
 		} catch (err) {
-			showToast(err instanceof AdminApiError ? err.message : t('loadListFailed'));
+			showToast(mapAdminError(err, 'apiConnections.loadListFailed'));
 		} finally {
 			setSyncingAll(false);
 		}

@@ -177,4 +177,56 @@ describe('AuditLogPage', () => {
 			expect(screen.queryByText('idp_encryption_cert_generated')).toBeNull();
 		});
 	});
+
+	it('WEB-ADM-105: Next requests the next offset page and Previous is disabled on page 1', async () => {
+		const listSpy = vi.spyOn(adminApi, 'listAuditEvents').mockResolvedValue({
+			items: [],
+			total: 120,
+			limit: 50,
+			offset: 0,
+		});
+
+		renderPage();
+		await waitFor(() => screen.getByRole('button', { name: 'Next' }));
+
+		expect(screen.getByText('Page 1 of 3')).toBeDefined();
+		expect((screen.getByRole('button', { name: 'Previous' }) as HTMLButtonElement).disabled).toBe(
+			true,
+		);
+
+		fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+
+		await waitFor(() => {
+			expect(listSpy).toHaveBeenLastCalledWith(
+				expect.objectContaining({ limit: '50', offset: '50' }),
+			);
+			expect(screen.getByText('Page 2 of 3')).toBeDefined();
+		});
+		expect((screen.getByRole('button', { name: 'Previous' }) as HTMLButtonElement).disabled).toBe(
+			false,
+		);
+	});
+
+	it('WEB-ADM-106: Filter submit resets pagination to the first page', async () => {
+		const listSpy = vi.spyOn(adminApi, 'listAuditEvents').mockResolvedValue({
+			items: [],
+			total: 120,
+			limit: 50,
+			offset: 0,
+		});
+
+		renderPage();
+		await waitFor(() => screen.getByRole('button', { name: 'Next' }));
+		fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+		await waitFor(() => {
+			expect(listSpy).toHaveBeenLastCalledWith(expect.objectContaining({ offset: '50' }));
+		});
+
+		fireEvent.click(screen.getByRole('button', { name: 'Filter' }));
+
+		await waitFor(() => {
+			expect(listSpy).toHaveBeenLastCalledWith(expect.objectContaining({ offset: '0' }));
+			expect(screen.getByText('Page 1 of 3')).toBeDefined();
+		});
+	});
 });

@@ -150,11 +150,6 @@ describe('ConfirmDialog', () => {
 		expect(onCancel).toHaveBeenCalledTimes(1);
 	});
 
-	it('WEB-EVG-CONF-07: confirmDisabled disables confirm button', () => {
-		renderDialog({ confirmDisabled: true });
-		expect(screen.getByRole('button', { name: 'Confirm' })).toHaveProperty('disabled', true);
-	});
-
 	it('WEB-EVG-CONF-12: dialog has aria-modal and labelledby/describedby', () => {
 		renderDialog();
 		const dialog = screen.getByRole('dialog');

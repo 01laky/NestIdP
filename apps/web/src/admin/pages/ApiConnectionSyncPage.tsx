@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { API_CONNECTION_ROUTE_PREFIX, type SyncTriggerSource } from '@nestidp/shared';
@@ -29,16 +29,24 @@ export function ApiConnectionSyncPage() {
 	const [logSource, setLogSource] = useState<'' | SyncTriggerSource>('');
 	const { showToast } = useToast();
 	const confirm = useConfirm();
+	// Monotonic requestId guard (same pattern as useAdminResource): only the latest
+	// in-flight log fetch may commit, so a slow earlier response cannot overwrite
+	// the list loaded for a newer filter selection.
+	const logsRequestIdRef = useRef(0);
 
 	async function reload(source: '' | SyncTriggerSource = logSource) {
 		if (!id) {
 			return;
 		}
+		const requestId = ++logsRequestIdRef.current;
 		const [conn, syncStatus, syncLogs] = await Promise.all([
 			getApiConnection(id),
 			getSyncStatus(id),
 			listSyncLogs(id, 20, source || undefined),
 		]);
+		if (requestId !== logsRequestIdRef.current) {
+			return;
+		}
 		setConnectionName(conn.connection.name);
 		setStatus(syncStatus.lastSyncStatus);
 		setLogs(syncLogs.syncLogs);
@@ -49,9 +57,12 @@ export function ApiConnectionSyncPage() {
 		if (!id) {
 			return;
 		}
+		const requestId = ++logsRequestIdRef.current;
 		try {
 			const syncLogs = await listSyncLogs(id, 20, source || undefined);
-			setLogs(syncLogs.syncLogs);
+			if (requestId === logsRequestIdRef.current) {
+				setLogs(syncLogs.syncLogs);
+			}
 		} catch {
 			// Keep the existing list on a transient filter error.
 		}

@@ -10,7 +10,6 @@ import {
 	type SamlSsoSessionStatusFilter,
 } from '@nestidp/shared';
 import {
-	AdminApiError,
 	getBackchannelQueueHealth,
 	listSamlSessions,
 	listSpConnections,
@@ -169,7 +168,7 @@ export function SamlSessionsPage() {
 			showToast(t('toastTerminated'));
 			await Promise.all([load(), loadQueueHealth()]);
 		} catch (err) {
-			showToast(err instanceof AdminApiError ? err.message : t('terminateFailed'));
+			showToast(mapAdminError(err, 'samlSessions.terminateFailed'));
 		}
 	}
 
@@ -192,7 +191,7 @@ export function SamlSessionsPage() {
 			showToast(t('toastTerminatedUser', { count: res.terminatedCount }));
 			await Promise.all([load(), loadQueueHealth()]);
 		} catch (err) {
-			showToast(err instanceof AdminApiError ? err.message : t('terminateFailed'));
+			showToast(mapAdminError(err, 'samlSessions.terminateFailed'));
 		}
 	}
 
@@ -217,7 +216,7 @@ export function SamlSessionsPage() {
 			showToast(t('toastBulkTerminated', { count: res.terminatedCount }));
 			await Promise.all([load(), loadQueueHealth()]);
 		} catch (err) {
-			showToast(err instanceof AdminApiError ? err.message : t('terminateFailed'));
+			showToast(mapAdminError(err, 'samlSessions.terminateFailed'));
 		} finally {
 			setBulkBusy(false);
 		}
@@ -240,7 +239,7 @@ export function SamlSessionsPage() {
 			showToast(t('toastAllTerminated', { count: res.terminatedCount }));
 			await Promise.all([load(), loadQueueHealth()]);
 		} catch (err) {
-			showToast(err instanceof AdminApiError ? err.message : t('terminateFailed'));
+			showToast(mapAdminError(err, 'samlSessions.terminateFailed'));
 		} finally {
 			setBulkBusy(false);
 		}
@@ -253,7 +252,7 @@ export function SamlSessionsPage() {
 			showToast(t('toastQueueProcessed', { count: res.processed }));
 			await Promise.all([load(), loadQueueHealth()]);
 		} catch (err) {
-			showToast(err instanceof AdminApiError ? err.message : t('terminateFailed'));
+			showToast(mapAdminError(err, 'samlSessions.terminateFailed'));
 		} finally {
 			setBulkBusy(false);
 		}
@@ -265,7 +264,7 @@ export function SamlSessionsPage() {
 			showToast(t('toastResent'));
 			await Promise.all([load(), loadQueueHealth()]);
 		} catch (err) {
-			showToast(err instanceof AdminApiError ? err.message : t('terminateFailed'));
+			showToast(mapAdminError(err, 'samlSessions.terminateFailed'));
 		}
 	}
 
