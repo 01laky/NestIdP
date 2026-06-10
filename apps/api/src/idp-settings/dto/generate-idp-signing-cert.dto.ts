@@ -6,6 +6,7 @@ import type {
 	IdpSigningKeyFamily,
 	IdpSigningRsaModulusBits,
 } from '@nestidp/shared';
+import { IDP_CERT_EC_CURVES, IDP_CERT_RSA_MODULUS_BITS } from '@nestidp/shared';
 
 export class GenerateIdpSigningCertBodyDto implements GenerateIdpSigningCertRequestDto {
 	@IsOptional()
@@ -16,12 +17,12 @@ export class GenerateIdpSigningCertBodyDto implements GenerateIdpSigningCertRequ
 	@IsOptional()
 	@Type(() => Number)
 	@IsInt()
-	@IsIn([2048, 3072, 4096])
+	@IsIn(IDP_CERT_RSA_MODULUS_BITS)
 	rsaModulusBits?: IdpSigningRsaModulusBits;
 
 	@ValidateIf((body: GenerateIdpSigningCertBodyDto) => body.keyFamily === 'ec')
 	@IsOptional()
-	@IsIn(['P-256', 'P-384', 'P-521'])
+	@IsIn(IDP_CERT_EC_CURVES)
 	ecCurve?: IdpSigningEcCurve;
 
 	@IsOptional()

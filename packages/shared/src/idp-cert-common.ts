@@ -2,8 +2,14 @@
 import { MS_PER_DAY } from './time.js';
 
 export type IdpCertKeyFamily = 'rsa' | 'ec';
-export type IdpCertRsaModulusBits = 2048 | 3072 | 4096;
-export type IdpCertEcCurve = 'P-256' | 'P-384' | 'P-521';
+
+/** Accepted RSA key sizes for IdP certificates (signing + encryption). Single source for the §A20 dedup. */
+export const IDP_CERT_RSA_MODULUS_BITS = [2048, 3072, 4096] as const;
+export type IdpCertRsaModulusBits = (typeof IDP_CERT_RSA_MODULUS_BITS)[number];
+
+/** Accepted EC curves for IdP certificates (signing + encryption). */
+export const IDP_CERT_EC_CURVES = ['P-256', 'P-384', 'P-521'] as const;
+export type IdpCertEcCurve = (typeof IDP_CERT_EC_CURVES)[number];
 
 export const IDP_CERT_MAX_VALIDITY_YEARS = 10;
 export const IDP_CERT_DEFAULT_VALIDITY_DAYS = 730;

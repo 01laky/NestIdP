@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Matches, ValidateIf } from 'class-validator';
 import type { IdpCertRsaModulusBits } from '@nestidp/shared';
+import { IDP_CERT_RSA_MODULUS_BITS } from '@nestidp/shared';
 
 export class StartIdpEncryptionCertRotationBodyDto {
 	@IsIn(['generate', 'upload'])
@@ -18,7 +19,7 @@ export class StartIdpEncryptionCertRotationBodyDto {
 	@IsOptional()
 	@Type(() => Number)
 	@IsInt()
-	@IsIn([2048, 3072, 4096])
+	@IsIn(IDP_CERT_RSA_MODULUS_BITS)
 	rsaModulusBits?: IdpCertRsaModulusBits;
 
 	@ValidateIf((body: StartIdpEncryptionCertRotationBodyDto) => body.mode === 'generate')
