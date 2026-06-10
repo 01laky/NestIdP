@@ -237,14 +237,14 @@ describe('Responsive shell — extended CSS and static guards (WEB-RSP-50–99)'
 		expect(webPkg.version).toBe(rootPkg.version);
 	});
 
-	it('WEB-RSP-84: root package.json defines dev:docker scripts', () => {
+	it('WEB-RSP-84: root package.json defines docker:dev scripts', () => {
 		const pkg = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'));
-		expect(pkg.scripts['dev:docker']).toContain('docker-compose.dev.yml');
-		expect(pkg.scripts['dev:docker:down']).toBeDefined();
+		expect(pkg.scripts['docker:dev']).toContain('docker-compose.dev.yml');
+		expect(pkg.scripts['docker:dev:down']).toBeDefined();
 	});
 
 	it('WEB-RSP-84b: docker dev compose and Dockerfile.dev exist', () => {
-		expect(existsSync(join(repoRoot, 'docker-compose.dev.yml'))).toBe(true);
+		expect(existsSync(join(repoRoot, 'deploy/docker-compose.dev.yml'))).toBe(true);
 		expect(existsSync(join(repoRoot, 'Dockerfile.dev'))).toBe(true);
 		expect(existsSync(join(repoRoot, 'scripts/docker-dev-entrypoint.sh'))).toBe(true);
 	});
