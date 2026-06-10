@@ -1,4 +1,4 @@
-import { plainToInstance, Transform } from 'class-transformer';
+import { plainToInstance } from 'class-transformer';
 import {
 	IsEnum,
 	IsInt,
@@ -12,6 +12,7 @@ import {
 	validateSync,
 } from 'class-validator';
 import { MAX_ADMIN_SESSION_REMEMBER_TTL_SECONDS, validateDatabaseUrl } from '@nestidp/shared';
+import { TransformOptionalInt } from './transform-optional-int.decorator';
 
 export enum NodeEnv {
 	Development = 'development',
@@ -64,235 +65,121 @@ export class EnvironmentVariables {
 	ADMIN_PASSWORD?: string;
 
 	@IsOptional()
-	@Transform(({ value }) => {
-		if (value === undefined || value === null || value === '') {
-			return undefined;
-		}
-		const parsed = Number.parseInt(String(value), 10);
-		return Number.isFinite(parsed) ? parsed : value;
-	})
+	@TransformOptionalInt()
 	@IsInt()
 	@Min(1)
 	ADMIN_SESSION_TTL_SECONDS?: number;
 
 	@IsOptional()
-	@Transform(({ value }) => {
-		if (value === undefined || value === null || value === '') {
-			return undefined;
-		}
-		const parsed = Number.parseInt(String(value), 10);
-		return Number.isFinite(parsed) ? parsed : value;
-	})
+	@TransformOptionalInt()
 	@IsInt()
 	@Min(3600)
 	@Max(MAX_ADMIN_SESSION_REMEMBER_TTL_SECONDS)
 	ADMIN_SESSION_REMEMBER_TTL_SECONDS?: number;
 
 	@IsOptional()
-	@Transform(({ value }) => {
-		if (value === undefined || value === null || value === '') {
-			return undefined;
-		}
-		const parsed = Number.parseInt(String(value), 10);
-		return Number.isFinite(parsed) ? parsed : value;
-	})
+	@TransformOptionalInt()
 	@IsInt()
 	@Min(1000)
 	SYNC_HTTP_TIMEOUT_MS?: number;
 
 	@IsOptional()
-	@Transform(({ value }) => {
-		if (value === undefined || value === null || value === '') {
-			return undefined;
-		}
-		const parsed = Number.parseInt(String(value), 10);
-		return Number.isFinite(parsed) ? parsed : value;
-	})
+	@TransformOptionalInt()
 	@IsInt()
 	@Min(1)
 	SYNC_STALE_RUN_MINUTES?: number;
 
 	@IsOptional()
-	@Transform(({ value }) => {
-		if (value === undefined || value === null || value === '') {
-			return undefined;
-		}
-		const parsed = Number.parseInt(String(value), 10);
-		return Number.isFinite(parsed) ? parsed : value;
-	})
+	@TransformOptionalInt()
 	@IsInt()
 	@Min(1)
 	SYNC_MAX_USERS_PER_RUN?: number;
 
 	/** Scheduled-sync tick interval (ms). `0` disables the in-process scheduler entirely. */
 	@IsOptional()
-	@Transform(({ value }) => {
-		if (value === undefined || value === null || value === '') {
-			return undefined;
-		}
-		const parsed = Number.parseInt(String(value), 10);
-		return Number.isFinite(parsed) ? parsed : value;
-	})
+	@TransformOptionalInt()
 	@IsInt()
 	@Min(0)
 	SYNC_SCHEDULER_TICK_MS?: number;
 
 	/** Minimum allowed cron frequency (minutes); a schedule firing more often is rejected. */
 	@IsOptional()
-	@Transform(({ value }) => {
-		if (value === undefined || value === null || value === '') {
-			return undefined;
-		}
-		const parsed = Number.parseInt(String(value), 10);
-		return Number.isFinite(parsed) ? parsed : value;
-	})
+	@TransformOptionalInt()
 	@IsInt()
 	@Min(1)
 	SYNC_SCHEDULE_MIN_INTERVAL_MINUTES?: number;
 
 	/** Max random spread (seconds) added to each computed run; `0` = exact (no jitter). */
 	@IsOptional()
-	@Transform(({ value }) => {
-		if (value === undefined || value === null || value === '') {
-			return undefined;
-		}
-		const parsed = Number.parseInt(String(value), 10);
-		return Number.isFinite(parsed) ? parsed : value;
-	})
+	@TransformOptionalInt()
 	@IsInt()
 	@Min(0)
 	SYNC_SCHEDULE_JITTER_MAX_SECONDS?: number;
 
 	/** N consecutive failed scheduled runs auto-pause the schedule; `0` = never auto-pause. */
 	@IsOptional()
-	@Transform(({ value }) => {
-		if (value === undefined || value === null || value === '') {
-			return undefined;
-		}
-		const parsed = Number.parseInt(String(value), 10);
-		return Number.isFinite(parsed) ? parsed : value;
-	})
+	@TransformOptionalInt()
 	@IsInt()
 	@Min(0)
 	SYNC_SCHEDULE_FAILURE_AUTOPAUSE_THRESHOLD?: number;
 
 	/** On boot, an overdue schedule runs immediately only if overdue by ≤ this many minutes (`0` = never). */
 	@IsOptional()
-	@Transform(({ value }) => {
-		if (value === undefined || value === null || value === '') {
-			return undefined;
-		}
-		const parsed = Number.parseInt(String(value), 10);
-		return Number.isFinite(parsed) ? parsed : value;
-	})
+	@TransformOptionalInt()
 	@IsInt()
 	@Min(0)
 	SYNC_SCHEDULE_BOOT_OVERDUE_GRACE_MINUTES?: number;
 
 	@IsOptional()
-	@Transform(({ value }) => {
-		if (value === undefined || value === null || value === '') {
-			return undefined;
-		}
-		const parsed = Number.parseInt(String(value), 10);
-		return Number.isFinite(parsed) ? parsed : value;
-	})
+	@TransformOptionalInt()
 	@IsInt()
 	@Min(1)
 	END_USER_SESSION_TTL_SECONDS?: number;
 
 	@IsOptional()
-	@Transform(({ value }) => {
-		if (value === undefined || value === null || value === '') {
-			return undefined;
-		}
-		const parsed = Number.parseInt(String(value), 10);
-		return Number.isFinite(parsed) ? parsed : value;
-	})
+	@TransformOptionalInt()
 	@IsInt()
 	@Min(1)
 	END_USER_LOGIN_RATE_LIMIT_MAX?: number;
 
 	@IsOptional()
-	@Transform(({ value }) => {
-		if (value === undefined || value === null || value === '') {
-			return undefined;
-		}
-		const parsed = Number.parseInt(String(value), 10);
-		return Number.isFinite(parsed) ? parsed : value;
-	})
+	@TransformOptionalInt()
 	@IsInt()
 	@Min(1000)
 	END_USER_LOGIN_RATE_LIMIT_WINDOW_MS?: number;
 
 	@IsOptional()
-	@Transform(({ value }) => {
-		if (value === undefined || value === null || value === '') {
-			return undefined;
-		}
-		const parsed = Number.parseInt(String(value), 10);
-		return Number.isFinite(parsed) ? parsed : value;
-	})
+	@TransformOptionalInt()
 	@IsInt()
 	@Min(1)
 	END_USER_LOGIN_RATE_LIMIT_USERNAME_MAX?: number;
 
 	@IsOptional()
-	@Transform(({ value }) => {
-		if (value === undefined || value === null || value === '') {
-			return undefined;
-		}
-		const parsed = Number.parseInt(String(value), 10);
-		return Number.isFinite(parsed) ? parsed : value;
-	})
+	@TransformOptionalInt()
 	@IsInt()
 	@Min(1000)
 	END_USER_LOGIN_RATE_LIMIT_USERNAME_WINDOW_MS?: number;
 
 	@IsOptional()
-	@Transform(({ value }) => {
-		if (value === undefined || value === null || value === '') {
-			return undefined;
-		}
-		const parsed = Number.parseInt(String(value), 10);
-		return Number.isFinite(parsed) ? parsed : value;
-	})
+	@TransformOptionalInt()
 	@IsInt()
 	@Min(1)
 	SAML_ASSERTION_TTL_SECONDS?: number;
 
 	@IsOptional()
-	@Transform(({ value }) => {
-		if (value === undefined || value === null || value === '') {
-			return undefined;
-		}
-		const parsed = Number.parseInt(String(value), 10);
-		return Number.isFinite(parsed) ? parsed : value;
-	})
+	@TransformOptionalInt()
 	@IsInt()
 	@Min(1)
 	SAML_SESSION_TTL_SECONDS?: number;
 
 	@IsOptional()
-	@Transform(({ value }) => {
-		if (value === undefined || value === null || value === '') {
-			return undefined;
-		}
-		const parsed = Number.parseInt(String(value), 10);
-		return Number.isFinite(parsed) ? parsed : value;
-	})
+	@TransformOptionalInt()
 	@IsInt()
 	@Min(1)
 	SAML_CLOCK_SKEW_SECONDS?: number;
 
 	@IsOptional()
-	@Transform(({ value }) => {
-		if (value === undefined || value === null || value === '') {
-			return undefined;
-		}
-		const parsed = Number.parseInt(String(value), 10);
-		return Number.isFinite(parsed) ? parsed : value;
-	})
+	@TransformOptionalInt()
 	@IsInt()
 	@Min(0)
 	SAML_SESSION_CLEANUP_INTERVAL_MS?: number;
@@ -317,49 +204,25 @@ export class EnvironmentVariables {
 	MIGRATE_ONLY?: string;
 
 	@IsOptional()
-	@Transform(({ value }) => {
-		if (value === undefined || value === null || value === '') {
-			return undefined;
-		}
-		const parsed = Number.parseInt(String(value), 10);
-		return Number.isFinite(parsed) ? parsed : value;
-	})
+	@TransformOptionalInt()
 	@IsInt()
 	@Min(1)
 	AUDIT_RETENTION_DAYS?: number;
 
 	@IsOptional()
-	@Transform(({ value }) => {
-		if (value === undefined || value === null || value === '') {
-			return undefined;
-		}
-		const parsed = Number.parseInt(String(value), 10);
-		return Number.isFinite(parsed) ? parsed : value;
-	})
+	@TransformOptionalInt()
 	@IsInt()
 	@Min(0)
 	AUDIT_CLEANUP_INTERVAL_MS?: number;
 
 	@IsOptional()
-	@Transform(({ value }) => {
-		if (value === undefined || value === null || value === '') {
-			return undefined;
-		}
-		const parsed = Number.parseInt(String(value), 10);
-		return Number.isFinite(parsed) ? parsed : value;
-	})
+	@TransformOptionalInt()
 	@IsInt()
 	@Min(1)
 	ADMIN_USER_CREATE_RATE_LIMIT_MAX?: number;
 
 	@IsOptional()
-	@Transform(({ value }) => {
-		if (value === undefined || value === null || value === '') {
-			return undefined;
-		}
-		const parsed = Number.parseInt(String(value), 10);
-		return Number.isFinite(parsed) ? parsed : value;
-	})
+	@TransformOptionalInt()
 	@IsInt()
 	@Min(1000)
 	ADMIN_USER_CREATE_RATE_LIMIT_WINDOW_MS?: number;
