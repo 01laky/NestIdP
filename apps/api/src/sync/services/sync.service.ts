@@ -90,7 +90,10 @@ interface MembershipKind {
 	key: MembershipKindKey;
 	fetchPhase: 'fetch_groups' | 'fetch_roles';
 	errorDescriptor: MembershipErrorDescriptor;
-	mapRow: (raw: unknown, fieldMap: { id: string; name: string }) => ExternalGroupDto | ExternalRoleDto;
+	mapRow: (
+		raw: unknown,
+		fieldMap: { id: string; name: string },
+	) => ExternalGroupDto | ExternalRoleDto;
 	fieldMap: { id: string; name: string };
 	embedded: boolean;
 	embeddedPath?: string;

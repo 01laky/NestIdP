@@ -19,7 +19,11 @@ import { PrismaService } from '../../prisma/services/prisma.service';
 import { IdentitySyncClientService } from '../../sync/services/identity-sync-client.service';
 import { OAuthTokenService } from '../../sync/services/oauth-token.service';
 import { ProxyDispatcherService } from '../../sync/services/proxy-dispatcher.service';
-import { buildOutboundUrl, extractArrayAt, outboundFetch } from '../../sync/utils/outbound-http.util';
+import {
+	buildOutboundUrl,
+	extractArrayAt,
+	outboundFetch,
+} from '../../sync/utils/outbound-http.util';
 import { annotateIfProxied, classifyProxyError } from '../../sync/utils/proxy-error.util';
 import { ApiConnectionsAuditService } from './api-connections-audit.service';
 import { normalizeBaseUrl } from '../utils/base-url.util';

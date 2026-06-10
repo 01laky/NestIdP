@@ -6,9 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [1.18.1]
 
-Refactor + hardening pass (Prompt 38) — **security & correctness fixes + the first refactor increment**.
-This release is in progress; the broader refactors (identity-store parity, cert-lifecycle unification,
-frontend de-duplication) and remaining items land in subsequent commits under this same version.
+Codebase-wide refactor + hardening pass (Prompt 38): the §5 security/correctness fixes (each with a
+regression test), all ten §6 behaviour-preserving refactor workstreams (identity-store parity,
+cert-lifecycle unification, sync decomposition behind characterization goldens, frontend
+de-duplication, …) and the full PART III safety-net set (§11 goldens, §12 race harness, §13 import
+boundaries, §14 transactional-integrity sweep, §15 audit-event registry, §16 secret-leak guard,
+§17 migration-safety guards, §18 injectable clocks, §19 typed-config ratchet + bundle hygiene).
+
+**Rollback note (§20):** 1.18.1 introduces **no schema migrations** (local or external — the optional
+`SyncLog.dryRun` column was _not_ taken; the dry-run sentinel stays). Some fixes change DB-write
+_atomicity_ (transactions around existing writes) but not the written shapes, so rolling back to
+1.18.0 is safe in any order; the three renamed audit-event families keep their old names in
+historical rows (see `docs/audit-events.md`).
 
 ### Changed
 
@@ -76,6 +85,10 @@ frontend de-duplication) and remaining items land in subsequent commits under th
   `admin/adminApi.ts` reduced to a re-export barrel. No call sites or tests changed — `import … from
 '../adminApi'` and the `vi.spyOn(adminApi, …)` pattern (~480 sites) keep working through the barrel.
 
+- **`@TransformOptionalInt()` for boot env validation** (§6.1, final piece): the identical optional-int
+  `@Transform` block was copy-pasted 23× in `env.validation.ts`; one decorator replaces them all
+  (390 → 253 lines). Empty/absent stays `undefined`, non-numeric input passes through unchanged so
+  `@IsInt()` rejects it loudly.
 - **`SyncService` decomposed behind characterization goldens** (§11/§6.8): before touching the ~1000-line
   service, 8 golden scenarios (clean run, collision-skip/fail_run, membership-phase failure, deactivation
   with dropped-row entry, dry-run, `syncAll` aggregate, fetch failure) snapshot the ordered `finishLog`
@@ -120,6 +133,14 @@ frontend de-duplication) and remaining items land in subsequent commits under th
 
 ### Added
 
+- **The §8 test-coverage gaps are closed**: a 24-test HTTP integration suite for the admin SAML-sessions
+  controller (`API-SESS-CTRL-*` — list filters, single/bulk/by-user/kill-switch terminate, back-channel
+  resend/process incl. the module-absent 503 path, CSRF on all six mutating POSTs, authz on all eight
+  endpoints, DTO validation matrix), a `logout-propagation-notifier` unit suite (`BC-NOTIF-*`), unit suites
+  for `SpConnectionTestSsoUrlService` (`API-SP-TSSO-U-*` — incl. cryptographic verification of the signed
+  test-SSO URL and RelayState tamper coverage) and `SpConnectionProbeSigningService` (`API-SP-PROBE-U-*`),
+  and the five `ExternalIdentityDatabasePage` action error paths in the web suite (`WEB-EXTDB-ERR-*`).
+  Plus `apps/api/test/TEST-IDS.md` — the test-ID prefix registry (§6.10).
 - **ESLint import-boundary rules** (§13): four `no-restricted-imports` blocks (each with an inline
   rationale) now make the layering permanent — `auth`/`bootstrap` ↛ `admin-auth` (and the reverse),
   the external identity store ↛ the Prisma-bound `identity.repository`, and the SPA ↛ server-only
@@ -131,8 +152,7 @@ frontend de-duplication) and remaining items land in subsequent commits under th
   an `ENCRYPTION_KEY`-shaped string, an OAuth client secret, a proxy password, a session cookie, a
   private-key PEM) through every formatting path that can reach logs or HTTP clients — audit metadata
   (top-level **and** nested), the `redactSecrets` string scrubber in its production wire shapes, and the
-  global `RedactingExceptionFilter` (string, object and nested payloads; plain `Error` stays a generic
-  500) — and asserts none of them survive. A boundary test pins that key-name-based metadata redaction
+  global `RedactingExceptionFilter` (string, object and nested payloads; plain `Error` stays a generic 500) — and asserts none of them survive. A boundary test pins that key-name-based metadata redaction
   does NOT catch a secret under an innocuous key (proving the guard bites). Writing the guard immediately
   caught a real hole: `encryptionKey`-style metadata keys slipped past the `encrypted` substring — the
   denylist now also covers `encryptionkey`.
@@ -209,8 +229,7 @@ frontend de-duplication) and remaining items land in subsequent commits under th
     separately (new additive `manualAllRunCount` DTO field) instead of folding them into "manual"; the
     error-list truncation marker uses a new dedicated `truncated` phase (was: polluted `parse_users`);
     `parseSyncLogErrors` validates DB JSON instead of blind-casting; `POST sync/:id` accepts `?dryRun=true`
-    like `sync/all`; `removeSourceIdentities` session termination is bounded (shared `runPool`, concurrency
-    5) with per-user error isolation; the connection-test preview applies the same users-per-run cap as a
+    like `sync/all`; `removeSourceIdentities` session termination is bounded (shared `runPool`, concurrency 5) with per-user error isolation; the connection-test preview applies the same users-per-run cap as a
     real sync; the username-only proxy `Basic` credential and the stale-run reclaim window are documented.
   - _SAML_: the admin session-list search escapes LIKE wildcards and matches case-insensitively (same fix
     as the identity stores); back-channel logout verification reads `SAML_CLOCK_SKEW_SECONDS` instead of a
@@ -250,6 +269,12 @@ frontend de-duplication) and remaining items land in subsequent commits under th
     piece); the SP certificate is parsed with `X509Certificate` at upload (was: substring sniffing — a
     structurally broken cert failed later at SSO time); dead `requireHttps` option, four dead `@deprecated`
     shared stubs and a `while`-that-was-an-`if` in `validateProxyUrl` removed.
+- **Back-channel notifier hooks can no longer corrupt the delivery state machine** — the
+  logout-propagation notifier calls were bare (`void this.notifier.onSent(...)`): an async rejection
+  became a process-level unhandled rejection, and a notifier throwing synchronously from `onSucceeded`
+  was caught by the delivery wrapper which then flipped an **already-succeeded** row to `failed` (with a
+  duplicate audit). All four hooks now go through a `notifySafe` wrapper (sync throw + async rejection
+  both logged as `backchannel_notifier_error`, never escalated). Found by the new `BC-NOTIF-*` suite.
 - **Multi-write operations made atomic** (§14): `completeSso`'s participation-create + one-time SAML-session
   delete now run in one transaction (a crash between them could leave a replayable pending session or an SSO
   session invisible to SLO fan-out), `purgeExpiredSessions` deletes pending sessions, expired SSO

@@ -107,9 +107,7 @@ export function pushUpsertEntityError(
 	const entry: SyncLogErrorEntryDto = {
 		phase: descriptor.upsertPhase,
 		externalUserId,
-		message: descriptor.isNameCollision(error)
-			? error.message
-			: descriptor.upsertFailedMessage,
+		message: descriptor.isNameCollision(error) ? error.message : descriptor.upsertFailedMessage,
 	};
 	entry[descriptor.errorIdField] = externalEntityId;
 	errors.push(entry);

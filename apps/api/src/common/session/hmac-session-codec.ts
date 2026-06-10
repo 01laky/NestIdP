@@ -21,7 +21,10 @@ export class HmacSessionCodec<TPayload extends { exp: number }> {
 	}
 
 	// §18: `nowSeconds` is injectable so expiry can be tested against a fixed clock.
-	verify(token: string | undefined, nowSeconds: number = Math.floor(Date.now() / 1000)): TPayload | null {
+	verify(
+		token: string | undefined,
+		nowSeconds: number = Math.floor(Date.now() / 1000),
+	): TPayload | null {
 		if (!token) {
 			return null;
 		}

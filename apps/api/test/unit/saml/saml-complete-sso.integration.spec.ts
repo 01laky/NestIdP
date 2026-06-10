@@ -332,9 +332,7 @@ describe('SAML complete-sso integration (SQLite)', () => {
 		// below must hold: the one-time session is not consumed and no participation row leaks.
 		await prisma.samlSpParticipation.deleteMany({});
 		await prisma.samlSsoSession.deleteMany({});
-		const res = await agent
-			.post(`${AUTH_API_PATH}/login/complete-sso`)
-			.send({ samlSessionId });
+		const res = await agent.post(`${AUTH_API_PATH}/login/complete-sso`).send({ samlSessionId });
 		expect(res.status).toBeGreaterThanOrEqual(400);
 		// rollback: the one-time SAML session was NOT consumed and no participation row leaked
 		await expect(

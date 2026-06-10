@@ -19,8 +19,7 @@ const SENTINELS = {
 	oauthClientSecret: 'oauth-cs-SENTINEL-94c1b2cf2d',
 	proxyPassword: 'proxy-pw-SENTINEL-d41d8cd98f',
 	sessionCookie: 'nestidp_admin=sess-SENTINEL-1f3870be27.sig-SENTINEL',
-	privateKeyPem:
-		'-----BEGIN PRIVATE KEY-----\nMIIPEMSENTINELBODYxyz123\n-----END PRIVATE KEY-----',
+	privateKeyPem: '-----BEGIN PRIVATE KEY-----\nMIIPEMSENTINELBODYxyz123\n-----END PRIVATE KEY-----',
 } as const;
 
 const SENTINEL_VALUES = Object.values(SENTINELS);
@@ -92,7 +91,9 @@ describe('secret-leak guard (SLG, §16)', () => {
 		} as unknown as ArgumentsHost;
 
 		filter.catch(
-			new BadRequestException(`token exchange failed: client_secret=${SENTINELS.oauthClientSecret}`),
+			new BadRequestException(
+				`token exchange failed: client_secret=${SENTINELS.oauthClientSecret}`,
+			),
 			host,
 		);
 		filter.catch(

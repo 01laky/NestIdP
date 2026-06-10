@@ -1,5 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { hashPassword, verifyPassword, verifyPasswordTimingSafe } from '../../common/crypto/password.util';
+import {
+	hashPassword,
+	verifyPassword,
+	verifyPasswordTimingSafe,
+} from '../../common/crypto/password.util';
 
 @Injectable()
 export class PasswordService {

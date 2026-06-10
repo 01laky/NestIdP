@@ -271,7 +271,12 @@ SP/API connections, audit, SAML sessions) **always stays local** and never moves
   through Kysely, not Prisma).
 - NestIdP owns a small set of **`nestidp_`-prefixed** tables + a `nestidp_meta` marker in the external
   database (a versioned migrator manages them). It never touches other tables; a database whose prefixed
-  tables are not ours is classified **foreign** and refused.
+  tables are not ours is classified **foreign** and refused. A schema stamped by a **newer** NestIdP build
+  is refused too (downgrade guard), and a legacy half-initialised schema (marker never stamped) is
+  recovered, not bricked (v1.18.1, §17).
+- **PostgreSQL `pgSchema`** (optional, v1.18.1): when set, every pooled connection pins
+  `search_path=<schema>,public` and schema bootstrap runs `CREATE SCHEMA IF NOT EXISTS`, so the
+  `nestidp_` tables can live outside `public`. Empty = default behaviour (`public`).
 - **Cross-store note:** identity rows reference `apiConnectionId` (and `SamlSession`/`SamlSsoSession`
   reference `userId`), but those parent tables stay local. In the external schema `apiConnectionId` is a
   plain value column; referential integrity to the local `ApiConnection` is enforced at the app layer

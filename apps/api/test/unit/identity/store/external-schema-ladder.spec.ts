@@ -51,9 +51,7 @@ describe('external schema migration ladder (EXT-LADDER, §17)', () => {
 			await runExternalMigrations(db, 'postgres');
 			await sql`insert into nestidp_user
 				(id, external_id, api_connection_id, origin, username, password_hash, password_hash_algorithm, active, created_at, updated_at)
-				values ('u1', 'ext-1', 'conn-1', 'MANUAL', 'alice', 'x', 'bcrypt', true, now(), now())`.execute(
-				db,
-			);
+				values ('u1', 'ext-1', 'conn-1', 'MANUAL', 'alice', 'x', 'bcrypt', true, now(), now())`.execute(db);
 			const version = await runExternalMigrations(db, 'postgres');
 			expect(version).toBe(CURRENT_SCHEMA_VERSION);
 			// Existing data untouched by the idempotent re-run.
