@@ -62,15 +62,14 @@ describe('Identity UI edge — extended (WEB-IDN-UI-25+)', () => {
 	});
 
 	it('WEB-IDN-UI-26: identity list pages use evg-inline-form in source', () => {
-		for (const file of [
-			'IdentityUsersPage.tsx',
-			'IdentityGroupsPage.tsx',
-			'IdentityRolesPage.tsx',
-		]) {
-			const text = readFileSync(join(adminPagesDir, file), 'utf8');
-			expect(text).toContain('evg-inline-form');
-			expect(text).not.toContain('labelVisuallyHidden');
-		}
+		// The filter toolbar now lives in the shared IdentityListPage shell (Prompt 38 §A17); the three
+		// list pages are thin wrappers that delegate to it.
+		const text = readFileSync(
+			join(webSrc, 'admin/components/identity/IdentityListPage.tsx'),
+			'utf8',
+		);
+		expect(text).toContain('evg-inline-form');
+		expect(text).not.toContain('labelVisuallyHidden');
 	});
 
 	it('WEB-IDN-UI-27: roles Origin + Apply refetches list', async () => {
@@ -520,8 +519,12 @@ describe('Identity UI edge — extended (WEB-IDN-UI-25+)', () => {
 		);
 	});
 
-	it('WEB-IDN-UI-52: TextInput fieldClassName prop documented in IdentityUsersPage', () => {
-		const text = readFileSync(join(adminPagesDir, 'IdentityUsersPage.tsx'), 'utf8');
+	it('WEB-IDN-UI-52: TextInput fieldClassName prop documented in identity list shell', () => {
+		// The search/origin toolbar fields moved into the shared IdentityListPage shell (Prompt 38 §A17).
+		const text = readFileSync(
+			join(webSrc, 'admin/components/identity/IdentityListPage.tsx'),
+			'utf8',
+		);
 		expect(text).toContain('fieldClassName="evg-field--grow"');
 		expect(text).toContain('fieldClassName="evg-field--fixed"');
 	});

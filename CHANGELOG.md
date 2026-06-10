@@ -54,6 +54,11 @@ frontend de-duplication) and remaining items land in subsequent commits under th
   supplying a per-kind descriptor (API calls, routes, i18n keys). Behaviour-preserving — the existing identity
   CRUD/edge suites and the evergreen/responsive static guards (updated to point at the shared components)
   stay green.
+- **Identity list pages collapsed onto one shell** (§6.9 / §A17): the ~95%-identical user/group/role list
+  pages now share a config-driven `<IdentityListPage>` shell (header, origin/source filter toolbar, optional
+  search field + info callout, lazy paginated table, section nav). Each page is a thin wrapper supplying its
+  columns, fetcher, routes and i18n keys; the user page additionally enables the search box and callout. The
+  evergreen/responsive/pagination static guards were repointed at the shell where the toolbar UI now lives.
 
 ### Security
 

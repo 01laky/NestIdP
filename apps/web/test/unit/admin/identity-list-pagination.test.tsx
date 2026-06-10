@@ -182,6 +182,8 @@ describe('Identity list pagination (WEB-IDN-TBL)', () => {
 			'utf8',
 		);
 		expect(lazyHelper).toContain("import('./IdentityListTable')");
+		// Each list page (now a thin wrapper, Prompt 38 §A17) still creates its own lazy table chunk;
+		// the <Suspense> boundary that mounts it lives in the shared IdentityListPage shell.
 		for (const file of [
 			'IdentityUsersPage.tsx',
 			'IdentityGroupsPage.tsx',
@@ -189,8 +191,12 @@ describe('Identity list pagination (WEB-IDN-TBL)', () => {
 		]) {
 			const src = readFileSync(join(pagesDir, file), 'utf8');
 			expect(src).toContain('createLazyIdentityListTable');
-			expect(src).toContain('Suspense');
 		}
+		const shell = readFileSync(
+			join(webSrc, 'admin/components/identity/IdentityListPage.tsx'),
+			'utf8',
+		);
+		expect(shell).toContain('Suspense');
 	});
 
 	it('WEB-IDN-TBL-08: stale fetch response is ignored', async () => {

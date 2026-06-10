@@ -943,6 +943,8 @@ describe('Admin forms Evergreen — extended edge cases', () => {
 });
 
 describe('Admin forms static conventions — edge cases', () => {
+	// IdentityUsersPage (and the group/role list pages) are now thin wrappers over the shared
+	// IdentityListPage shell (Prompt 38 §A17); the toolbar controls live in that component, asserted below.
 	const formPages = [
 		'ApiConnectionFormPage.tsx',
 		'ApiConnectionSyncPage.tsx',
@@ -950,7 +952,6 @@ describe('Admin forms static conventions — edge cases', () => {
 		'IdpSettingsPage.tsx',
 		'AdminUsersPage.tsx',
 		'AuditLogPage.tsx',
-		'IdentityUsersPage.tsx',
 	];
 
 	function walkTsx(dir: string, out: string[] = []): string[] {
@@ -980,7 +981,6 @@ describe('Admin forms static conventions — edge cases', () => {
 			'IdpSettingsPage.tsx': ['TextInput', 'Button'],
 			'AdminUsersPage.tsx': ['TextInput', 'Button'],
 			'AuditLogPage.tsx': ['Button'],
-			'IdentityUsersPage.tsx': ['TextInput', 'Button', 'ButtonLink'],
 			'IdentityUserFormPage.tsx': ['TextInput', 'Button', 'ButtonLink', 'Panel'],
 			'IdentityGroupFormPage.tsx': ['TextInput', 'Button', 'ButtonLink', 'Panel'],
 			'IdentityRoleFormPage.tsx': ['TextInput', 'Button', 'ButtonLink', 'Panel'],
@@ -1000,6 +1000,19 @@ describe('Admin forms static conventions — edge cases', () => {
 				if (!text.includes(symbol)) {
 					missing.push(`${file} (missing ${symbol})`);
 				}
+			}
+		}
+		// The shared identity list shell owns the toolbar controls for all three list pages.
+		const shell = readFileSync(
+			join(webSrc, 'admin/components/identity/IdentityListPage.tsx'),
+			'utf8',
+		);
+		if (!/from ['"]\.\.\/\.\.\/\.\.\/ui['"]/.test(shell)) {
+			missing.push('IdentityListPage.tsx (ui barrel)');
+		}
+		for (const symbol of ['TextInput', 'Button', 'ButtonLink', 'Select']) {
+			if (!shell.includes(symbol)) {
+				missing.push(`IdentityListPage.tsx (missing ${symbol})`);
 			}
 		}
 		expect(missing).toEqual([]);
