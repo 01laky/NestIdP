@@ -48,6 +48,12 @@ frontend de-duplication) and remaining items land in subsequent commits under th
   loaders. The identity-list query serialiser was also generalised to one `toQuery()` helper (skips
   `undefined`/`''`, stringifies booleans) and reused by the sync-log, SAML-session and test-SSO-URL endpoints
   in `adminApi.ts`, replacing their per-endpoint `new URLSearchParams(); if (x) params.set(…)` ladders.
+- **Identity group/role page families collapsed** (§6.9 / §A17): the ~95%-identical group and role
+  create/edit pages now share one config-driven `<SimpleNameFormPage>` component, and the ~90%-identical
+  group and role detail pages share one `<IdentityMemberDetailPage>`; each page is reduced to a thin wrapper
+  supplying a per-kind descriptor (API calls, routes, i18n keys). Behaviour-preserving — the existing identity
+  CRUD/edge suites and the evergreen/responsive static guards (updated to point at the shared components)
+  stay green.
 
 ### Security
 

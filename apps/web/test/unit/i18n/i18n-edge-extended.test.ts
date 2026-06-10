@@ -12,6 +12,16 @@ const ADMIN_PAGE_GLOBS = readdirSync(join(webSrc, 'admin/pages')).filter(
 	(f) => f.endsWith('.tsx') && !f.includes('.test.'),
 );
 
+// Thin wrappers that delegate all rendering (and i18n) to a shared config-driven component
+// (Prompt 38 §A17): the group/role form and detail pages. Their UI conventions are asserted on the
+// shared components (SimpleNameFormPage / IdentityMemberDetailPage) instead of the wrappers.
+const DELEGATING_WRAPPER_PAGES = new Set([
+	'IdentityGroupFormPage.tsx',
+	'IdentityRoleFormPage.tsx',
+	'IdentityGroupDetailPage.tsx',
+	'IdentityRoleDetailPage.tsx',
+]);
+
 describe('i18n edge — extended (WEB-I18N-79–95)', () => {
 	it('WEB-I18N-79: all ten locale JSON files exist and parse', () => {
 		for (const code of SUPPORTED_LOCALES) {
@@ -65,6 +75,9 @@ describe('i18n edge — extended (WEB-I18N-79–95)', () => {
 	it('WEB-I18N-86: admin pages import useTranslation or error helpers', () => {
 		const missing: string[] = [];
 		for (const file of ADMIN_PAGE_GLOBS) {
+			if (DELEGATING_WRAPPER_PAGES.has(file)) {
+				continue;
+			}
 			const text = readFileSync(join(webSrc, 'admin/pages', file), 'utf8');
 			const usesI18n =
 				text.includes('useTranslation') ||

@@ -751,12 +751,14 @@ describe('Identity manual CRUD — web edge', () => {
 		expect((unchecked as HTMLInputElement).disabled).toBe(true);
 	});
 
-	const identityFormFiles = [
-		'IdentityUserFormPage.tsx',
-		'IdentityGroupFormPage.tsx',
-		'IdentityRoleFormPage.tsx',
-		'IdentityGroupDetailPage.tsx',
-		'IdentityRoleDetailPage.tsx',
+	// Page-level identity form screens that own their own UI. The group/role *form* and *detail* pages are
+	// now thin wrappers over the shared `SimpleNameFormPage` / `IdentityMemberDetailPage` components
+	// (Prompt 38 §A17), so the UI conventions below are asserted on those components instead of the wrappers.
+	const identityFormFiles = ['IdentityUserFormPage.tsx'];
+	const identityFormComponents = [
+		'admin/components/identity/SimpleNameFormPage.tsx',
+		'admin/components/identity/IdentityMemberDetailPage.tsx',
+		'admin/components/identity/IdentityMembershipPicker.tsx',
 	];
 
 	it('WEB-EVG-169: identity form pages import from ui barrel', () => {
@@ -767,38 +769,38 @@ describe('Identity manual CRUD — web edge', () => {
 				missing.push(file);
 			}
 		}
-		const picker = readFileSync(
-			join(webSrc, 'admin/components/identity/IdentityMembershipPicker.tsx'),
-			'utf8',
-		);
-		if (!/from ['"]\.\.\/\.\.\/\.\.\/ui['"]/.test(picker)) {
-			missing.push('IdentityMembershipPicker.tsx');
+		for (const rel of identityFormComponents) {
+			const text = readFileSync(join(webSrc, rel), 'utf8');
+			if (!/from ['"]\.\.\/\.\.\/\.\.\/ui['"]/.test(text)) {
+				missing.push(rel);
+			}
 		}
 		expect(missing).toEqual([]);
 	});
 
 	it('WEB-EVG-170: identity form pages do not hand-apply evg-input', () => {
 		const hits: string[] = [];
-		for (const file of [...identityFormFiles, 'IdentityMembershipPicker.tsx']) {
-			const path =
-				file === 'IdentityMembershipPicker.tsx'
-					? join(webSrc, 'admin/components/identity', file)
-					: join(webSrc, 'admin/pages', file);
-			const text = readFileSync(path, 'utf8');
+		for (const file of identityFormFiles) {
+			const text = readFileSync(join(webSrc, 'admin/pages', file), 'utf8');
 			if (/className="evg-input"/.test(text)) {
 				hits.push(file);
+			}
+		}
+		for (const rel of identityFormComponents) {
+			const text = readFileSync(join(webSrc, rel), 'utf8');
+			if (/className="evg-input"/.test(text)) {
+				hits.push(rel);
 			}
 		}
 		expect(hits).toEqual([]);
 	});
 
 	it('WEB-EVG-171: identity manual pages use Panel on form screens', () => {
-		for (const file of [
-			'IdentityUserFormPage.tsx',
-			'IdentityGroupFormPage.tsx',
-			'IdentityRoleFormPage.tsx',
+		for (const rel of [
+			'admin/pages/IdentityUserFormPage.tsx',
+			'admin/components/identity/SimpleNameFormPage.tsx',
 		]) {
-			const text = readFileSync(join(webSrc, 'admin/pages', file), 'utf8');
+			const text = readFileSync(join(webSrc, rel), 'utf8');
 			expect(text).toContain('Panel');
 		}
 	});

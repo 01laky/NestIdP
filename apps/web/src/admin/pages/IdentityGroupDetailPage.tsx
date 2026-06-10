@@ -1,158 +1,32 @@
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
-import {
-	IDENTITY_ROUTE_PREFIX,
-	identityGroupEditRoute,
-	identityUserDetailRoute,
-} from '@nestidp/shared';
+import { IDENTITY_ROUTE_PREFIX, identityGroupEditRoute } from '@nestidp/shared';
 import { deleteIdentityGroup, getIdentityGroup } from '../adminApi';
-import { AdminPageHeader } from '../components/layout/AdminPageHeader';
-import { ErrorBanner } from '../components/common/ErrorBanner';
-import { LoadingState } from '../components/common/LoadingState';
-import { useAdminResource } from '../hooks/useAdminResource';
-import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
-import { mapAdminError } from '../../i18n/api-error-messages';
-import { identityOriginLabel, identityOriginToBadge } from '../status-badge';
-import { buildIdentityMemberDeleteDetail } from '../identity-delete-detail';
-import { Badge, Button, ButtonLink, Panel, Table, useConfirmAction, useToast } from '../../ui';
+import {
+	IdentityMemberDetailPage,
+	type IdentityMemberDetailConfig,
+} from '../components/identity/IdentityMemberDetailPage';
+
+const groupDetailConfig: IdentityMemberDetailConfig = {
+	load: async (id) => {
+		const data = await getIdentityGroup(id);
+		return { entity: data.group, members: data.members, memberCount: data.memberCount };
+	},
+	remove: (id) => deleteIdentityGroup(id),
+	editRoute: identityGroupEditRoute,
+	listPath: `${IDENTITY_ROUTE_PREFIX}/groups`,
+	keys: {
+		docTitle: 'viewGroup',
+		loadFailed: 'identity.loadGroupFailed',
+		notFound: 'groupNotFound',
+		navList: 'groups',
+		syncedCallout: 'syncedGroupCallout',
+		backTo: 'backToGroups',
+		confirmDeleteTitle: 'confirmDeleteGroupTitle',
+		confirmDelete: 'confirmDeleteGroup',
+		confirmDeleteWithMembers: 'confirmDeleteGroupWithMembers',
+		toastDeleted: 'toastGroupDeleted',
+	},
+};
 
 export function IdentityGroupDetailPage() {
-	const { id } = useParams<{ id: string }>();
-	const navigate = useNavigate();
-	const { showToast } = useToast();
-	const { t } = useTranslation('identity');
-	const { t: tNav } = useTranslation('nav');
-	const { t: tCommon } = useTranslation('common');
-	const confirmAction = useConfirmAction();
-	useAdminDocumentTitle(t('viewGroup'));
-	const {
-		data: detail,
-		loading,
-		error,
-		setError,
-	} = useAdminResource(() => getIdentityGroup(id as string), {
-		fallbackKey: 'identity.loadGroupFailed',
-		deps: [id],
-	});
-
-	async function handleDelete() {
-		if (!detail || !id) {
-			return;
-		}
-		const description =
-			detail.memberCount > 0
-				? t('confirmDeleteGroupWithMembers', {
-						name: detail.group.name,
-						count: detail.memberCount,
-					})
-				: t('confirmDeleteGroup', { name: detail.group.name });
-		await confirmAction({
-			title: t('confirmDeleteGroupTitle'),
-			description,
-			detail: buildIdentityMemberDeleteDetail(detail.members, detail.memberCount, t),
-			tone: 'danger',
-			showAuditNote: true,
-			confirmLabel: tCommon('delete'),
-			onConfirm: async () => {
-				try {
-					await deleteIdentityGroup(id);
-					showToast(t('toastGroupDeleted'));
-					navigate(`${IDENTITY_ROUTE_PREFIX}/groups`);
-				} catch (err) {
-					setError(mapAdminError(err, 'errors.deleteFailed'));
-				}
-			},
-		});
-	}
-
-	if (loading) {
-		return <LoadingState />;
-	}
-	if (error) {
-		return <ErrorBanner message={error} />;
-	}
-	if (!detail) {
-		return <ErrorBanner message={t('groupNotFound')} />;
-	}
-
-	const { group, members, memberCount } = detail;
-	const isManual = group.origin === 'manual';
-
-	return (
-		<section>
-			<AdminPageHeader
-				title={group.name}
-				breadcrumbs={[
-					{ label: tNav('dashboard'), to: '/admin' },
-					{ label: tNav('groups'), to: `${IDENTITY_ROUTE_PREFIX}/groups` },
-					{ label: group.name },
-				]}
-				actions={
-					isManual ? (
-						<>
-							<ButtonLink variant="secondary" to={identityGroupEditRoute(group.id)}>
-								{tCommon('edit')}
-							</ButtonLink>
-							<Button type="button" variant="danger" onClick={() => void handleDelete()}>
-								{tCommon('delete')}
-							</Button>
-						</>
-					) : null
-				}
-			/>
-			<p>
-				<Badge variant={identityOriginToBadge(group.origin)}>
-					{identityOriginLabel(group.origin)}
-				</Badge>
-			</p>
-			<ul className="evg-dl">
-				<li>
-					<span>{tCommon('externalId')}</span>
-					<code>{group.externalId}</code>
-				</li>
-				<li>
-					<span>{tCommon('members')}</span>
-					<code>{memberCount}</code>
-				</li>
-			</ul>
-			{!isManual ? (
-				<p className="evg-callout evg-callout--info">{t('syncedGroupCallout')}</p>
-			) : null}
-			<Panel title={t('membersPanel', { count: members.length })}>
-				{members.length === 0 ? (
-					<p className="evg-muted">{t('noMembers')}</p>
-				) : (
-					<div className="evg-table-wrap">
-						<Table>
-							<thead>
-								<tr>
-									<th>{tCommon('username')}</th>
-									<th>{tCommon('origin')}</th>
-								</tr>
-							</thead>
-							<tbody>
-								{members.map((member) => (
-									<tr key={member.id}>
-										<td>
-											<Link to={identityUserDetailRoute(member.id)}>{member.username}</Link>
-										</td>
-										<td>
-											<Badge variant={identityOriginToBadge(member.origin)}>
-												{identityOriginLabel(member.origin)}
-											</Badge>
-										</td>
-									</tr>
-								))}
-							</tbody>
-						</Table>
-					</div>
-				)}
-			</Panel>
-			<p>
-				<ButtonLink variant="link" to={`${IDENTITY_ROUTE_PREFIX}/groups`}>
-					{t('backToGroups')}
-				</ButtonLink>
-			</p>
-		</section>
-	);
+	return <IdentityMemberDetailPage config={groupDetailConfig} />;
 }

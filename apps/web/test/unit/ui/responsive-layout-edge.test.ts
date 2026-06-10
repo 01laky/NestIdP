@@ -6,6 +6,14 @@ import { evergreenDir, repoRoot, webSrc } from '@test/helpers/paths';
 const adminPages = join(webSrc, 'admin/pages');
 
 function pageSource(name: string): string {
+	// The group/role detail pages are now thin wrappers over the shared `IdentityMemberDetailPage`
+	// component (Prompt 38 §A17); the table-wrap conventions live there, so resolve those to the component.
+	if (name === 'IdentityGroupDetailPage.tsx' || name === 'IdentityRoleDetailPage.tsx') {
+		return readFileSync(
+			join(webSrc, 'admin/components/identity/IdentityMemberDetailPage.tsx'),
+			'utf8',
+		);
+	}
 	return readFileSync(join(adminPages, name), 'utf8');
 }
 

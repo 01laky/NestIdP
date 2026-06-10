@@ -11,6 +11,18 @@ function pageSource(name: string): string {
 	return readFileSync(join(adminPages, name), 'utf8');
 }
 
+// The group/role detail pages are now thin wrappers over the shared `IdentityMemberDetailPage` component
+// (Prompt 38 §A17); the table-wrap conventions live there, so resolve those wrappers to the component.
+function pageOrSharedSource(name: string): string {
+	if (name === 'IdentityGroupDetailPage.tsx' || name === 'IdentityRoleDetailPage.tsx') {
+		return readFileSync(
+			join(webSrc, 'admin/components/identity/IdentityMemberDetailPage.tsx'),
+			'utf8',
+		);
+	}
+	return pageSource(name);
+}
+
 function tableWrapBeforeTable(src: string): boolean {
 	const wrapIdx = src.indexOf('evg-table-wrap');
 	const tableIdx = src.indexOf('<Table');
@@ -141,7 +153,7 @@ describe('Responsive shell — extended CSS and static guards (WEB-RSP-50–99)'
 
 	it('WEB-RSP-71: identity detail pages wrap member tables', () => {
 		for (const file of ['IdentityGroupDetailPage.tsx', 'IdentityRoleDetailPage.tsx']) {
-			expect(tableWrapBeforeTable(pageSource(file))).toBe(true);
+			expect(tableWrapBeforeTable(pageOrSharedSource(file))).toBe(true);
 		}
 	});
 
@@ -161,7 +173,7 @@ describe('Responsive shell — extended CSS and static guards (WEB-RSP-50–99)'
 		];
 		expect(wrappedWithLocalWrap.length + wrappedViaListTable.length).toBe(9);
 		for (const file of wrappedWithLocalWrap) {
-			expect(pageSource(file)).toContain('evg-table-wrap');
+			expect(pageOrSharedSource(file)).toContain('evg-table-wrap');
 		}
 		for (const file of wrappedViaListTable) {
 			expect(pageSource(file)).toContain('createLazyIdentityListTable');
