@@ -424,4 +424,15 @@ describe('SqlIdentityStore (external, PGlite)', () => {
 		);
 		expect(recordSuccess).toHaveBeenCalledWith('end_user', 'alice');
 	});
+
+	it('STORE-ORIGIN-VALIDATE: a corrupt origin value is rejected on read, not silently cast (§B6)', async () => {
+		const user = await store.upsertUser(CONN, upsertInput());
+		// Tamper with the free-form varchar origin directly (no CHECK constraint on the external table).
+		await handle.db
+			.updateTable('nestidp_user')
+			.set({ origin: 'BOGUS' })
+			.where('id', '=', user.id)
+			.execute();
+		await expect(store.getUserById(user.id)).rejects.toThrow(/Unexpected identity origin 'BOGUS'/);
+	});
 });

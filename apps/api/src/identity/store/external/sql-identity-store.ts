@@ -64,6 +64,18 @@ function escapeLike(term: string): string {
 	return term.replace(/[\\%_]/g, (c) => `\\${c}`);
 }
 
+/**
+ * Validate a free-form `origin` column value against the {@link IdentityOrigin} enum instead of blindly
+ * casting it (Prompt 38 §B6). The external table stores `origin` as `varchar(32)` with no CHECK constraint,
+ * so a tampered/corrupt value would otherwise flow through as a bogus enum and silently mislabel rows.
+ */
+function toOrigin(raw: string): IdentityOrigin {
+	if (raw === IdentityOrigin.MANUAL || raw === IdentityOrigin.SYNCED) {
+		return raw;
+	}
+	throw new Error(`Unexpected identity origin '${raw}' in the external store`);
+}
+
 function isUniqueViolation(error: unknown): boolean {
 	const e = error as { code?: string; errno?: number; message?: string };
 	return (
@@ -78,7 +90,7 @@ function mapUser(row: NestidpUserTable): StoreUser {
 		id: row.id,
 		externalId: row.external_id,
 		apiConnectionId: row.api_connection_id,
-		origin: row.origin as IdentityOrigin,
+		origin: toOrigin(row.origin),
 		username: row.username,
 		email: row.email,
 		displayName: row.display_name,
@@ -95,7 +107,7 @@ function mapGroup(row: NestidpGroupTable): StoreGroup {
 		id: row.id,
 		externalId: row.external_id,
 		apiConnectionId: row.api_connection_id,
-		origin: row.origin as IdentityOrigin,
+		origin: toOrigin(row.origin),
 		name: row.name,
 		createdAt: new Date(row.created_at),
 		updatedAt: new Date(row.updated_at),
@@ -540,8 +552,8 @@ export class SqlIdentityStore implements IdentityStore {
 			.execute();
 		return {
 			user: mapUser(row),
-			groups: groups.map((g) => ({ id: g.id, name: g.name, origin: g.origin as IdentityOrigin })),
-			roles: roles.map((r) => ({ id: r.id, name: r.name, origin: r.origin as IdentityOrigin })),
+			groups: groups.map((g) => ({ id: g.id, name: g.name, origin: toOrigin(g.origin) })),
+			roles: roles.map((r) => ({ id: r.id, name: r.name, origin: toOrigin(r.origin) })),
 		};
 	}
 
@@ -785,7 +797,7 @@ export class SqlIdentityStore implements IdentityStore {
 		return rows.map((r) => ({
 			id: r.id,
 			username: r.username,
-			origin: r.origin as IdentityOrigin,
+			origin: toOrigin(r.origin),
 		}));
 	}
 
