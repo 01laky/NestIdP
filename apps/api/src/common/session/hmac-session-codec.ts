@@ -20,7 +20,8 @@ export class HmacSessionCodec<TPayload extends { exp: number }> {
 		return `${payloadPart}.${this.signPayloadJson(payloadJson)}`;
 	}
 
-	verify(token: string | undefined): TPayload | null {
+	// §18: `nowSeconds` is injectable so expiry can be tested against a fixed clock.
+	verify(token: string | undefined, nowSeconds: number = Math.floor(Date.now() / 1000)): TPayload | null {
 		if (!token) {
 			return null;
 		}
@@ -52,8 +53,7 @@ export class HmacSessionCodec<TPayload extends { exp: number }> {
 			return null;
 		}
 
-		const now = Math.floor(Date.now() / 1000);
-		if (payload.exp <= now) {
+		if (payload.exp <= nowSeconds) {
 			return null;
 		}
 		return payload;

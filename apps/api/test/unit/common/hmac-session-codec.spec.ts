@@ -57,6 +57,15 @@ describe('HmacSessionCodec (§6.5)', () => {
 		expect(codec.verify(codec.sign({ userId: 'u1', exp: now + 3600 }))).not.toBeNull();
 	});
 
+	it('HMAC-CODEC-12: expiry is exact against an injected fixed clock (§18)', () => {
+		const fixedNow = 1_750_000_000;
+		const token = codec.sign({ userId: 'u1', exp: fixedNow + 10 });
+		expect(codec.verify(token, fixedNow)).not.toBeNull(); // 10s before expiry
+		expect(codec.verify(token, fixedNow + 9)).not.toBeNull(); // 1s before expiry
+		expect(codec.verify(token, fixedNow + 10)).toBeNull(); // exp === now → rejected
+		expect(codec.verify(token, fixedNow + 11)).toBeNull(); // past expiry
+	});
+
 	it('HMAC-CODEC-08: tampering with the PAYLOAD (re-encoded, old signature) is rejected', () => {
 		const token = codec.sign({ userId: 'u1', exp: futureExp() });
 		const sigPart = token.slice(token.indexOf('.') + 1);

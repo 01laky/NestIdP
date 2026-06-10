@@ -49,6 +49,14 @@ describe('IpBanService (Prompt 35)', () => {
 		expect(svc.check('9.9.9.9').banned).toBe(false);
 	});
 
+	it('BAN-05: check() honours an injected fixed clock (§18)', () => {
+		const svc = new IpBanService(makeConfig(1, 10_000, 5000));
+		svc.recordTrip('7.7.7.7', 0); // banned until 5000
+		expect(svc.check('7.7.7.7', 4999).banned).toBe(true);
+		expect(svc.check('7.7.7.7', 4999).retryAfterMs).toBe(1);
+		expect(svc.check('7.7.7.7', 5000).banned).toBe(false);
+	});
+
 	it('BAN-03: threshold 0 disables the escalation layer', () => {
 		const svc = new IpBanService(makeConfig(0));
 		for (let i = 0; i < 20; i += 1) {

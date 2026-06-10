@@ -47,7 +47,8 @@ export class IpBanService {
 	}
 
 	/** Is this IP currently banned? Run up-front, before throttle and password. */
-	check(ip: string): IpBanCheck {
+	// §18: `now` is injectable so ban expiry can be tested against a fixed clock.
+	check(ip: string, now: number = Date.now()): IpBanCheck {
 		if (this.config.ipBanThreshold() === 0) {
 			return { banned: false, retryAfterMs: 0 };
 		}
@@ -55,7 +56,7 @@ export class IpBanService {
 		if (until === undefined) {
 			return { banned: false, retryAfterMs: 0 };
 		}
-		const remaining = until - Date.now();
+		const remaining = until - now;
 		if (remaining > 0) {
 			return { banned: true, retryAfterMs: remaining };
 		}
@@ -64,7 +65,7 @@ export class IpBanService {
 	}
 
 	/** Record one "trip" (a throttle rejection or an account lockout) for this IP; ban if over threshold. */
-	recordTrip(ip: string): IpBanTripResult {
+	recordTrip(ip: string, now: number = Date.now()): IpBanTripResult {
 		const threshold = this.config.ipBanThreshold();
 		if (threshold === 0) {
 			return { bannedNow: false, count: 0, bannedUntil: null };
@@ -77,7 +78,6 @@ export class IpBanService {
 		if (!limited) {
 			return { bannedNow: false, count, bannedUntil: null };
 		}
-		const now = Date.now();
 		const alreadyBanned = (this.bans.get(ip) ?? 0) > now;
 		// §5.B14: bound the map — sweep expired bans once it grows past the soft cap.
 		if (this.bans.size >= MAX_TRACKED_BANNED_IPS) {

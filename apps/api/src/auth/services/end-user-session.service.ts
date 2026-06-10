@@ -42,12 +42,17 @@ export class EndUserSessionService {
 		return this.codec.sign(payload);
 	}
 
-	verify(token: string | undefined): EndUserSessionPayload | null {
-		return this.codec.verify(token);
+	verify(token: string | undefined, nowSeconds?: number): EndUserSessionPayload | null {
+		return this.codec.verify(token, nowSeconds);
 	}
 
-	createPayload(userId: string, username: string, sid?: string): EndUserSessionPayload {
-		const now = Math.floor(Date.now() / 1000);
+	createPayload(
+		userId: string,
+		username: string,
+		sid?: string,
+		nowSeconds: number = Math.floor(Date.now() / 1000),
+	): EndUserSessionPayload {
+		const now = nowSeconds;
 		const ttl = this.getSessionTtlSeconds();
 		return {
 			userId,

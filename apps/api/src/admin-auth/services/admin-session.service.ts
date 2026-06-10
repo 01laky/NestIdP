@@ -61,8 +61,8 @@ export class AdminSessionService {
 		return this.codec.sign(payload);
 	}
 
-	verify(token: string | undefined): AdminSessionPayload | null {
-		return this.codec.verify(token);
+	verify(token: string | undefined, nowSeconds?: number): AdminSessionPayload | null {
+		return this.codec.verify(token, nowSeconds);
 	}
 
 	createPayload(
@@ -70,8 +70,9 @@ export class AdminSessionService {
 		username: string,
 		csrfToken?: string,
 		ttlSeconds?: number,
+		nowSeconds: number = Math.floor(Date.now() / 1000),
 	): AdminSessionPayload {
-		const now = Math.floor(Date.now() / 1000);
+		const now = nowSeconds;
 		const ttl = ttlSeconds ?? this.getSessionTtlSeconds(false);
 		return {
 			adminUserId,

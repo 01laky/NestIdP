@@ -97,10 +97,14 @@ frontend de-duplication) and remaining items land in subsequent commits under th
   longer mis-emits `identity_db_test` → `identity_db_connected`, and the flipped
   `idp_<kind>_rotation_auto_started/_completed` → `idp_<kind>_auto_rotation_started/_completed` (aligning
   with the rest of the `auto_rotation_*` family).
-- **Injectable clock/randomness in cert-rotation time paths** (§18): `isCertExpiringSoon` takes an
-  injectable `now` (tests run against a fixed clock), and the scheduler's `applyJitter` uses injectable
-  randomness instead of `Date.now() % range` — which was a deterministic, predictable function of
-  wall-clock, i.e. not jitter at all (aligned instances would collide).
+- **Injectable clock/randomness across the §6-touched time paths** (§18): `isCertExpiringSoon` takes an
+  injectable `now`, the cert-rotation scheduler's `applyJitter` uses injectable randomness instead of
+  `Date.now() % range` (which was a deterministic, predictable function of wall-clock — not jitter; aligned
+  instances would collide), the shared `HmacSessionCodec.verify` and both session services'
+  `createPayload`/`verify` accept an injectable `nowSeconds`, and `IpBanService.check`/`recordTrip` accept
+  an injectable `now` (prune already did). Account lockout already threaded `now: Date` params and the
+  sliding-window limiter already had a constructor clock. Session-expiry, ban-expiry and cert-expiry tests
+  now run against fixed clocks (HMAC-CODEC-12, BAN-05, API-IDP-VAL-CLK-01) — no real-time waits.
 
 ### Added
 
