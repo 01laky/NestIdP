@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../../prisma/services/prisma.service';
 import { isUniqueConstraintError } from '../../common/utils/prisma-error.util';
 import { positiveIntOrDefault } from '../../common/config/positive-int.util';
+import { MAX_SAML_REQUEST_BYTES } from '../../common/constants/crypto-limits';
 import { SamlSsoSessionService } from '../../saml-sessions/services/saml-sso-session.service';
 import { decodeRedirectBinding } from '../utils/build-authn-request.util';
 import {
@@ -27,8 +28,6 @@ import { IdpSigningService } from './idp-signing.service';
 import { SamlAuthAuditService } from './saml-auth-audit.service';
 import { SamlLogoutResponseBuilderService } from './saml-logout-response-builder.service';
 import { SamlPostBindingService } from './saml-post-binding.service';
-
-const MAX_SAML_REQUEST_BYTES = 256 * 1024;
 
 export interface SamlRedirectSloInput {
 	samlRequest: string;

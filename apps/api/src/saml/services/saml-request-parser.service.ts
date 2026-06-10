@@ -12,8 +12,7 @@ import {
 	isEncryptedDataRoot,
 } from '../utils/saml-xml-decryption.util';
 import { IdpEncryptionKeyService } from './idp-encryption-key.service';
-
-const MAX_SAML_REQUEST_BYTES = 256 * 1024;
+import { MAX_SAML_REQUEST_BYTES } from '../../common/constants/crypto-limits';
 
 export interface ParseRedirectBindingOptions {
 	requestWasEncrypted?: boolean;

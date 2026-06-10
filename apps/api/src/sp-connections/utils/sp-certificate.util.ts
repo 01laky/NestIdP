@@ -1,11 +1,11 @@
+import { MAX_PEM_LENGTH } from '../../common/constants/crypto-limits';
+
 export class SpCertificateValidationError extends Error {
 	constructor(message: string) {
 		super(message);
 		this.name = 'SpCertificateValidationError';
 	}
 }
-
-const MAX_PEM_LENGTH = 16_384;
 
 export function assertValidSpCertificatePem(value: string | null | undefined): string | null {
 	if (value === null || value === undefined) {

@@ -8,9 +8,8 @@ import {
 	verifyRedirectBindingSignature,
 } from '../../saml/utils/saml-authn-request-redirect-signature.util';
 import { fingerprintSha256Hex } from '../../idp-settings/utils/idp-cert.util';
+import { MAX_PEM_LENGTH } from '../../common/constants/crypto-limits';
 import { SpConnectionsAuditService } from './sp-connections-audit.service';
-
-const MAX_PRIVATE_KEY_PEM = 16_384;
 
 @Injectable()
 export class SpConnectionProbeSigningService {
@@ -34,7 +33,7 @@ export class SpConnectionProbeSigningService {
 		}
 
 		const privateKeyPem = body.spPrivateKeyPem?.trim();
-		if (!privateKeyPem || privateKeyPem.length > MAX_PRIVATE_KEY_PEM) {
+		if (!privateKeyPem || privateKeyPem.length > MAX_PEM_LENGTH) {
 			throw new BadRequestException('Valid spPrivateKeyPem is required');
 		}
 

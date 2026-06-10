@@ -11,6 +11,7 @@ import {
 	defaultSignatureAlgorithmIdForKeyFamily,
 	getIdpSigningSignatureOption,
 } from '@nestidp/shared';
+import { MAX_PEM_LENGTH } from '../../common/constants/crypto-limits';
 
 export class IdpCertValidationError extends Error {
 	constructor(message: string) {
@@ -18,8 +19,6 @@ export class IdpCertValidationError extends Error {
 		this.name = 'IdpCertValidationError';
 	}
 }
-
-const MAX_PEM_LENGTH = 16_384;
 
 export function assertValidSigningCertPem(value: string): string {
 	const trimmed = value.trim();

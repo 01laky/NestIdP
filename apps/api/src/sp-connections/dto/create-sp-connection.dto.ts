@@ -8,6 +8,7 @@ import {
 	ValidateIf,
 } from 'class-validator';
 import type { SpAttributeMappingConfig } from '@nestidp/shared';
+import { MAX_PEM_LENGTH } from '../../common/constants/crypto-limits';
 
 export class CreateSpConnectionBodyDto {
 	@IsString()
@@ -54,7 +55,7 @@ export class CreateSpConnectionBodyDto {
 	@IsOptional()
 	@ValidateIf((_, value) => value !== null)
 	@IsString()
-	@MaxLength(16384)
+	@MaxLength(MAX_PEM_LENGTH)
 	spCertificate?: string | null;
 
 	@IsOptional()

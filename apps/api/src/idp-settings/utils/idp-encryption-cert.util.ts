@@ -18,10 +18,9 @@ import {
 	IdpCertValidationError,
 	namedCurveToLabel,
 } from './idp-cert.util';
+import { MAX_PEM_LENGTH } from '../../common/constants/crypto-limits';
 
 export { IdpCertValidationError };
-
-const MAX_PEM_LENGTH = 16_384;
 
 export function assertValidEncryptionCertPem(value: string): string {
 	const trimmed = value.trim();
