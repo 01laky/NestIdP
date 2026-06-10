@@ -4,7 +4,9 @@ import type { IdpCertEcCurve, IdpCertKeyFamily, IdpCertRsaModulusBits } from './
 import {
 	defaultNotAfterCalendarDate,
 	IDP_CERT_DEFAULT_VALIDITY_DAYS,
+	IDP_CERT_EC_CURVES,
 	IDP_CERT_MAX_VALIDITY_YEARS,
+	IDP_CERT_RSA_MODULUS_BITS,
 	IdpCertCommonValidationError,
 	validateIdpCertNotAfter,
 } from './idp-cert-common.js';
@@ -157,7 +159,7 @@ export function resolveGenerateIdpEncryptionCertRequest(
 
 	if (keyFamily === 'rsa') {
 		rsaModulusBits = input.rsaModulusBits ?? 2048;
-		if (![2048, 3072, 4096].includes(rsaModulusBits)) {
+		if (!(IDP_CERT_RSA_MODULUS_BITS as readonly number[]).includes(rsaModulusBits)) {
 			throw new IdpEncryptionCryptoValidationError(
 				'rsaModulusBits must be 2048, 3072, or 4096',
 				'idp_encryption_bad_rsa_modulus',
@@ -175,7 +177,7 @@ export function resolveGenerateIdpEncryptionCertRequest(
 		keyTransportAlgorithmId = transportId;
 	} else {
 		ecCurve = input.ecCurve ?? 'P-256';
-		if (!['P-256', 'P-384', 'P-521'].includes(ecCurve)) {
+		if (!(IDP_CERT_EC_CURVES as readonly string[]).includes(ecCurve)) {
 			throw new IdpEncryptionCryptoValidationError(
 				'ecCurve must be P-256, P-384, or P-521',
 				'idp_encryption_bad_curve',
@@ -269,8 +271,8 @@ export function listKeyAgreementOptionsForKeyFamily(
 export function buildIdpEncryptionGenerateOptionsForUi(now = new Date()) {
 	return {
 		keyFamilies: ['rsa', 'ec'] as const,
-		rsaModulusBits: [2048, 3072, 4096] as const,
-		ecCurves: ['P-256', 'P-384', 'P-521'] as const,
+		rsaModulusBits: IDP_CERT_RSA_MODULUS_BITS,
+		ecCurves: IDP_CERT_EC_CURVES,
 		algorithms: IDP_ENCRYPTION_KEY_TRANSPORT_ALGORITHMS,
 		defaultRequest: getDefaultGenerateIdpEncryptionCertRequest(now),
 		maxValidityYears: IDP_ENCRYPTION_CERT_MAX_VALIDITY_YEARS,
