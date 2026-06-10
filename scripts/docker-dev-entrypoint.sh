@@ -1,5 +1,6 @@
 #!/bin/sh
 set -eu
+echo "NestIdP [dev]: running in DEVELOPMENT mode — do not use in production"
 cd /app
 
 # node_modules live in named volumes (docker-compose.dev.yml), not on the bind mount.

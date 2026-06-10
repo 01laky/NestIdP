@@ -1,6 +1,6 @@
 {
 	"name": "nest-idp",
-	"version": "1.20.1",
+	"version": "1.20.2",
 	"private": true,
 	"packageManager": "pnpm@9.15.9",
 	"engines": {
@@ -10,9 +10,16 @@
 	"scripts": {
 		"postinstall": "pnpm --filter @nestidp/shared build && pnpm --filter @nestidp/api prisma:generate",
 		"dev": "pnpm --filter @nestidp/shared build && concurrently -k -n shared,api,web -c magenta,blue,green \"pnpm --filter @nestidp/shared exec tsc -w -p tsconfig.json --preserveWatchOutput\" \"pnpm --filter @nestidp/api dev\" \"pnpm --filter @nestidp/web dev\"",
-		"dev:docker": "docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile dev up --build",
-		"dev:docker:down": "docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile dev down",
-		"dev:docker:reset": "docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile dev down -v",
+		"docker:dev": "docker compose -f deploy/docker-compose.dev.yml --env-file deploy/.env.docker.dev up --build",
+		"docker:dev:down": "docker compose -f deploy/docker-compose.dev.yml --env-file deploy/.env.docker.dev down",
+		"docker:dev:reset": "docker compose -f deploy/docker-compose.dev.yml --env-file deploy/.env.docker.dev down -v",
+		"docker:dev:logs": "docker compose -f deploy/docker-compose.dev.yml logs -f",
+		"docker:dev:shell": "docker compose -f deploy/docker-compose.dev.yml exec nestidp-dev sh",
+		"docker:prod": "docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.docker.prod up --build -d",
+		"docker:prod:down": "docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.docker.prod down",
+		"docker:prod:reset": "docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.docker.prod down -v",
+		"docker:prod:logs": "docker compose -f deploy/docker-compose.prod.yml logs -f",
+		"docker:prod:migrate": "docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.docker.prod run --rm nestidp sh -c \"MIGRATE_ONLY=1 node dist/main.js\"",
 		"build": "pnpm --filter @nestidp/shared build && pnpm --filter @nestidp/web build && pnpm --filter @nestidp/api build",
 		"lint": "eslint . && node scripts/check-config-access.mjs && pnpm --filter @nestidp/shared lint && pnpm --filter @nestidp/api lint && pnpm --filter @nestidp/web lint",
 		"test": "node scripts/run-monorepo-tests.mjs",

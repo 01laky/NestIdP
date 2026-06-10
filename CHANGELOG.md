@@ -4,6 +4,57 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.20.2]
+
+Prod / dev environment separation (Prompt 41): `deploy/` folder, explicit `.prod`/`.dev` suffixes on all
+compose files and env templates, standalone dev compose (no overlay + profiles trick), and a full set of
+`docker:prod*` / `docker:dev*` pnpm scripts.
+
+### Added
+
+- **`deploy/` folder** — all deployment artifacts moved here; `Dockerfile` and `Dockerfile.dev` stay in
+  root per Docker convention.
+- **`deploy/docker-compose.prod.yml`** (renamed from `docker-compose.yml`): updated `build: { context: ..,
+  dockerfile: Dockerfile }`, `env_file: .env.docker.prod`, `IDP_BASE_URL` removed from compose
+  `environment:` block so the env file value is always used (was previously silently overridden to
+  `http://localhost:3000`).
+- **`deploy/docker-compose.dev.yml`** (moved from root, now standalone — not an overlay): `build: { context:
+  .., dockerfile: Dockerfile.dev }`, `env_file: .env.docker.dev`, bind-mount updated `./` → `../`, all
+  `profiles:` entries removed (no prod service to suppress when running standalone).
+- **`deploy/.env.docker.prod.example`** (committed) — production env template with every secret as
+  `change-me-generate-with-openssl-rand-hex-32`; `IDP_BASE_URL=https://idp.your-domain.com` (HTTPS);
+  `MIGRATE_ONLY=0` with init-container explanation; full commented tuning section.
+- **`deploy/.env.docker.dev.example`** (committed) — development env template with all secrets pre-filled
+  with known dummy values (nothing to edit before first run); `IDP_BASE_URL=http://localhost:5173`;
+  `VITE_API_PROXY_TARGET=http://127.0.0.1:3000`; mock-app connectivity hint for `localhost:4010`.
+- **`deploy/README.md`** — self-contained folder guide: file table, quick-start for both envs, port
+  usage table, DB storage table, port-conflict warning, useful commands table.
+- **New pnpm scripts** in root `package.json`:
+  `docker:dev`, `docker:dev:down`, `docker:dev:reset`, `docker:dev:logs`, `docker:dev:shell`,
+  `docker:prod`, `docker:prod:down`, `docker:prod:reset`, `docker:prod:logs`, `docker:prod:migrate`.
+
+### Changed
+
+- **`scripts/docker-dev-entrypoint.sh`**: added startup log line
+  "NestIdP [dev]: running in DEVELOPMENT mode — do not use in production".
+- **`.gitignore`**: replaced `.env.docker` with `deploy/.env.docker.prod` and `deploy/.env.docker.dev`.
+- **`docs/deployment.md`**: added `deploy/` intro; updated "First deploy" to `pnpm docker:prod`; updated
+  "Upgrades" to reference `pnpm docker:prod:migrate`; updated all `docker compose exec/cp` commands to
+  include `-f deploy/docker-compose.prod.yml`; replaced "Local development" section with env file table,
+  DB storage table, simultaneous-env port-conflict warning, and useful shortcuts table.
+- **`docs/development.md`**, **`docs/tutorial.md`**, **`docs/RELEASE.md`**, **`docs/README.md`**,
+  **`README.md`**: updated all references from old script names and file paths to new ones; added
+  `deploy/` entry to the docs index; expanded developer commands table in README.
+
+### Removed
+
+- Root-level `docker-compose.yml` (replaced by `deploy/docker-compose.prod.yml`)
+- Root-level `docker-compose.dev.yml` (replaced by `deploy/docker-compose.dev.yml`)
+- Root-level `.env.docker.example` (replaced by `deploy/.env.docker.prod.example`)
+- pnpm scripts `dev:docker`, `dev:docker:down`, `dev:docker:reset` (replaced by `docker:dev*`)
+
+---
+
 ## [1.20.1]
 
 Docs fix: document the existing `apiContractConfig` system in `integration-api.md`; the file previously

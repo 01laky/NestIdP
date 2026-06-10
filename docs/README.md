@@ -2,7 +2,7 @@
 
 Product and developer documentation. Visual assets live in [`img/`](./img/) (UI `.png` screenshots + Mermaid `.mmd` / `.svg` diagrams).
 
-**Current release:** v1.20.1
+**Current release:** v1.20.2
 
 ## Start here
 
@@ -18,6 +18,7 @@ Product and developer documentation. Visual assets live in [`img/`](./img/) (UI 
 | [audit-events.md](./audit-events.md)                       | Audit-event naming scheme + full event catalogue (§15)                           |
 | [transactional-integrity.md](./transactional-integrity.md) | Every atomic multi-write, its mechanism and proving test (§14)                   |
 | [RELEASE.md](./RELEASE.md)                                 | Production go-live checklist                                                     |
+| [`deploy/`](../deploy/README.md)                           | Compose files and env templates for prod and dev Docker environments             |
 
 ## Screenshots
 

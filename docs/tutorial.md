@@ -1,6 +1,6 @@
 # NestIdP operator tutorial
 
-Step-by-step walkthrough of the admin console and SAML login UI, with screenshots from a local dev stack (`pnpm dev:docker`, mock identity API on port 4010).
+Step-by-step walkthrough of the admin console and SAML login UI, with screenshots from a local dev stack (`pnpm docker:dev`, mock identity API on port 4010).
 
 **New here?** Start with the [product tour in the root README](../README.md#product-tour), then follow the steps below.
 
@@ -8,8 +8,8 @@ For architecture and API contracts see [proposal.MD](./proposal.MD), [developmen
 
 ## Before you start
 
-1. Copy `.env.docker.example` to `.env.docker` and set secrets (`SESSION_SECRET`, `ENCRYPTION_KEY`, `ADMIN_PASSWORD`, `IDP_BASE_URL`).
-2. Run `pnpm dev:docker` (or `pnpm dev` with SQLite).
+1. Copy `deploy/.env.docker.dev.example` to `deploy/.env.docker.dev` — pre-filled with dev dummy values, nothing to edit.
+2. Run `pnpm docker:dev` (or `pnpm dev` on the host without Docker).
 3. Optional: start the mock identity API — `cd mock-app && pnpm start` (Bearer token `mock-sync-dev-token`, base URL `http://localhost:4010` from inside Docker via `localhost:host-gateway`).
 
 Open the admin UI at **http://localhost:5173/admin/login** (Vite proxies `/api` and `/saml` to the API).

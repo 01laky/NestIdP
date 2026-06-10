@@ -1,0 +1,45 @@
+# Development stack — bind-mount + Nest watch + Vite HMR. Standalone file (not an override).
+# Usage: pnpm docker:dev
+# Env template: deploy/.env.docker.dev.example → deploy/.env.docker.dev
+# Full guide: docs/deployment.md
+#
+# Admin SPA: http://localhost:5173  |  API: http://localhost:3000
+# localhost inside the container resolves to the host (extra_hosts: host-gateway),
+# so a mock API on the host at http://localhost:4010 is reachable from sync/tests.
+
+services:
+	nestidp-dev:
+		build:
+			context: ..
+			dockerfile: Dockerfile.dev
+		ports:
+			- '3000:3000'
+			- '5173:5173'
+		env_file:
+			- .env.docker.dev
+		environment:
+			# DATABASE_URL is tied to the bind-mount path — not configurable via env file.
+			# The DB file lives on the host at apps/api/data/nestidp.db (via ../:/app bind-mount).
+			DATABASE_URL: file:/app/apps/api/data/nestidp.db
+			NODE_ENV: development
+			PORT: '3000'
+			# Docker-specific file-watch polling settings (required inside most Docker runtimes).
+			CHOKIDAR_USEPOLLING: 'true'
+			WATCHPACK_POLLING: 'true'
+			FORCE_TSC_POLLING: 'true'
+		volumes:
+			# Repo root bind-mounted at /app. Path is relative to this compose file: ../ = repo root.
+			- ../:/app
+			# node_modules in named volumes so host installs don't leak into the container.
+			- dev_root_node_modules:/app/node_modules
+			- dev_api_node_modules:/app/apps/api/node_modules
+			- dev_web_node_modules:/app/apps/web/node_modules
+			- dev_shared_node_modules:/app/packages/shared/node_modules
+		extra_hosts:
+			- localhost:host-gateway
+
+volumes:
+	dev_root_node_modules:
+	dev_api_node_modules:
+	dev_web_node_modules:
+	dev_shared_node_modules:

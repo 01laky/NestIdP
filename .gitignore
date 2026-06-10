@@ -20,6 +20,8 @@ apps/web/playwright-report/
 .env
 .env.local
 .env.*.local
+deploy/.env.docker.prod
+deploy/.env.docker.dev
 .env.docker
 
 # IDE and OS

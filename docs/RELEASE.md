@@ -1,12 +1,13 @@
 # NestIdP — Production release checklist
 
-Use this checklist before exposing the IdP to end users. Detailed deploy steps: [deployment.md](./deployment.md). Identity API contract: [integration-api.md](./integration-api.md).
+Use this checklist before exposing the IdP to end users. Detailed deploy steps: [deployment.md](./deployment.md). Compose files and env templates: [`deploy/`](../deploy/README.md). Identity API contract: [integration-api.md](./integration-api.md).
 
 ---
 
 ## Infrastructure
 
-- [ ] TLS terminates in front of IdP; `IDP_BASE_URL` is the public HTTPS URL
+- [ ] `deploy/.env.docker.prod` created from `deploy/.env.docker.prod.example` with all secrets replaced
+- [ ] TLS terminates in front of IdP; `IDP_BASE_URL` is the public HTTPS URL (set in `deploy/.env.docker.prod`)
 - [ ] `TRUST_PROXY=true` when behind a load balancer (single proxy hop)
 - [ ] DB file on a persistent volume; encrypted backups scheduled (`pnpm db:backup` per [deployment.md](./deployment.md))
 - [ ] `SESSION_SECRET`, `ENCRYPTION_KEY`, and `DATABASE_ENCRYPTION_KEY` generated and stored in a secrets manager (not in git)

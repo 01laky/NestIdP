@@ -872,12 +872,12 @@ This sets `core.hooksPath=.githooks`. Hooks run on `prepare-commit-msg` and `com
 ## Docker
 
 - **Default dev:** embedded libSQL file — no containers, no DB server; `pnpm dev` on the host
-- **Production stack:** `docker compose up --build` — single NestIdP image; the encrypted DB file lives on the `nestidp_data` volume. See [deployment.md](./deployment.md)
-- **Hot reload in Docker (v1.3.4):** `pnpm dev:docker` — **Nest watch** + **Vite HMR** at **http://localhost:5173** (no rebuild for TS/CSS edits). Stop: `pnpm dev:docker:down`. `node_modules` are stored in **named volumes** (not the bind mount); the dev entrypoint runs `pnpm install` when `pnpm-lock.yaml` changes. If dependencies are still missing after a git pull, run `pnpm dev:docker:reset` then `pnpm dev:docker` (removes dev volumes).
-- **`MIGRATE_ONLY=1`:** run migrations without starting HTTP (init containers)
+- **Production stack:** `pnpm docker:prod` — single NestIdP image; the encrypted DB file lives on the `nestidp_data` Docker named volume. See [deployment.md](./deployment.md)
+- **Hot reload in Docker:** `pnpm docker:dev` — **Nest watch** + **Vite HMR** at **http://localhost:5173** (no rebuild for TS/CSS edits). Stop: `pnpm docker:dev:down`. `node_modules` are stored in **named volumes** (not the bind mount); the dev entrypoint runs `pnpm install` when `pnpm-lock.yaml` changes. If dependencies are still missing after a git pull, run `pnpm docker:dev:reset` then `pnpm docker:dev` (removes dev volumes).
+- **`MIGRATE_ONLY=1`:** run migrations without starting HTTP (init containers); shortcut: `pnpm docker:prod:migrate`
 - **`TRUST_PROXY`:** set `true` when behind a TLS-terminating reverse proxy
 
-Copy `.env.docker.example` → `.env.docker` for compose secrets.
+Compose files and env templates live in `deploy/`. Copy `deploy/.env.docker.dev.example` → `deploy/.env.docker.dev` (pre-filled, nothing to edit).
 
 ## What’s included
 

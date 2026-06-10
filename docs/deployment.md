@@ -2,6 +2,8 @@
 
 NestIdP ships as a single Docker image (NestJS API + built React SPA) with an **encrypted libSQL file** as the only datastore — no external database server. Persist the file on a volume and supply an at-rest encryption key.
 
+Deployment artifacts (compose files, env templates) live in **`deploy/`**. `Dockerfile` and `Dockerfile.dev` stay in the repo root per Docker convention. See [`deploy/README.md`](../deploy/README.md) for a quick-reference summary.
+
 Related: [RELEASE.md](./RELEASE.md) (go-live checklist) · [database.md](./database.md) · [integration-api.md](./integration-api.md)
 
 ---
@@ -20,30 +22,31 @@ Related: [RELEASE.md](./RELEASE.md) (go-live checklist) · [database.md](./datab
 
 ## First deploy (Docker Compose)
 
-1. Copy the compose environment template:
+1. Copy the prod env template and fill in secrets:
 
 ```bash
-cp .env.docker.example .env.docker
+cp deploy/.env.docker.prod.example deploy/.env.docker.prod
+# Edit deploy/.env.docker.prod — set SESSION_SECRET, ENCRYPTION_KEY,
+# DATABASE_ENCRYPTION_KEY (openssl rand -hex 32 for each),
+# ADMIN_PASSWORD (min 12 chars), IDP_BASE_URL (must be HTTPS in production)
 ```
 
-2. Edit `.env.docker` — set strong `SESSION_SECRET`, `ENCRYPTION_KEY`, `DATABASE_ENCRYPTION_KEY`, `ADMIN_PASSWORD` (min 12 chars in production), and `IDP_BASE_URL` to the URL users and SPs use (e.g. `https://idp.example.com`).
-
-3. Build and start the stack (the DB file lives on the `nestidp_data` volume):
+2. Build and start the stack (the DB file lives on the `nestidp_data` named volume):
 
 ```bash
-docker compose up --build -d
+pnpm docker:prod
 ```
 
-4. Wait until healthy:
+3. Wait until healthy:
 
 ```bash
-docker compose ps
+pnpm docker:prod:logs          # follow startup logs
 curl -sf http://localhost:3000/ready
 ```
 
-5. Open the admin console at `{IDP_BASE_URL}/admin/login` (with default compose, `http://localhost:3000/admin/login`).
+4. Open the admin console at `{IDP_BASE_URL}/admin/login`.
 
-6. Complete operator setup per [RELEASE.md](./RELEASE.md).
+5. Complete operator setup per [RELEASE.md](./RELEASE.md).
 
 The API applies pending migrations through the keyed libSQL adapter at startup (the encrypted file cannot be opened by the Prisma CLI). Bootstrap creates the first `AdminUser` when the table is empty and `ADMIN_USERNAME` / `ADMIN_PASSWORD` are set.
 
@@ -111,8 +114,9 @@ NODE_ENV=production node apps/api/dist/main.js
 
 1. Back up the database (see below).
 2. Pull or rebuild the image.
-3. `docker compose up -d` — entrypoint applies new migrations on start.
-4. Verify `/ready` and run smoke SSO per [RELEASE.md](./RELEASE.md).
+3. Optional — run migrations only before bringing up the new container: `pnpm docker:prod:migrate`
+4. `pnpm docker:prod` — entrypoint applies any remaining migrations on start.
+5. Verify `/ready` and run smoke SSO per [RELEASE.md](./RELEASE.md).
 
 ---
 
@@ -146,8 +150,8 @@ Persist the `data/` directory on a volume so the file survives container restart
 `pnpm db:backup` produces an encrypted copy that is readable only with the same `DATABASE_ENCRYPTION_KEY`:
 
 ```bash
-docker compose exec nestidp pnpm db:backup -- /app/apps/api/data/backup-$(date +%Y%m%d).db
-docker compose cp nestidp:/app/apps/api/data/backup-YYYYMMDD.db ./backups/
+docker compose -f deploy/docker-compose.prod.yml exec nestidp pnpm db:backup -- /app/apps/api/data/backup-$(date +%Y%m%d).db
+docker compose -f deploy/docker-compose.prod.yml cp nestidp:/app/apps/api/data/backup-YYYYMMDD.db ./backups/
 ```
 
 ### Cold copy
@@ -165,8 +169,8 @@ Stop the API, put the backup file at `DATABASE_URL`'s path, and start with the m
 ### Rekey (rotate the at-rest key)
 
 ```bash
-docker compose exec nestidp pnpm db:rekey -- "$NEW_KEY"
-# then update DATABASE_ENCRYPTION_KEY and restart
+docker compose -f deploy/docker-compose.prod.yml exec nestidp pnpm db:rekey -- "$NEW_KEY"
+# then update DATABASE_ENCRYPTION_KEY in deploy/.env.docker.prod and restart
 ```
 
 ---
@@ -248,7 +252,7 @@ docker compose exec nestidp pnpm db:rekey -- "$NEW_KEY"
 > Multiple replicas would **double-send** LogoutRequests — keep the scheduler on exactly one instance and
 > set `SAML_BACKCHANNEL_LOGOUT_SCHEDULER_TICK_MS=0` on the others (the synchronous first pass still runs).
 
-See also `.env.docker.example` and root `.env.example` for optional SAML, sync, and login tuning.
+See also `deploy/.env.docker.prod.example` and root `.env.example` for optional SAML, sync, and login tuning.
 
 ---
 
@@ -304,17 +308,35 @@ Configure load balancers to use `/ready` for traffic routing.
 
 ---
 
-## Local development without full stack
+## Local development
 
-**Hot reload in Docker (Nest watch + Vite HMR):**
+### Env file overview
+
+| File | Template | Used by | Committed? |
+| --- | --- | --- | --- |
+| `deploy/.env.docker.prod` | `deploy/.env.docker.prod.example` | `pnpm docker:prod` | No |
+| `deploy/.env.docker.dev` | `deploy/.env.docker.dev.example` | `pnpm docker:dev` | No |
+| `.env` | `.env.example` | `pnpm dev` (host, no Docker) | No |
+
+### DB storage per environment
+
+| Environment | Location | Managed by |
+| --- | --- | --- |
+| `pnpm docker:prod` | Docker named volume `nestidp_data` | Docker (survives `down`, removed by `docker:prod:reset`) |
+| `pnpm docker:dev` | Host file `apps/api/data/nestidp.db` (via bind-mount) | Git-ignored; inspect directly on host |
+| `pnpm dev` (host) | Host file `apps/api/data/nestidp.db` | Same path as docker dev — shared if both run from same repo |
+
+> **Running both docker:prod and docker:dev simultaneously is not supported** — both expose port `3000` and will conflict. Stop one before starting the other.
+
+### Hot reload in Docker (Nest watch + Vite HMR)
 
 ```bash
-cp .env.docker.example .env.docker
-pnpm dev:docker
-# Browser: http://localhost:5173 (SPA) — API: http://localhost:3000
+cp deploy/.env.docker.dev.example deploy/.env.docker.dev   # pre-filled — nothing to edit
+pnpm docker:dev
+# Admin SPA: http://localhost:5173/admin/login  |  API: http://localhost:3000
 ```
 
-**API + web on host (no Docker, no DB server):**
+### API + web on host (no Docker, no DB server)
 
 ```bash
 # .env: DATABASE_URL=file:../data/nestidp.db (DATABASE_ENCRYPTION_KEY optional in dev)
@@ -322,7 +344,18 @@ pnpm db:migrate:deploy
 pnpm dev
 ```
 
-See [development.md](./development.md) for details.
+### Useful shortcuts
+
+| Task | Command |
+| --- | --- |
+| Follow dev logs | `pnpm docker:dev:logs` |
+| Open shell in dev container | `pnpm docker:dev:shell` |
+| Wipe dev volumes (node_modules) | `pnpm docker:dev:reset` |
+| Follow prod logs | `pnpm docker:prod:logs` |
+| Run prod migrations only | `pnpm docker:prod:migrate` |
+| Wipe prod DB volume | `pnpm docker:prod:reset` |
+
+See [development.md](./development.md) for the full local dev guide.
 
 ---
 

@@ -4,7 +4,7 @@
 
 **A self-hosted SAML 2.0 Identity Provider you deploy in minutes**
 
-[![Version](https://img.shields.io/badge/version-1.20.1-blue?style=flat-square)](package.json)
+[![Version](https://img.shields.io/badge/version-1.20.2-blue?style=flat-square)](package.json)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-green?style=flat-square)](package.json)
 [![pnpm](https://img.shields.io/badge/pnpm-%3E%3D9-orange?style=flat-square)](package.json)
 [![License](https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square)](LICENSE)
@@ -234,19 +234,19 @@ Vite proxies `/api` and `/saml` to the NestJS API (port 3000) — use port 5173 
 <summary><strong>Docker Compose (production-like)</strong></summary>
 
 ```bash
-cp .env.docker.example .env.docker
-# Edit .env.docker — set strong values for:
+cp deploy/.env.docker.prod.example deploy/.env.docker.prod
+# Edit deploy/.env.docker.prod — set strong values for:
 #   SESSION_SECRET, ENCRYPTION_KEY, DATABASE_ENCRYPTION_KEY (openssl rand -hex 32 for each)
 #   ADMIN_USERNAME, ADMIN_PASSWORD (min 12 chars in prod)
 #   IDP_BASE_URL=https://idp.your-domain.com
-docker compose up --build -d
-docker compose ps      # wait for healthy
+pnpm docker:prod
+pnpm docker:prod:logs   # follow startup logs
 curl -sf http://localhost:3000/ready
 ```
 
 Open http://localhost:3000/admin/login (or your `IDP_BASE_URL`).
 
-For local hot-reload with Docker: `pnpm dev:docker` — Nest watch + Vite HMR at http://localhost:5173.
+For local hot-reload with Docker: `pnpm docker:dev` — Nest watch + Vite HMR at http://localhost:5173.
 
 </details>
 
@@ -254,7 +254,7 @@ For local hot-reload with Docker: `pnpm dev:docker` — Nest watch + Vite HMR at
 <summary><strong>Try sync with the mock identity API</strong></summary>
 
 ```bash
-cd mock-app && npm install && npm start
+cd mock-app && pnpm install && pnpm start
 # → http://localhost:4010  (40 users, groups, roles, bcrypt passwords)
 ```
 
@@ -315,7 +315,12 @@ Alert when:
 | Command                  | Description                                                      |
 | ------------------------ | ---------------------------------------------------------------- |
 | `pnpm dev`               | Shared types watch + API (port 3000) + Vite (port 5173)          |
-| `pnpm dev:docker`        | Hot-reload stack in Docker (Nest watch + Vite HMR)               |
+| `pnpm docker:dev`        | Hot-reload stack in Docker (Nest watch + Vite HMR)               |
+| `pnpm docker:dev:logs`   | Follow dev container logs                                        |
+| `pnpm docker:dev:shell`  | Open shell in the running dev container                          |
+| `pnpm docker:prod`       | Production stack (detached, named DB volume)                     |
+| `pnpm docker:prod:logs`  | Follow prod container logs                                       |
+| `pnpm docker:prod:migrate` | Run migrations only, then exit (upgrade / init-container)      |
 | `pnpm build`             | Production build of all packages                                 |
 | `pnpm test`              | Monorepo tests (shared + API + web)                              |
 | `pnpm lint`              | ESLint + TypeScript check                                        |
