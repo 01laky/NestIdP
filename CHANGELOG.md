@@ -40,8 +40,8 @@ The Prompt 38 §7 optional additions, re-cut as a minor release, plus the Prompt
 - **Singleton IdP-settings reads are cached** (§A5): the ~14 hot-path reads of the `IdpSettings` row
   (SAML SSO/SLO/metadata, end-user auth, encryption key resolution, back-channel propagation) go through
   a per-Prisma-instance memo with a 5 s TTL plus explicit invalidation at every write site (all 13
-  `idp-settings.service` writes + the first-use signing-material claim). Disabled under `NODE_ENV=test`
-  and tunable via `IDP_SETTINGS_CACHE_TTL_MS` (0 disables). Read-modify-write paths keep direct reads.
+  `idp-settings.service` writes + the first-use signing-material claim). Disabled inside jest workers
+  (via `JEST_WORKER_ID`) and tunable via `IDP_SETTINGS_CACHE_TTL_MS` (0 disables). Read-modify-write paths keep direct reads.
 - **Due-soon rotation notifications are deduped** — `idp_<kind>_auto_rotation_due_soon` (audit + notifier)
   now fires once per certificate (`notAfter`-keyed, re-armed by rotation; reset on restart), instead of on
   every scheduler tick inside the notify window (previously up to ~1440 duplicates/day).
