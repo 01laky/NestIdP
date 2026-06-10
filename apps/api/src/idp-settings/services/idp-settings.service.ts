@@ -38,7 +38,6 @@ import {
 	isCertExpiringSoon,
 	parseCertNotAfterIso,
 	prismaCryptoPendingData,
-	prismaCryptoPrimaryData,
 	validateSigningCertPair,
 } from '../utils/idp-cert.util';
 import { CertRotationConfig } from '../cert-rotation.config';
@@ -49,7 +48,6 @@ import {
 } from '../cert-rotation-notifier';
 import {
 	prismaEncryptionPendingData,
-	prismaEncryptionPrimaryData,
 	validateEncryptionKeyPair,
 } from '../utils/idp-encryption-cert.util';
 import {
@@ -214,11 +212,11 @@ export class IdpSettingsService {
 		const generated = this.generateWithOptions(settings.entityId, body);
 		const updated = await this.prisma.idpSettings.update({
 			where: { id: 'default' },
-			data: {
-				signingCertPem: generated.certPem,
-				signingKeyEncrypted: this.encryptionService.encrypt(generated.privateKeyPem),
-				...prismaCryptoPrimaryData(generated.metadata),
-			},
+			data: SIGNING_DESCRIPTOR.primaryData(
+				generated.certPem,
+				this.encryptionService.encrypt(generated.privateKeyPem),
+				generated.metadata,
+			),
 		});
 		this.audit.logSigningCertGenerated(
 			false,
@@ -234,11 +232,11 @@ export class IdpSettingsService {
 		const pair = this.validateCertPair(body.signingCertPem, body.signingPrivateKeyPem);
 		const updated = await this.prisma.idpSettings.update({
 			where: { id: 'default' },
-			data: {
-				signingCertPem: pair.certPem,
-				signingKeyEncrypted: this.encryptionService.encrypt(pair.privateKeyPem),
-				...prismaCryptoPrimaryData(pair.crypto),
-			},
+			data: SIGNING_DESCRIPTOR.primaryData(
+				pair.certPem,
+				this.encryptionService.encrypt(pair.privateKeyPem),
+				pair.crypto,
+			),
 		});
 		this.audit.logSigningCertUploaded(false);
 		return toIdpSettingsPublicDto(updated, this.getIdpBaseUrl());
@@ -278,12 +276,12 @@ export class IdpSettingsService {
 
 		const updated = await this.prisma.idpSettings.update({
 			where: { id: 'default' },
-			data: {
-				pendingSigningCertPem: pendingCertPem,
-				pendingSigningKeyEncrypted: this.encryptionService.encrypt(pendingKeyPem),
-				rotationStartedAt: new Date(),
-				...prismaCryptoPendingData(pendingCrypto),
-			},
+			data: SIGNING_DESCRIPTOR.pendingData(
+				pendingCertPem,
+				this.encryptionService.encrypt(pendingKeyPem),
+				pendingCrypto,
+				new Date(),
+			),
 		});
 		return toIdpSettingsPublicDto(updated, this.getIdpBaseUrl());
 	}
@@ -301,11 +299,11 @@ export class IdpSettingsService {
 		const generated = this.generateEncryptionWithOptions(settings.entityId, body);
 		const updated = await this.prisma.idpSettings.update({
 			where: { id: 'default' },
-			data: {
-				encryptionCertPem: generated.certPem,
-				encryptionKeyEncrypted: this.encryptionService.encrypt(generated.privateKeyPem),
-				...prismaEncryptionPrimaryData(generated.metadata),
-			},
+			data: ENCRYPTION_DESCRIPTOR.primaryData(
+				generated.certPem,
+				this.encryptionService.encrypt(generated.privateKeyPem),
+				generated.metadata,
+			),
 		});
 		this.audit.logEncryptionCertGenerated(
 			false,
@@ -327,11 +325,11 @@ export class IdpSettingsService {
 		);
 		const updated = await this.prisma.idpSettings.update({
 			where: { id: 'default' },
-			data: {
-				encryptionCertPem: pair.certPem,
-				encryptionKeyEncrypted: this.encryptionService.encrypt(pair.privateKeyPem),
-				...prismaEncryptionPrimaryData(pair.crypto),
-			},
+			data: ENCRYPTION_DESCRIPTOR.primaryData(
+				pair.certPem,
+				this.encryptionService.encrypt(pair.privateKeyPem),
+				pair.crypto,
+			),
 		});
 		this.audit.logEncryptionCertUploaded(false);
 		return toIdpSettingsPublicDto(updated, this.getIdpBaseUrl());
@@ -377,12 +375,12 @@ export class IdpSettingsService {
 
 		const updated = await this.prisma.idpSettings.update({
 			where: { id: 'default' },
-			data: {
-				pendingEncryptionCertPem: pendingCertPem,
-				pendingEncryptionKeyEncrypted: this.encryptionService.encrypt(pendingKeyPem),
-				encryptionRotationStartedAt: new Date(),
-				...prismaEncryptionPendingData(pendingCrypto),
-			},
+			data: ENCRYPTION_DESCRIPTOR.pendingData(
+				pendingCertPem,
+				this.encryptionService.encrypt(pendingKeyPem),
+				pendingCrypto,
+				new Date(),
+			),
 		});
 		return toIdpSettingsPublicDto(updated, this.getIdpBaseUrl());
 	}
