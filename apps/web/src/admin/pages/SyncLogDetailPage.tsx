@@ -62,6 +62,15 @@ export function SyncLogDetailPage() {
 					<span>{t('dryRunField')}</span>
 					<code>{String(log.dryRun)}</code>
 				</li>
+				<li>
+					<span>{t('groupsDeactivatedField')}</span>
+					{/* Null on legacy rows persisted before v1.19.0 — shown as an em-dash, like finishedAt. */}
+					<code>{log.groupsDeactivated ?? tCommon('emDash')}</code>
+				</li>
+				<li>
+					<span>{t('rolesDeactivatedField')}</span>
+					<code>{log.rolesDeactivated ?? tCommon('emDash')}</code>
+				</li>
 			</ul>
 			{log.errors && log.errors.length > 0 ? (
 				<CodeBlock>{JSON.stringify(log.errors, null, 2)}</CodeBlock>

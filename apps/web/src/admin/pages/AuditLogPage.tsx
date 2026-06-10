@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { AUDIT_CATEGORIES } from '@nestidp/shared';
+import { AUDIT_ACTOR_TYPES, AUDIT_CATEGORIES } from '@nestidp/shared';
 import { auditExportUrl, listAuditEvents } from '../adminApi';
 import { AdminPageHeader } from '../components/layout/AdminPageHeader';
 import { ErrorBanner } from '../components/common/ErrorBanner';
@@ -14,6 +14,12 @@ import { Button, Select, Table, TextInput, useToast } from '../../ui';
 
 const PAGE_SIZE = 50;
 
+const ACTOR_TYPE_LABEL_KEYS: Record<(typeof AUDIT_ACTOR_TYPES)[number], string> = {
+	admin: 'actorTypeAdmin',
+	end_user: 'actorTypeEndUser',
+	system: 'actorTypeSystem',
+};
+
 export function AuditLogPage() {
 	const { t } = useTranslation('audit');
 	const { t: tNav } = useTranslation('nav');
@@ -23,9 +29,32 @@ export function AuditLogPage() {
 	const [error, setError] = useState<string | null>(null);
 	const [category, setCategory] = useState('');
 	const [event, setEvent] = useState('');
+	const [actorType, setActorType] = useState('');
+	const [subjectType, setSubjectType] = useState('');
+	const [subjectId, setSubjectId] = useState('');
 	const [data, setData] = useState<Awaited<ReturnType<typeof listAuditEvents>> | null>(null);
 	const [page, setPage] = useState(1);
 	const { showToast } = useToast();
+
+	function filterParams(): Record<string, string> {
+		const params: Record<string, string> = {};
+		if (category) {
+			params.category = category;
+		}
+		if (event.trim()) {
+			params.event = event.trim();
+		}
+		if (actorType) {
+			params.actorType = actorType;
+		}
+		if (subjectType.trim()) {
+			params.subjectType = subjectType.trim();
+		}
+		if (subjectId.trim()) {
+			params.subjectId = subjectId.trim();
+		}
+		return params;
+	}
 
 	async function load(nextPage: number) {
 		setLoading(true);
@@ -34,13 +63,8 @@ export function AuditLogPage() {
 			const params: Record<string, string> = {
 				limit: String(PAGE_SIZE),
 				offset: String((nextPage - 1) * PAGE_SIZE),
+				...filterParams(),
 			};
-			if (category) {
-				params.category = category;
-			}
-			if (event.trim()) {
-				params.event = event.trim();
-			}
 			const result = await listAuditEvents(params);
 			setData(result);
 			setPage(nextPage);
@@ -58,13 +82,7 @@ export function AuditLogPage() {
 	}, []);
 
 	function download(format: 'json' | 'csv') {
-		const params: Record<string, string> = { format };
-		if (category) {
-			params.category = category;
-		}
-		if (event.trim()) {
-			params.event = event.trim();
-		}
+		const params: Record<string, string> = { format, ...filterParams() };
 		window.open(auditExportUrl(params), '_blank');
 		showToast(t('toastExportDownloaded'));
 	}
@@ -114,6 +132,28 @@ export function AuditLogPage() {
 						value={event}
 						onChange={(e) => setEvent(e.target.value)}
 						placeholder={t('eventPlaceholder')}
+					/>
+					<Select
+						label={t('actorType')}
+						value={actorType}
+						onChange={(e) => setActorType(e.target.value)}
+					>
+						<option value="">{tCommon('all')}</option>
+						{AUDIT_ACTOR_TYPES.map((type) => (
+							<option key={type} value={type}>
+								{t(ACTOR_TYPE_LABEL_KEYS[type])}
+							</option>
+						))}
+					</Select>
+					<TextInput
+						label={t('subjectType')}
+						value={subjectType}
+						onChange={(e) => setSubjectType(e.target.value)}
+					/>
+					<TextInput
+						label={t('subjectId')}
+						value={subjectId}
+						onChange={(e) => setSubjectId(e.target.value)}
 					/>
 					<Button type="submit" variant="primary">
 						{tCommon('filter')}

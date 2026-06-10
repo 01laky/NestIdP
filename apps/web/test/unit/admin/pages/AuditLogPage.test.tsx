@@ -207,6 +207,69 @@ describe('AuditLogPage', () => {
 		);
 	});
 
+	it('WEB-ADM-107: actorType/subjectType/subjectId filters serialise into the list request and reset to page 1', async () => {
+		const listSpy = vi.spyOn(adminApi, 'listAuditEvents').mockResolvedValue({
+			items: [],
+			total: 120,
+			limit: 50,
+			offset: 0,
+		});
+
+		renderPage();
+		await waitFor(() => screen.getByRole('button', { name: 'Next' }));
+		fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+		await waitFor(() => {
+			expect(listSpy).toHaveBeenLastCalledWith(expect.objectContaining({ offset: '50' }));
+		});
+
+		fireEvent.change(screen.getByLabelText('Actor type'), { target: { value: 'end_user' } });
+		fireEvent.change(screen.getByLabelText('Subject type'), { target: { value: 'SpConnection' } });
+		fireEvent.change(screen.getByLabelText('Subject ID'), { target: { value: 'sp-1' } });
+		fireEvent.click(screen.getByRole('button', { name: 'Filter' }));
+
+		await waitFor(() => {
+			expect(listSpy).toHaveBeenLastCalledWith(
+				expect.objectContaining({
+					actorType: 'end_user',
+					subjectType: 'SpConnection',
+					subjectId: 'sp-1',
+					offset: '0',
+				}),
+			);
+			expect(screen.getByText('Page 1 of 3')).toBeDefined();
+		});
+	});
+
+	it('WEB-ADM-108: export URL carries the actorType/subjectType/subjectId filters', async () => {
+		vi.spyOn(adminApi, 'listAuditEvents').mockResolvedValue({
+			items: [],
+			total: 0,
+			limit: 50,
+			offset: 0,
+		});
+		const exportSpy = vi
+			.spyOn(adminApi, 'auditExportUrl')
+			.mockReturnValue('/api/admin/audit-events/export?format=csv');
+		vi.spyOn(window, 'open').mockImplementation(() => null);
+
+		renderPage();
+		await waitFor(() => screen.getByLabelText('Actor type'));
+
+		fireEvent.change(screen.getByLabelText('Actor type'), { target: { value: 'system' } });
+		fireEvent.change(screen.getByLabelText('Subject type'), { target: { value: 'ApiConnection' } });
+		fireEvent.change(screen.getByLabelText('Subject ID'), { target: { value: 'conn-9' } });
+		fireEvent.click(screen.getByRole('button', { name: 'Export CSV' }));
+
+		expect(exportSpy).toHaveBeenCalledWith(
+			expect.objectContaining({
+				format: 'csv',
+				actorType: 'system',
+				subjectType: 'ApiConnection',
+				subjectId: 'conn-9',
+			}),
+		);
+	});
+
 	it('WEB-ADM-106: Filter submit resets pagination to the first page', async () => {
 		const listSpy = vi.spyOn(adminApi, 'listAuditEvents').mockResolvedValue({
 			items: [],

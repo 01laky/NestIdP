@@ -28,6 +28,12 @@ The Prompt 38 §7 optional additions, re-cut as a minor release, plus the Prompt
   `20260617120000_sync_log_deactivation_counts`): each run now persists how many orphan groups/roles its
   deactivation phase deleted (0 on dry runs and early failures; `null` on historical rows). Closes the
   Prompt 39 D5 TODO; the characterization goldens gained exactly the two new fields per scenario.
+- **Admin SPA surface for the above** (web): the audit-log page gained `actorType` (select) /
+  `subjectType` / `subjectId` filter controls that flow into both the list request and the JSON/CSV
+  export links (filter submit still resets to page 1); the admin login page's existing 429
+  retry-after countdown is now covered by a ticking fake-timer test (submit stays disabled until 0);
+  and the sync-log detail page surfaces `groupsDeactivated` / `rolesDeactivated` (em-dash on legacy
+  `null` rows). New i18n keys in all ten locales.
 
 ### Changed
 
