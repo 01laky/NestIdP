@@ -54,7 +54,12 @@ export async function classifyOwnership(db: Kysely<ExternalIdentityDB>): Promise
 	const hasAnyOurs = OUR_TABLES.some((t) => names.has(t));
 	if (hasMeta) {
 		const marker = await getMetaValue(db, 'instance_id').catch(() => null);
-		return marker ? 'ours' : 'foreign';
+		// §17 half-init recovery: a `nestidp_meta` table WITHOUT an instance marker can only be our
+		// own interrupted init (pre-1.18.1, before init became transactional) — the prefix is ours
+		// and a real foreign/other-instance DB would carry its marker. Classify it 'empty' so
+		// ensureSchema re-runs the idempotent migrations and stamps the marker, instead of bricking
+		// the DB as 'foreign' forever.
+		return marker ? 'ours' : 'empty';
 	}
 	return hasAnyOurs ? 'foreign' : 'empty';
 }
@@ -153,6 +158,13 @@ export async function runExternalMigrations(
 	// ensureSchema transaction, where a failed statement would abort the whole transaction on Postgres.
 	const names = await listTableNames(db);
 	const current = names.has(T_META) ? Number((await getMetaValue(db, 'schema_version')) ?? 0) : 0;
+	// §17 downgrade guard: a schema stamped by a NEWER build must not be touched by an older one —
+	// silently "upgrading" past it would corrupt structures this build doesn't know about.
+	if (current > CURRENT_SCHEMA_VERSION) {
+		throw new Error(
+			`External identity schema version ${current} is newer than this build supports (${CURRENT_SCHEMA_VERSION}) — refusing to modify it`,
+		);
+	}
 	if (current < 1) {
 		await createSchemaV1(db, dialect, pgSchema);
 		await setMetaValue(db, 'schema_version', '1');

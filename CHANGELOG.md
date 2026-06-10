@@ -115,7 +115,13 @@ frontend de-duplication) and remaining items land in subsequent commits under th
   `BEGIN`/`END`, a `;` inside a string literal, or an unterminated literal — with a
   `DbMigrationError('unsafe_migration')` naming the offending file, **before** any DDL runs. The
   constraints are documented in the new `docs/migrations.md`; the `MIG-GUARD-*` tests also assert every
-  real migration in `apps/api/prisma/migrations/` passes the guard.
+  real migration in `apps/api/prisma/migrations/` passes the guard. The external-DB side gained the
+  `EXT-LADDER-*` PGlite suite (v0 → current upgrade, idempotent re-run, half-init recovery, foreign-DB
+  rejection) plus two behaviour fixes it demanded: a **downgrade guard** (`runExternalMigrations` refuses a
+  schema stamped by a newer build instead of silently modifying it) and **legacy half-init recovery** — a
+  `nestidp_meta` table without an instance marker (a pre-1.18.1 crash between schema creation and the
+  marker write) is now classified recoverable and re-initialised, instead of being bricked as `foreign`
+  forever.
 - **Race-harness self-test** (§12): `RACE-SELF-*` tests prove `runConcurrently` genuinely overlaps its
   invocations (all N in flight simultaneously before any completes) — a race regression test built on a
   secretly-serialising helper would prove nothing.
