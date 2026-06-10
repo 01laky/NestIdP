@@ -26,7 +26,7 @@ import {
 	IdpSigningCryptoValidationError,
 	type StoredEncryptionCrypto,
 } from '@nestidp/shared';
-import type { IdpSettings } from '@prisma/client';
+import type { IdpSettings, Prisma } from '@prisma/client';
 import { EncryptionService } from '../../encryption/services/encryption.service';
 import { redactSecrets } from '../../encryption/utils/redact-secret.util';
 import { PrismaService } from '../../prisma/services/prisma.service';
@@ -37,7 +37,6 @@ import {
 	IdpCertValidationError,
 	isCertExpiringSoon,
 	parseCertNotAfterIso,
-	prismaCryptoPendingData,
 	validateSigningCertPair,
 } from '../utils/idp-cert.util';
 import { CertRotationConfig } from '../cert-rotation.config';
@@ -46,10 +45,7 @@ import {
 	type CertRotationKind,
 	type CertRotationNotifier,
 } from '../cert-rotation-notifier';
-import {
-	prismaEncryptionPendingData,
-	validateEncryptionKeyPair,
-} from '../utils/idp-encryption-cert.util';
+import { validateEncryptionKeyPair } from '../utils/idp-encryption-cert.util';
 import {
 	assertValidIdpEntityId,
 	assertValidIdpNameIdFormat,
@@ -405,6 +401,11 @@ export class IdpSettingsService {
 		return this.cancelRotationFor(SIGNING_DESCRIPTOR);
 	}
 
+	/** The per-kind descriptor (signing / encryption) used by the kind-parameterised cert flows. */
+	private descriptorFor(kind: CertRotationKind): CertKindDescriptor<unknown> {
+		return kind === 'signing' ? SIGNING_DESCRIPTOR : ENCRYPTION_DESCRIPTOR;
+	}
+
 	/** Promote the pending cert to active and clear the pending slot (Prompt 38 §6.6). */
 	private async completeRotationFor(
 		descriptor: CertKindDescriptor<unknown>,
@@ -581,7 +582,7 @@ export class IdpSettingsService {
 			return settings;
 		}
 
-		let pendingData: Record<string, unknown>;
+		let pendingData: Prisma.IdpSettingsUncheckedUpdateInput;
 		if (kind === 'signing') {
 			const generated = this.generateWithOptions(settings.entityId, {
 				keyFamily: (settings.signingKeyFamily as never) ?? undefined,
@@ -590,12 +591,12 @@ export class IdpSettingsService {
 				signatureAlgorithmId: settings.signingSignatureAlgorithmId ?? undefined,
 				notAfter,
 			});
-			pendingData = {
-				pendingSigningCertPem: generated.certPem,
-				pendingSigningKeyEncrypted: this.encryptionService.encrypt(generated.privateKeyPem),
-				rotationStartedAt: now,
-				...prismaCryptoPendingData(generated.metadata),
-			};
+			pendingData = SIGNING_DESCRIPTOR.pendingData(
+				generated.certPem,
+				this.encryptionService.encrypt(generated.privateKeyPem),
+				generated.metadata,
+				now,
+			);
 		} else {
 			const generated = this.generateEncryptionWithOptions(settings.entityId, {
 				keyFamily: (settings.encryptionKeyFamily as never) ?? undefined,
@@ -604,12 +605,12 @@ export class IdpSettingsService {
 				keyTransportAlgorithmId: settings.encryptionKeyTransportAlgorithmId ?? undefined,
 				notAfter,
 			});
-			pendingData = {
-				pendingEncryptionCertPem: generated.certPem,
-				pendingEncryptionKeyEncrypted: this.encryptionService.encrypt(generated.privateKeyPem),
-				encryptionRotationStartedAt: now,
-				...prismaEncryptionPendingData(generated.metadata),
-			};
+			pendingData = ENCRYPTION_DESCRIPTOR.pendingData(
+				generated.certPem,
+				this.encryptionService.encrypt(generated.privateKeyPem),
+				generated.metadata,
+				now,
+			);
 		}
 
 		const updated = await this.prisma.idpSettings.update({
@@ -641,38 +642,7 @@ export class IdpSettingsService {
 			return settings;
 		}
 
-		const promotion =
-			kind === 'signing'
-				? {
-						signingCertPem: settings.pendingSigningCertPem,
-						signingKeyEncrypted: settings.pendingSigningKeyEncrypted,
-						signingKeyFamily: settings.pendingSigningKeyFamily,
-						signingSignatureAlgorithmId: settings.pendingSigningSignatureAlgorithmId,
-						signingRsaModulusBits: settings.pendingSigningRsaModulusBits,
-						signingEcCurve: settings.pendingSigningEcCurve,
-						pendingSigningCertPem: null,
-						pendingSigningKeyEncrypted: null,
-						pendingSigningKeyFamily: null,
-						pendingSigningSignatureAlgorithmId: null,
-						pendingSigningRsaModulusBits: null,
-						pendingSigningEcCurve: null,
-						rotationStartedAt: null,
-					}
-				: {
-						encryptionCertPem: settings.pendingEncryptionCertPem,
-						encryptionKeyEncrypted: settings.pendingEncryptionKeyEncrypted,
-						encryptionKeyFamily: settings.pendingEncryptionKeyFamily,
-						encryptionKeyTransportAlgorithmId: settings.pendingEncryptionKeyTransportAlgorithmId,
-						encryptionRsaModulusBits: settings.pendingEncryptionRsaModulusBits,
-						encryptionEcCurve: settings.pendingEncryptionEcCurve,
-						pendingEncryptionCertPem: null,
-						pendingEncryptionKeyEncrypted: null,
-						pendingEncryptionKeyFamily: null,
-						pendingEncryptionKeyTransportAlgorithmId: null,
-						pendingEncryptionRsaModulusBits: null,
-						pendingEncryptionEcCurve: null,
-						encryptionRotationStartedAt: null,
-					};
+		const promotion = this.descriptorFor(kind).completeData(settings);
 
 		const updated = await this.prisma.idpSettings.update({
 			where: { id: 'default' },
