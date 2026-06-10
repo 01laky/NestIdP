@@ -226,7 +226,7 @@ docker compose exec nestidp pnpm db:rekey -- "$NEW_KEY"
 | `SAML_BACKCHANNEL_LOGOUT_PRUNE_INTERVAL_MS`          | `3600000`                   | Sweep of resolved queue rows; `0` disables                                                                                                          |
 | `SAML_BACKCHANNEL_LOGOUT_PRUNE_RETENTION_MS`         | `604800000`                 | Delete resolved rows older than this in the prune sweep                                                                                             |
 | `SYNC_USERNAME_COLLISION_POLICY`                     | `skip`                      | Cross-connection username collision policy (`skip` keeps the run successful; `fail_run` fails the colliding run); per-connection override available |
-| `SYNC_ALL_CONCURRENCY`                               | `1`                         | Max connections synced concurrently by "Sync all"; `1` = sequential (deterministic collision winner); bounded `[1, 16]`                             |
+| `SYNC_ALL_CONCURRENCY`                               | `1`                         | Max connections synced concurrently by "Sync all"; `1` = sequential (deterministic collision winner); bounded `[1, 16]`. Values `> 1` are honoured only when **every** included connection uses the `fail_run` collision policy — otherwise clamped to `1` with a warning (the first-connection-wins order is only deterministic sequentially)   |
 | `SYNC_SOURCE_STALE_FACTOR`                           | `3`                         | Dashboard marks a scheduled source "overdue" when `lastSyncAt` is older than cron interval × this factor; bounded `[1, 50]`                         |
 
 > **Single-instance scheduling.** The scheduled-sync scheduler is **in-process** and assumes a single

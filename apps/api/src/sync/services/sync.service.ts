@@ -3,6 +3,7 @@ import {
 	ConflictException,
 	Inject,
 	Injectable,
+	Logger,
 	NotFoundException,
 } from '@nestjs/common';
 import type {
@@ -75,6 +76,8 @@ interface MembershipRaw {
 
 @Injectable()
 export class SyncService {
+	private readonly logger = new Logger(SyncService.name);
+
 	constructor(
 		private readonly prisma: PrismaService,
 		private readonly identityRepository: ActiveIdentityStore,
@@ -421,7 +424,7 @@ export class SyncService {
 			orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
 		});
 		const byId = new Map<string, SyncAllConnectionResultDto>();
-		const concurrency = this.multiSourceConfig.syncAllConcurrency();
+		const concurrency = this.effectiveSyncAllConcurrency(connections);
 
 		await this.runPool(connections, concurrency, async (c) => {
 			if (!dryRun && (await this.isSyncInProgress(c.id))) {
@@ -650,6 +653,35 @@ export class SyncService {
 			}
 		}
 		return ids;
+	}
+
+	/**
+	 * §B3: the "first connection (createdAt order) wins a cross-source username collision" guarantee
+	 * only holds when the sources run sequentially. Parallelism is therefore allowed only when every
+	 * included connection uses the `fail_run` collision policy (a collision then fails the colliding
+	 * run loudly instead of silently picking a racy winner); otherwise the configured concurrency is
+	 * clamped to 1 with a warning.
+	 */
+	private effectiveSyncAllConcurrency(connections: ApiConnection[]): number {
+		const configured = this.multiSourceConfig.syncAllConcurrency();
+		if (configured <= 1) {
+			return configured;
+		}
+		const globalPolicy = this.multiSourceConfig.usernameCollisionPolicy();
+		const allFailRun = connections.every(
+			(c) =>
+				((c.usernameCollisionPolicy as UsernameCollisionPolicy | null) ?? globalPolicy) ===
+				'fail_run',
+		);
+		if (allFailRun) {
+			return configured;
+		}
+		this.logger.warn(
+			`SYNC_ALL_CONCURRENCY=${configured} clamped to 1: at least one included connection uses the ` +
+				`'skip' username-collision policy, and the first-connection-wins order is only deterministic ` +
+				`sequentially. Set every connection to 'fail_run' to allow parallel "sync all".`,
+		);
+		return 1;
 	}
 
 	/** Run `worker` over items with at most `concurrency` in flight. */

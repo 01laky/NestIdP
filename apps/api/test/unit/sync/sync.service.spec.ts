@@ -1241,6 +1241,66 @@ describe('SyncService', () => {
 			expect(res.totals).toMatchObject({ connections: 2, succeeded: 1, excluded: 1 });
 		});
 
+		describe('MAS-ALL-B3: concurrency clamp (cross-source collision determinism)', () => {
+			function makeParallelService(configured: number) {
+				return new SyncService(
+					prisma as never,
+					identityRepository as unknown as ActiveIdentityStore,
+					syncLogService as unknown as SyncLogService,
+					identitySyncClient as unknown as IdentitySyncClientService,
+					encryption,
+					audit as never,
+					oauthTokenService as never,
+					fakeProxyDispatcher(),
+					{
+						usernameCollisionPolicy: () => 'skip',
+						syncAllConcurrency: () => configured,
+						syncSourceStaleFactor: () => 3,
+					} as never,
+				);
+			}
+
+			async function maxOverlap(
+				svc: SyncService,
+				conns: Array<Record<string, unknown>>,
+			): Promise<number> {
+				prisma.apiConnection.findMany.mockResolvedValueOnce(conns).mockResolvedValueOnce([]);
+				jest.spyOn(svc, 'isSyncInProgress').mockResolvedValue(false);
+				let active = 0;
+				let max = 0;
+				jest.spyOn(svc, 'triggerSync').mockImplementation(async () => {
+					active += 1;
+					max = Math.max(max, active);
+					await new Promise((r) => setTimeout(r, 5));
+					active -= 1;
+					return log() as never;
+				});
+				await svc.syncAll({});
+				return max;
+			}
+
+			it('MAS-ALL-B3-01: SYNC_ALL_CONCURRENCY>1 is clamped to sequential when any source uses the skip policy', async () => {
+				const svc = makeParallelService(4);
+				// c1 has no per-connection override → falls back to the global 'skip' policy → clamp.
+				const overlap = await maxOverlap(svc, [
+					{ id: 'c1', name: 'A', usernameCollisionPolicy: null },
+					{ id: 'c2', name: 'B', usernameCollisionPolicy: 'fail_run' },
+					{ id: 'c3', name: 'C', usernameCollisionPolicy: 'fail_run' },
+				]);
+				expect(overlap).toBe(1);
+			});
+
+			it('MAS-ALL-B3-02: configured parallelism is honoured when every source is fail_run', async () => {
+				const svc = makeParallelService(4);
+				const overlap = await maxOverlap(svc, [
+					{ id: 'c1', name: 'A', usernameCollisionPolicy: 'fail_run' },
+					{ id: 'c2', name: 'B', usernameCollisionPolicy: 'fail_run' },
+					{ id: 'c3', name: 'C', usernameCollisionPolicy: 'fail_run' },
+				]);
+				expect(overlap).toBeGreaterThan(1);
+			});
+		});
+
 		it('MAS-ALL-05: dry-run does not check in-progress and passes dryRun through', async () => {
 			prisma.apiConnection.findMany.mockResolvedValue([{ id: 'c1', name: 'A' }]);
 			const inProgress = jest.spyOn(service, 'isSyncInProgress');

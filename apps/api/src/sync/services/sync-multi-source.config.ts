@@ -20,7 +20,12 @@ export class SyncMultiSourceConfig {
 		return isUsernameCollisionPolicy(raw) ? raw : 'skip';
 	}
 
-	/** Max connections synced concurrently by "sync all"; `1` = sequential (deterministic winner order). */
+	/**
+	 * Max connections synced concurrently by "sync all"; `1` = sequential (deterministic winner order).
+	 * §B3: values > 1 are honoured by SyncService only when every included connection uses the
+	 * `fail_run` collision policy — otherwise clamped to 1 (first-connection-wins is only
+	 * deterministic sequentially).
+	 */
 	syncAllConcurrency(): number {
 		return this.boundedInt('SYNC_ALL_CONCURRENCY', 1, 1, 16);
 	}

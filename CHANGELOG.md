@@ -115,6 +115,12 @@ frontend de-duplication) and remaining items land in subsequent commits under th
 
 ### Fixed
 
+- **"Sync all" parallelism no longer breaks collision determinism** (§B3) — the "first connection
+  (createdAt order) wins a cross-source username collision" guarantee only holds when sources run
+  sequentially, but `SYNC_ALL_CONCURRENCY` could be raised to 16 and silently produce a racy winner.
+  Concurrency > 1 is now honoured only when **every** included connection uses the `fail_run` collision
+  policy (a collision then fails the run loudly instead of picking a nondeterministic winner); otherwise
+  the configured value is clamped to 1 with a warning. Documented in `.env.example` + `docs/deployment.md`.
 - **"Sync all" no longer hides opted-out sources** (§B3) — the `excluded` total was hardcoded `0`. Non-local
   API connections with `includeInSyncAll: false` are now counted and emitted as `excluded` per-connection
   results (status `excluded`, never contacted), so they're visible in the summary instead of silently dropped.
