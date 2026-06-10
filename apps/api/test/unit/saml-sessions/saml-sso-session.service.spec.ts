@@ -237,10 +237,13 @@ describe('saml-sso-session.service', () => {
 				apiConnection: { name: 'HR', isLocalDirectory: false },
 			},
 		]);
+		// §5.C/§B7: the search term resolves session ids via an escaped raw LIKE, not Prisma `contains`.
+		const queryRaw = jest.fn().mockResolvedValue([{ id: 's1' }]);
 		const { service } = makeService({
 			samlSsoSession: { count, findMany },
 			samlBackchannelLogout: { findMany: bcFindMany },
 			user: { findMany: userFindMany },
+			$queryRaw: queryRaw,
 		});
 		const res = await service.listForAdmin({
 			status: 'terminated',
@@ -252,7 +255,8 @@ describe('saml-sso-session.service', () => {
 		const where = findMany.mock.calls[0][0].where;
 		expect(where.status).toBe('terminated');
 		expect(where.participations).toEqual({ some: { spConnectionId: 'sp1' } });
-		expect(where.OR).toBeDefined();
+		expect(queryRaw).toHaveBeenCalledTimes(1);
+		expect(where.id).toEqual({ in: ['s1'] });
 		// Per-SP back-channel state is fetched for the page's sessions (Prompt 36, item N).
 		expect(bcFindMany.mock.calls[0][0].where).toEqual({ ssoSessionId: { in: ['s1'] } });
 		// Per-user source resolution (Prompt 37): sourceLabel is attached from the user's connection.

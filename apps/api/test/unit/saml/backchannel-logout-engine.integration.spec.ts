@@ -65,6 +65,8 @@ describe('back-channel logout engine (SQLite, mocked SOAP)', () => {
 							SAML_BACKCHANNEL_LOGOUT_RETRY_BASE_MS: 1_000,
 							SAML_BACKCHANNEL_LOGOUT_CONCURRENCY: 2,
 							SAML_BACKCHANNEL_LOGOUT_MAX_INFLIGHT: 5,
+							// §5.C: must thread into the SOAP verifier options instead of a hardcoded 60.
+							SAML_CLOCK_SKEW_SECONDS: 99,
 						}),
 					],
 				}),
@@ -171,6 +173,18 @@ describe('back-channel logout engine (SQLite, mocked SOAP)', () => {
 		);
 		expect(notifier.onSent).toHaveBeenCalledTimes(1);
 		expect(notifier.onSucceeded).toHaveBeenCalledTimes(1);
+	});
+
+	it('BC-PROP-SKEW: SAML_CLOCK_SKEW_SECONDS threads into the SOAP verifier options (§5.C)', async () => {
+		const sp = await makeSp('https://sp.example.com/slo/soap');
+		const session = await makeSession();
+		await participate(session.id, sp.id);
+		await sessions.terminate(session.id, 'admin_action', 'admin-1');
+
+		deliver.mockResolvedValue({ outcome: 'succeeded' });
+		await propagation.processDue();
+		expect(deliver).toHaveBeenCalledTimes(1);
+		expect((deliver.mock.calls[0][0] as { clockSkewSeconds: number }).clockSkewSeconds).toBe(99);
 	});
 
 	it('BC-PROP-PARTIAL: a PartialLogout response → partial outcome, distinct from success/failure', async () => {
@@ -600,6 +614,13 @@ describe('back-channel logout engine (SQLite, mocked SOAP)', () => {
 		expect(deliver).toHaveBeenCalledTimes(1);
 		// the probe must never persist a delivery row
 		expect(await prisma.samlBackchannelLogout.count()).toBe(0);
+	});
+
+	it('BC-PROBE-SKEW: the probe delivery also honours SAML_CLOCK_SKEW_SECONDS (§5.C)', async () => {
+		const sp = await makeSp('https://sp.example.com/slo/soap');
+		deliver.mockResolvedValue({ outcome: 'succeeded' });
+		await propagation.probe(sp.id);
+		expect((deliver.mock.calls[0][0] as { clockSkewSeconds: number }).clockSkewSeconds).toBe(99);
 	});
 
 	it('BC-PROBE-PARTIAL: a PartialLogout probe response still counts as reachable (ok:true)', async () => {

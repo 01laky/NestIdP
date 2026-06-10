@@ -132,11 +132,11 @@ describe('IdentityAdminService', () => {
 		).rejects.toThrow(NotFoundException);
 	});
 
-	it('H4: deleteUser terminates the user’s SSO sessions before delete', async () => {
+	it('H4: deleteUser terminates the user’s SSO sessions before delete (reason user_deleted)', async () => {
 		store.getUserById.mockResolvedValue({ ...baseUser });
 		store.deleteUser.mockResolvedValue(undefined);
 		await service.deleteUser('u1');
-		expect(ssoSessions.terminateAllForUser).toHaveBeenCalledWith('u1', 'user_deactivated');
+		expect(ssoSessions.terminateAllForUser).toHaveBeenCalledWith('u1', 'user_deleted');
 		expect(store.deleteUser).toHaveBeenCalledWith('u1');
 	});
 
@@ -183,19 +183,45 @@ describe('IdentityAdminService', () => {
 	});
 
 	it('MAS-FILTER: listUsers forwards the apiConnectionId source filter + returns source options', async () => {
+		const connA = 'cconnaaaaaaaaaaaaaaaaaaaaaaaa';
+		const localId = 'clocal11111111111111111111111';
 		store.listUsers.mockResolvedValue({ items: [], total: 0 });
 		prisma.apiConnection.findMany.mockResolvedValue([
-			{ id: 'conn-a', name: 'HR', isLocalDirectory: false },
-			{ id: 'local-1', name: 'Local directory', isLocalDirectory: true },
+			{ id: connA, name: 'HR', isLocalDirectory: false },
+			{ id: localId, name: 'Local directory', isLocalDirectory: true },
 		]);
-		const res = await service.listUsers(undefined, undefined, undefined, 'synced', 'conn-a');
+		const res = await service.listUsers(undefined, undefined, undefined, 'synced', connA);
 		expect(store.listUsers).toHaveBeenCalledWith(
-			expect.objectContaining({ apiConnectionId: 'conn-a' }),
+			expect.objectContaining({ apiConnectionId: connA }),
 		);
 		expect(res.sources).toEqual([
-			{ apiConnectionId: 'conn-a', label: 'HR', isLocalDirectory: false },
-			{ apiConnectionId: 'local-1', label: 'Local directory', isLocalDirectory: true },
+			{ apiConnectionId: connA, label: 'HR', isLocalDirectory: false },
+			{ apiConnectionId: localId, label: 'Local directory', isLocalDirectory: true },
 		]);
+	});
+
+	it('MAS-FILTER-VALIDATE-01: a garbage apiConnectionId filter → 400 on users/groups/roles lists', async () => {
+		await expect(
+			service.listUsers(undefined, undefined, undefined, undefined, 'not-a-cuid'),
+		).rejects.toThrow('Invalid apiConnectionId');
+		await expect(service.listGroups(undefined, undefined, undefined, "x'; DROP")).rejects.toThrow(
+			BadRequestException,
+		);
+		await expect(service.listRoles(undefined, undefined, undefined, 'garbage!')).rejects.toThrow(
+			BadRequestException,
+		);
+		expect(store.listUsers).not.toHaveBeenCalled();
+		expect(store.listGroups).not.toHaveBeenCalled();
+		expect(store.listRoles).not.toHaveBeenCalled();
+	});
+
+	it('MAS-FILTER-VALIDATE-02: absent or empty apiConnectionId filter means "all sources"', async () => {
+		store.listUsers.mockResolvedValue({ items: [], total: 0 });
+		await service.listUsers();
+		await service.listUsers(undefined, undefined, undefined, undefined, '');
+		for (const call of store.listUsers.mock.calls) {
+			expect(call[0].apiConnectionId).toBeUndefined();
+		}
 	});
 
 	it('API-IDN-SVC-06: getUserById unknown → NotFoundException', async () => {

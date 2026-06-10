@@ -103,6 +103,8 @@ export class ProxyDispatcherService implements OnModuleDestroy {
 			connectTimeout: this.connectTimeoutMs(),
 		};
 		if (connection.proxyUsername) {
+			// Username without a stored password intentionally yields `Basic base64("user:")` (empty
+			// password) — some proxies use username-only tokens for authentication (§5.C).
 			let password = '';
 			if (connection.proxyPasswordEncrypted) {
 				password = this.encryption.decrypt(connection.proxyPasswordEncrypted);

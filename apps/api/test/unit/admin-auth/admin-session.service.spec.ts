@@ -237,4 +237,15 @@ describe('AdminSessionService', () => {
 		expect(mixedService.getSessionTtlSeconds(true)).toBe(2_592_000);
 		expect(mixedService.getSessionTtlSeconds(false)).toBe(600);
 	});
+
+	it('API-SES-25: missing/empty SESSION_SECRET → constructor throws (fail closed)', () => {
+		const emptyConfig = {
+			get: jest.fn(() => undefined),
+		} as unknown as ConfigService;
+		expect(() => new AdminSessionService(emptyConfig)).toThrow(/SESSION_SECRET/);
+		const blankConfig = {
+			get: jest.fn((key: string) => (key === 'SESSION_SECRET' ? '' : 'test')),
+		} as unknown as ConfigService;
+		expect(() => new AdminSessionService(blankConfig)).toThrow(/SESSION_SECRET/);
+	});
 });

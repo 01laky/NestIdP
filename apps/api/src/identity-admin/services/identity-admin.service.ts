@@ -34,6 +34,7 @@ import {
 	CREDENTIALS_ENCRYPTION,
 	type CredentialsEncryptionPort,
 } from '../../encryption/credentials-encryption.port';
+import { isCuid } from '../../common/pipes/parse-cuid.pipe';
 import { normalizeSyncedEmail } from '../../identity/utils/normalize-synced-email.util';
 import { ActiveIdentityStore } from '../../identity/store/active-identity-store';
 import type { StoreGroup, StoreRole, StoreUser } from '../../identity/store/identity-store';
@@ -48,6 +49,8 @@ import { IdentityAdminAuditService } from './identity-admin-audit.service';
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 const MAX_AUDIT_LIMIT = 20;
+// Detail responses truncate the member list at this cap; the web detail page shows "of N" via the
+// untruncated `memberCount` field, so larger groups/roles are not silently misrepresented.
 const MAX_MEMBERS = 500;
 
 @Injectable()
@@ -77,7 +80,7 @@ export class IdentityAdminService {
 			offset,
 			search,
 			origin: this.parseOrigin(originFilter),
-			apiConnectionId: apiConnectionId || undefined,
+			apiConnectionId: this.parseApiConnectionId(apiConnectionId),
 		});
 		const mapped = items.map((row) => this.toUserListItem(row));
 		const statuses = await this.accountLockout.getStatusMany(
@@ -198,6 +201,9 @@ export class IdentityAdminService {
 			await this.validateMembershipIds([], body.roleIds, existing.apiConnectionId);
 		}
 
+		// Group/role membership changes intentionally do NOT terminate live SSO sessions: SAML assertions
+		// are point-in-time snapshots, so an already-issued assertion keeps the old entitlements until the
+		// session expires; the next login picks up the new memberships. Only deactivation kills sessions.
 		await this.store.updateManualUser(id, {
 			username: body.username !== undefined ? body.username.trim() : undefined,
 			email,
@@ -221,7 +227,7 @@ export class IdentityAdminService {
 
 	async deleteUser(id: string): Promise<void> {
 		const existing = await this.findManualUserOrThrow(id);
-		await this.ssoSessions.terminateAllForUser(id, 'user_deactivated');
+		await this.ssoSessions.terminateAllForUser(id, 'user_deleted');
 		await this.store.deleteUser(id);
 		this.audit.logUserDeleted(id, existing.username);
 	}
@@ -238,7 +244,7 @@ export class IdentityAdminService {
 			limit,
 			offset,
 			origin: this.parseOrigin(originFilter),
-			apiConnectionId: apiConnectionId || undefined,
+			apiConnectionId: this.parseApiConnectionId(apiConnectionId),
 		});
 		return {
 			items: items.map((row) => ({
@@ -321,7 +327,7 @@ export class IdentityAdminService {
 			limit,
 			offset,
 			origin: this.parseOrigin(originFilter),
-			apiConnectionId: apiConnectionId || undefined,
+			apiConnectionId: this.parseApiConnectionId(apiConnectionId),
 		});
 		return {
 			items: items.map((row) => ({
@@ -556,6 +562,17 @@ export class IdentityAdminService {
 		} catch {
 			return undefined;
 		}
+	}
+
+	/** Source filter: empty/absent means "all"; anything else must be a cuid (garbage → 400, not an empty page). */
+	private parseApiConnectionId(value?: string): string | undefined {
+		if (!value) {
+			return undefined;
+		}
+		if (!isCuid(value)) {
+			throw new BadRequestException('Invalid apiConnectionId');
+		}
+		return value;
 	}
 
 	private parseOrigin(originFilter?: string): IdentityOrigin | undefined {

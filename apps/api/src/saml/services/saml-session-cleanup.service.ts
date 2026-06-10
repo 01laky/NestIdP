@@ -39,21 +39,18 @@ export class SamlSessionCleanupService implements OnModuleInit, OnModuleDestroy 
 
 	async purgeExpiredSessions(): Promise<number> {
 		const now = new Date();
-		const result = await this.prisma.samlSession.deleteMany({
-			where: { expiresAt: { lt: now } },
-		});
-
-		// SLO (v1.8.0): drop expired SSO sessions (cascade removes participations)
-		// and replay-log rows older than the clock-skew window.
-		await this.prisma.samlSsoSession.deleteMany({
-			where: { expiresAt: { lt: now } },
-		});
 		const skewCutoff = new Date(now.getTime() - this.getClockSkewMs());
-		await this.prisma.samlLogoutRequestLog.deleteMany({
-			where: { createdAt: { lt: skewCutoff } },
-		});
-
-		return result.count;
+		// §14: one transaction — a crash mid-purge must not leave a partially-cleaned state
+		// (e.g. pending sessions gone but their expired SSO sessions still listed). §5.C: the
+		// returned count now covers ALL purged rows, not just the pending samlSession table.
+		const [pending, sso, replay] = await this.prisma.$transaction([
+			this.prisma.samlSession.deleteMany({ where: { expiresAt: { lt: now } } }),
+			// SLO (v1.8.0): expired SSO sessions (cascade removes participations) and replay-log
+			// rows older than the clock-skew window.
+			this.prisma.samlSsoSession.deleteMany({ where: { expiresAt: { lt: now } } }),
+			this.prisma.samlLogoutRequestLog.deleteMany({ where: { createdAt: { lt: skewCutoff } } }),
+		]);
+		return pending.count + sso.count + replay.count;
 	}
 
 	private getClockSkewMs(): number {

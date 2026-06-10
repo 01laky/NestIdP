@@ -55,11 +55,32 @@ export async function runBootstrap(
 			}
 
 			const passwordHash = await hashPassword(adminPassword);
-			await prisma.adminUser.create({
+			const createdAdmin = await prisma.adminUser.create({
 				data: { username: adminUsername, passwordHash },
 			});
 			adminCreated = true;
 			logger.log(`Bootstrap: created initial admin user "${adminUsername}"`);
+			// §5.C: the most privileged account creation must leave an audit row. Direct Prisma write
+			// (bootstrap runs outside Nest DI); same column shape as AuditPersistenceService. Best-effort —
+			// a failed audit write must never abort bootstrap.
+			try {
+				await prisma.auditEvent.create({
+					data: {
+						category: 'admin_config',
+						event: 'admin_user_bootstrapped',
+						actorType: 'system',
+						actorId: null,
+						actorLabel: null,
+						subjectType: 'AdminUser',
+						subjectId: createdAdmin.id,
+						clientIp: null,
+						metadata: { username: createdAdmin.username },
+					},
+				});
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				logger.warn(`Bootstrap: failed to write admin_user_bootstrapped audit row — ${message}`);
+			}
 		} else if (nodeEnv === 'production') {
 			assertProductionBootstrapPassword(nodeEnv, adminPassword, adminCount);
 		} else if (adminUsername || adminPassword) {

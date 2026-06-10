@@ -16,12 +16,14 @@ import {
 } from '../../encryption/credentials-encryption.port';
 import { redactBearerToken, redactSecrets } from '../../encryption/utils/redact-secret.util';
 import { PrismaService } from '../../prisma/services/prisma.service';
+import { IdentitySyncClientService } from '../../sync/services/identity-sync-client.service';
 import { OAuthTokenService } from '../../sync/services/oauth-token.service';
 import { ProxyDispatcherService } from '../../sync/services/proxy-dispatcher.service';
 import { annotateIfProxied, classifyProxyError } from '../../sync/utils/proxy-error.util';
 import { ApiConnectionsAuditService } from './api-connections-audit.service';
 import { normalizeBaseUrl } from '../utils/base-url.util';
 import {
+	assertUsersArrayWithinLimit,
 	ExternalApiValidationError,
 	mapExternalUserRow,
 } from '../../sync/validators/external-api.validator';
@@ -41,6 +43,7 @@ export class ApiConnectionTestService {
 		private readonly audit: ApiConnectionsAuditService,
 		private readonly oauthTokenService: OAuthTokenService,
 		private readonly proxyDispatcher: ProxyDispatcherService,
+		private readonly identitySyncClient: IdentitySyncClientService,
 	) {}
 
 	/** Token-exchange-only diagnostics (POST /:id/test-token). Never returns the token. */
@@ -202,7 +205,12 @@ export class ApiConnectionTestService {
 		// Contract diagnostics: parse + map under the resolved contract.
 		try {
 			const body = await response.json();
-			const array = this.extractArray(body, contract.responseRoot.users);
+			// §5.C: the preview obeys the same users-per-run cap as a real sync — a huge target yields a
+			// clear validation error instead of an unbounded parse/map loop.
+			const array = assertUsersArrayWithinLimit(
+				this.extractArray(body, contract.responseRoot.users),
+				this.identitySyncClient.getMaxUsersPerRun(),
+			);
 			const sample: ApiConnectionPreviewUserDto[] = [];
 			let firstUserId: string | undefined;
 			for (const raw of array) {

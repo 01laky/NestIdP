@@ -97,6 +97,8 @@ export class SamlResponseBuilderService {
 			})
 			.ele('saml2:AuthnContext')
 			.ele('saml2:AuthnContextClassRef')
+			// Intentionally fixed: password login over TLS is the only authentication method this IdP
+			// supports (MVP scope — no MFA/other contexts), so PasswordProtectedTransport always applies.
 			.txt('urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport')
 			.up()
 			.up()

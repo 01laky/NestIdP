@@ -232,4 +232,21 @@ describe('AccountLockoutService (Prompt 35)', () => {
 		expect(many.get('u3')?.locked).toBe(false);
 		expect(await svc.countLocked('end_user', t0)).toBe(2);
 	});
+
+	it('LOCK-12: recordSuccess swallows store errors but logs them with key context (§5.C)', async () => {
+		const prisma = fakePrisma();
+		prisma.loginLockout.deleteMany.mockRejectedValueOnce(new Error('disk I/O error'));
+		const svc = new AccountLockoutService(prisma as never, makeConfig(3));
+		const warn = jest
+			.spyOn((svc as unknown as { logger: { warn: (msg: string) => void } }).logger, 'warn')
+			.mockImplementation(() => undefined);
+
+		await expect(svc.recordSuccess('admin', 'alice')).resolves.toBeUndefined();
+
+		expect(warn).toHaveBeenCalledTimes(1);
+		const logged = JSON.parse(warn.mock.calls[0][0] as string) as Record<string, unknown>;
+		expect(logged.event).toBe('lockout_reset_failed');
+		expect(logged.usernameKey).toBe('alice');
+		expect(logged.message).toContain('disk I/O error');
+	});
 });

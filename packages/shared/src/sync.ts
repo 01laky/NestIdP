@@ -47,7 +47,10 @@ export interface SyncLogErrorEntryDto {
 		| 'username_collision'
 		// §5.B3: an unexpected internal failure (e.g. a throw in the membership/deactivation phase) so a
 		// FAILED run is always self-describing rather than showing an empty error list.
-		| 'internal';
+		| 'internal'
+		// §5.C: marker entry appended when the per-run error list was capped — distinct from
+		// 'parse_users' so per-phase rollups are not polluted by the truncation notice.
+		| 'truncated';
 	externalUserId?: string;
 	externalGroupId?: string;
 	externalRoleId?: string;

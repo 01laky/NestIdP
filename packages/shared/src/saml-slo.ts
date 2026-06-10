@@ -23,7 +23,8 @@ export type SamlSsoSessionTerminationReason =
 	| 'admin_action'
 	| 'sp_logout'
 	| 'user_logout'
-	| 'user_deactivated';
+	| 'user_deactivated'
+	| 'user_deleted';
 
 export interface SamlSpParticipationPublicDto {
 	id: string;

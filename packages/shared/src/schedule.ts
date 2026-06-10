@@ -232,7 +232,9 @@ export interface SchedulesOverviewResponseDto {
 	/** True when the in-process scheduler tick is enabled (SYNC_SCHEDULER_TICK_MS > 0). */
 	schedulerEnabled: boolean;
 	schedules: SchedulesOverviewItemDto[];
-	/** Total sync runs ever recorded by source (legacy null rows counted as manual). */
+	/** Runs started by a single-connection manual trigger (legacy null rows counted as manual). */
 	manualRunCount: number;
 	scheduledRunCount: number;
+	/** Runs launched per-connection by the "sync all sources" bulk trigger (§5.C; additive). */
+	manualAllRunCount: number;
 }

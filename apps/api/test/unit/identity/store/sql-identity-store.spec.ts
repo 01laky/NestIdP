@@ -4,8 +4,10 @@ import {
 	MembershipCrossConnectionError,
 	UsernameCollisionError,
 } from '@api/identity/identity.repository';
+import { sql } from 'kysely';
 import {
 	classifyOwnership,
+	ensureSchema,
 	getMetaValue,
 	runExternalMigrations,
 } from '@api/identity/store/external/external-schema';
@@ -323,6 +325,53 @@ describe('SqlIdentityStore (external, PGlite)', () => {
 			await expect(classifyOwnership(fresh)).resolves.toBe('foreign');
 		} finally {
 			await fresh.destroy();
+		}
+	});
+
+	it('EXT-PGSCHEMA-01: pgSchema places all tables in the configured schema and round-trips (§B6)', async () => {
+		const h = await createPgliteStore({ pgSchema: 'idp_test' });
+		try {
+			const tables = await sql<{ table_schema: string; table_name: string }>`
+				select table_schema, table_name from information_schema.tables
+				where table_name like 'nestidp_%'
+			`.execute(h.db);
+			expect(tables.rows.length).toBeGreaterThanOrEqual(6);
+			expect(tables.rows.every((r) => r.table_schema === 'idp_test')).toBe(true);
+			const u = await h.store.upsertUser(CONN, upsertInput());
+			expect((await h.store.findUserByUsername('alice'))?.id).toBe(u.id);
+			expect(await h.store.countUsers()).toBe(1);
+		} finally {
+			await h.destroy();
+		}
+	});
+
+	it('EXT-SCHEMA-ATOMIC-01: a failed instance-marker write rolls back the whole init (§5.C)', async () => {
+		let failMarker = true;
+		const db = await createPgliteKysely({
+			interceptQuery: (_sqlText, params) => {
+				if (failMarker && params.includes('instance_id')) {
+					throw new Error('marker write failed');
+				}
+			},
+		});
+		try {
+			await expect(ensureSchema(db, 'postgres', 'inst-1')).rejects.toThrow('marker write failed');
+			// rolled back as one unit: no half-init tables remain, so the DB is still 'empty', not 'foreign'
+			const tables = await sql<{ table_name: string }>`
+				select table_name from information_schema.tables where table_name like 'nestidp_%'
+			`.execute(db);
+			expect(tables.rows).toHaveLength(0);
+			await expect(classifyOwnership(db)).resolves.toBe('empty');
+			// recovery: the next attempt initializes cleanly and the DB becomes ours
+			failMarker = false;
+			await expect(ensureSchema(db, 'postgres', 'inst-1')).resolves.toEqual({
+				ownership: 'empty',
+				schemaVersion: 1,
+			});
+			await expect(classifyOwnership(db)).resolves.toBe('ours');
+			expect(await getMetaValue(db, 'instance_id')).toBe('inst-1');
+		} finally {
+			await db.destroy();
 		}
 	});
 

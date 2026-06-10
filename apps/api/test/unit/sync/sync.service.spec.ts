@@ -291,6 +291,38 @@ describe('SyncService', () => {
 		expect(identityRepository.upsertUser).toHaveBeenCalledTimes(1);
 	});
 
+	it('API-SYNC-SVC-ROWID: numeric/missing external user ids are reported as parse_users errors, run continues (§5.C)', async () => {
+		setupHappyPathMocks();
+		identitySyncClient.fetchUsersRaw.mockResolvedValue([
+			validExternalUser({ id: 'good', username: 'bob' }),
+			validExternalUser({ id: 123, username: 'numeric' }),
+			validExternalUser({ id: undefined, username: 'noid' }),
+		]);
+
+		const result = await service.triggerSync(CONNECTION_ID);
+
+		expect(result.syncLog.status).toBe('SUCCESS');
+		expect(identityRepository.upsertUser).toHaveBeenCalledTimes(1);
+		const errors = result.syncLog.errors ?? [];
+		expect(errors).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					phase: 'parse_users',
+					message: expect.stringContaining('Row 1: non-string or empty user id'),
+				}),
+				expect.objectContaining({
+					phase: 'parse_users',
+					message: expect.stringContaining('Row 2: missing user id'),
+				}),
+			]),
+		);
+		// Only the valid row counts toward the deactivation snapshot.
+		expect(identityRepository.deactivateUsersNotInExternalIds).toHaveBeenCalledWith(
+			CONNECTION_ID,
+			new Set(['good']),
+		);
+	});
+
 	it('API-SYNC-SVC-05: User removed from API → deactivated locally', async () => {
 		setupHappyPathMocks();
 		identitySyncClient.fetchUsersRaw.mockResolvedValue([validExternalUser({ id: 'kept' })]);
@@ -407,7 +439,7 @@ describe('SyncService', () => {
 
 		expect(result.syncLog.errors).toHaveLength(100);
 		expect(result.syncLog.errors![99]).toEqual({
-			phase: 'parse_users',
+			phase: 'truncated',
 			message: 'Additional errors truncated',
 		});
 	});
@@ -526,6 +558,43 @@ describe('SyncService', () => {
 		);
 
 		await service.triggerSync(CONNECTION_ID);
+
+		expect(syncLogService.finishLog).toHaveBeenCalledWith(
+			runningLog.id,
+			'FAILED',
+			expect.objectContaining({ usersSkippedCollision: 1 }),
+			expect.anything(),
+		);
+	});
+
+	it('MAS-COLL-INVALID: an invalid per-connection collision policy falls back to the global policy (§5.C)', async () => {
+		setupHappyPathMocks();
+		// Global policy fail_run; the stored override is garbage — the old blind cast would have
+		// silently behaved like 'skip', the validated read must fall back to fail_run.
+		const failRunService = new SyncService(
+			prisma as never,
+			identityRepository as unknown as ActiveIdentityStore,
+			syncLogService as unknown as SyncLogService,
+			identitySyncClient as unknown as IdentitySyncClientService,
+			encryption,
+			audit as never,
+			oauthTokenService as never,
+			fakeProxyDispatcher(),
+			{
+				usernameCollisionPolicy: () => 'fail_run',
+				syncAllConcurrency: () => 1,
+				syncSourceStaleFactor: () => 3,
+			} as never,
+		);
+		prisma.apiConnection.findUnique.mockResolvedValue({
+			...baseConnection,
+			usernameCollisionPolicy: 'bogus-policy',
+		});
+		identityRepository.upsertUser.mockRejectedValue(
+			new UsernameCollisionError('ext-user-1', 'alice'),
+		);
+
+		await failRunService.triggerSync(CONNECTION_ID);
 
 		expect(syncLogService.finishLog).toHaveBeenCalledWith(
 			runningLog.id,

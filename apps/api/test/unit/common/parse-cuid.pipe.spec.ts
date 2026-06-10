@@ -27,4 +27,15 @@ describe('ParseCuidPipe', () => {
 	it('API-CUID-05: too-short cuid rejected', () => {
 		expect(() => pipe.transform('c123')).toThrow(BadRequestException);
 	});
+
+	it('API-CUID-06: over-long id rejected (bounded at 64 chars, §5.C)', () => {
+		expect(() => pipe.transform(`c${'a'.repeat(64)}`)).toThrow(BadRequestException);
+		expect(() => pipe.transform(`c${'a'.repeat(10_000)}`)).toThrow(BadRequestException);
+		expect(pipe.transform(`c${'a'.repeat(63)}`)).toBe(`c${'a'.repeat(63)}`);
+	});
+
+	it('API-CUID-07: uppercase rejected (Prisma cuids are lowercase)', () => {
+		expect(() => pipe.transform('CLXYZ1234567890123456789012')).toThrow(BadRequestException);
+		expect(() => pipe.transform('clxyZ1234567890123456789012')).toThrow(BadRequestException);
+	});
 });

@@ -26,12 +26,14 @@ import {
 	createTestIdpSettingsWithSigningKey,
 	createTestSamlSession,
 	createTestSpConnection,
+	getTestSigningMaterial,
 } from '@test/support/prisma/test-fixtures';
 import { runMigrationsOnTestDb } from '@test/support/prisma/test-db.helper';
 
 jest.setTimeout(60_000);
 
-const VALID_PEM = '-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----';
+// real parseable cert — spCertificate is X.509-parsed since §5.C, a fake PEM body no longer passes
+const VALID_PEM = getTestSigningMaterial('urn:test:sp-connections-int').certPem.trim();
 
 describe('SP connections admin API (SQLite)', () => {
 	let app: INestApplication;
@@ -310,6 +312,21 @@ describe('SP connections admin API (SQLite)', () => {
 				spEntityId: 'urn:sp:bad-map',
 				acsUrl: 'https://sp.example.com/acs',
 				attributeMapping: { attributes: [{ samlName: '', source: 'email' }] },
+			})
+			.expect(400);
+	});
+
+	it('API-SPC-13b: garbage between PEM markers → 400 (real X.509 parse, §5.C)', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginCsrf(agent);
+		await agent
+			.post(SP_CONNECTIONS_API_PATH)
+			.set(csrfHeader(csrf))
+			.send({
+				name: 'Broken Cert SP',
+				spEntityId: 'urn:sp:broken-cert',
+				acsUrl: 'https://sp.example.com/acs/broken-cert',
+				spCertificate: '-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----',
 			})
 			.expect(400);
 	});

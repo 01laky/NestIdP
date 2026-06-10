@@ -64,6 +64,15 @@ export class SlidingWindowRateLimiter {
 		return this.check(key, max, windowMs);
 	}
 
+	/** Current hit count for `key` within its live window (0 when absent/expired). Does not increment. */
+	currentCount(key: string, windowMs: number): number {
+		const bucket = this.buckets.get(key);
+		if (!bucket || this.now() - bucket.windowStartMs >= windowMs) {
+			return 0;
+		}
+		return bucket.count;
+	}
+
 	reset(key: string): void {
 		this.buckets.delete(key);
 	}

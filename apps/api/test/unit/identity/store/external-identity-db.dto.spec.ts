@@ -53,4 +53,12 @@ describe('External DB request DTO validation (DTO)', () => {
 		expect(errs(DisconnectExternalDbBodyDto, { moveDataToLocal: true })).toEqual([]);
 		expect(errs(DisconnectExternalDbBodyDto, {}).length).toBeGreaterThan(0);
 	});
+
+	it('DTO-07: pgSchema must be a plain identifier (it lands in search_path / CREATE SCHEMA)', () => {
+		expect(errs(TestExternalDbBodyDto, { ...valid, pgSchema: 'idp_test' })).toEqual([]);
+		expect(errs(TestExternalDbBodyDto, { ...valid, pgSchema: null })).toEqual([]);
+		for (const bad of ['idp test', 'idp;drop', '"quoted"', '1starts_with_digit', 'a'.repeat(64)]) {
+			expect(errs(TestExternalDbBodyDto, { ...valid, pgSchema: bad }).length).toBeGreaterThan(0);
+		}
+	});
 });

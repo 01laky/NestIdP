@@ -71,6 +71,9 @@ export class ExternalIdentityDatabaseService implements OnModuleInit, OnModuleDe
 					`External identity database configured but could not be activated at boot: ${this.msg(error)}. ` +
 						'Identity is degraded until it is reachable or detached.',
 				);
+				// Best-effort status update so the admin UI shows the degraded state (the settings row
+				// still says active/external while the runtime fell back to local). Must never throw.
+				await this.markReachable(false, this.msg(error)).catch(() => undefined);
 			}
 		}
 	}
@@ -223,7 +226,7 @@ export class ExternalIdentityDatabaseService implements OnModuleInit, OnModuleDe
 						'The target database already has nestidp_ tables that are not ours.',
 					);
 				}
-				await ensureSchema(conn.db, req.dialect, await this.instanceId());
+				await ensureSchema(conn.db, req.dialect, await this.instanceId(), req.pgSchema);
 				const ext = new SqlIdentityStore(conn.db, req.dialect);
 
 				// Pre-cutover conflict detection against pre-existing (ours) data.
@@ -263,7 +266,7 @@ export class ExternalIdentityDatabaseService implements OnModuleInit, OnModuleDe
 					}
 				}
 
-				await this.markConnected(relocate ? 'relocate' : 'mirror', backupPath);
+				await this.markConnected(relocate ? 'relocate' : 'mirror');
 				await this.activate(await this.loadConfig());
 				this.audit.recordSafe({
 					category: 'identity',
@@ -372,6 +375,7 @@ export class ExternalIdentityDatabaseService implements OnModuleInit, OnModuleDe
 			this.active.db,
 			cfg.dialect as 'postgres' | 'mysql',
 			await this.instanceId(),
+			cfg.pgSchema,
 		);
 		this.breaker = new CircuitBreaker();
 		this.activeDialect = cfg.dialect as 'postgres' | 'mysql';
@@ -622,7 +626,7 @@ export class ExternalIdentityDatabaseService implements OnModuleInit, OnModuleDe
 		});
 	}
 
-	private async markConnected(mode: string, backupPath: string | null): Promise<void> {
+	private async markConnected(mode: string): Promise<void> {
 		await this.prisma.externalIdentityDatabase.update({
 			where: { id: CONFIG_ID },
 			data: {
@@ -636,7 +640,6 @@ export class ExternalIdentityDatabaseService implements OnModuleInit, OnModuleDe
 				migrationPhase: null,
 				migrationDone: 0,
 				migrationTotal: 0,
-				...(backupPath ? {} : {}),
 			},
 		});
 	}

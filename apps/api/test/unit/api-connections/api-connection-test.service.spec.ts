@@ -22,12 +22,16 @@ describe('ApiConnectionTestService', () => {
 		getLastTokenAt: jest.fn().mockReturnValue(null),
 		fetchDiagnostics: jest.fn(),
 	};
+	const identitySyncClient = {
+		getMaxUsersPerRun: jest.fn().mockReturnValue(10_000),
+	};
 	const service = new ApiConnectionTestService(
 		prisma as never,
 		encryption,
 		audit as never,
 		oauthTokenService as never,
 		fakeProxyDispatcher(),
+		identitySyncClient as never,
 	);
 
 	const connection = {
@@ -46,6 +50,7 @@ describe('ApiConnectionTestService', () => {
 		jest.clearAllMocks();
 		encryption.decrypt.mockReturnValue('plain-bearer-token');
 		prisma.apiConnection.findUnique.mockResolvedValue(connection);
+		identitySyncClient.getMaxUsersPerRun.mockReturnValue(10_000);
 	});
 
 	it('API-CON-TST-01: external 200 → ok true, reachable true, statusCode 200', async () => {
@@ -183,6 +188,28 @@ describe('ApiConnectionTestService', () => {
 		expect(result.previewSample?.[0]).toMatchObject({ id: 'u1', username: 'alice' });
 		expect(JSON.stringify(result.previewSample)).not.toContain('"passwordHash"');
 		expect(JSON.stringify(result.previewSample)).not.toContain('$2b$');
+	});
+
+	it('API-CON-TST-CAP: preview obeys the sync users-per-run cap → clear contractError (§5.C)', async () => {
+		identitySyncClient.getMaxUsersPerRun.mockReturnValue(2);
+		jest.spyOn(global, 'fetch').mockResolvedValue({
+			status: 200,
+			json: async () =>
+				Array.from({ length: 3 }, (_, i) => ({
+					id: `u${i}`,
+					username: `user${i}`,
+					passwordHash: '$2b$12$abcdefghijklmnopqrstuv',
+					passwordHashAlgorithm: 'bcrypt',
+					active: true,
+				})),
+		} as Response);
+
+		const result = await service.testConnection(connection.id);
+
+		expect(result.ok).toBe(true); // HTTP reachability is fine — only the contract parse is capped
+		expect(result.contractError).toMatch(/User count exceeds limit of 2/);
+		expect(result.previewUsersCount).toBeUndefined();
+		expect(result.previewSample).toBeUndefined();
 	});
 
 	it('API-APICONN-CONTRACT-05: mapping failure → contractError naming field + path', async () => {
@@ -388,6 +415,7 @@ describe('ApiConnectionTestService', () => {
 				audit as never,
 				oauthTokenService as never,
 				fakeProxyDispatcher({ proxied: true, dispatcher: marker }),
+				identitySyncClient as never,
 			);
 		}
 

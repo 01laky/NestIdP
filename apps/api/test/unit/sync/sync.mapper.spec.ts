@@ -86,6 +86,23 @@ describe('sync.mapper', () => {
 		expect(parseSyncLogErrors('string')).toBeNull();
 	});
 
+	it('API-SYNC-MAP-08: corrupt array elements are dropped, valid entries kept (§5.C)', () => {
+		const corrupt = [
+			{ phase: 'parse_users', message: 'kept', externalUserId: 'u1' },
+			'junk-string',
+			null,
+			42,
+			{ phase: 5, message: 'phase not a string' },
+			{ phase: 'fetch_users' }, // missing message
+			{ message: 'missing phase' },
+		];
+		expect(parseSyncLogErrors(corrupt)).toEqual([
+			{ phase: 'parse_users', message: 'kept', externalUserId: 'u1' },
+		]);
+		const dto = toSyncLogDto({ ...baseLog, errors: corrupt as SyncLog['errors'] });
+		expect(dto.errors).toHaveLength(1);
+	});
+
 	it('API-SYNC-MAP-05: dryRun: true when dry_run_summary phase present', () => {
 		const dto = toSyncLogDto({
 			...baseLog,

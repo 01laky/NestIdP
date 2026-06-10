@@ -32,6 +32,8 @@ describe('saml-logout.service', () => {
 			recordThrows?: boolean;
 			idpMaterial?: { certPem: string; privateKeyPem: string; signatureAlgorithmId: string };
 			terminateResult?: { found: boolean; alreadyTerminated: boolean };
+			terminateThrows?: boolean;
+			signThrows?: boolean;
 			noIdpSettings?: boolean;
 		} = {},
 	) {
@@ -65,9 +67,13 @@ describe('saml-logout.service', () => {
 				? jest.fn().mockRejectedValue(Object.assign(new Error('dup'), { code: 'P2002' }))
 				: jest.fn().mockResolvedValue(undefined),
 			findMatchingForLogout: jest.fn().mockResolvedValue(overrides.match ?? null),
-			terminate: jest
-				.fn()
-				.mockResolvedValue(overrides.terminateResult ?? { found: true, alreadyTerminated: false }),
+			terminate: overrides.terminateThrows
+				? jest.fn().mockRejectedValue(new Error('terminate failed'))
+				: jest
+						.fn()
+						.mockResolvedValue(
+							overrides.terminateResult ?? { found: true, alreadyTerminated: false },
+						),
 		};
 		const idpSigning = {
 			ensureSigningMaterial: jest.fn().mockResolvedValue(
@@ -77,7 +83,11 @@ describe('saml-logout.service', () => {
 					signatureAlgorithmId: 'rsa-sha256',
 				},
 			),
-			signLogoutResponse: jest.fn().mockReturnValue('<signed/>'),
+			signLogoutResponse: overrides.signThrows
+				? jest.fn().mockImplementation(() => {
+						throw new Error('signing failed');
+					})
+				: jest.fn().mockReturnValue('<signed/>'),
 		};
 		const audit = {
 			logLogoutRequestReceived: jest.fn(),
@@ -247,6 +257,48 @@ describe('saml-logout.service', () => {
 			'ip',
 			'redirect',
 		);
+	});
+
+	it('API-SLO-REPLAY-02: terminate failure does not burn the replay id — a retry is not a replay (§5.C)', async () => {
+		const { service, sessions } = makeService({
+			match: { ssoSessionId: 'sso1' },
+			terminateThrows: true,
+		});
+		const signed = buildSignedLogoutRedirect({
+			issuer: SP_ENTITY,
+			spPrivateKeyPem: sp.privateKeyPem,
+		});
+		await expect(
+			service.handleRedirectSlo({
+				samlRequest: signed.samlRequest,
+				raw: {
+					samlRequest: signed.samlRequest,
+					sigAlg: signed.sigAlg,
+					signature: signed.signature,
+				},
+				clientIp: 'ip',
+			}),
+		).rejects.toThrow('terminate failed');
+		// The id must NOT be recorded, so the SP's legitimate retry of the same request can succeed.
+		expect(sessions.recordLogoutRequestId).not.toHaveBeenCalled();
+	});
+
+	it('API-SLO-AUDIT-01: response signing failure → no false logout_completed audit (§5.C)', async () => {
+		const { service, audit, sessions } = makeService({
+			match: { ssoSessionId: 'sso1' },
+			signThrows: true,
+		});
+		const post = buildSignedLogoutPostBody({
+			issuer: SP_ENTITY,
+			spPrivateKeyPem: sp.privateKeyPem,
+			spCertificatePem: sp.certPem,
+		});
+		await expect(
+			service.handlePostSlo({ samlRequest: post.samlRequest, clientIp: 'ip' }),
+		).rejects.toThrow('signing failed');
+		expect(audit.logLogoutCompleted).not.toHaveBeenCalled();
+		// The terminate did succeed, so the replay id is legitimately recorded before signing.
+		expect(sessions.recordLogoutRequestId).toHaveBeenCalled();
 	});
 
 	it('API-SLO-MATCH-03: no active session matched → still success (idempotent)', async () => {

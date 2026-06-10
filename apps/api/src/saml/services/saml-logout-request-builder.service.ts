@@ -26,9 +26,16 @@ export interface BuiltLogoutRequest {
 @Injectable()
 export class SamlLogoutRequestBuilderService {
 	build(input: BuildLogoutRequestInput): BuiltLogoutRequest {
+		// An empty <NameID/> is rejected by SPs downstream — fail loudly here instead (§5.C).
+		if (!input.nameId.trim()) {
+			throw new Error('LogoutRequest requires a non-empty NameID');
+		}
 		const issueInstant = new Date();
 		const notOnOrAfter = new Date(issueInstant.getTime() + input.validitySeconds * 1000);
+		// Zero SessionIndex elements are valid SAML SLO semantics (logout of all the principal's
+		// sessions), so empty/whitespace indexes are simply dropped.
 		const sessionIndexXml = input.sessionIndexes
+			.filter((idx) => idx.trim().length > 0)
 			.map((idx) => `<samlp:SessionIndex>${escapeXmlText(idx)}</samlp:SessionIndex>`)
 			.join('');
 

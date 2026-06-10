@@ -1,3 +1,4 @@
+import { ConflictException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { IdpSettings } from '@prisma/client';
 import { IdpSettingsService } from '@api/idp-settings/services/idp-settings.service';
@@ -37,6 +38,8 @@ describe('IdpSettingsService — automatic rotation', () => {
 	const idpEncryptionService = { generateKeyPairAndCert: jest.fn() };
 	const samlMetadataService = { generateMetadata: jest.fn() };
 	const audit = {
+		logRotationCompleted: jest.fn(),
+		logRotationCancelled: jest.fn(),
 		logAutoRotationStarted: jest.fn(),
 		logAutoRotationCompleted: jest.fn(),
 		logAutoRotationDueSoon: jest.fn(),
@@ -543,6 +546,126 @@ describe('IdpSettingsService — automatic rotation', () => {
 		wireDb(makeSettings({ autoRotateSigningEnabled: false }));
 		await service().runAutoRotationCheckOnDemand();
 		expect(audit.logAutoRotationCheckRun).toHaveBeenCalledWith(true);
+	});
+
+	// --- Prompt 38 §5.C correctness fixes ----------------------------------------------------------
+
+	it('CERT-ROT-FAIL-03: an unparseable active cert warns per tick that auto-rotation cannot evaluate it', async () => {
+		const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+		try {
+			wireDb(makeSettings({ autoRotateSigningEnabled: true, signingCertPem: 'not-a-valid-pem' }));
+			await service().runAutoRotationCheck({ trigger: 'scheduled' });
+			expect(warnSpy).toHaveBeenCalledWith(
+				expect.stringContaining('cert_rotation_active_cert_unparseable'),
+			);
+			expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('signing'));
+			expect(idpSigningService.generateKeyPairAndCert).not.toHaveBeenCalled();
+			expect(audit.logAutoRotationStarted).not.toHaveBeenCalled();
+		} finally {
+			warnSpy.mockRestore();
+		}
+	});
+
+	it('CERT-ROT-RACE-01: manual complete during an in-flight auto check → 409, succeeds after it finishes', async () => {
+		// Pending rotation present, but auto-rotate disabled so the tick itself stays inert.
+		wireDb(
+			makeSettings({
+				pendingSigningCertPem: pendingCert.certPem,
+				pendingSigningKeyEncrypted: 'enc:pend',
+				pendingSigningKeyFamily: 'rsa',
+				rotationStartedAt: new Date(),
+			}),
+		);
+		let release!: () => void;
+		const gate = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		// The tick's first settings read blocks until released, keeping the in-flight flag held.
+		prisma.idpSettings.findUnique.mockImplementationOnce(async () => {
+			await gate;
+			return prisma.idpSettings.findUnique();
+		});
+		const svc = service();
+		const tick = svc.runAutoRotationCheck({ trigger: 'scheduled' });
+		await expect(svc.completeRotation()).rejects.toThrow(ConflictException);
+		expect(audit.logRotationCompleted).not.toHaveBeenCalled();
+		release();
+		await tick;
+		await expect(svc.completeRotation()).resolves.toBeDefined();
+		expect(audit.logRotationCompleted).toHaveBeenCalledTimes(1);
+	});
+
+	it('CERT-ROT-RACE-02: manual cancel during an in-flight auto check → 409, succeeds after it finishes', async () => {
+		wireDb(
+			makeSettings({
+				pendingSigningCertPem: pendingCert.certPem,
+				pendingSigningKeyEncrypted: 'enc:pend',
+				pendingSigningKeyFamily: 'rsa',
+				rotationStartedAt: new Date(),
+			}),
+		);
+		let release!: () => void;
+		const gate = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		prisma.idpSettings.findUnique.mockImplementationOnce(async () => {
+			await gate;
+			return prisma.idpSettings.findUnique();
+		});
+		const svc = service();
+		const tick = svc.runAutoRotationCheck({ trigger: 'scheduled' });
+		await expect(svc.cancelRotation()).rejects.toThrow(ConflictException);
+		expect(audit.logRotationCancelled).not.toHaveBeenCalled();
+		release();
+		await tick;
+		await expect(svc.cancelRotation()).resolves.toBeDefined();
+		expect(audit.logRotationCancelled).toHaveBeenCalledTimes(1);
+	});
+
+	it('CERT-ROT-RACE-03: auto-complete re-checks pending state on its fresh read — a vanished pending is a clean no-op', async () => {
+		config.overlapDays.mockReturnValue(0);
+		const withPending = makeSettings({
+			autoRotateSigningEnabled: true,
+			pendingSigningCertPem: pendingCert.certPem,
+			pendingSigningKeyEncrypted: 'enc:pend',
+			pendingSigningKeyFamily: 'rsa',
+			rotationStartedAt: new Date(Date.now() - 86_400_000),
+		});
+		const cleared = makeSettings({ autoRotateSigningEnabled: true });
+		// Evaluation snapshot sees the pending rotation; the re-read inside autoCompleteKind sees it
+		// already cleared (a manual complete/cancel won the race between the two reads).
+		prisma.idpSettings.findUnique
+			.mockResolvedValueOnce(withPending)
+			.mockResolvedValue(cleared as never);
+		prisma.idpSettings.update.mockImplementation(async ({ data }) => ({ ...cleared, ...data }));
+		await service().runAutoRotationCheck({ trigger: 'scheduled' });
+		expect(audit.logAutoRotationCompleted).not.toHaveBeenCalled();
+		// crucially: no promotion write that would null out the active cert fields
+		const promote = prisma.idpSettings.update.mock.calls.find((c) => 'signingCertPem' in c[0].data);
+		expect(promote).toBeUndefined();
+	});
+
+	it('CERT-ROT-NOTIFY-02: a rejecting notifier does not fail the tick and is not counted as a rotation failure', async () => {
+		const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+		try {
+			notifier.onAutoRotationStarted.mockRejectedValueOnce(new Error('smtp down'));
+			wireDb(makeSettings({ autoRotateSigningEnabled: true }));
+			await expect(service().runAutoRotationCheck({ trigger: 'scheduled' })).resolves.toBeDefined();
+			// the rotation itself still started and was audited
+			const startCall = prisma.idpSettings.update.mock.calls.find(
+				(c) => c[0].data.pendingSigningCertPem,
+			);
+			expect(startCall).toBeDefined();
+			expect(audit.logAutoRotationStarted).toHaveBeenCalledWith(
+				'signing',
+				false,
+				expect.anything(),
+			);
+			expect(audit.logAutoRotationFailed).not.toHaveBeenCalled();
+			expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('cert_rotation_notifier_error'));
+		} finally {
+			warnSpy.mockRestore();
+		}
 	});
 
 	it('CERT-ROT-IND-02: both certs auto-rotate independently in a single tick', async () => {

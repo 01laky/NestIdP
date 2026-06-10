@@ -112,6 +112,13 @@ describe('validateEnv', () => {
 		expect(() => validateEnv({ ...validConfig, SESSION_SECRET: '' })).toThrow();
 	});
 
+	it('ENV-SES-01: rejects SESSION_SECRET shorter than 16 characters', () => {
+		expect(() => validateEnv({ ...validConfig, SESSION_SECRET: 'short-secret' })).toThrow(
+			/SESSION_SECRET[\s\S]*minLength/,
+		);
+		expect(() => validateEnv({ ...validConfig, SESSION_SECRET: 'exactly-16-chars' })).not.toThrow();
+	});
+
 	it('rejects missing ENCRYPTION_KEY', () => {
 		const { ENCRYPTION_KEY, ...rest } = validConfig;
 		void ENCRYPTION_KEY;

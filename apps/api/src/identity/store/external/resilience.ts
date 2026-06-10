@@ -20,7 +20,10 @@ export class CircuitBreaker {
 		if (Date.now() < this.openUntil) {
 			return 'open';
 		}
-		return this.failures > 0 ? 'half-open' : 'closed';
+		// Half-open is the genuine probe state only: the breaker tripped (openUntil was set) and the
+		// cooldown elapsed without a success (success resets openUntil to 0). Failures below the
+		// threshold never trip the breaker, so they still report 'closed'.
+		return this.openUntil > 0 ? 'half-open' : 'closed';
 	}
 
 	async exec<T>(fn: () => Promise<T>): Promise<T> {
@@ -42,6 +45,7 @@ export class CircuitBreaker {
 	}
 }
 
+// Limitation: rejects the caller after `ms` but cannot cancel the underlying query — it keeps running.
 export function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
 	return new Promise<T>((resolve, reject) => {
 		const timer = setTimeout(

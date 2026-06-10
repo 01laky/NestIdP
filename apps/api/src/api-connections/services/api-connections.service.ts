@@ -32,6 +32,7 @@ import {
 	type CredentialsEncryptionPort,
 } from '../../encryption/credentials-encryption.port';
 import { PrismaService } from '../../prisma/services/prisma.service';
+import { runPool } from '../../common/utils/run-pool.util';
 import { ActiveIdentityStore } from '../../identity/store/active-identity-store';
 import { SamlSsoSessionService } from '../../saml-sessions/services/saml-sso-session.service';
 import { OAuthTokenService } from '../../sync/services/oauth-token.service';
@@ -284,9 +285,29 @@ export class ApiConnectionsService {
 			throw new BadRequestException('Local directory identities cannot be removed this way');
 		}
 		const userIds = await this.identityStore.syncedUserIdsForConnection(id);
+		// §5.C: bounded-parallel termination with per-user isolation — one failing user must not abort
+		// the SLO fan-out for the rest (the identities are removed either way).
 		let sessionsTerminated = 0;
-		for (const userId of userIds) {
-			sessionsTerminated += await this.ssoSessions.terminateAllForUser(userId, 'user_deactivated');
+		let terminationFailures = 0;
+		await runPool(userIds, 5, async (userId) => {
+			try {
+				// Await first, then accumulate — `x += await f()` reads x before the await and would
+				// lose concurrent updates.
+				const terminated = await this.ssoSessions.terminateAllForUser(userId, 'user_deactivated');
+				sessionsTerminated += terminated;
+			} catch (error) {
+				terminationFailures += 1;
+				this.logger.warn(
+					`Failed to terminate SSO sessions for user ${userId} while removing identities of ` +
+						`connection ${id}: ${error instanceof Error ? error.message : 'unknown error'}`,
+				);
+			}
+		});
+		if (terminationFailures > 0) {
+			this.logger.warn(
+				`Session termination failed for ${terminationFailures} of ${userIds.length} users ` +
+					`while removing identities of connection ${id}`,
+			);
 		}
 		const counts = await this.identityStore.removeConnectionIdentities(id, mode);
 		this.audit.logSourceIdentitiesRemoved(existing.id, existing.name, mode, counts);

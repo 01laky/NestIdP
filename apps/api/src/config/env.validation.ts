@@ -34,8 +34,11 @@ export class EnvironmentVariables {
 	@IsString()
 	DATABASE_ENCRYPTION_KEY_FILE?: string;
 
+	// §5.C: the session HMAC key must fail fast at boot — an unset/short secret previously fell back to
+	// signing sessions with an empty key. Mirrors the ENCRYPTION_KEY boot check below.
 	@IsString()
 	@IsNotEmpty()
+	@MinLength(16, { message: 'SESSION_SECRET must be at least 16 characters' })
 	SESSION_SECRET!: string;
 
 	// §5.B11: enforce the secret-encryption key length at boot (the encryption util also checks ≥16, but

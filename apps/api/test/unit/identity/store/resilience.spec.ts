@@ -36,10 +36,27 @@ describe('CircuitBreaker (RES-CB)', () => {
 		expect(cb.state).toBe('closed');
 	});
 
-	it('RES-CB-04: a single failure (below threshold) reports half-open, not open', async () => {
+	it('RES-CB-04: failures below the threshold report closed, not half-open (§5.C)', async () => {
 		const cb = new CircuitBreaker(3, 1000);
 		await expect(cb.exec(async () => Promise.reject(new Error('one')))).rejects.toThrow('one');
+		expect(cb.state).toBe('closed');
+		await expect(cb.exec(async () => Promise.reject(new Error('two')))).rejects.toThrow('two');
+		expect(cb.state).toBe('closed');
+	});
+
+	it('RES-CB-05: a failed half-open probe re-opens; only a success closes the breaker (§5.C)', async () => {
+		const cb = new CircuitBreaker(1, 5);
+		await expect(cb.exec(async () => Promise.reject(new Error('x')))).rejects.toThrow('x');
+		expect(cb.state).toBe('open');
+		await new Promise((r) => setTimeout(r, 12));
 		expect(cb.state).toBe('half-open');
+		// probe fails → breaker trips again (open), not closed
+		await expect(cb.exec(async () => Promise.reject(new Error('y')))).rejects.toThrow('y');
+		expect(cb.state).toBe('open');
+		await new Promise((r) => setTimeout(r, 12));
+		expect(cb.state).toBe('half-open');
+		await expect(cb.exec(async () => 'ok')).resolves.toBe('ok');
+		expect(cb.state).toBe('closed');
 	});
 });
 

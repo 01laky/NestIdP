@@ -105,6 +105,10 @@ export class AuthController {
 		if (payload?.sid) {
 			await this.ssoSessions.terminate(payload.sid, 'user_logout');
 		}
+		// §5.C: audit the logout when we know who it was (no/invalid session → nothing to attribute).
+		if (payload) {
+			this.endUserAuthAudit.logLogout(payload.userId, req.ip ?? 'unknown');
+		}
 		this.endUserSessionService.clearCookie(res);
 		return { ok: true };
 	}

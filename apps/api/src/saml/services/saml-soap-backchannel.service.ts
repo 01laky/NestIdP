@@ -97,13 +97,19 @@ export class SamlSoapBackchannelService {
 		}
 		const root = responseNodes[0];
 
+		// We always send the SOAP LogoutRequest with an ID, so a response without InResponseTo cannot be
+		// correlated to our request — treat it as a failure rather than accepting it blindly (§5.C).
 		const inResponseTo = root.getAttribute('InResponseTo');
-		if (inResponseTo && inResponseTo !== input.requestId) {
+		if (!inResponseTo) {
+			return { outcome: 'failed', reason: 'missing_in_response_to' };
+		}
+		if (inResponseTo !== input.requestId) {
 			return { outcome: 'failed', reason: 'in_response_to_mismatch' };
 		}
 
 		// Verify the SP's signature against the ORIGINAL received bytes, not a re-serialised node — a
 		// round-tripped `root.toString()` re-emits namespaces/whitespace and breaks XML-DSig canonicalisation.
+		// Conditional by design: an SP without a registered certificate cannot be verified at all.
 		if (input.spCertificate) {
 			let verified = false;
 			try {

@@ -1,11 +1,12 @@
 import 'reflect-metadata';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { NestFactory } from '@nestjs/core';
+import { HttpAdapterHost, NestFactory } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
 import express from 'express';
 import { AppModule } from './app.module';
 import { parseBoolEnv } from './common/config/parse-bool-env.util';
+import { RedactingExceptionFilter } from './common/filters/redacting-exception.filter';
 import { applyHttpSecurity } from './common/utils/http-security';
 import { databaseEncryptionMode } from './prisma/libsql';
 import { runMigrations } from './prisma/db-migrator';
@@ -53,6 +54,8 @@ async function bootstrap() {
 			transform: true,
 		}),
 	);
+	// §16: last-line redaction of secrets in outgoing error responses (shape/status preserved).
+	app.useGlobalFilters(new RedactingExceptionFilter(app.get(HttpAdapterHost)));
 
 	// §5.B10: validate PORT is a usable TCP port (env.validation already rejects non-numeric strings).
 	const rawPort = configService.get<string>('PORT') ?? '3000';

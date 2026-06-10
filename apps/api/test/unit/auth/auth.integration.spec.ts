@@ -738,6 +738,29 @@ describe('end-user auth integration (SQLite)', () => {
 		expect(status.body.samlSession?.readyToComplete).toBe(false);
 	});
 
+	it('API-AUTH-INT-53: logout with a valid session writes an end_user_logout audit row', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		await agent
+			.post(`${AUTH_API_PATH}/login`)
+			.send({ username: 'alice', password: endUserPassword })
+			.expect(200);
+		const alice = await prisma.user.findFirst({ where: { username: 'alice' } });
+		await prisma.auditEvent.deleteMany({ where: { event: 'end_user_logout' } });
+
+		await agent.post(`${AUTH_API_PATH}/logout`).expect(200);
+
+		let row = null;
+		for (let attempt = 0; attempt < 30 && !row; attempt += 1) {
+			row = await prisma.auditEvent.findFirst({ where: { event: 'end_user_logout' } });
+			if (!row) {
+				await new Promise((resolve) => setTimeout(resolve, 25));
+			}
+		}
+		expect(row).not.toBeNull();
+		expect(row?.actorType).toBe('end_user');
+		expect(row?.actorId).toBe(alice!.id);
+	});
+
 	it('admin cookie and end-user cookie use different names', async () => {
 		const adminRes = await request(app.getHttpServer() as App)
 			.post('/api/admin/auth/login')

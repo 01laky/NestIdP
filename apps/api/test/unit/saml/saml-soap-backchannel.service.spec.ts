@@ -143,11 +143,14 @@ describe('SamlSoapBackchannelService (BC-SOAP)', () => {
 		});
 	});
 
-	it('BC-SOAP-02c: absent InResponseTo is tolerated (no mismatch error)', async () => {
+	it('BC-SOAP-02c: absent InResponseTo → failed missing_in_response_to (we always send an ID, §5.C)', async () => {
 		okResponse(
 			envelope(logoutResponseXml({ inResponseTo: null, statusValues: [SAML_STATUS_SUCCESS] })),
 		);
-		await expect(service.deliver(input())).resolves.toEqual({ outcome: 'succeeded' });
+		await expect(service.deliver(input())).resolves.toEqual({
+			outcome: 'failed',
+			reason: 'missing_in_response_to',
+		});
 	});
 
 	it('BC-SOAP-03a: non-2xx HTTP → failed http_<status>, never throws', async () => {

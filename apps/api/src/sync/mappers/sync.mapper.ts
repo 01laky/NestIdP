@@ -18,7 +18,15 @@ export function parseSyncLogErrors(errors: unknown): SyncLogErrorEntryDto[] | nu
 	if (!Array.isArray(errors)) {
 		return null;
 	}
-	return errors as SyncLogErrorEntryDto[];
+	// §5.C: minimal shape validation instead of a blind cast — the JSON column is not trusted. Keep
+	// only object entries with a string phase + message; extra fields pass through unchanged.
+	return errors.filter(
+		(entry): entry is SyncLogErrorEntryDto =>
+			typeof entry === 'object' &&
+			entry !== null &&
+			typeof (entry as { phase?: unknown }).phase === 'string' &&
+			typeof (entry as { message?: unknown }).message === 'string',
+	);
 }
 
 export function isDryRunLog(errors: SyncLogErrorEntryDto[] | null): boolean {

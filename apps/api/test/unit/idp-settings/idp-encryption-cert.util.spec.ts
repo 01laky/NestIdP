@@ -6,6 +6,7 @@ import {
 	validateEncryptionKeyPair,
 } from '@api/idp-settings/utils/idp-encryption-cert.util';
 import {
+	generateTestEcEncryptionCert,
 	generateTestRsaEncryptionCert,
 	isSigningOnlyCertPair,
 } from '@test/support/crypto/test-cert.util';
@@ -25,9 +26,9 @@ describe('idp-encryption-cert.util', () => {
 
 	it('API-ENC-UTIL-02b: certHasEncryptionKeyUsage is false for a non-certificate input, not a throw (§B8)', () => {
 		// The native DER parser (no openssl subprocess) must fail closed on garbage.
-		expect(certHasEncryptionKeyUsage('-----BEGIN CERTIFICATE-----\nnope\n-----END CERTIFICATE-----')).toBe(
-			false,
-		);
+		expect(
+			certHasEncryptionKeyUsage('-----BEGIN CERTIFICATE-----\nnope\n-----END CERTIFICATE-----'),
+		).toBe(false);
 		expect(certHasEncryptionKeyUsage('not a pem at all')).toBe(false);
 	});
 
@@ -62,5 +63,28 @@ describe('idp-encryption-cert.util', () => {
 	it('API-ENC-UTIL-06: validateEncryptionKeyPair rejects signing PEM as encryption upload', () => {
 		const { certPem, privateKeyPem } = getTestSigningMaterial('https://sign-upload.example.com');
 		expect(() => validateEncryptionKeyPair(certPem, privateKeyPem)).toThrow();
+	});
+
+	it('API-ENC-UTIL-07: matching EC pair passes the ECDH agreement probe and infers ec crypto', () => {
+		const { certPem, privateKeyPem } = generateTestEcEncryptionCert('https://enc-ec.example.com');
+		const crypto = inferStoredEncryptionCryptoFromPem(certPem, privateKeyPem);
+		expect(crypto.encryptionKeyFamily).toBe('ec');
+		expect(crypto.encryptionKeyTransportAlgorithmId).toBeNull();
+		expect(crypto.encryptionRsaModulusBits).toBeNull();
+		expect(crypto.encryptionEcCurve).toBe('P-256');
+	});
+
+	it('API-ENC-UTIL-08: mismatched EC cert and key fails the ECDH agreement probe (§5.C)', () => {
+		// Same curve, different keypair — only the functional probe can catch this.
+		const a = generateTestEcEncryptionCert('https://enc-ec-a.example.com');
+		const b = generateTestEcEncryptionCert('https://enc-ec-b.example.com');
+		expect(() => inferStoredEncryptionCryptoFromPem(a.certPem, b.privateKeyPem)).toThrow(
+			'do not match',
+		);
+		// Cross-curve pair (both family 'ec', so the type check alone would pass).
+		const p384 = generateTestEcEncryptionCert('https://enc-ec-c.example.com', 'P-384');
+		expect(() => inferStoredEncryptionCryptoFromPem(a.certPem, p384.privateKeyPem)).toThrow(
+			'do not match',
+		);
 	});
 });

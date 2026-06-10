@@ -8,12 +8,17 @@ import type {
 	TerminateSessionOptions,
 } from '@nestidp/shared';
 import { LOGOUT_PROPAGATION_PORT, SAML_SESSIONS_LIST_PAGE_SIZE } from '@nestidp/shared';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { AuditPersistenceService } from '../../audit/services/audit-persistence.service';
 import { PrismaService } from '../../prisma/services/prisma.service';
 import { toSamlSsoSessionPublicDto } from '../mappers/saml-sso-session.mapper';
 
 const USER_AGENT_MAX_LENGTH = 512;
+
+/** Escape LIKE metacharacters so `%`/`_` in a search term match literally (used with `ESCAPE '\'`, §B7). */
+function escapeLike(term: string): string {
+	return term.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
 
 export interface CreateSsoSessionInput {
 	userId: string | null;
@@ -82,8 +87,11 @@ export class SamlSsoSessionService {
 		return session;
 	}
 
-	async createParticipation(input: CreateParticipationInput): Promise<void> {
-		await this.prisma.samlSpParticipation.create({
+	async createParticipation(
+		input: CreateParticipationInput,
+		tx?: Prisma.TransactionClient,
+	): Promise<void> {
+		await (tx ?? this.prisma).samlSpParticipation.create({
 			data: {
 				ssoSessionId: input.ssoSessionId,
 				spConnectionId: input.spConnectionId,
@@ -149,7 +157,10 @@ export class SamlSsoSessionService {
 		this.audit.recordSafe({
 			category: 'saml',
 			event: 'saml_session_terminated',
-			actorType: reason === 'admin_action' || reason === 'user_deactivated' ? 'admin' : 'system',
+			actorType:
+				reason === 'admin_action' || reason === 'user_deactivated' || reason === 'user_deleted'
+					? 'admin'
+					: 'system',
 			actorId: adminId ?? undefined,
 			subjectType: 'SamlSsoSession',
 			subjectId: id,
@@ -285,6 +296,21 @@ export class SamlSsoSessionService {
 		});
 	}
 
+	/**
+	 * libSQL search path mirroring IdentityRepository.listUsersWithSearch (Prompt 38 §5.C/§B7): Prisma
+	 * `contains` translates to `LIKE '%term%'` with no `ESCAPE` clause, so a literal `%`/`_` in the term
+	 * would act as a wildcard. Resolve the matching session ids (by username or participation NameID)
+	 * with an escaped raw `LIKE … ESCAPE '\'`, then let the regular Prisma query apply the remaining
+	 * filters + pagination over the id set.
+	 */
+	private async searchSessionIds(term: string): Promise<string[]> {
+		const pat = `%${escapeLike(term)}%`;
+		const rows = await this.prisma.$queryRaw<{ id: string }[]>(
+			Prisma.sql`SELECT "id" FROM "SamlSsoSession" WHERE "username" LIKE ${pat} ESCAPE '\\' UNION SELECT "ssoSessionId" AS "id" FROM "SamlSpParticipation" WHERE "nameId" LIKE ${pat} ESCAPE '\\'`,
+		);
+		return rows.map((r) => r.id);
+	}
+
 	async listForAdmin(query: SamlSsoSessionListQueryDto): Promise<SamlSsoSessionListResponseDto> {
 		const status: SamlSsoSessionStatusFilter = query.status ?? 'active';
 		const page = query.page && query.page > 0 ? query.page : 1;
@@ -301,11 +327,7 @@ export class SamlSsoSessionService {
 			where.participations = { some: { spConnectionId: query.spConnectionId } };
 		}
 		if (query.q && query.q.trim().length > 0) {
-			const q = query.q.trim();
-			where.OR = [
-				{ username: { contains: q } },
-				{ participations: { some: { nameId: { contains: q } } } },
-			];
+			where.id = { in: await this.searchSessionIds(query.q.trim()) };
 		}
 		// Filter by the signed-in user's originating identity source (Prompt 37).
 		if (query.apiConnectionId) {

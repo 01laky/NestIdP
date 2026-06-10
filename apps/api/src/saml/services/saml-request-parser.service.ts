@@ -245,8 +245,7 @@ export class SamlRequestParserService {
 		if (child.length > 0) {
 			return (child[0].textContent ?? '').trim() || null;
 		}
-		const attr = authn.getAttribute('Issuer');
-		return attr?.trim() || null;
+		return null;
 	}
 
 	private validateIssueInstant(issueInstant: string): void {

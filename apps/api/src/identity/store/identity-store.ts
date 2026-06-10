@@ -167,17 +167,14 @@ export interface IdentityStore {
 	findUserProfileById(userId: string): Promise<UserProfileForAuth | null>;
 
 	// --- inbound sync writes ---
-	upsertUser(connectionId: string, user: UpsertUserInput): Promise<{ id: string }>;
+	upsertUser(connectionId: string, user: UpsertUserInput): Promise<StoreUser>;
 	replaceUserGroups(userId: string, groupIds: string[]): Promise<void>;
 	replaceUserRoles(userId: string, roleIds: string[]): Promise<void>;
 	upsertGroup(
 		connectionId: string,
 		externalGroup: { id: string; name: string },
-	): Promise<{ id: string }>;
-	upsertRole(
-		connectionId: string,
-		externalRole: { id: string; name: string },
-	): Promise<{ id: string }>;
+	): Promise<StoreGroup>;
+	upsertRole(connectionId: string, externalRole: { id: string; name: string }): Promise<StoreRole>;
 	deactivateUsersNotInExternalIds(connectionId: string, externalIds: Set<string>): Promise<number>;
 	deleteOrphanGroups(connectionId: string, seenExternalIds: Set<string>): Promise<number>;
 	deleteOrphanRoles(connectionId: string, seenExternalIds: Set<string>): Promise<number>;

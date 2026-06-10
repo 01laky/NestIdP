@@ -7,10 +7,6 @@ export class AcsUrlValidationError extends Error {
 	}
 }
 
-export interface AssertValidAcsUrlOptions {
-	requireHttps?: boolean;
-}
-
 export function assertValidAcsUrl(raw: string, nodeEnv: string): string {
 	const trimmed = raw.trim();
 	if (!trimmed) {

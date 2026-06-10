@@ -184,16 +184,3 @@ export interface OAuthTokenDiagnosticsDto {
 
 /** Result of POST /api/admin/api-connections/:id/test-token — token exchange only. */
 export type ApiConnectionTestTokenResponseDto = OAuthTokenDiagnosticsDto;
-
-/** @deprecated Use ApiConnectionDto */
-export type ApiConnectionStubDto = ApiConnectionDto;
-
-/** Stub DTO for SP connection (SAML application) — full CRUD in a later prompt. */
-export interface SpConnectionStubDto {
-	id?: string;
-	name: string;
-	spEntityId: string;
-	acsUrl: string;
-	nameIdFormat?: string;
-	active?: boolean;
-}

@@ -57,6 +57,17 @@ describe('IpBanService (Prompt 35)', () => {
 		expect(svc.check('5.5.5.5').banned).toBe(false);
 	});
 
+	it('BAN-04: recordTrip reports the real observed trip count, not the threshold (§5.C)', () => {
+		const svc = new IpBanService(makeConfig(3));
+		expect(svc.recordTrip('7.7.7.7').count).toBe(1);
+		expect(svc.recordTrip('7.7.7.7').count).toBe(2);
+		const third = svc.recordTrip('7.7.7.7');
+		expect(third.bannedNow).toBe(true);
+		expect(third.count).toBe(3);
+		// trips past the threshold keep counting up — the audit row reflects what actually happened
+		expect(svc.recordTrip('7.7.7.7').count).toBe(4);
+	});
+
 	it('clear resets all ban + trip state', () => {
 		const svc = new IpBanService(makeConfig(1));
 		svc.recordTrip('1.1.1.1');

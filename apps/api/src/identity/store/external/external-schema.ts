@@ -59,12 +59,19 @@ export async function classifyOwnership(db: Kysely<ExternalIdentityDB>): Promise
 	return hasAnyOurs ? 'foreign' : 'empty';
 }
 
-/** Create the v1 schema (idempotent). */
+/** Create the v1 schema (idempotent). `pgSchema` (Postgres only) hosts the tables via search_path. */
 export async function createSchemaV1(
 	db: Kysely<ExternalIdentityDB>,
 	dialect: ExternalDialect,
+	pgSchema?: string | null,
 ): Promise<void> {
 	const ts = tsType(dialect);
+
+	// The configured schema must exist before any CREATE TABLE: the connection's search_path points at
+	// it, and table creation targets the first *existing* schema on the path.
+	if (pgSchema && dialect === 'postgres') {
+		await sql`create schema if not exists ${sql.id(pgSchema)}`.execute(db);
+	}
 
 	await db.schema
 		.createTable(T_META)
@@ -140,10 +147,14 @@ export async function createSchemaV1(
 export async function runExternalMigrations(
 	db: Kysely<ExternalIdentityDB>,
 	dialect: ExternalDialect,
+	pgSchema?: string | null,
 ): Promise<number> {
-	const current = Number((await getMetaValue(db, 'schema_version').catch(() => null)) ?? 0);
+	// Probe the meta table via introspection instead of a failing SELECT: this also runs inside the
+	// ensureSchema transaction, where a failed statement would abort the whole transaction on Postgres.
+	const names = await listTableNames(db);
+	const current = names.has(T_META) ? Number((await getMetaValue(db, 'schema_version')) ?? 0) : 0;
 	if (current < 1) {
-		await createSchemaV1(db, dialect);
+		await createSchemaV1(db, dialect, pgSchema);
 		await setMetaValue(db, 'schema_version', '1');
 	}
 	// Future: if (current < 2) { ...alter...; setMetaValue(db,'schema_version','2'); }
@@ -158,15 +169,22 @@ export async function ensureSchema(
 	db: Kysely<ExternalIdentityDB>,
 	dialect: ExternalDialect,
 	instanceId: string,
+	pgSchema?: string | null,
 ): Promise<{ ownership: Ownership; schemaVersion: number }> {
 	const ownership = await classifyOwnership(db);
 	if (ownership === 'foreign') {
 		return { ownership, schemaVersion: 0 };
 	}
-	const schemaVersion = await runExternalMigrations(db, dialect);
-	if (!(await getMetaValue(db, 'instance_id'))) {
-		await setMetaValue(db, 'instance_id', instanceId);
-		await setMetaValue(db, 'created_at', new Date().toISOString());
-	}
+	// Schema creation, version stamp and instance marker commit atomically: a crash mid-init must not
+	// leave prefixed tables without the marker, which would misclassify this DB as 'foreign' forever.
+	// (Postgres has transactional DDL; on MySQL DDL auto-commits, so this matches the old behaviour there.)
+	const schemaVersion = await db.transaction().execute(async (trx) => {
+		const version = await runExternalMigrations(trx, dialect, pgSchema);
+		if (!(await getMetaValue(trx, 'instance_id'))) {
+			await setMetaValue(trx, 'instance_id', instanceId);
+			await setMetaValue(trx, 'created_at', new Date().toISOString());
+		}
+		return version;
+	});
 	return { ownership, schemaVersion };
 }

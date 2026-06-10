@@ -10,9 +10,11 @@ export class EndUserLoginBodyDto {
 	@Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
 	username!: string;
 
+	// bcrypt (the only supported synced-hash algorithm) truncates input at 72 bytes — a longer password is
+	// never a byte-exact match, so reject it with a clean 400 instead of comparing a truncated prefix.
 	@IsString()
 	@IsNotEmpty()
-	@MaxLength(256)
+	@MaxLength(72)
 	password!: string;
 
 	@IsOptional()

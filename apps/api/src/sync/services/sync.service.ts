@@ -19,7 +19,7 @@ import type {
 	SyncAllResponseDto,
 	SyncAllConnectionResultDto,
 } from '@nestidp/shared';
-import { getByPath, resolveApiContract } from '@nestidp/shared';
+import { getByPath, isUsernameCollisionPolicy, resolveApiContract } from '@nestidp/shared';
 import { SyncMultiSourceConfig } from './sync-multi-source.config';
 import { ApiConnection } from '@prisma/client';
 import { toApiConnectionDto } from '../../api-connections/mappers/api-connections.mapper';
@@ -33,6 +33,7 @@ import {
 	UsernameCollisionError,
 } from '../../identity/identity.repository';
 import { ActiveIdentityStore } from '../../identity/store/active-identity-store';
+import { runPool } from '../../common/utils/run-pool.util';
 import { PrismaService } from '../../prisma/services/prisma.service';
 import {
 	assertUsersArrayWithinLimit,
@@ -136,9 +137,12 @@ export class SyncService {
 		let rolesSynced = 0;
 		let usersSkippedCollision = 0;
 		// Cross-connection username collision policy: per-connection override → global default (Prompt 37).
+		// §5.C: the stored override is validated (not blind-cast) — an unknown value falls back to global.
 		const collisionPolicy: UsernameCollisionPolicy =
-			(connection.usernameCollisionPolicy as UsernameCollisionPolicy | null) ??
-			this.multiSourceConfig.usernameCollisionPolicy();
+			typeof connection.usernameCollisionPolicy === 'string' &&
+			isUsernameCollisionPolicy(connection.usernameCollisionPolicy)
+				? connection.usernameCollisionPolicy
+				: this.multiSourceConfig.usernameCollisionPolicy();
 		const seenGroupExternalIds = new Set<string>();
 		const seenRoleExternalIds = new Set<string>();
 		const upsertedGroupExternalIds = new Set<string>();
@@ -214,10 +218,21 @@ export class SyncService {
 
 			const seenUserExternalIds = new Set<string>();
 			const userRowsById = new Map<string, unknown>();
-			for (const rawRow of usersBody) {
+			for (let rowIndex = 0; rowIndex < usersBody.length; rowIndex += 1) {
+				const rawRow = usersBody[rowIndex];
 				const idValue = getByPath(rawRow, contract.userFieldMap.id);
 				if (typeof idValue === 'string' && idValue.trim().length > 0) {
 					userRowsById.set(idValue.trim(), rawRow);
+				} else {
+					// §5.C: a dropped row would otherwise vanish silently AND its existing local user would be
+					// deactivated (not in seenUserExternalIds) — record an explicit, recoverable error.
+					errors.push({
+						phase: 'parse_users',
+						message:
+							idValue == null
+								? `Row ${rowIndex}: missing user id at "${contract.userFieldMap.id}" — row skipped`
+								: `Row ${rowIndex}: non-string or empty user id at "${contract.userFieldMap.id}" — row skipped`,
+					});
 				}
 			}
 
@@ -426,7 +441,7 @@ export class SyncService {
 		const byId = new Map<string, SyncAllConnectionResultDto>();
 		const concurrency = this.effectiveSyncAllConcurrency(connections);
 
-		await this.runPool(connections, concurrency, async (c) => {
+		await runPool(connections, concurrency, async (c) => {
 			if (!dryRun && (await this.isSyncInProgress(c.id))) {
 				byId.set(c.id, this.skippedResult(c.id, c.name));
 				return;
@@ -581,7 +596,7 @@ export class SyncService {
 			return result;
 		}
 
-		await this.runPool(processed, this.identitySyncClient.getMembershipFetchConcurrency(), worker);
+		await runPool(processed, this.identitySyncClient.getMembershipFetchConcurrency(), worker);
 		return result;
 	}
 
@@ -682,23 +697,6 @@ export class SyncService {
 				`sequentially. Set every connection to 'fail_run' to allow parallel "sync all".`,
 		);
 		return 1;
-	}
-
-	/** Run `worker` over items with at most `concurrency` in flight. */
-	private async runPool<T>(
-		items: T[],
-		concurrency: number,
-		worker: (item: T) => Promise<void>,
-	): Promise<void> {
-		let index = 0;
-		const runners = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
-			while (index < items.length) {
-				const current = items[index];
-				index += 1;
-				await worker(current);
-			}
-		});
-		await Promise.all(runners);
 	}
 
 	/**
@@ -854,6 +852,11 @@ export class SyncService {
 			});
 			return;
 		}
+		// Stale-run reclaim caveat (§5.C): "stale" is judged purely by run AGE — there is no heartbeat.
+		// A healthy run that legitimately takes longer than SYNC_STALE_RUN_MINUTES is reclaimed here
+		// (marked FAILED) and a new run starts, so the same connection can effectively be double-run.
+		// Operators with very large/slow sources must raise SYNC_STALE_RUN_MINUTES above the worst-case
+		// run duration.
 		if (this.isStaleRun(openLog.startedAt)) {
 			await this.syncLogService.finishLog(
 				openLog.id,

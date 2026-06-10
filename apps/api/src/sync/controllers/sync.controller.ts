@@ -83,10 +83,12 @@ export class SyncController {
 		@Param('connectionId', ParseCuidPipe) connectionId: string,
 		@Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
 		body: TriggerSyncBodyDto,
+		@Query('dryRun') dryRunQuery: string | undefined,
 		@Req() req: AdminAuthenticatedRequest,
 	): Promise<TriggerSyncResponseDto> {
+		// §5.C: same body-OR-query dryRun precedence as syncAll above.
 		return this.syncService.triggerSync(connectionId, {
-			dryRun: body.dryRun,
+			dryRun: body.dryRun === true || dryRunQuery === 'true',
 			adminId: req.adminUser?.id,
 			adminUsername: req.adminUser?.username,
 		});

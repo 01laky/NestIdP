@@ -190,7 +190,7 @@ export class LogoutPropagationService implements LogoutPropagationPort {
 				requestId,
 				spCertificate: sp.spCertificate,
 				timeoutMs: this.config.httpTimeoutMs(),
-				clockSkewSeconds: 60,
+				clockSkewSeconds: this.config.clockSkewSeconds(),
 			});
 			return {
 				ok: result.outcome === 'succeeded' || result.outcome === 'partial',
@@ -264,7 +264,7 @@ export class LogoutPropagationService implements LogoutPropagationPort {
 				requestId,
 				spCertificate: sp.spCertificate,
 				timeoutMs: this.config.httpTimeoutMs(),
-				clockSkewSeconds: 60,
+				clockSkewSeconds: this.config.clockSkewSeconds(),
 			});
 
 			if (result.outcome === 'succeeded' || result.outcome === 'partial') {

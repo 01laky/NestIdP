@@ -9,8 +9,10 @@ export class CreateAdminUserBodyDto implements CreateAdminUserRequestDto {
 	@Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
 	username!: string;
 
+	// bcrypt silently truncates input at 72 bytes — reject longer new passwords instead of storing a
+	// silently-truncated one (72 chars == 72 bytes for ASCII).
 	@IsString()
 	@IsNotEmpty()
-	@MaxLength(1024)
+	@MaxLength(72)
 	password!: string;
 }

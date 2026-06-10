@@ -31,6 +31,21 @@ export interface ExternalKyselyFactory {
 	create(config: ExternalDbConfig): ExternalKysely;
 }
 
+/** Conservative Postgres identifier shape — keeps the schema safe to embed in search_path/DDL. */
+export const PG_SCHEMA_PATTERN = /^[A-Za-z_][A-Za-z0-9_]{0,62}$/;
+
+/** Returns the validated pgSchema or null; throws on a value that is not a plain identifier. */
+export function resolvePgSchema(config: Pick<ExternalDbConfig, 'pgSchema'>): string | null {
+	const schema = config.pgSchema?.trim();
+	if (!schema) {
+		return null;
+	}
+	if (!PG_SCHEMA_PATTERN.test(schema)) {
+		throw new Error('Invalid pgSchema: must be a plain PostgreSQL identifier.');
+	}
+	return schema;
+}
+
 export function pgSslOption(
 	config: ExternalDbConfig,
 ): false | { rejectUnauthorized: boolean; ca?: string } {
@@ -69,6 +84,7 @@ export function mysqlSslOption(
 export class RealExternalKyselyFactory implements ExternalKyselyFactory {
 	create(config: ExternalDbConfig): ExternalKysely {
 		if (config.dialect === 'postgres') {
+			const pgSchema = resolvePgSchema(config);
 			const pool = new Pool({
 				host: config.host,
 				port: config.port,
@@ -80,6 +96,9 @@ export class RealExternalKyselyFactory implements ExternalKyselyFactory {
 				statement_timeout: config.queryTimeoutMs,
 				query_timeout: config.queryTimeoutMs,
 				ssl: pgSslOption(config),
+				// Startup parameter — applies to EVERY pooled connection, so all unqualified table
+				// references resolve to the configured schema (public stays the fallback).
+				...(pgSchema ? { options: `-c search_path=${pgSchema},public` } : {}),
 			});
 			const db = new Kysely<ExternalIdentityDB>({ dialect: new PostgresDialect({ pool }) });
 			return { db, destroy: () => db.destroy() };

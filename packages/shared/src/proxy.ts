@@ -65,8 +65,9 @@ export function validateProxyUrl(raw: string): string {
 		throw new ProxyConfigError('Proxy URL must not contain a query or fragment');
 	}
 	parsed.hostname = parsed.hostname.toLowerCase();
+	// URL serializes a bare-host proxy with exactly one trailing slash — strip it once.
 	let normalized = parsed.toString();
-	while (normalized.endsWith('/') && parsed.pathname === '/') {
+	if (normalized.endsWith('/') && parsed.pathname === '/') {
 		normalized = normalized.slice(0, -1);
 	}
 	return normalized;

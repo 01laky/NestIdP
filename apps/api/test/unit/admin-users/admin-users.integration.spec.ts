@@ -459,6 +459,38 @@ describe('admin-users integration (SQLite)', () => {
 			.send({ username: 'helper', password: 'PatchedPass1234' })
 			.expect(200);
 	});
+
+	it('API-ADM-USR-32: PATCH password clears the target account lockout (§5.C)', async () => {
+		const locked = await createTestAdminUserWithPassword(prisma, 'lockedout', 'LockedPass123456');
+		await prisma.loginLockout.create({
+			data: {
+				scope: 'admin',
+				usernameKey: 'lockedout',
+				failedCount: 10,
+				lockedUntil: new Date(Date.now() + 3_600_000),
+				lastFailedAt: new Date(),
+			},
+		});
+
+		const agent = request.agent(app.getHttpServer() as App);
+		const csrf = await loginAgent(agent);
+		await agent
+			.patch(`${ADMIN_USERS_API_PATH}/${locked.id}`)
+			.set(csrfHeader(csrf))
+			.send({ password: 'FreshOperatorPass1' })
+			.expect(200);
+
+		const row = await prisma.loginLockout.findUnique({
+			where: { scope_usernameKey: { scope: 'admin', usernameKey: 'lockedout' } },
+		});
+		expect(row).toBeNull();
+
+		const fresh = request.agent(app.getHttpServer() as App);
+		await fresh
+			.post('/api/admin/auth/login')
+			.send({ username: 'lockedout', password: 'FreshOperatorPass1' })
+			.expect(200);
+	});
 });
 
 describe('admin-users create rate limit (SQLite)', () => {

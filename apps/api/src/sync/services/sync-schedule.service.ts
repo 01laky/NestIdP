@@ -36,7 +36,9 @@ export class SyncScheduleService {
 	}
 
 	async getOverview(): Promise<SchedulesOverviewResponseDto> {
-		const [rows, scheduledRunCount, totalRunCount] = await Promise.all([
+		// §5.C: count each trigger source explicitly — the old `total - scheduled` arithmetic miscounted
+		// 'manual_all' (sync-all) runs as manual. Legacy rows (null triggerSource) stay counted as manual.
+		const [rows, scheduledRunCount, manualRunCount, manualAllRunCount] = await Promise.all([
 			this.prisma.apiConnection.findMany({
 				where: {
 					isLocalDirectory: false,
@@ -45,14 +47,17 @@ export class SyncScheduleService {
 				orderBy: { createdAt: 'asc' },
 			}),
 			this.prisma.syncLog.count({ where: { triggerSource: 'scheduled' } }),
-			this.prisma.syncLog.count(),
+			this.prisma.syncLog.count({
+				where: { OR: [{ triggerSource: 'manual' }, { triggerSource: null }] },
+			}),
+			this.prisma.syncLog.count({ where: { triggerSource: 'manual_all' } }),
 		]);
 		return {
 			schedulerEnabled: this.config.isSchedulerEnabled(),
 			schedules: rows.map(toSchedulesOverviewItemDto),
-			// Legacy rows have a null triggerSource and are counted as manual.
-			manualRunCount: totalRunCount - scheduledRunCount,
+			manualRunCount,
 			scheduledRunCount,
+			manualAllRunCount,
 		};
 	}
 

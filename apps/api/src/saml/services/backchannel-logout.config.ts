@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MS_PER_DAY } from '@nestidp/shared';
 import { boundedInt as boundedIntFromRaw } from '../../common/config/bounded-int.util';
+import { positiveIntOrDefault } from '../../common/config/positive-int.util';
 
 const MIN = 60_000;
 const HOUR = 3_600_000;
@@ -55,6 +56,17 @@ export class BackchannelLogoutConfig {
 	/** Outbound LogoutRequest validity window (`NotOnOrAfter = IssueInstant + N`). */
 	validitySeconds(): number {
 		return this.boundedInt('SAML_BACKCHANNEL_LOGOUT_VALIDITY_S', 300, 30, 3_600);
+	}
+
+	/**
+	 * Allowed clock skew when verifying SP LogoutResponses — honours the same SAML_CLOCK_SKEW_SECONDS
+	 * env as the rest of the SAML layer (§5.C); default 60 preserves the previous hardcoded value.
+	 */
+	clockSkewSeconds(): number {
+		return positiveIntOrDefault(
+			this.configService.get<number | string>('SAML_CLOCK_SKEW_SECONDS'),
+			60,
+		);
 	}
 
 	/** Periodic prune of old succeeded/given_up rows; `0` disables. */

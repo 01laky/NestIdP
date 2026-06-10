@@ -1,6 +1,9 @@
 /** HTTP-only cookie name for end-user (synced identity) sessions. */
 export const END_USER_SESSION_COOKIE_NAME = 'nestidp_user_session';
 
+/** Hard cap for the end-user session TTL — 90 days, mirrors MAX_ADMIN_SESSION_REMEMBER_TTL_SECONDS. */
+export const MAX_END_USER_SESSION_TTL_SECONDS = 7_776_000 as const;
+
 /** End-user REST API base path (not the React /login route). */
 export const AUTH_API_PATH = '/api/auth';
 
@@ -65,11 +68,4 @@ export interface EndUserSessionStatusResponseDto {
 		/** True when authenticated user may POST complete-sso successfully. */
 		readyToComplete: boolean;
 	} | null;
-}
-
-/** @deprecated v0.7.0 returns text/html from complete-sso — do not use in new code. */
-export interface CompleteSsoNotImplementedResponseDto {
-	status: 'not_implemented';
-	message: string;
-	samlSessionId: string;
 }

@@ -1,5 +1,7 @@
 import {
 	createPublicKey,
+	diffieHellman,
+	generateKeyPairSync,
 	publicEncrypt,
 	privateDecrypt,
 	constants,
@@ -73,6 +75,29 @@ function probeEncryptDecrypt(certPem: string, privateKeyPem: string): boolean {
 	}
 }
 
+/**
+ * Functional EC probe — the ECDH-ES analogue of probeEncryptDecrypt (Prompt 38 §5.C). An ephemeral key
+ * on the private key's curve must derive the same shared secret against the cert's public key as against
+ * the uploaded private key; that holds only when the cert and key are a real pair on the same curve.
+ */
+function probeEcdhAgreement(certPem: string, privateKey: KeyObject): boolean {
+	try {
+		const namedCurve = privateKey.asymmetricKeyDetails?.namedCurve;
+		if (!namedCurve) {
+			return false;
+		}
+		const ephemeral = generateKeyPairSync('ec', { namedCurve });
+		const viaPrivateKey = diffieHellman({ privateKey, publicKey: ephemeral.publicKey });
+		const viaCert = diffieHellman({
+			privateKey: ephemeral.privateKey,
+			publicKey: createPublicKey(certPem),
+		});
+		return viaPrivateKey.equals(viaCert);
+	} catch {
+		return false;
+	}
+}
+
 // KeyUsage extension: OID 2.5.29.15 (DER OID body `55 1D 0F`); its value is an OCTET STRING wrapping a
 // BIT STRING whose first content byte carries the usage flags (keyEncipherment = bit 2 = 0x20,
 // dataEncipherment = bit 3 = 0x10). The extension is only a handful of bytes, so the length octets are
@@ -119,9 +144,7 @@ export function certHasEncryptionKeyUsage(certPem: string): boolean {
 		return false;
 	}
 	const flags = der[i + 5]; // 04 <len> 03 <len> <unusedBits> <flags>
-	return (
-		(flags & KEY_USAGE_KEY_ENCIPHERMENT) !== 0 || (flags & KEY_USAGE_DATA_ENCIPHERMENT) !== 0
-	);
+	return (flags & KEY_USAGE_KEY_ENCIPHERMENT) !== 0 || (flags & KEY_USAGE_DATA_ENCIPHERMENT) !== 0;
 }
 
 export function assertEncryptionCertNotSigningOnly(certPem: string): void {
@@ -170,6 +193,9 @@ export function inferStoredEncryptionCryptoFromPem(
 		};
 	}
 
+	if (!probeEcdhAgreement(normalizedCert, keyObject)) {
+		throw new IdpCertValidationError('Certificate and private key do not match');
+	}
 	const details = keyObject.asymmetricKeyDetails;
 	return {
 		encryptionKeyFamily: 'ec',

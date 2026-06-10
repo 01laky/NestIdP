@@ -339,4 +339,39 @@ describe('ExternalIdentityDatabaseService (PGlite)', () => {
 			await service2.onModuleDestroy();
 		}
 	});
+
+	it('EXT-SVC-BOOT-02: a failed boot activation stays local AND flags the config unreachable (§5.C)', async () => {
+		await service.connect({ ...connInput, keepLocalCopy: false, acknowledgeBackup: true });
+		await service.onModuleDestroy();
+
+		// restart with a dead external DB: the factory cannot open a connection at all
+		const repo2 = new IdentityRepository(prisma);
+		const active2 = new ActiveIdentityStore(repo2);
+		const encryption2 = new EncryptionService({
+			get: () => 'encryption-key-32-chars-min!!!',
+		} as unknown as ConfigService);
+		const deadFactory = {
+			create: () => {
+				throw new Error('ECONNREFUSED');
+			},
+		};
+		const service2 = new ExternalIdentityDatabaseService(
+			prisma,
+			active2,
+			encryption2,
+			deadFactory as never,
+			{ recordSafe: jest.fn() } as never,
+			{ recordSuccess: jest.fn() } as never,
+		);
+		try {
+			await service2.onModuleInit(); // must not throw
+			expect(active2.mode()).toBe('local');
+			const row = await prisma.externalIdentityDatabase.findUnique({ where: { id: 'default' } });
+			expect(row?.status).toBe('active'); // settings row untouched — runtime degraded
+			expect(row?.reachable).toBe(false);
+			expect(row?.lastProbeError).toContain('ECONNREFUSED');
+		} finally {
+			await service2.onModuleDestroy();
+		}
+	});
 });

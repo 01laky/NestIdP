@@ -31,8 +31,9 @@ describe('capSyncErrors', () => {
 		const errors = Array.from({ length: 150 }, (_, i) => makeError(i));
 		const capped = capSyncErrors(errors);
 		expect(capped).toHaveLength(100);
+		// §5.C: the marker uses the dedicated 'truncated' phase, not 'parse_users'.
 		expect(capped![99]).toEqual({
-			phase: 'parse_users',
+			phase: 'truncated',
 			message: 'Additional errors truncated',
 		});
 		expect(capped![0]).toEqual(makeError(0));
@@ -51,7 +52,7 @@ describe('capSyncErrors', () => {
 		const next = appendSyncError(initial, makeError(999));
 		expect(next).toHaveLength(100);
 		expect(next[99]).toEqual({
-			phase: 'parse_users',
+			phase: 'truncated',
 			message: 'Additional errors truncated',
 		});
 	});
@@ -109,7 +110,7 @@ describe('SyncLogService', () => {
 		const updateData = prisma.syncLog.update.mock.calls[0][0].data;
 		expect(updateData.errors).toHaveLength(100);
 		expect(updateData.errors[99]).toEqual({
-			phase: 'parse_users',
+			phase: 'truncated',
 			message: 'Additional errors truncated',
 		});
 	});

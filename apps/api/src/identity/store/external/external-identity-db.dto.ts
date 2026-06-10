@@ -6,6 +6,7 @@ import {
 	IsNotEmpty,
 	IsOptional,
 	IsString,
+	Matches,
 	Max,
 	Min,
 } from 'class-validator';
@@ -51,8 +52,12 @@ export class TestExternalDbBodyDto implements ExternalDbConnectionInput {
 	@IsString()
 	sslCaCertPem?: string | null;
 
+	// Embedded in search_path / CREATE SCHEMA, so it must stay a plain identifier (PG_SCHEMA_PATTERN).
 	@IsOptional()
 	@IsString()
+	@Matches(/^[A-Za-z_][A-Za-z0-9_]{0,62}$/, {
+		message: 'pgSchema must be a plain PostgreSQL identifier (letters, digits, underscores)',
+	})
 	pgSchema?: string | null;
 }
 

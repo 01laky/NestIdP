@@ -74,6 +74,14 @@ describe('BackchannelLogoutConfig (bounded env)', () => {
 		expect(make({ SAML_BACKCHANNEL_LOGOUT_PRUNE_INTERVAL_MS: 0 }).pruneIntervalMs()).toBe(0);
 	});
 
+	it('BC-CONFIG-SKEW: clockSkewSeconds honours SAML_CLOCK_SKEW_SECONDS, default 60 (§5.C)', () => {
+		expect(make({}).clockSkewSeconds()).toBe(60);
+		expect(make({ SAML_CLOCK_SKEW_SECONDS: 99 }).clockSkewSeconds()).toBe(99);
+		expect(make({ SAML_CLOCK_SKEW_SECONDS: '45' }).clockSkewSeconds()).toBe(45);
+		expect(make({ SAML_CLOCK_SKEW_SECONDS: 'abc' }).clockSkewSeconds()).toBe(60);
+		expect(make({ SAML_CLOCK_SKEW_SECONDS: -5 }).clockSkewSeconds()).toBe(60);
+	});
+
 	it('honours exact boundary values', () => {
 		expect(make({ SAML_BACKCHANNEL_LOGOUT_VALIDITY_S: 30 }).validitySeconds()).toBe(30);
 		expect(make({ SAML_BACKCHANNEL_LOGOUT_VALIDITY_S: 3_600 }).validitySeconds()).toBe(3_600);

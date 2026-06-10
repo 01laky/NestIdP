@@ -54,6 +54,49 @@ describe('bootstrap integration (SQLite)', () => {
 		expect(await prisma.adminUser.count()).toBe(1);
 	});
 
+	it('API-BST-19: initial admin creation writes an admin_user_bootstrapped audit row', async () => {
+		await runBootstrap(
+			prisma,
+			{
+				adminUsername: 'bootstrap-admin',
+				adminPassword: 'strong-bootstrap-pass',
+				idpBaseUrl: 'https://idp.example.com',
+			},
+			logger,
+		);
+
+		const admin = await prisma.adminUser.findFirst({ where: { username: 'bootstrap-admin' } });
+		const row = await prisma.auditEvent.findFirst({
+			where: { event: 'admin_user_bootstrapped' },
+		});
+		expect(row).not.toBeNull();
+		expect(row?.category).toBe('admin_config');
+		expect(row?.actorType).toBe('system');
+		expect(row?.subjectType).toBe('AdminUser');
+		expect(row?.subjectId).toBe(admin!.id);
+		expect(row?.metadata).toEqual({ username: 'bootstrap-admin' });
+	});
+
+	it('API-BST-20: a failed audit write does not abort bootstrap', async () => {
+		const auditCreate = jest
+			.spyOn(prisma.auditEvent, 'create')
+			.mockRejectedValueOnce(new Error('audit table unavailable'));
+		const result = await runBootstrap(
+			prisma,
+			{
+				adminUsername: 'bootstrap-admin',
+				adminPassword: 'strong-bootstrap-pass',
+				idpBaseUrl: 'https://idp.example.com',
+			},
+			logger,
+		);
+		auditCreate.mockRestore();
+
+		expect(result.adminCreated).toBe(true);
+		expect(await prisma.adminUser.count()).toBe(1);
+		expect(warnings.some((w) => w.includes('admin_user_bootstrapped'))).toBe(true);
+	});
+
 	it('API-BST-02: Admin exists → second boot skips, count stays 1', async () => {
 		await runBootstrap(
 			prisma,

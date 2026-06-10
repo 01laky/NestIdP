@@ -231,17 +231,32 @@ describe('SyncScheduleService', () => {
 		expect((data.nextRunAt as Date).getTime()).toBeGreaterThan(NOW.getTime());
 	});
 
-	it('HARD-OVERVIEW-01: overview lists scheduled connections + manual/scheduled run counts', async () => {
+	it('HARD-OVERVIEW-01: overview lists scheduled connections + per-trigger-source run counts (§5.C)', async () => {
 		prisma.apiConnection.findMany.mockResolvedValue([
 			makeConn({ scheduleEnabled: true, scheduleCron: '*/15 * * * *' }),
 		]);
-		prisma.syncLog.count
-			.mockResolvedValueOnce(4) // scheduled
-			.mockResolvedValueOnce(10); // total
+		prisma.syncLog.count.mockImplementation(
+			async ({ where }: { where: Record<string, unknown> }) => {
+				if (where.triggerSource === 'scheduled') {
+					return 4;
+				}
+				if (where.triggerSource === 'manual_all') {
+					return 3;
+				}
+				// manual + legacy-null rows
+				return 6;
+			},
+		);
 		const res = await service.getOverview();
 		expect(res.schedulerEnabled).toBe(true);
 		expect(res.schedules).toHaveLength(1);
 		expect(res.scheduledRunCount).toBe(4);
+		// 'manual_all' runs no longer inflate the manual count (old code did total - scheduled).
 		expect(res.manualRunCount).toBe(6);
+		expect(res.manualAllRunCount).toBe(3);
+		// Legacy null triggerSource rows are counted as manual via an explicit OR clause.
+		expect(prisma.syncLog.count).toHaveBeenCalledWith({
+			where: { OR: [{ triggerSource: 'manual' }, { triggerSource: null }] },
+		});
 	});
 });

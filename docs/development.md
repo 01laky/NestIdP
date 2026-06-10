@@ -317,7 +317,7 @@ User/Group/Role store; every synced record is tagged with the `apiConnectionId` 
 - **`SYNC_MAX_USERS_PER_RUN`** (default 10000) caps snapshot size
 - **`durationMs`** on `SyncLogDto` is computed in API responses (not a DB column)
 - **`dryRun: true`** — fetches external API, writes `SyncLog`, but does **not** mutate `User`/`Group`/`Role` or `lastSyncAt`
-- **Concurrency** — only one real sync per connection; stale `IN_PROGRESS` runs auto-fail after `SYNC_STALE_RUN_MINUTES` (default 30)
+- **Concurrency** — only one real sync per connection; stale `IN_PROGRESS` runs auto-fail after `SYNC_STALE_RUN_MINUTES` (default 30). Staleness is judged purely by run age (no heartbeat), so a run must finish within this window or it may be reclaimed and double-run — raise the value above your worst-case run duration.
 - **Partial errors** — per-user failures go to `SyncLog.errors[]`; run completes with `SUCCESS` unless fetch/decrypt fails
 - **Upsert failure** skips groups/roles fetch for that user
 - External contract: [integration-api.md](./integration-api.md) (proposal [§7.2](./proposal.MD))

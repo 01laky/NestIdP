@@ -2,6 +2,7 @@ import {
 	type ExternalDbConfig,
 	mysqlSslOption,
 	pgSslOption,
+	resolvePgSchema,
 } from '@api/identity/store/external/external-connection';
 
 function cfg(over: Partial<ExternalDbConfig>): ExternalDbConfig {
@@ -44,5 +45,20 @@ describe('TLS option mapping (TLS)', () => {
 			rejectUnauthorized: true,
 			ca: 'CA',
 		});
+	});
+});
+
+describe('pgSchema resolution (PGSCHEMA)', () => {
+	it('PGSCHEMA-01: empty/null/whitespace → null (default search_path, today’s behaviour)', () => {
+		expect(resolvePgSchema(cfg({}))).toBeNull();
+		expect(resolvePgSchema(cfg({ pgSchema: null }))).toBeNull();
+		expect(resolvePgSchema(cfg({ pgSchema: '  ' }))).toBeNull();
+	});
+
+	it('PGSCHEMA-02: a plain identifier passes; anything else throws (it lands in search_path)', () => {
+		expect(resolvePgSchema(cfg({ pgSchema: 'idp_test' }))).toBe('idp_test');
+		for (const bad of ['idp test', 'idp;drop', 'a,b', '"x"', '1abc']) {
+			expect(() => resolvePgSchema(cfg({ pgSchema: bad }))).toThrow('Invalid pgSchema');
+		}
 	});
 });

@@ -71,8 +71,11 @@ export class IpBanService {
 		}
 		const windowMs = this.config.ipBanWindowMs();
 		const { limited } = this.trips.hit(ip, threshold, windowMs);
+		// §5.C: report the real observed trip count, not the configured threshold — the audit row must say
+		// how many trips this IP actually accumulated.
+		const count = this.trips.currentCount(ip, windowMs);
 		if (!limited) {
-			return { bannedNow: false, count: threshold, bannedUntil: null };
+			return { bannedNow: false, count, bannedUntil: null };
 		}
 		const now = Date.now();
 		const alreadyBanned = (this.bans.get(ip) ?? 0) > now;
@@ -83,7 +86,7 @@ export class IpBanService {
 		const bannedUntil = new Date(now + this.config.ipBanMs());
 		this.bans.set(ip, bannedUntil.getTime());
 		// `bannedNow` only on the transition into banned, so audit/notify is de-duped under a flood.
-		return { bannedNow: !alreadyBanned, count: threshold, bannedUntil };
+		return { bannedNow: !alreadyBanned, count, bannedUntil };
 	}
 
 	clear(): void {

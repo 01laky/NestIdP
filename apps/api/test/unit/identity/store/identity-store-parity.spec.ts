@@ -144,4 +144,47 @@ describe.each([
 		expect(g.origin).toBe(IdentityOrigin.MANUAL);
 		expect(await store.groupMemberCount(g.id)).toBe(0);
 	});
+
+	it('PARITY-UPSERT-RETURN: upserts return the full row on insert AND update (§5.C)', async () => {
+		const inserted = await store.upsertUser(conn, user({ externalId: 'e1', username: 'u1' }));
+		expect(inserted).toMatchObject({
+			externalId: 'e1',
+			apiConnectionId: conn,
+			origin: IdentityOrigin.SYNCED,
+			username: 'u1',
+			email: 'u1@example.com',
+			active: true,
+		});
+		expect(inserted.createdAt).toBeInstanceOf(Date);
+		expect(inserted.updatedAt).toBeInstanceOf(Date);
+
+		const updated = await store.upsertUser(
+			conn,
+			user({ externalId: 'e1', username: 'u1-renamed' }),
+		);
+		expect(updated.id).toBe(inserted.id);
+		expect(updated.username).toBe('u1-renamed');
+		// createdAt on the update path must match what a subsequent read returns (preserved, not reset)
+		const reread = await store.getUserById(inserted.id);
+		expect(updated.createdAt.getTime()).toBe(reread?.createdAt.getTime());
+
+		const g1 = await store.upsertGroup(conn, { id: 'g-ext-1', name: 'Engineering' });
+		expect(g1).toMatchObject({
+			externalId: 'g-ext-1',
+			apiConnectionId: conn,
+			origin: IdentityOrigin.SYNCED,
+			name: 'Engineering',
+		});
+		const g2 = await store.upsertGroup(conn, { id: 'g-ext-1', name: 'Renamed' });
+		expect(g2.id).toBe(g1.id);
+		expect(g2.name).toBe('Renamed');
+
+		const r1 = await store.upsertRole(conn, { id: 'r-ext-1', name: 'admin' });
+		expect(r1).toMatchObject({
+			externalId: 'r-ext-1',
+			apiConnectionId: conn,
+			origin: IdentityOrigin.SYNCED,
+			name: 'admin',
+		});
+	});
 });

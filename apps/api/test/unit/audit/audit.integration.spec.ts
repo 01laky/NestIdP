@@ -388,6 +388,14 @@ describe('audit integration (SQLite)', () => {
 		await agent.get(`${AUDIT_EVENTS_API_PATH}?offset=-1`).expect(400);
 	});
 
+	it('API-AUD-26: garbage since/until → 400 (must be ISO 8601)', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		await loginAgent(agent);
+		await agent.get(`${AUDIT_EVENTS_API_PATH}?since=not-a-date`).expect(400);
+		await agent.get(`${AUDIT_EVENTS_API_PATH}?until=garbage`).expect(400);
+		await agent.get(`${AUDIT_EVENTS_API_PATH}?since=2026-01-01T00:00:00.000Z`).expect(200);
+	});
+
 	it('API-AUD-17: export without session → 401', async () => {
 		await request(app.getHttpServer() as App)
 			.get(`${AUDIT_EVENTS_API_PATH}/export?format=json`)

@@ -63,6 +63,9 @@ export class IdentitySyncClientService {
 		return this.fetchCollectionRaw(baseUrl, bearerToken, contract.endpoints.usersPath, contract, {
 			responseRoot: contract.responseRoot.users,
 			cap: this.getMaxUsersPerRun(),
+			// §5.C: exceeding the users cap fails the run loudly (same as the non-paginated path) instead
+			// of silently truncating — a truncated user list would deactivate the dropped users locally.
+			onCapExceeded: 'throw',
 			dispatcher,
 		});
 	}
@@ -188,7 +191,13 @@ export class IdentitySyncClientService {
 		bearerToken: string,
 		path: string,
 		contract: ResolvedApiContract,
-		opts: { responseRoot: string; cap: number; dispatcher?: Dispatcher },
+		opts: {
+			responseRoot: string;
+			cap: number;
+			/** 'throw' (users) fails like assertUsersArrayWithinLimit; default truncates (memberships). */
+			onCapExceeded?: 'throw' | 'truncate';
+			dispatcher?: Dispatcher;
+		},
 	): Promise<unknown[]> {
 		const { pagination, queryParams, headers } = contract;
 
@@ -207,6 +216,7 @@ export class IdentitySyncClientService {
 		let pageIndex = 0;
 		let offset = 0;
 		let page = pagination.startPage ?? 1;
+		let previousFirstRowKey: string | null = null;
 
 		while (pageIndex < maxPages) {
 			const extra: Record<string, string | number> = {};
@@ -225,9 +235,22 @@ export class IdentitySyncClientService {
 				opts.responseRoot,
 				url,
 			);
+			// §5.C: a server that ignores the page/offset params returns the same page forever — an
+			// identical first row to the previous page means we are not advancing, so stop. (An empty
+			// page already stops below via the short-page check.)
+			const firstRowKey = pageRows.length > 0 ? JSON.stringify(pageRows[0]) : null;
+			if (firstRowKey != null && firstRowKey === previousFirstRowKey) {
+				break;
+			}
+			previousFirstRowKey = firstRowKey;
 			for (const row of pageRows) {
 				accumulated.push(row);
-				if (accumulated.length >= opts.cap) {
+				if (accumulated.length > opts.cap && opts.onCapExceeded === 'throw') {
+					// Same error/message as assertUsersArrayWithinLimit so paginated and non-paginated
+					// over-cap runs fail identically (§5.C).
+					throw new ExternalApiValidationError(`User count exceeds limit of ${opts.cap}`);
+				}
+				if (accumulated.length >= opts.cap && opts.onCapExceeded !== 'throw') {
 					return accumulated.slice(0, opts.cap);
 				}
 			}

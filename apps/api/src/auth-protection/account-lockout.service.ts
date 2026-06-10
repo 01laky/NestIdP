@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import type { AccountLockoutStatusDto } from '@nestidp/shared';
 import { PrismaService } from '../prisma/services/prisma.service';
 import type { LoginScope } from './brute-force-notifier';
@@ -41,6 +41,8 @@ export interface LockoutStatus {
  */
 @Injectable()
 export class AccountLockoutService {
+	private readonly logger = new Logger(AccountLockoutService.name);
+
 	constructor(
 		private readonly prisma: PrismaService,
 		private readonly config: RateLimitConfig,
@@ -116,9 +118,14 @@ export class AccountLockoutService {
 
 	/** Clear the account on a successful login (or credential rotation). Best-effort, never throws. */
 	async recordSuccess(scope: LoginScope, usernameKey: string): Promise<void> {
-		await this.prisma.loginLockout
-			.deleteMany({ where: { scope, usernameKey } })
-			.catch(() => undefined);
+		await this.prisma.loginLockout.deleteMany({ where: { scope, usernameKey } }).catch((error) => {
+			// §5.C: best-effort, but never silent — a stale failedCount can re-lock a just-authenticated
+			// account, so the operator must at least see why the reset failed.
+			const message = error instanceof Error ? error.message : String(error);
+			this.logger.warn(
+				JSON.stringify({ event: 'lockout_reset_failed', scope, usernameKey, message }),
+			);
+		});
 	}
 
 	/** Operator unlock — clears the lockout row. Returns whether a row was actually cleared. */

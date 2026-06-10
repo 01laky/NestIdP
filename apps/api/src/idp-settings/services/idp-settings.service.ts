@@ -411,6 +411,7 @@ export class IdpSettingsService {
 	private async completeRotationFor(
 		descriptor: CertKindDescriptor<unknown>,
 	): Promise<IdpSettingsPublicDto> {
+		this.assertNoAutoRotationCheckInFlight();
 		const settings = await this.findSettingsOrThrow();
 		if (!descriptor.hasPending(settings)) {
 			throw new ConflictException(descriptor.messages.noRotationInProgress);
@@ -431,6 +432,7 @@ export class IdpSettingsService {
 	private async cancelRotationFor(
 		descriptor: CertKindDescriptor<unknown>,
 	): Promise<IdpSettingsPublicDto> {
+		this.assertNoAutoRotationCheckInFlight();
 		const settings = await this.findSettingsOrThrow();
 		if (!descriptor.hasPending(settings)) {
 			throw new ConflictException(descriptor.messages.noRotationInProgress);
@@ -475,6 +477,33 @@ export class IdpSettingsService {
 	 * the other; nothing throws out of here.
 	 */
 	private autoRotationInFlight = false;
+
+	/**
+	 * Manual complete/cancel must not interleave with an in-flight auto-rotation check — a manual
+	 * promotion racing autoCompleteKind could double-promote (Prompt 38 §5.C). The check is quick, so
+	 * the admin simply retries.
+	 */
+	private assertNoAutoRotationCheckInFlight(): void {
+		if (this.autoRotationInFlight) {
+			throw new ConflictException(
+				'Automatic certificate rotation check is in progress — retry in a moment',
+			);
+		}
+	}
+
+	/** Notifier hooks are best-effort: a throwing/rejecting notifier must never break a rotation tick. */
+	private async notifySafe(notify: () => Promise<void> | void): Promise<void> {
+		try {
+			await notify();
+		} catch (error) {
+			this.autoLogger.warn(
+				JSON.stringify({
+					event: 'cert_rotation_notifier_error',
+					reason: redactSecrets(error instanceof Error ? error.message : String(error)),
+				}),
+			);
+		}
+	}
 
 	async runAutoRotationCheck(opts: {
 		trigger: 'scheduled' | 'manual' | 'boot';
@@ -557,6 +586,16 @@ export class IdpSettingsService {
 		}
 
 		const notAfter = parseCertNotAfterIso(activeCertPem);
+		if (notAfter === null) {
+			this.autoLogger.warn(
+				JSON.stringify({
+					event: 'cert_rotation_active_cert_unparseable',
+					kind,
+					message: 'Active certificate could not be parsed — auto-rotation cannot evaluate it',
+				}),
+			);
+			return settings;
+		}
 		if (isCertExpiringSoon(notAfter, this.certRotationConfig.leadDays(kind))) {
 			if (trigger === 'boot' && !this.withinBootGrace(notAfter, now)) {
 				return settings; // defer surprise rotation right after a deploy
@@ -564,7 +603,9 @@ export class IdpSettingsService {
 			return this.autoStartKind(kind, settings, now, dryRun);
 		}
 		if (isCertExpiringSoon(notAfter, this.certRotationConfig.notifyLeadDays())) {
-			this.certRotationNotifier.onAutoRotationDueSoon({ kind, activeCertNotAfter: notAfter });
+			await this.notifySafe(() =>
+				this.certRotationNotifier.onAutoRotationDueSoon({ kind, activeCertNotAfter: notAfter }),
+			);
 			this.audit.logAutoRotationDueSoon(kind, notAfter);
 		}
 		return settings;
@@ -579,7 +620,9 @@ export class IdpSettingsService {
 		const notAfter = this.notAfterFromDays(this.certRotationConfig.validityDays(), now);
 		if (dryRun) {
 			this.audit.logAutoRotationStarted(kind, true, { notAfter, would: 'auto_start' });
-			this.certRotationNotifier.onAutoRotationStarted({ kind, dryRun: true });
+			await this.notifySafe(() =>
+				this.certRotationNotifier.onAutoRotationStarted({ kind, dryRun: true }),
+			);
 			return settings;
 		}
 
@@ -623,11 +666,13 @@ export class IdpSettingsService {
 			},
 		});
 		this.audit.logAutoRotationStarted(kind, false, { notAfter });
-		this.certRotationNotifier.onAutoRotationStarted({
-			kind,
-			pendingCertNotAfter: notAfter,
-			willAutoCompleteAt: this.notAfterFromDays(this.certRotationConfig.overlapDays(kind), now),
-		});
+		await this.notifySafe(() =>
+			this.certRotationNotifier.onAutoRotationStarted({
+				kind,
+				pendingCertNotAfter: notAfter,
+				willAutoCompleteAt: this.notAfterFromDays(this.certRotationConfig.overlapDays(kind), now),
+			}),
+		);
 		return updated;
 	}
 
@@ -637,20 +682,28 @@ export class IdpSettingsService {
 		dryRun: boolean,
 	): Promise<IdpSettings> {
 		const settings = await this.findSettingsOrThrow();
+		const descriptor = this.descriptorFor(kind);
+		// Re-check on the freshly-read row: a manual complete/cancel may have cleared the pending slot
+		// since this tick's evaluation snapshot — promoting now would write nulls over the active cert.
+		if (!descriptor.hasPending(settings)) {
+			return settings;
+		}
 		if (dryRun) {
 			this.audit.logAutoRotationCompleted(kind, true);
-			this.certRotationNotifier.onAutoRotationCompleted({ kind, dryRun: true });
+			await this.notifySafe(() =>
+				this.certRotationNotifier.onAutoRotationCompleted({ kind, dryRun: true }),
+			);
 			return settings;
 		}
 
-		const promotion = this.descriptorFor(kind).completeData(settings);
+		const promotion = descriptor.completeData(settings);
 
 		const updated = await this.prisma.idpSettings.update({
 			where: { id: 'default' },
 			data: { ...promotion, lastAutoRotationActionAt: now, ...this.clearFailureData(kind) },
 		});
 		this.audit.logAutoRotationCompleted(kind, false);
-		this.certRotationNotifier.onAutoRotationCompleted({ kind });
+		await this.notifySafe(() => this.certRotationNotifier.onAutoRotationCompleted({ kind }));
 		return updated;
 	}
 
@@ -688,7 +741,7 @@ export class IdpSettingsService {
 		if (autodisable) {
 			this.audit.logAutoRotationAutodisabled(kind, count);
 		}
-		this.certRotationNotifier.onAutoRotationFailed({ kind, reason });
+		await this.notifySafe(() => this.certRotationNotifier.onAutoRotationFailed({ kind, reason }));
 		return updated;
 	}
 

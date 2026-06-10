@@ -47,7 +47,13 @@ export class ActiveIdentityStore {
 		return new Proxy(this, DELEGATING_HANDLER);
 	}
 
-	/** Swap the active delegate atomically. Pass the local repo (or mode 'local') to revert. */
+	/**
+	 * Swap the active delegate atomically. Pass the local repo (or mode 'local') to revert.
+	 *
+	 * Hot-swap window: the swap is atomic for NEW calls only — method calls already in flight finish
+	 * against the OLD delegate. Accepted: swaps happen only through the rare admin connect/disconnect
+	 * operations, and both delegates are consistent databases, so a straggler completes safely.
+	 */
 	setActive(store: IdentityStore, mode: IdentityStoreMode): void {
 		this.current = store;
 		this.currentMode = mode;

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Response } from 'express';
-import { END_USER_SESSION_COOKIE_NAME } from '@nestidp/shared';
+import { END_USER_SESSION_COOKIE_NAME, MAX_END_USER_SESSION_TTL_SECONDS } from '@nestidp/shared';
 import { HmacSessionCodec } from '../../common/session/hmac-session-codec';
 import { positiveIntOrDefault } from '../../common/config/positive-int.util';
 import { NodeEnv } from '../../config/env.validation';
@@ -15,14 +15,27 @@ export class EndUserSessionService {
 	private readonly codec: HmacSessionCodec<EndUserSessionPayload>;
 
 	constructor(private readonly configService: ConfigService) {
-		this.codec = new HmacSessionCodec(() => this.configService.get<string>('SESSION_SECRET') ?? '');
+		this.codec = new HmacSessionCodec(() => this.requireSessionSecret());
+		// §5.C: fail closed at construction — never fall back to HMAC-signing sessions with an empty key.
+		this.requireSessionSecret();
+	}
+
+	private requireSessionSecret(): string {
+		const secret = this.configService.get<string>('SESSION_SECRET');
+		if (!secret) {
+			throw new Error('SESSION_SECRET is not set — refusing to sign/verify end-user sessions');
+		}
+		return secret;
 	}
 
 	getSessionTtlSeconds(): number {
-		return positiveIntOrDefault(
+		// §5.C: clamp like the admin remember-me TTL — a misconfigured huge value must not produce a
+		// practically-immortal end-user session.
+		const ttl = positiveIntOrDefault(
 			this.configService.get<number | string>('END_USER_SESSION_TTL_SECONDS'),
 			DEFAULT_END_USER_SESSION_TTL_SECONDS,
 		);
+		return Math.min(ttl, MAX_END_USER_SESSION_TTL_SECONDS);
 	}
 
 	sign(payload: EndUserSessionPayload): string {

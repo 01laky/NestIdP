@@ -60,11 +60,17 @@ describe('EndUserLoginBodyDto validation', () => {
 		expect(errors.some((e) => e.property === 'username')).toBe(true);
 	});
 
-	it('API-AUTH-DTO-08: password longer than 256 fails MaxLength', async () => {
+	it('API-AUTH-DTO-08: password longer than 72 fails MaxLength (bcrypt 72-byte truncation)', async () => {
 		const errors = await validateLogin({
 			username: 'alice',
-			password: 'p'.repeat(257),
+			password: 'p'.repeat(73),
 		});
 		expect(errors.some((e) => e.property === 'password')).toBe(true);
+
+		const ok = await validateLogin({
+			username: 'alice',
+			password: 'p'.repeat(72),
+		});
+		expect(ok.some((e) => e.property === 'password')).toBe(false);
 	});
 });

@@ -74,7 +74,32 @@ frontend de-duplication) and remaining items land in subsequent commits under th
   `admin/adminApi/` (`core` — `adminFetch`/`AdminApiError`/CSRF/`toQuery`; then `auth`, `api-connections`,
   `sp-connections`, `sync`, `saml-sessions`, `identity`, `idp-settings`, `audit`, `external-db`), with
   `admin/adminApi.ts` reduced to a re-export barrel. No call sites or tests changed — `import … from
-  '../adminApi'` and the `vi.spyOn(adminApi, …)` pattern (~480 sites) keep working through the barrel.
+'../adminApi'` and the `vi.spyOn(adminApi, …)` pattern (~480 sites) keep working through the barrel.
+
+- **Injectable clock/randomness in cert-rotation time paths** (§18): `isCertExpiringSoon` takes an
+  injectable `now` (tests run against a fixed clock), and the scheduler's `applyJitter` uses injectable
+  randomness instead of `Date.now() % range` — which was a deterministic, predictable function of
+  wall-clock, i.e. not jitter at all (aligned instances would collide).
+
+### Added
+
+- **Migration-safety guard** (§17): `assertSplittableSql` in the boot migrator rejects any
+  `migration.sql` the naive `;`-splitter cannot apply safely — `CREATE TRIGGER`, standalone
+  `BEGIN`/`END`, a `;` inside a string literal, or an unterminated literal — with a
+  `DbMigrationError('unsafe_migration')` naming the offending file, **before** any DDL runs. The
+  constraints are documented in the new `docs/migrations.md`; the `MIG-GUARD-*` tests also assert every
+  real migration in `apps/api/prisma/migrations/` passes the guard.
+- **Race-harness self-test** (§12): `RACE-SELF-*` tests prove `runConcurrently` genuinely overlaps its
+  invocations (all N in flight simultaneously before any completes) — a race regression test built on a
+  secretly-serialising helper would prove nothing.
+- **Typed-config ratchet** (§19): `scripts/check-config-access.mjs` (wired into root `pnpm lint`) freezes
+  the current set of files reading `ConfigService` directly — a new direct reader outside the `*Config`
+  provider files fails lint, and a migrated file must be removed from the allowlist (the list can only
+  shrink). It already caught the schedules-overview cleanup dropping its last direct read.
+- **Bundle hygiene check** (§19): `scripts/check-web-bundle-size.mjs` now also scans every SPA chunk for
+  server-only dependency markers (`@prisma/client`, `@libsql/client`, `xmlbuilder2`) and fails the build
+  on a leak. `cron-parser` is deliberately **not** on the list: the admin schedule form legitimately uses
+  the shared cron helpers client-side for validation and the "next runs" preview.
 
 ### Security
 
@@ -94,7 +119,7 @@ frontend de-duplication) and remaining items land in subsequent commits under th
   certificate DER instead of shelling out to `openssl x509 -ext keyUsage` per upload. This removes the
   synchronous event-loop block, the temp-file write, and the dependency on the `openssl` binary and its
   locale-specific output (any failure of which previously rejected a valid cert). It fails closed on
-  non-certificate input. (`X509Certificate.keyUsage` is unusable here — Node exposes the *extended* key
+  non-certificate input. (`X509Certificate.keyUsage` is unusable here — Node exposes the _extended_ key
   usage there, not the basic KeyUsage bits.)
 - **Certificate crypto metadata is no longer silently mislabelled** (§B8) — `detectRsaModulusBits` now
   throws when the RSA modulus size can't be read (instead of storing a wrong `2048`), and `namedCurveToLabel`
@@ -115,6 +140,62 @@ frontend de-duplication) and remaining items land in subsequent commits under th
 
 ### Fixed
 
+- **API small correctness fixes** (§5.C, api batch) — the remaining low-severity FIX items from the
+  PART I module audit, each with a regression test:
+  - _Sync_: rows with a missing/non-string external user id now emit explicit `parse_users` error entries
+    instead of being silently dropped (and later deactivated); the paginated users fetch now **throws** the
+    same `user_limit` validation error as the non-paginated path when the cap is exceeded (was: silent
+    truncation) and stops on a repeated page; the per-connection collision-policy override is validated on
+    read (unknown values fall back to the global policy); the schedules overview counts `manual_all` runs
+    separately (new additive `manualAllRunCount` DTO field) instead of folding them into "manual"; the
+    error-list truncation marker uses a new dedicated `truncated` phase (was: polluted `parse_users`);
+    `parseSyncLogErrors` validates DB JSON instead of blind-casting; `POST sync/:id` accepts `?dryRun=true`
+    like `sync/all`; `removeSourceIdentities` session termination is bounded (shared `runPool`, concurrency
+    5) with per-user error isolation; the connection-test preview applies the same users-per-run cap as a
+    real sync; the username-only proxy `Basic` credential and the stale-run reclaim window are documented.
+  - _SAML_: the admin session-list search escapes LIKE wildcards and matches case-insensitively (same fix
+    as the identity stores); back-channel logout verification reads `SAML_CLOCK_SKEW_SECONDS` instead of a
+    hardcoded 60s; a SOAP `LogoutResponse` without `InResponseTo` is rejected; the SLO replay-id is recorded
+    only after session termination succeeds (a failed logout no longer burns the id against the SP's
+    legitimate retry); the `logout_completed` audit fires only after the response is actually built/signed;
+    the LogoutRequest builder rejects an empty NameID and filters empty SessionIndexes; the non-standard
+    `Issuer` attribute fallback in request parsing was removed; dead base64 try/catch removed; the fixed
+    `PasswordProtectedTransport` AuthnContextClassRef is documented as intentional (password-only scope).
+  - _Identity stores_: the store interface's `upsert*` methods now return the full row (the external store
+    returned bare `{id}` against a richer local implementation); `pgSchema` is **finally wired** — the pg
+    pool sets `search_path` (and schema bootstrap creates the schema) so external tables can live outside
+    `public`, with identifier validation on the DTO; external schema init is transactional (no more
+    half-init misclassified as a foreign DB); the circuit-breaker `state` getter no longer reports
+    `half-open` below the trip threshold; boot-activation failure now records `reachable=false`; dead
+    `markConnected` spread/param removed; deleting a user terminates its SSO sessions with a new dedicated
+    `user_deleted` reason (was: `user_deactivated`); identity list filters validate `apiConnectionId`
+    (garbage → 400, not a silently empty page).
+  - _IdP settings / certs_: an unparseable active cert now logs a warning during auto-rotation evaluation
+    (was: silently never rotates); manual complete/cancel rotation take the auto-rotation in-flight guard
+    (409 instead of racing the auto driver), and auto-complete re-checks pending state on its fresh read
+    (a vanished rotation is a no-op, not a null-overwrite of the active cert); EC encryption uploads get a
+    real ECDH key-agreement probe (mirroring the RSA encrypt/decrypt probe — ECDH-ES is supported
+    end-to-end); rotation notifier calls are awaited and error-guarded (a throwing notifier can no longer
+    break the scheduler tick).
+  - _Auth / common / shared_: `SESSION_SECRET` fails closed (boot `@MinLength(16)` validation + both
+    session services throw on an empty secret instead of HMAC-ing with `''`); the end-user session TTL is
+    clamped (90-day ceiling, mirroring the admin clamp); end-user logout is audited; an operator password
+    reset clears the target's lockout (a locked-out admin no longer stays locked after a reset); the
+    lockout-reset best-effort delete logs its failure instead of swallowing it; the IP-ban audit records
+    the real observed trip count (was: always the configured threshold); initial-admin bootstrap is audited
+    (`admin_user_bootstrapped`); the timing-equalisation dummy bcrypt hash follows the configured cost
+    factor; password DTOs cap at bcrypt's 72-byte input limit (login/rotation paths for legacy hashes
+    deliberately keep their old bounds); audit `since`/`until` validate as ISO-8601; `ParseCuidPipe` is
+    lowercase-only and length-bounded (a 10 KB "id" no longer reaches the DB); a global
+    `RedactingExceptionFilter` deep-redacts secrets in every outgoing HTTP error payload (§B10's last
+    piece); the SP certificate is parsed with `X509Certificate` at upload (was: substring sniffing — a
+    structurally broken cert failed later at SSO time); dead `requireHttps` option, four dead `@deprecated`
+    shared stubs and a `while`-that-was-an-`if` in `validateProxyUrl` removed.
+- **Multi-write operations made atomic** (§14): `completeSso`'s participation-create + one-time SAML-session
+  delete now run in one transaction (a crash between them could leave a replayable pending session or an SSO
+  session invisible to SLO fan-out), and `purgeExpiredSessions` deletes pending sessions, expired SSO
+  sessions and stale replay-log rows in one transaction — returning the **full** purged count (previously
+  only the pending-session count was reported).
 - **Admin SPA small correctness fixes** (§5.C, web batch): the external-DB, SAML-sessions and
   API-connections pages no longer toast raw `error.message` (all error paths now flow through
   `mapAdminError`, with five new `externalDb.*Failed` fallback keys across all 10 locales); the audit log
@@ -152,7 +233,7 @@ frontend de-duplication) and remaining items land in subsequent commits under th
 - **OAuth token cache invalidation** — deleting or updating an API connection now evicts its cached token /
   in-flight exchange / last-token timestamp (`OAuthTokenService.invalidate`).
 - **OAuth token cache: no decrypt on hit + `forceRefresh` single-flight** (§B13) — the cache key is now
-  derived from the *encrypted* client-secret blob, so a cache hit no longer decrypts the stored secret on
+  derived from the _encrypted_ client-secret blob, so a cache hit no longer decrypts the stored secret on
   every sync request (re-encryption of the same secret is a conservative miss, never a stale hit); and
   `forceRefresh` now joins an already-in-flight exchange instead of starting a competing one (the in-flight
   exchange already returns a brand-new token), eliminating the double token-endpoint hit and the orphaned

@@ -936,6 +936,29 @@ describe('ApiConnectionsService', () => {
 			expect(audit.logSourceIdentitiesRemoved).toHaveBeenCalled();
 		});
 
+		it('MAS-REMOVE-03: one failing terminateAllForUser does not abort the rest (§5.C)', async () => {
+			prisma.apiConnection.findUnique.mockResolvedValue({ ...sampleRow, isLocalDirectory: false });
+			identityStore.syncedUserIdsForConnection.mockResolvedValue(['u1', 'u2', 'u3']);
+			identityStore.removeConnectionIdentities.mockResolvedValue({
+				usersRemoved: 3,
+				groupsRemoved: 0,
+				rolesRemoved: 0,
+			});
+			ssoSessions.terminateAllForUser.mockImplementation(async (userId: string) => {
+				if (userId === 'u2') {
+					throw new Error('SLO fan-out exploded');
+				}
+				return 1;
+			});
+
+			const res = await service.removeSourceIdentities(sampleRow.id, 'delete');
+
+			// All three users were attempted; the u2 failure is logged and skipped.
+			expect(ssoSessions.terminateAllForUser).toHaveBeenCalledTimes(3);
+			expect(res.sessionsTerminated).toBe(2);
+			expect(identityStore.removeConnectionIdentities).toHaveBeenCalledWith(sampleRow.id, 'delete');
+		});
+
 		it('MAS-REMOVE-02: the local-directory connection’s identities cannot be removed this way', async () => {
 			prisma.apiConnection.findUnique.mockResolvedValue({ ...sampleRow, isLocalDirectory: true });
 			// findOrThrow rejects the local-directory connection up front (Forbidden), never deleting identities.

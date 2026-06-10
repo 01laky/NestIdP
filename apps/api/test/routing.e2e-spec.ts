@@ -28,6 +28,7 @@ describe('Routing (e2e)', () => {
 		pingDatabase: jest.fn(),
 		appliedMigrationCount: jest.fn().mockResolvedValue(0),
 		$disconnect: jest.fn(),
+		$transaction: jest.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
 		user: {
 			count: jest.fn().mockResolvedValue(0),
 			findUnique: jest.fn(),

@@ -210,7 +210,7 @@ export class SqlIdentityStore implements IdentityStore {
 		};
 	}
 
-	async upsertUser(connectionId: string, user: UpsertUserInput): Promise<{ id: string }> {
+	async upsertUser(connectionId: string, user: UpsertUserInput): Promise<StoreUser> {
 		const existingByUsername = await this.db
 			.selectFrom(T_USER)
 			.select(['id', 'api_connection_id', 'external_id', 'password_hash'])
@@ -239,7 +239,7 @@ export class SqlIdentityStore implements IdentityStore {
 
 		const existing = await this.db
 			.selectFrom(T_USER)
-			.select(['id', 'origin'])
+			.select(['id', 'origin', 'created_at'])
 			.where('api_connection_id', '=', connectionId)
 			.where('external_id', '=', user.externalId)
 			.executeTakeFirst();
@@ -248,6 +248,7 @@ export class SqlIdentityStore implements IdentityStore {
 		}
 
 		if (existing) {
+			const updatedAt = this.now();
 			await this.db
 				.updateTable(T_USER)
 				.set({
@@ -257,14 +258,27 @@ export class SqlIdentityStore implements IdentityStore {
 					password_hash: user.passwordHash,
 					password_hash_algorithm: user.passwordHashAlgorithm,
 					active: user.active,
-					updated_at: this.now(),
+					updated_at: updatedAt,
 				})
 				.where('id', '=', existing.id)
 				.execute();
 			if (credentialRotated) {
 				await this.accountLockout?.recordSuccess('end_user', user.username.trim());
 			}
-			return { id: existing.id };
+			return {
+				id: existing.id,
+				externalId: user.externalId,
+				apiConnectionId: connectionId,
+				origin: toOrigin(existing.origin),
+				username: user.username,
+				email,
+				displayName: user.displayName,
+				passwordHash: user.passwordHash,
+				passwordHashAlgorithm: user.passwordHashAlgorithm,
+				active: user.active,
+				createdAt: new Date(existing.created_at),
+				updatedAt,
+			};
 		}
 
 		const id = cuid();
@@ -303,7 +317,20 @@ export class SqlIdentityStore implements IdentityStore {
 			}
 			throw error;
 		}
-		return { id };
+		return {
+			id,
+			externalId: user.externalId,
+			apiConnectionId: connectionId,
+			origin: IdentityOrigin.SYNCED,
+			username: user.username,
+			email,
+			displayName: user.displayName,
+			passwordHash: user.passwordHash,
+			passwordHashAlgorithm: user.passwordHashAlgorithm,
+			active: user.active,
+			createdAt: now,
+			updatedAt: now,
+		};
 	}
 
 	async replaceUserGroups(userId: string, groupIds: string[]): Promise<void> {
@@ -366,21 +393,30 @@ export class SqlIdentityStore implements IdentityStore {
 		connectionId: string,
 		external: { id: string; name: string },
 		onCollision: () => never,
-	): Promise<{ id: string }> {
+	): Promise<StoreGroup> {
 		try {
 			const existing = await this.db
 				.selectFrom(table)
-				.select(['id'])
+				.select(['id', 'origin', 'created_at'])
 				.where('api_connection_id', '=', connectionId)
 				.where('external_id', '=', external.id)
 				.executeTakeFirst();
 			if (existing) {
+				const updatedAt = this.now();
 				await this.db
 					.updateTable(table)
-					.set({ name: external.name, updated_at: this.now() })
+					.set({ name: external.name, updated_at: updatedAt })
 					.where('id', '=', existing.id)
 					.execute();
-				return { id: existing.id };
+				return {
+					id: existing.id,
+					externalId: external.id,
+					apiConnectionId: connectionId,
+					origin: toOrigin(existing.origin),
+					name: external.name,
+					createdAt: new Date(existing.created_at),
+					updatedAt,
+				};
 			}
 			const id = cuid();
 			const now = this.now();
@@ -396,7 +432,15 @@ export class SqlIdentityStore implements IdentityStore {
 					updated_at: now,
 				})
 				.execute();
-			return { id };
+			return {
+				id,
+				externalId: external.id,
+				apiConnectionId: connectionId,
+				origin: IdentityOrigin.SYNCED,
+				name: external.name,
+				createdAt: now,
+				updatedAt: now,
+			};
 		} catch (error) {
 			if (isUniqueViolation(error)) {
 				onCollision();
@@ -408,16 +452,13 @@ export class SqlIdentityStore implements IdentityStore {
 	upsertGroup(
 		connectionId: string,
 		externalGroup: { id: string; name: string },
-	): Promise<{ id: string }> {
+	): Promise<StoreGroup> {
 		return this.upsertNamed(T_GROUP, connectionId, externalGroup, () => {
 			throw new GroupNameCollisionError(externalGroup.id, externalGroup.name);
 		});
 	}
 
-	upsertRole(
-		connectionId: string,
-		externalRole: { id: string; name: string },
-	): Promise<{ id: string }> {
+	upsertRole(connectionId: string, externalRole: { id: string; name: string }): Promise<StoreRole> {
 		return this.upsertNamed(T_ROLE, connectionId, externalRole, () => {
 			throw new RoleNameCollisionError(externalRole.id, externalRole.name);
 		});

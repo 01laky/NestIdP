@@ -150,21 +150,6 @@ export class SamlLogoutService {
 			throw new BadRequestException(signature.reason);
 		}
 
-		// Replay protection — only AFTER signature is valid.
-		try {
-			await this.sessions.recordLogoutRequestId(parsed.id, sp.id);
-		} catch (error) {
-			if (isUniqueConstraintError(error)) {
-				this.audit.logLogoutRequestRejected(
-					'logout_request_replayed',
-					ctx.clientIp,
-					ctx.bindingType,
-				);
-				throw new BadRequestException('LogoutRequest replayed');
-			}
-			throw error;
-		}
-
 		this.audit.logLogoutRequestReceived({
 			spEntityId: sp.spEntityId,
 			logoutRequestId: parsed.id,
@@ -190,17 +175,37 @@ export class SamlLogoutService {
 			sessionTerminated = result.found && !result.alreadyTerminated;
 		}
 
-		// Build + deliver the LogoutResponse.
-		const responseDelivered = Boolean(sp.sloUrl);
-		this.audit.logLogoutCompleted({
-			spEntityId: sp.spEntityId,
-			spConnectionId: sp.id,
-			bindingType: ctx.bindingType,
-			responseDelivered,
-			sessionTerminated,
-		});
+		// Replay protection — recorded only AFTER the terminate succeeded (§5.C): recording first would
+		// burn the request id on a terminate failure and reject the SP's legitimate retry as a replay.
+		// Trade-off: a concurrent replay can race into a double terminate, which is idempotent — the
+		// sessions are already gone.
+		try {
+			await this.sessions.recordLogoutRequestId(parsed.id, sp.id);
+		} catch (error) {
+			if (isUniqueConstraintError(error)) {
+				this.audit.logLogoutRequestRejected(
+					'logout_request_replayed',
+					ctx.clientIp,
+					ctx.bindingType,
+				);
+				throw new BadRequestException('LogoutRequest replayed');
+			}
+			throw error;
+		}
+
+		// Build + deliver the LogoutResponse. `logout_completed` is audited only after the response has
+		// actually been built + signed (§5.C) — a signing failure must not produce a false "completed".
+		const completed = (responseDelivered: boolean) =>
+			this.audit.logLogoutCompleted({
+				spEntityId: sp.spEntityId,
+				spConnectionId: sp.id,
+				bindingType: ctx.bindingType,
+				responseDelivered,
+				sessionTerminated,
+			});
 
 		if (!sp.sloUrl) {
+			completed(false);
 			return { delivery: { type: 'logged-out' }, clearEndUserCookie: true };
 		}
 
@@ -216,6 +221,7 @@ export class SamlLogoutService {
 			const signedXml = this.idpSigning.signLogoutResponse(built.xml, material, built.responseId);
 			const base64 = Buffer.from(signedXml, 'utf8').toString('base64');
 			const html = this.postBinding.renderAutoPostForm(sp.sloUrl, base64, ctx.relayState);
+			completed(true);
 			return { delivery: { type: 'post', html }, clearEndUserCookie: true };
 		}
 
@@ -229,6 +235,7 @@ export class SamlLogoutService {
 			privateKeyPem: material.privateKeyPem,
 		});
 		const separator = sp.sloUrl.includes('?') ? '&' : '?';
+		completed(true);
 		return {
 			delivery: { type: 'redirect', url: `${sp.sloUrl}${separator}${query}` },
 			clearEndUserCookie: true,
@@ -308,12 +315,8 @@ export class SamlLogoutService {
 		if (!encoded || encoded.trim().length === 0) {
 			throw new BadRequestException('Missing SAMLRequest');
 		}
-		let xml: string;
-		try {
-			xml = Buffer.from(encoded, 'base64').toString('utf8');
-		} catch {
-			throw new BadRequestException('Invalid SAMLRequest encoding');
-		}
+		// Buffer.from(..., 'base64') never throws — malformed input just yields bytes that fail XML parsing.
+		const xml = Buffer.from(encoded, 'base64').toString('utf8');
 		if (
 			xml.length > 0 &&
 			xml.charCodeAt(0) < 0x20 &&

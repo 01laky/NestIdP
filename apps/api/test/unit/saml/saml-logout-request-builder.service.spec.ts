@@ -72,6 +72,24 @@ describe('SamlLogoutRequestBuilderService + signLogoutRequest (BC-BUILD)', () =>
 		expect(xml).not.toContain('<samlp:SessionIndex>');
 	});
 
+	it('BC-BUILD-09: empty / whitespace-only NameID throws instead of emitting <NameID/> (§5.C)', () => {
+		expect(() => builder.build({ ...baseInput, nameId: '' })).toThrow(
+			'LogoutRequest requires a non-empty NameID',
+		);
+		expect(() => builder.build({ ...baseInput, nameId: '   ' })).toThrow(
+			'LogoutRequest requires a non-empty NameID',
+		);
+	});
+
+	it('BC-BUILD-10: empty / whitespace session indexes are dropped (zero elements is valid SLO)', () => {
+		const { xml } = builder.build({ ...baseInput, sessionIndexes: ['', '  ', '_keep'] });
+		const count = (xml.match(/<samlp:SessionIndex>/g) ?? []).length;
+		expect(count).toBe(1);
+		expect(xml).toContain('<samlp:SessionIndex>_keep</samlp:SessionIndex>');
+		const { xml: none } = builder.build({ ...baseInput, sessionIndexes: ['', '   '] });
+		expect(none).not.toContain('<samlp:SessionIndex>');
+	});
+
 	it('BC-BUILD-03: XML-escapes special chars in NameID / Destination / Issuer / SessionIndex', () => {
 		const { xml } = builder.build({
 			...baseInput,

@@ -185,5 +185,11 @@ export function useCertActions<TOptions>(
 		});
 	}
 
-	return { generatePrimary, uploadPrimary, startRotationGenerate, completeRotation, cancelRotation };
+	return {
+		generatePrimary,
+		uploadPrimary,
+		startRotationGenerate,
+		completeRotation,
+		cancelRotation,
+	};
 }

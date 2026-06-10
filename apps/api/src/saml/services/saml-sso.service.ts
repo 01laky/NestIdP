@@ -459,17 +459,26 @@ export class SamlSsoService {
 			session.relayState ?? undefined,
 		);
 
+		// §14: participation-create + one-time SAML-session delete are atomic — a crash between them
+		// would otherwise leave either a replayable pending session (participation without delete) or
+		// an SSO session the SLO fan-out doesn't know about (delete without participation).
 		if (ssoSessionId) {
-			await this.ssoSessions.createParticipation({
-				ssoSessionId,
-				spConnectionId: session.spConnectionId,
-				sessionIndex,
-				nameId,
-				nameIdFormat,
+			await this.prisma.$transaction(async (tx) => {
+				await this.ssoSessions.createParticipation(
+					{
+						ssoSessionId,
+						spConnectionId: session.spConnectionId,
+						sessionIndex,
+						nameId,
+						nameIdFormat,
+					},
+					tx,
+				);
+				await tx.samlSession.delete({ where: { id: samlSessionId } });
 			});
+		} else {
+			await this.prisma.samlSession.delete({ where: { id: samlSessionId } });
 		}
-
-		await this.prisma.samlSession.delete({ where: { id: samlSessionId } });
 
 		this.audit.logResponseIssued({
 			samlSessionId,

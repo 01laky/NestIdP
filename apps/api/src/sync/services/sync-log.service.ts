@@ -115,7 +115,7 @@ export function capSyncErrors(
 	}
 	return [
 		...errors.slice(0, MAX_SYNC_ERRORS - 1),
-		{ phase: 'parse_users', message: 'Additional errors truncated' },
+		{ phase: 'truncated', message: 'Additional errors truncated' },
 	];
 }
 

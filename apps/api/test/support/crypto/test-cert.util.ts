@@ -44,6 +44,35 @@ export function generateTestRsaEncryptionCert(
 	}
 }
 
+/** Build a test EC encryption cert with proper key usage (for the ECDH-probe fixtures). */
+export function generateTestEcEncryptionCert(
+	entityId: string,
+	curve: 'P-256' | 'P-384' | 'P-521' = 'P-256',
+	days = 365,
+): { privateKeyPem: string; certPem: string } {
+	const namedCurve =
+		curve === 'P-256' ? 'prime256v1' : curve === 'P-384' ? 'secp384r1' : 'secp521r1';
+	const { privateKey } = generateKeyPairSync('ec', {
+		namedCurve,
+		privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+		publicKeyEncoding: { type: 'spki', format: 'pem' },
+	});
+	const tmp = mkdtempSync(join(tmpdir(), 'nestidp-test-ec-enc-cert-'));
+	try {
+		const keyPath = join(tmp, 'key.pem');
+		const certPath = join(tmp, 'cert.pem');
+		writeFileSync(keyPath, privateKey);
+		const cn = entityId.replace(/^https?:\/\//, '').slice(0, 64) || 'nestidp';
+		execSync(
+			`openssl req -new -x509 -key "${keyPath}" -out "${certPath}" -days ${days} -subj "/CN=${cn}" -nodes -addext keyUsage=keyEncipherment,dataEncipherment`,
+			{ stdio: 'pipe' },
+		);
+		return { privateKeyPem: privateKey, certPem: readFileSync(certPath, 'utf8') };
+	} finally {
+		rmSync(tmp, { recursive: true, force: true });
+	}
+}
+
 /** Detect uploaded signing cert mistakenly used as encryption cert. */
 export function isSigningOnlyCertPair(certPem: string, privateKeyPem: string): boolean {
 	try {

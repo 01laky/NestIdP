@@ -1,6 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import type { Response } from 'express';
-import { END_USER_SESSION_COOKIE_NAME } from '@nestidp/shared';
+import { END_USER_SESSION_COOKIE_NAME, MAX_END_USER_SESSION_TTL_SECONDS } from '@nestidp/shared';
 import { EndUserSessionService } from '@api/auth/services/end-user-session.service';
 
 describe('EndUserSessionService', () => {
@@ -120,5 +120,28 @@ describe('EndUserSessionService', () => {
 			END_USER_SESSION_COOKIE_NAME,
 			expect.objectContaining({ path: '/', sameSite: 'lax', httpOnly: true }),
 		);
+	});
+
+	it('API-AUTH-SESSION-09: missing/empty SESSION_SECRET → constructor throws (fail closed)', () => {
+		const emptyConfig = {
+			get: jest.fn(() => undefined),
+		} as unknown as ConfigService;
+		expect(() => new EndUserSessionService(emptyConfig)).toThrow(/SESSION_SECRET/);
+		const blankConfig = {
+			get: jest.fn((key: string) => (key === 'SESSION_SECRET' ? '' : 'test')),
+		} as unknown as ConfigService;
+		expect(() => new EndUserSessionService(blankConfig)).toThrow(/SESSION_SECRET/);
+	});
+
+	it('API-AUTH-SESSION-10: TTL from env is clamped to the 90-day ceiling', () => {
+		const hugeConfig = {
+			get: jest.fn((key: string) => {
+				if (key === 'SESSION_SECRET') return 'test-session-secret-min-16';
+				if (key === 'END_USER_SESSION_TTL_SECONDS') return '99999999';
+				return 'test';
+			}),
+		} as unknown as ConfigService;
+		const hugeService = new EndUserSessionService(hugeConfig);
+		expect(hugeService.getSessionTtlSeconds()).toBe(MAX_END_USER_SESSION_TTL_SECONDS);
 	});
 });

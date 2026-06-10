@@ -106,6 +106,3 @@ export interface AdminDashboardSyncSourceHealthDto {
 	/** neverSynced + failing + overdue — the count the warning widget surfaces. */
 	unhealthy: number;
 }
-
-/** @deprecated Use AdminDashboardResponseDto */
-export type AdminStubResponseDto = AdminDashboardResponseDto;

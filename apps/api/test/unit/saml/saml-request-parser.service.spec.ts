@@ -87,6 +87,15 @@ describe('SamlRequestParserService', () => {
 		);
 	});
 
+	it('API-SAML-PARSE-05b: Issuer as an attribute (non-standard, no element) → 400 (§5.C)', async () => {
+		// Per the SAML spec Issuer is an element; the old attribute fallback was dead code and is gone.
+		const xml = `<?xml version="1.0"?>
+<samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" ID="_attr-issuer" Version="2.0" IssueInstant="${new Date().toISOString()}" Destination="http://localhost:3000/saml/sso" Issuer="urn:test:sp"/>`;
+		await expect(parser.parseRedirectBinding(validEncodedRequest({ xml }))).rejects.toThrow(
+			BadRequestException,
+		);
+	});
+
 	it('API-SAML-PARSE-06: IssueInstant too far in future → 400', async () => {
 		const future = new Date(Date.now() + 10 * 60_000).toISOString();
 		await expect(

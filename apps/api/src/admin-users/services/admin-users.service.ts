@@ -129,6 +129,9 @@ export class AdminUsersService {
 			where: { id },
 			data: { passwordHash },
 		});
+		// §5.C: credential rotated by an operator — clear any brute-force lockout so the target can log in
+		// with the new password immediately (mirrors admin-auth changePassword).
+		await this.accountLockout.recordSuccess('admin', existing.username.trim());
 		this.audit.recordSafe({
 			category: 'admin_config',
 			event: 'admin_user_updated',

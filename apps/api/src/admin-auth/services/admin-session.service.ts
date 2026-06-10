@@ -26,7 +26,17 @@ export class AdminSessionService {
 	private readonly codec: HmacSessionCodec<AdminSessionPayload>;
 
 	constructor(private readonly configService: ConfigService) {
-		this.codec = new HmacSessionCodec(() => this.configService.get<string>('SESSION_SECRET') ?? '');
+		this.codec = new HmacSessionCodec(() => this.requireSessionSecret());
+		// §5.C: fail closed at construction — never fall back to HMAC-signing sessions with an empty key.
+		this.requireSessionSecret();
+	}
+
+	private requireSessionSecret(): string {
+		const secret = this.configService.get<string>('SESSION_SECRET');
+		if (!secret) {
+			throw new Error('SESSION_SECRET is not set — refusing to sign/verify admin sessions');
+		}
+		return secret;
 	}
 
 	getSessionTtlSeconds(remember = false): number {

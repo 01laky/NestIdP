@@ -126,8 +126,13 @@ describe('IdentitySyncClientService', () => {
 	});
 
 	it('API-SYNC-CONTRACT-E2-02: page pagination stops at maxPages', async () => {
-		const fullPage = [{ id: 'x' }, { id: 'y' }];
-		const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue(jsonResponse(fullPage));
+		// Distinct full pages (a repeating page would trip the §5.C duplicate-page guard instead).
+		let call = 0;
+		const fetchMock = jest.spyOn(global, 'fetch').mockImplementation(async () => {
+			const page = call;
+			call += 1;
+			return jsonResponse([{ id: `x${page}` }, { id: `y${page}` }]);
+		});
 		const rows = await service.fetchUsersRaw(
 			BASE,
 			BEARER_TOKEN,
@@ -142,9 +147,30 @@ describe('IdentitySyncClientService', () => {
 				},
 			}),
 		);
-		// Without dedup at the client level, 3 full pages × 2 = 6 rows.
 		expect(rows).toHaveLength(6);
 		expect(fetchMock).toHaveBeenCalledTimes(3);
+	});
+
+	it('API-SYNC-CONTRACT-E2-03: a repeated page (server ignores paging params) stops pagination (§5.C)', async () => {
+		const samePage = [{ id: 'x' }, { id: 'y' }];
+		const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue(jsonResponse(samePage));
+		const rows = await service.fetchUsersRaw(
+			BASE,
+			BEARER_TOKEN,
+			C({
+				pagination: {
+					mode: 'page',
+					pageParam: 'page',
+					limitParam: 'per_page',
+					pageSize: 2,
+					startPage: 1,
+					maxPages: 50,
+				},
+			}),
+		);
+		// Page 2 starts with the same first row as page 1 → not advancing → stop after 2 fetches.
+		expect(rows).toHaveLength(2);
+		expect(fetchMock).toHaveBeenCalledTimes(2);
 	});
 
 	it('API-CONTRACT-E3-01: extra headers are sent', async () => {
@@ -222,11 +248,43 @@ describe('IdentitySyncClientService', () => {
 		expect(custom.getHttpTimeoutMs()).toBe(15_000);
 	});
 
-	it('EDGE: pagination stops + truncates at SYNC_MAX_USERS_PER_RUN', async () => {
+	it('EDGE: paginated users over SYNC_MAX_USERS_PER_RUN throws like the non-paginated path (§5.C)', async () => {
 		const capped = new IdentitySyncClientService({
 			get: jest.fn((k: string) => (k === 'SYNC_MAX_USERS_PER_RUN' ? '3' : undefined)),
 		} as unknown as ConfigService);
-		jest.spyOn(global, 'fetch').mockResolvedValue(jsonResponse([{ id: 'a' }, { id: 'b' }]));
+		// Distinct full pages so the duplicate-page guard does not stop the loop first.
+		let call = 0;
+		jest.spyOn(global, 'fetch').mockImplementation(async () => {
+			const page = call;
+			call += 1;
+			return jsonResponse([{ id: `a${page}` }, { id: `b${page}` }]);
+		});
+		await expect(
+			capped.fetchUsersRaw(
+				BASE,
+				BEARER_TOKEN,
+				C({
+					pagination: {
+						mode: 'offset',
+						offsetParam: 'o',
+						limitParam: 'l',
+						pageSize: 2,
+						maxPages: 100,
+					},
+				}),
+			),
+		).rejects.toThrow('User count exceeds limit of 3');
+	});
+
+	it('EDGE: paginated users totalling exactly the cap succeed (§5.C)', async () => {
+		const capped = new IdentitySyncClientService({
+			get: jest.fn((k: string) => (k === 'SYNC_MAX_USERS_PER_RUN' ? '4' : undefined)),
+		} as unknown as ConfigService);
+		const fetchMock = jest
+			.spyOn(global, 'fetch')
+			.mockResolvedValueOnce(jsonResponse([{ id: 'a' }, { id: 'b' }]))
+			.mockResolvedValueOnce(jsonResponse([{ id: 'c' }, { id: 'd' }]))
+			.mockResolvedValueOnce(jsonResponse([]));
 		const rows = await capped.fetchUsersRaw(
 			BASE,
 			BEARER_TOKEN,
@@ -240,7 +298,8 @@ describe('IdentitySyncClientService', () => {
 				},
 			}),
 		);
-		expect(rows).toHaveLength(3); // capped at 3 even though pages keep returning 2
+		expect(rows).toHaveLength(4);
+		expect(fetchMock).toHaveBeenCalledTimes(3);
 	});
 
 	it('EDGE: empty first page → zero rows, single request', async () => {

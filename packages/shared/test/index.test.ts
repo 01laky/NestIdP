@@ -2,8 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	API_CONNECTION_ROUTE_PREFIX,
 	SP_CONNECTION_ROUTE_PREFIX,
-	type ApiConnectionStubDto,
-	type SpConnectionStubDto,
+	type ApiConnectionDto,
 } from '@shared/connections.js';
 import type { HealthResponse, ReadyCheckResult, ReadyResponse } from '@shared/health.js';
 
@@ -25,8 +24,8 @@ describe('connection route prefixes', () => {
 	});
 });
 
-describe('ApiConnectionStubDto', () => {
-	const fullDto: ApiConnectionStubDto = {
+describe('ApiConnectionDto', () => {
+	const fullDto: ApiConnectionDto = {
 		id: 'conn-1',
 		name: 'HR System',
 		baseUrl: 'https://hr.example.com/api',
@@ -60,7 +59,7 @@ describe('ApiConnectionStubDto', () => {
 	});
 
 	it('accepts sync metadata fields aligned with schema', () => {
-		const dto: ApiConnectionStubDto = {
+		const dto: ApiConnectionDto = {
 			...fullDto,
 			lastSyncStatus: 'SUCCESS',
 			lastSyncAt: '2026-01-01T00:00:00.000Z',
@@ -72,40 +71,6 @@ describe('ApiConnectionStubDto', () => {
 
 	it('allows null lastSyncAt before first sync', () => {
 		expect(fullDto.lastSyncAt).toBeNull();
-	});
-});
-
-describe('SpConnectionStubDto', () => {
-	it('accepts minimal required SAML fields', () => {
-		const dto: SpConnectionStubDto = {
-			name: 'My App',
-			spEntityId: 'urn:myapp:sp',
-			acsUrl: 'https://app.example.com/saml/acs',
-		};
-		expect(dto.spEntityId).toBe('urn:myapp:sp');
-		expect(dto.id).toBeUndefined();
-	});
-
-	it('accepts optional id', () => {
-		const dto: SpConnectionStubDto = {
-			id: 'sp-1',
-			name: 'My App',
-			spEntityId: 'urn:myapp:sp',
-			acsUrl: 'https://app.example.com/saml/acs',
-		};
-		expect(dto.id).toBe('sp-1');
-	});
-
-	it('accepts nameIdFormat and active flag', () => {
-		const dto: SpConnectionStubDto = {
-			name: 'My App',
-			spEntityId: 'urn:myapp:sp',
-			acsUrl: 'https://app.example.com/saml/acs',
-			nameIdFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
-			active: false,
-		};
-		expect(dto.active).toBe(false);
-		expect(dto.nameIdFormat).toContain('emailAddress');
 	});
 });
 

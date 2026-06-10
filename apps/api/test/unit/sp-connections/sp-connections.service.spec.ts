@@ -1,6 +1,10 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SpConnectionsService } from '@api/sp-connections/services/sp-connections.service';
+import { getTestSigningMaterial } from '@test/support/prisma/test-fixtures';
+
+// real parseable cert — spCertificate is X.509-parsed since §5.C, a fake PEM body no longer passes
+const REAL_CERT_PEM = getTestSigningMaterial('urn:test:sp-connections-svc').certPem.trim();
 
 describe('SpConnectionsService', () => {
 	const audit = {
@@ -251,7 +255,7 @@ describe('SpConnectionsService', () => {
 	});
 
 	it('API-SPC-SVC-16: create stores valid spCertificate PEM', async () => {
-		const pem = '-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----';
+		const pem = REAL_CERT_PEM;
 		prisma.spConnection.create.mockResolvedValue({ ...sampleRow, spCertificate: pem });
 
 		await service.create({
@@ -268,7 +272,7 @@ describe('SpConnectionsService', () => {
 		);
 	});
 
-	const certPem = '-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----';
+	const certPem = REAL_CERT_PEM;
 
 	it('SLO: create stores a valid sloUrl', async () => {
 		prisma.spConnection.create.mockResolvedValue(sampleRow);
