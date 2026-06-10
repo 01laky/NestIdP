@@ -24,7 +24,9 @@ const DELEGATING_HANDLER: ProxyHandler<ActiveIdentityStore> = {
 };
 
 // Declaration merge: the wrapper exposes the full IdentityStore surface at the type level, while the
-// methods are provided at runtime by DELEGATING_HANDLER rather than ~45 hand-written forwarders.
+// methods are provided at runtime by DELEGATING_HANDLER rather than ~45 hand-written forwarders. The merge
+// is intentional (the class deliberately does not implement the interface members — the Proxy does).
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging
 export interface ActiveIdentityStore extends IdentityStore {}
 
 /**
@@ -34,6 +36,7 @@ export interface ActiveIdentityStore extends IdentityStore {}
  * Default delegate is the local libSQL {@link IdentityRepository}.
  */
 @Injectable()
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- runtime delegation via Proxy
 export class ActiveIdentityStore {
 	private current: IdentityStore;
 	private currentMode: IdentityStoreMode = 'local';
