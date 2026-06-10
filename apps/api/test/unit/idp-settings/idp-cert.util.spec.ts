@@ -1,5 +1,4 @@
 import {
-	assertMatchingKeyPair,
 	assertValidSigningCertPem,
 	assertValidSigningPrivateKeyPem,
 	fingerprintSha256Hex,
@@ -9,6 +8,7 @@ import {
 	validateSigningCertPair,
 	IdpCertValidationError,
 } from '@api/idp-settings/utils/idp-cert.util';
+import { assertMatchingKeyPair } from '@test/support/crypto/test-cert.util';
 import { ConfigService } from '@nestjs/config';
 import { getTestSigningMaterial } from '@test/support/prisma/test-fixtures';
 import { IdpSigningService } from '@api/saml/services/idp-signing.service';

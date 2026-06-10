@@ -31,7 +31,7 @@ import {
 	createTestIdpSettingsWithSigningKey,
 	getTestSigningMaterial,
 } from '@test/support/prisma/test-fixtures';
-import { generateTestRsaEncryptionCert } from '@api/idp-settings/utils/idp-encryption-cert.util';
+import { generateTestRsaEncryptionCert } from '@test/support/crypto/test-cert.util';
 import { runMigrationsOnTestDb } from '@test/support/prisma/test-db.helper';
 
 jest.setTimeout(60_000);

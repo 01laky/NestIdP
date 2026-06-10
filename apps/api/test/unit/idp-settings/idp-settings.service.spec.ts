@@ -5,7 +5,7 @@ import { IdpEncryptionCryptoValidationError } from '@nestidp/shared';
 import { IdpSettingsService } from '@api/idp-settings/services/idp-settings.service';
 import { CertRotationConfig } from '@api/idp-settings/cert-rotation.config';
 import { NoopCertRotationNotifier } from '@api/idp-settings/cert-rotation-notifier';
-import { generateTestRsaEncryptionCert } from '@api/idp-settings/utils/idp-encryption-cert.util';
+import { generateTestRsaEncryptionCert } from '@test/support/crypto/test-cert.util';
 import { getTestSigningMaterial } from '@test/support/prisma/test-fixtures';
 
 describe('IdpSettingsService', () => {

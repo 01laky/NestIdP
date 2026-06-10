@@ -1,4 +1,4 @@
-import { generateTestRsaEncryptionCert } from '@api/idp-settings/utils/idp-encryption-cert.util';
+import { generateTestRsaEncryptionCert } from '@test/support/crypto/test-cert.util';
 import { encryptAuthnRequestForIdp } from '@api/saml/utils/encrypt-authn-request-for-idp.util';
 import {
 	decryptXmlEncryptedElement,

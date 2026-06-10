@@ -184,8 +184,7 @@ describe('SamlMetadataService', () => {
 	});
 
 	it('API-SAML-META-ENC-02: includes encryption KeyDescriptor when configured', async () => {
-		const { generateTestRsaEncryptionCert } =
-			await import('@api/idp-settings/utils/idp-encryption-cert.util');
+		const { generateTestRsaEncryptionCert } = await import('@test/support/crypto/test-cert.util');
 		const { certPem } = generateTestRsaEncryptionCert('http://localhost:3000');
 		jest.mocked(idpEncryption.getMetadataEncryptionCertificates).mockResolvedValue([certPem]);
 		const xml = await service.generateMetadata();
@@ -194,8 +193,7 @@ describe('SamlMetadataService', () => {
 	});
 
 	it('API-SAML-META-ENC-03: signing and encryption descriptors both present', async () => {
-		const { generateTestRsaEncryptionCert } =
-			await import('@api/idp-settings/utils/idp-encryption-cert.util');
+		const { generateTestRsaEncryptionCert } = await import('@test/support/crypto/test-cert.util');
 		const { certPem } = generateTestRsaEncryptionCert('http://localhost:3000');
 		jest.mocked(idpEncryption.getMetadataEncryptionCertificates).mockResolvedValue([certPem]);
 		const xml = await service.generateMetadata();
@@ -226,8 +224,7 @@ describe('SamlMetadataService', () => {
 	it('API-SAML-META-ENC-05: dual signing + encryption rotation → four KeyDescriptors', async () => {
 		const primarySign = getTestSigningMaterial('http://localhost:3000');
 		const pendingSign = getTestSigningMaterial('https://pending-sign.example.com');
-		const { generateTestRsaEncryptionCert } =
-			await import('@api/idp-settings/utils/idp-encryption-cert.util');
+		const { generateTestRsaEncryptionCert } = await import('@test/support/crypto/test-cert.util');
 		const primaryEnc = generateTestRsaEncryptionCert('http://localhost:3000');
 		const pendingEnc = generateTestRsaEncryptionCert('https://pending-enc.example.com');
 		prisma.idpSettings.findUnique.mockResolvedValue({

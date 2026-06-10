@@ -9,7 +9,7 @@ import {
 	toDashboardIdpStatus,
 	toIdpSettingsPublicDto,
 } from '@api/idp-settings/mappers/idp-settings.mapper';
-import { generateTestRsaEncryptionCert } from '@api/idp-settings/utils/idp-encryption-cert.util';
+import { generateTestRsaEncryptionCert } from '@test/support/crypto/test-cert.util';
 import {
 	getTestSigningMaterial,
 	getTestSigningMaterialWithDays,

@@ -13,7 +13,7 @@ import {
 	SAML_REQUEST_QUERY_PARAM,
 	SP_CONNECTIONS_API_PATH,
 } from '@nestidp/shared';
-import { generateTestRsaEncryptionCert } from '@api/idp-settings/utils/idp-encryption-cert.util';
+import { generateTestRsaEncryptionCert } from '@test/support/crypto/test-cert.util';
 import { AdminAuthModule } from '@api/admin-auth/admin-auth.module';
 import { EncryptionModule } from '@api/encryption/encryption.module';
 import { SamlModule } from '@api/saml/saml.module';

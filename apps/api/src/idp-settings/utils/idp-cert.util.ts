@@ -167,11 +167,6 @@ export function inferStoredSigningCryptoFromPem(
 	};
 }
 
-/** @deprecated use inferStoredSigningCryptoFromPem */
-export function assertMatchingKeyPair(certPem: string, privateKeyPem: string): void {
-	inferStoredSigningCryptoFromPem(certPem, privateKeyPem);
-}
-
 export function fingerprintSha256Hex(certPem: string): string {
 	const cert = new X509Certificate(certPem);
 	return createHash('sha256').update(cert.raw).digest('hex');

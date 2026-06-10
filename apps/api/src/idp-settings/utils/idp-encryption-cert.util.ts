@@ -1,25 +1,21 @@
 import { execSync } from 'node:child_process';
 import {
 	createPublicKey,
-	generateKeyPairSync,
 	publicEncrypt,
 	privateDecrypt,
 	constants,
 	type KeyObject,
 } from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { StoredEncryptionCrypto } from '@nestidp/shared';
 import { IDP_ENCRYPTION_DEFAULT_KEY_TRANSPORT_ALGORITHM_ID } from '@nestidp/shared';
 import {
 	assertMatchingKeyTypes,
-	assertValidSigningCertPem,
-	assertValidSigningPrivateKeyPem,
 	detectKeyFamily,
 	fingerprintSha256Hex,
 	IdpCertValidationError,
-	inferStoredSigningCryptoFromPem,
 	namedCurveToLabel,
 } from './idp-cert.util';
 
@@ -185,43 +181,4 @@ export function prismaEncryptionPendingData(crypto: StoredEncryptionCrypto) {
 		pendingEncryptionRsaModulusBits: crypto.encryptionRsaModulusBits,
 		pendingEncryptionEcCurve: crypto.encryptionEcCurve,
 	};
-}
-
-/** Build a test encryption cert with proper key usage (for fixtures). */
-export function generateTestRsaEncryptionCert(
-	entityId: string,
-	days = 365,
-	modulusLength = 2048,
-): { privateKeyPem: string; certPem: string } {
-	const { privateKey } = generateKeyPairSync('rsa', {
-		modulusLength,
-		privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
-		publicKeyEncoding: { type: 'spki', format: 'pem' },
-	});
-	const tmp = mkdtempSync(join(tmpdir(), 'nestidp-test-enc-cert-'));
-	try {
-		const keyPath = join(tmp, 'key.pem');
-		const certPath = join(tmp, 'cert.pem');
-		writeFileSync(keyPath, privateKey);
-		const cn = entityId.replace(/^https?:\/\//, '').slice(0, 64) || 'nestidp';
-		execSync(
-			`openssl req -new -x509 -key "${keyPath}" -out "${certPath}" -days ${days} -subj "/CN=${cn}" -nodes -addext keyUsage=keyEncipherment,dataEncipherment`,
-			{ stdio: 'pipe' },
-		);
-		return { privateKeyPem: privateKey, certPem: readFileSync(certPath, 'utf8') };
-	} finally {
-		rmSync(tmp, { recursive: true, force: true });
-	}
-}
-
-/** Detect uploaded signing cert mistakenly used as encryption cert. */
-export function isSigningOnlyCertPair(certPem: string, privateKeyPem: string): boolean {
-	try {
-		const normalizedCert = assertValidSigningCertPem(certPem);
-		const normalizedKey = assertValidSigningPrivateKeyPem(privateKeyPem);
-		inferStoredSigningCryptoFromPem(normalizedCert, normalizedKey);
-		return !certHasEncryptionKeyUsage(normalizedCert);
-	} catch {
-		return false;
-	}
 }

@@ -5,7 +5,7 @@ import {
 	buildAuthnRequestXml,
 	encodeRedirectBinding,
 } from '@test/support/saml/build-authn-request.util';
-import { generateTestRsaEncryptionCert } from '@api/idp-settings/utils/idp-encryption-cert.util';
+import { generateTestRsaEncryptionCert } from '@test/support/crypto/test-cert.util';
 import { encryptAuthnRequestForIdp } from '@api/saml/utils/encrypt-authn-request-for-idp.util';
 import { SamlRequestParserService } from '@api/saml/services/saml-request-parser.service';
 import type { IdpEncryptionKeyService } from '@api/saml/services/idp-encryption-key.service';

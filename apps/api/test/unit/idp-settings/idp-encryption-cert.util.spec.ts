@@ -2,11 +2,13 @@ import {
 	assertEncryptionCertDiffersFromSigningPrimary,
 	assertEncryptionCertNotSigningOnly,
 	certHasEncryptionKeyUsage,
-	generateTestRsaEncryptionCert,
 	inferStoredEncryptionCryptoFromPem,
-	isSigningOnlyCertPair,
 	validateEncryptionKeyPair,
 } from '@api/idp-settings/utils/idp-encryption-cert.util';
+import {
+	generateTestRsaEncryptionCert,
+	isSigningOnlyCertPair,
+} from '@test/support/crypto/test-cert.util';
 import { getTestSigningMaterial } from '@test/support/prisma/test-fixtures';
 
 describe('idp-encryption-cert.util', () => {
