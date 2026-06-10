@@ -8,7 +8,7 @@ import { EmptyState } from '../components/common/EmptyState';
 import { ErrorBanner } from '../components/common/ErrorBanner';
 import { LoadingState } from '../components/common/LoadingState';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
-import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
+import { mapAdminError } from '../../i18n/api-error-messages';
 import { Button, Table, useToast } from '../../ui';
 
 export function ApiConnectionsListPage() {
@@ -60,16 +60,7 @@ export function ApiConnectionsListPage() {
 				}
 			} catch (err) {
 				if (!cancelled) {
-					setError(
-						err instanceof AdminApiError
-							? formatAdminApiError(
-									err.statusCode,
-									err.message,
-									resolveI18nKey,
-									'apiConnections.loadListFailed',
-								)
-							: t('loadListFailed'),
-					);
+					setError(mapAdminError(err, 'apiConnections.loadListFailed'));
 				}
 			} finally {
 				if (!cancelled) {

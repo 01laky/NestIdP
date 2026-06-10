@@ -15,7 +15,6 @@ import {
 	type UsernameCollisionPolicy,
 } from '@nestidp/shared';
 import {
-	AdminApiError,
 	createApiConnection,
 	deleteApiConnection,
 	getApiConnection,
@@ -29,7 +28,7 @@ import { AdminPageHeader } from '../components/layout/AdminPageHeader';
 import { ErrorBanner } from '../components/common/ErrorBanner';
 import { LoadingState } from '../components/common/LoadingState';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
-import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
+import { mapAdminError } from '../../i18n/api-error-messages';
 import {
 	Button,
 	Callout,
@@ -142,16 +141,7 @@ export function ApiConnectionFormPage() {
 				}
 			} catch (err) {
 				if (!cancelled) {
-					setError(
-						err instanceof AdminApiError
-							? formatAdminApiError(
-									err.statusCode,
-									err.message,
-									resolveI18nKey,
-									'apiConnections.loadFailed',
-								)
-							: t('loadFailed'),
-					);
+					setError(mapAdminError(err, 'apiConnections.loadFailed'));
 				}
 			} finally {
 				if (!cancelled) {
@@ -240,16 +230,7 @@ export function ApiConnectionFormPage() {
 					showToast(t('toastSaved'));
 				}
 			} catch (err) {
-				setError(
-					err instanceof AdminApiError
-						? formatAdminApiError(
-								err.statusCode,
-								err.message,
-								resolveI18nKey,
-								'apiConnections.saveFailed',
-							)
-						: t('saveFailed'),
-				);
+				setError(mapAdminError(err, 'apiConnections.saveFailed'));
 			} finally {
 				setSaving(false);
 			}
@@ -291,16 +272,7 @@ export function ApiConnectionFormPage() {
 			}
 			setTestMessage(parts.join(' · '));
 		} catch (err) {
-			setTestMessage(
-				err instanceof AdminApiError
-					? formatAdminApiError(
-							err.statusCode,
-							err.message,
-							resolveI18nKey,
-							'apiConnections.testFailed',
-						)
-					: t('testFailed'),
-			);
+			setTestMessage(mapAdminError(err, 'apiConnections.testFailed'));
 		}
 	}
 
@@ -322,16 +294,7 @@ export function ApiConnectionFormPage() {
 				setTestMessage(t('tokenError', { error: result.error ?? 'failed' }));
 			}
 		} catch (err) {
-			setTestMessage(
-				err instanceof AdminApiError
-					? formatAdminApiError(
-							err.statusCode,
-							err.message,
-							resolveI18nKey,
-							'apiConnections.testFailed',
-						)
-					: t('testFailed'),
-			);
+			setTestMessage(mapAdminError(err, 'apiConnections.testFailed'));
 		}
 	}
 
@@ -346,16 +309,7 @@ export function ApiConnectionFormPage() {
 			setLastProxyCheckAt(new Date().toISOString());
 			setTestMessage(`${t('proxyCheckTitle')}: ${result.message}`);
 		} catch (err) {
-			setTestMessage(
-				err instanceof AdminApiError
-					? formatAdminApiError(
-							err.statusCode,
-							err.message,
-							resolveI18nKey,
-							'apiConnections.testFailed',
-						)
-					: t('testFailed'),
-			);
+			setTestMessage(mapAdminError(err, 'apiConnections.testFailed'));
 		}
 	}
 
@@ -383,16 +337,7 @@ export function ApiConnectionFormPage() {
 						}),
 					);
 				} catch (err) {
-					setError(
-						err instanceof AdminApiError
-							? formatAdminApiError(
-									err.statusCode,
-									err.message,
-									resolveI18nKey,
-									'apiConnections.saveFailed',
-								)
-							: t('saveFailed'),
-					);
+					setError(mapAdminError(err, 'apiConnections.saveFailed'));
 				}
 			},
 		});
@@ -413,16 +358,7 @@ export function ApiConnectionFormPage() {
 					await deleteApiConnection(id);
 					navigate(API_CONNECTION_ROUTE_PREFIX);
 				} catch (err) {
-					setError(
-						err instanceof AdminApiError
-							? formatAdminApiError(
-									err.statusCode,
-									err.message,
-									resolveI18nKey,
-									'apiConnections.deleteFailed',
-								)
-							: t('deleteFailed'),
-					);
+					setError(mapAdminError(err, 'apiConnections.deleteFailed'));
 				}
 			},
 		});

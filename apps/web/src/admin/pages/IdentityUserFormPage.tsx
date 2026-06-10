@@ -2,18 +2,13 @@ import { FormEvent, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { IDENTITY_ROUTE_PREFIX, identityUserDetailRoute } from '@nestidp/shared';
-import {
-	AdminApiError,
-	createIdentityUser,
-	getIdentityUser,
-	updateIdentityUser,
-} from '../adminApi';
+import { createIdentityUser, getIdentityUser, updateIdentityUser } from '../adminApi';
 import { IdentityMembershipPicker } from '../components/identity/IdentityMembershipPicker';
 import { AdminPageHeader } from '../components/layout/AdminPageHeader';
 import { ErrorBanner } from '../components/common/ErrorBanner';
 import { LoadingState } from '../components/common/LoadingState';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
-import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
+import { mapAdminError } from '../../i18n/api-error-messages';
 import { Button, ButtonLink, Checkbox, Panel, TextInput, useToast } from '../../ui';
 
 export function IdentityUserFormPage() {
@@ -61,16 +56,7 @@ export function IdentityUserFormPage() {
 				setRoleIds(data.roles.map((r) => r.id));
 			} catch (err) {
 				if (!cancelled) {
-					setError(
-						err instanceof AdminApiError
-							? formatAdminApiError(
-									err.statusCode,
-									err.message,
-									resolveI18nKey,
-									'identity.loadUserFailed',
-								)
-							: t('loadUserFailed'),
-					);
+					setError(mapAdminError(err, 'identity.loadUserFailed'));
 				}
 			} finally {
 				if (!cancelled) {
@@ -127,11 +113,7 @@ export function IdentityUserFormPage() {
 				navigate(identityUserDetailRoute(updated.user.id));
 			}
 		} catch (err) {
-			setError(
-				err instanceof AdminApiError
-					? formatAdminApiError(err.statusCode, err.message, resolveI18nKey, 'errors.saveFailed')
-					: tErrors('saveFailed'),
-			);
+			setError(mapAdminError(err, 'errors.saveFailed'));
 		} finally {
 			setSaving(false);
 		}

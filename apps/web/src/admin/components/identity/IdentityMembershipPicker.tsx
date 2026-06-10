@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { IdentityOriginLiteral } from '@nestidp/shared';
-import { AdminApiError, listIdentityGroups, listIdentityRoles } from '../../adminApi';
+import { listIdentityGroups, listIdentityRoles } from '../../adminApi';
 import { identityOriginLabel } from '../../status-badge';
 import { Checkbox, ErrorBanner, Fieldset, TextInput } from '../../../ui';
-import { formatAdminApiError, resolveI18nKey } from '../../../i18n/api-error-messages';
+import { mapAdminError } from '../../../i18n/api-error-messages';
 
 const MAX_SELECTED = 100;
 const LIST_LIMIT = 200;
@@ -64,16 +64,7 @@ export function IdentityMembershipPicker({
 				}
 			} catch (err) {
 				if (!cancelled) {
-					setLoadError(
-						err instanceof AdminApiError
-							? formatAdminApiError(
-									err.statusCode,
-									err.message,
-									resolveI18nKey,
-									'identity.loadMembershipFailed',
-								)
-							: t('loadMembershipFailed'),
-					);
+					setLoadError(mapAdminError(err, 'identity.loadMembershipFailed'));
 				}
 			}
 		})();

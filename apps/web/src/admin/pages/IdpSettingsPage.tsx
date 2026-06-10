@@ -16,7 +16,6 @@ import {
 	SP_CONNECTION_ROUTE_PREFIX,
 } from '@nestidp/shared';
 import {
-	AdminApiError,
 	cancelIdpCertRotation,
 	cancelIdpEncryptionCertRotation,
 	completeIdpCertRotation,
@@ -46,7 +45,7 @@ import { AdminPageHeader } from '../components/layout/AdminPageHeader';
 import { ErrorBanner } from '../components/common/ErrorBanner';
 import { LoadingState } from '../components/common/LoadingState';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
-import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
+import { mapAdminError } from '../../i18n/api-error-messages';
 import {
 	Button,
 	Callout,
@@ -159,16 +158,7 @@ export function IdpSettingsPage() {
 				await reload();
 			} catch (err) {
 				if (!cancelled) {
-					setError(
-						err instanceof AdminApiError
-							? formatAdminApiError(
-									err.statusCode,
-									err.message,
-									resolveI18nKey,
-									'idpSettings.loadFailed',
-								)
-							: t('loadFailed'),
-					);
+					setError(mapAdminError(err, 'idpSettings.loadFailed'));
 				}
 			} finally {
 				if (!cancelled) {
@@ -188,16 +178,7 @@ export function IdpSettingsPage() {
 		try {
 			await action();
 		} catch (err) {
-			setError(
-				err instanceof AdminApiError
-					? formatAdminApiError(
-							err.statusCode,
-							err.message,
-							resolveI18nKey,
-							'idpSettings.requestFailed',
-						)
-					: t('requestFailed'),
-			);
+			setError(mapAdminError(err, 'idpSettings.requestFailed'));
 		} finally {
 			setBusy(false);
 		}

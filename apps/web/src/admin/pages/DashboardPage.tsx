@@ -8,12 +8,12 @@ import {
 	SP_CONNECTION_ROUTE_PREFIX,
 } from '@nestidp/shared';
 import type { SchedulesOverviewResponseDto } from '@nestidp/shared';
-import { AdminApiError, getAdminDashboard, getSchedulesOverview } from '../adminApi';
+import { getAdminDashboard, getSchedulesOverview } from '../adminApi';
 import { AdminPageHeader } from '../components/layout/AdminPageHeader';
 import { ErrorBanner } from '../components/common/ErrorBanner';
 import { LoadingState } from '../components/common/LoadingState';
+import { useAdminResource } from '../hooks/useAdminResource';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
-import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
 import { Badge, Callout, Panel, StatCard } from '../../ui';
 import {
 	certStatusLabel,
@@ -28,11 +28,13 @@ export function DashboardPage() {
 	const { t: tCommon } = useTranslation('common');
 	const { t: tNav } = useTranslation('nav');
 	useAdminDocumentTitle(t('title'));
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
-	const [dashboard, setDashboard] = useState<Awaited<ReturnType<typeof getAdminDashboard>> | null>(
-		null,
-	);
+	const {
+		data: dashboard,
+		loading,
+		error,
+	} = useAdminResource(getAdminDashboard, {
+		fallbackKey: 'dashboard.loadFailed',
+	});
 	const [schedules, setSchedules] = useState<SchedulesOverviewResponseDto | null>(null);
 
 	useEffect(() => {
@@ -51,38 +53,6 @@ export function DashboardPage() {
 			cancelled = true;
 		};
 	}, []);
-
-	useEffect(() => {
-		let cancelled = false;
-		void (async () => {
-			try {
-				const data = await getAdminDashboard();
-				if (!cancelled) {
-					setDashboard(data);
-				}
-			} catch (err) {
-				if (!cancelled) {
-					setError(
-						err instanceof AdminApiError
-							? formatAdminApiError(
-									err.statusCode,
-									err.message,
-									resolveI18nKey,
-									'dashboard.loadFailed',
-								)
-							: t('loadFailed'),
-					);
-				}
-			} finally {
-				if (!cancelled) {
-					setLoading(false);
-				}
-			}
-		})();
-		return () => {
-			cancelled = true;
-		};
-	}, [t]);
 
 	if (loading) {
 		return <LoadingState message={t('loading')} />;

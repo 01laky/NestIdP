@@ -1,4 +1,5 @@
 import type { TFunction } from 'i18next';
+import { AdminApiError } from '../admin/adminApi';
 import { getI18n } from './i18n';
 import { I18N_NAMESPACES, type I18nNamespace } from './namespaces';
 
@@ -47,6 +48,20 @@ export function formatAdminApiError(
 		return message;
 	}
 	return t(fallbackKey);
+}
+
+/**
+ * Collapses the `err instanceof AdminApiError ? formatAdminApiError(err.statusCode, err.message,
+ * resolveI18nKey, key) : t(localKey)` ladder that was copy-pasted across ~50 admin catch blocks
+ * (Prompt 38 §A16 / §6.9). `fallbackKey` is the fully-qualified i18n key (e.g. `'dashboard.loadFailed'`);
+ * both branches resolve through `resolveI18nKey`, so a non-AdminApiError degrades to the same translated
+ * fallback the inline `t(localKey)` produced.
+ */
+export function mapAdminError(err: unknown, fallbackKey: string): string {
+	if (err instanceof AdminApiError) {
+		return formatAdminApiError(err.statusCode, err.message, resolveI18nKey, fallbackKey);
+	}
+	return resolveI18nKey(fallbackKey);
 }
 
 export function formatAuthApiError(message: string, t: TFunction): string {

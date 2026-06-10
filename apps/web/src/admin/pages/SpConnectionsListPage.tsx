@@ -1,14 +1,13 @@
-import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { SP_CONNECTION_ROUTE_PREFIX } from '@nestidp/shared';
-import { AdminApiError, listSpConnections } from '../adminApi';
+import { listSpConnections } from '../adminApi';
 import { AdminPageHeader } from '../components/layout/AdminPageHeader';
 import { EmptyState } from '../components/common/EmptyState';
 import { ErrorBanner } from '../components/common/ErrorBanner';
 import { LoadingState } from '../components/common/LoadingState';
+import { useAdminResource } from '../hooks/useAdminResource';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
-import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
 import { Table } from '../../ui';
 
 export function SpConnectionsListPage() {
@@ -16,41 +15,10 @@ export function SpConnectionsListPage() {
 	const { t: tNav } = useTranslation('nav');
 	const { t: tCommon } = useTranslation('common');
 	useAdminDocumentTitle(t('listTitle'));
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
-	const [items, setItems] = useState<Awaited<ReturnType<typeof listSpConnections>>['items']>([]);
-
-	useEffect(() => {
-		let cancelled = false;
-		void (async () => {
-			try {
-				const data = await listSpConnections();
-				if (!cancelled) {
-					setItems(data.items);
-				}
-			} catch (err) {
-				if (!cancelled) {
-					setError(
-						err instanceof AdminApiError
-							? formatAdminApiError(
-									err.statusCode,
-									err.message,
-									resolveI18nKey,
-									'spConnections.loadListFailed',
-								)
-							: t('loadListFailed'),
-					);
-				}
-			} finally {
-				if (!cancelled) {
-					setLoading(false);
-				}
-			}
-		})();
-		return () => {
-			cancelled = true;
-		};
-	}, [t]);
+	const { data, loading, error } = useAdminResource(listSpConnections, {
+		fallbackKey: 'spConnections.loadListFailed',
+	});
+	const items = data?.items ?? [];
 
 	return (
 		<section>

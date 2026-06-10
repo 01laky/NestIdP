@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ADMIN_USERS_ROUTE_PREFIX } from '@nestidp/shared';
 import {
-	AdminApiError,
 	changeAdminPassword,
 	createAdminUser,
 	deleteAdminUser,
@@ -15,7 +14,7 @@ import { AdminPageHeader } from '../components/layout/AdminPageHeader';
 import { ErrorBanner } from '../components/common/ErrorBanner';
 import { LoadingState } from '../components/common/LoadingState';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
-import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
+import { mapAdminError } from '../../i18n/api-error-messages';
 import { Badge, Button, Panel, Table, TextInput, useConfirmAction, useToast } from '../../ui';
 
 export function AdminUsersPage() {
@@ -52,16 +51,7 @@ export function AdminUsersPage() {
 				await reload();
 			} catch (err) {
 				if (!cancelled) {
-					setError(
-						err instanceof AdminApiError
-							? formatAdminApiError(
-									err.statusCode,
-									err.message,
-									resolveI18nKey,
-									'adminUsers.loadFailed',
-								)
-							: t('loadFailed'),
-					);
+					setError(mapAdminError(err, 'adminUsers.loadFailed'));
 				}
 			} finally {
 				if (!cancelled) {
@@ -90,16 +80,7 @@ export function AdminUsersPage() {
 			await reload();
 			showToast(t('toastAdminCreated'));
 		} catch (err) {
-			setError(
-				err instanceof AdminApiError
-					? formatAdminApiError(
-							err.statusCode,
-							err.message,
-							resolveI18nKey,
-							'adminUsers.createFailed',
-						)
-					: t('createFailed'),
-			);
+			setError(mapAdminError(err, 'adminUsers.createFailed'));
 		} finally {
 			setCreating(false);
 		}
@@ -120,16 +101,7 @@ export function AdminUsersPage() {
 			setNewPasswordConfirm('');
 			showToast(t('toastPasswordChanged'));
 		} catch (err) {
-			setError(
-				err instanceof AdminApiError
-					? formatAdminApiError(
-							err.statusCode,
-							err.message,
-							resolveI18nKey,
-							'adminUsers.passwordChangeFailed',
-						)
-					: t('passwordChangeFailed'),
-			);
+			setError(mapAdminError(err, 'adminUsers.passwordChangeFailed'));
 		} finally {
 			setChangingPassword(false);
 		}

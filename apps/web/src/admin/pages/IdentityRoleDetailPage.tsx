@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -6,12 +5,13 @@ import {
 	identityRoleEditRoute,
 	identityUserDetailRoute,
 } from '@nestidp/shared';
-import { AdminApiError, deleteIdentityRole, getIdentityRole } from '../adminApi';
+import { deleteIdentityRole, getIdentityRole } from '../adminApi';
 import { AdminPageHeader } from '../components/layout/AdminPageHeader';
 import { ErrorBanner } from '../components/common/ErrorBanner';
 import { LoadingState } from '../components/common/LoadingState';
+import { useAdminResource } from '../hooks/useAdminResource';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
-import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
+import { mapAdminError } from '../../i18n/api-error-messages';
 import { identityOriginLabel, identityOriginToBadge } from '../status-badge';
 import { buildIdentityMemberDeleteDetail } from '../identity-delete-detail';
 import { Badge, Button, ButtonLink, Panel, Table, useConfirmAction, useToast } from '../../ui';
@@ -25,44 +25,15 @@ export function IdentityRoleDetailPage() {
 	const { t: tCommon } = useTranslation('common');
 	const confirmAction = useConfirmAction();
 	useAdminDocumentTitle(t('viewRole'));
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
-	const [detail, setDetail] = useState<Awaited<ReturnType<typeof getIdentityRole>> | null>(null);
-
-	useEffect(() => {
-		if (!id) {
-			return;
-		}
-		let cancelled = false;
-		void (async () => {
-			try {
-				const data = await getIdentityRole(id);
-				if (!cancelled) {
-					setDetail(data);
-				}
-			} catch (err) {
-				if (!cancelled) {
-					setError(
-						err instanceof AdminApiError
-							? formatAdminApiError(
-									err.statusCode,
-									err.message,
-									resolveI18nKey,
-									'identity.loadRoleFailed',
-								)
-							: t('loadRoleFailed'),
-					);
-				}
-			} finally {
-				if (!cancelled) {
-					setLoading(false);
-				}
-			}
-		})();
-		return () => {
-			cancelled = true;
-		};
-	}, [id, t]);
+	const {
+		data: detail,
+		loading,
+		error,
+		setError,
+	} = useAdminResource(() => getIdentityRole(id as string), {
+		fallbackKey: 'identity.loadRoleFailed',
+		deps: [id],
+	});
 
 	async function handleDelete() {
 		if (!detail || !id) {
@@ -88,16 +59,7 @@ export function IdentityRoleDetailPage() {
 					showToast(t('toastRoleDeleted'));
 					navigate(`${IDENTITY_ROUTE_PREFIX}/roles`);
 				} catch (err) {
-					setError(
-						err instanceof AdminApiError
-							? formatAdminApiError(
-									err.statusCode,
-									err.message,
-									resolveI18nKey,
-									'errors.deleteFailed',
-								)
-							: resolveI18nKey('errors.deleteFailed'),
-					);
+					setError(mapAdminError(err, 'errors.deleteFailed'));
 				}
 			},
 		});

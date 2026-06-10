@@ -2,19 +2,13 @@ import { FormEvent, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { API_CONNECTION_ROUTE_PREFIX, type SyncTriggerSource } from '@nestidp/shared';
-import {
-	AdminApiError,
-	getApiConnection,
-	getSyncStatus,
-	listSyncLogs,
-	triggerIdentitySync,
-} from '../adminApi';
+import { getApiConnection, getSyncStatus, listSyncLogs, triggerIdentitySync } from '../adminApi';
 import { AdminPageHeader } from '../components/layout/AdminPageHeader';
 import { ErrorBanner } from '../components/common/ErrorBanner';
 import { LoadingState } from '../components/common/LoadingState';
 import { ScheduleSection } from '../components/sync/ScheduleSection';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
-import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
+import { mapAdminError } from '../../i18n/api-error-messages';
 import { Badge, Button, Checkbox, Panel, Select, useConfirm, useToast } from '../../ui';
 
 export function ApiConnectionSyncPage() {
@@ -73,11 +67,7 @@ export function ApiConnectionSyncPage() {
 				await reload();
 			} catch (err) {
 				if (!cancelled) {
-					setError(
-						err instanceof AdminApiError
-							? formatAdminApiError(err.statusCode, err.message, resolveI18nKey, 'sync.loadFailed')
-							: t('loadFailed'),
-					);
+					setError(mapAdminError(err, 'sync.loadFailed'));
 				}
 			} finally {
 				if (!cancelled) {
@@ -121,11 +111,7 @@ export function ApiConnectionSyncPage() {
 			showToast(dryRun ? t('toastDryRunFinished') : t('toastSyncFinished'));
 			await reload();
 		} catch (err) {
-			setError(
-				err instanceof AdminApiError
-					? formatAdminApiError(err.statusCode, err.message, resolveI18nKey, 'sync.syncFailed')
-					: t('syncFailed'),
-			);
+			setError(mapAdminError(err, 'sync.syncFailed'));
 		} finally {
 			setSyncing(false);
 		}

@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 import type { SpAttributeMappingConfig } from '@nestidp/shared';
 import { SAML_NAME_ID_FORMATS, SP_CONNECTION_ROUTE_PREFIX } from '@nestidp/shared';
 import {
-	AdminApiError,
 	createSpConnection,
 	deleteSpConnection,
 	getSpConnection,
@@ -19,7 +18,7 @@ import { AttributeMappingEditor } from '../components/mapping/AttributeMappingEd
 import { ErrorBanner } from '../components/common/ErrorBanner';
 import { LoadingState } from '../components/common/LoadingState';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
-import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
+import { mapAdminError } from '../../i18n/api-error-messages';
 import {
 	Button,
 	Callout,
@@ -97,16 +96,7 @@ export function SpConnectionFormPage() {
 				}
 			} catch (err) {
 				if (!cancelled) {
-					setError(
-						err instanceof AdminApiError
-							? formatAdminApiError(
-									err.statusCode,
-									err.message,
-									resolveI18nKey,
-									'spConnections.loadFailed',
-								)
-							: t('loadFailed'),
-					);
+					setError(mapAdminError(err, 'spConnections.loadFailed'));
 				}
 			} finally {
 				if (!cancelled) {
@@ -168,16 +158,7 @@ export function SpConnectionFormPage() {
 				showToast(t('toastSaved'));
 			}
 		} catch (err) {
-			setError(
-				err instanceof AdminApiError
-					? formatAdminApiError(
-							err.statusCode,
-							err.message,
-							resolveI18nKey,
-							'spConnections.saveFailed',
-						)
-					: t('saveFailed'),
-			);
+			setError(mapAdminError(err, 'spConnections.saveFailed'));
 		} finally {
 			setSaving(false);
 		}
@@ -222,16 +203,7 @@ export function SpConnectionFormPage() {
 					await deleteSpConnection(id);
 					navigate(SP_CONNECTION_ROUTE_PREFIX);
 				} catch (err) {
-					setError(
-						err instanceof AdminApiError
-							? formatAdminApiError(
-									err.statusCode,
-									err.message,
-									resolveI18nKey,
-									'spConnections.deleteFailed',
-								)
-							: t('deleteFailed'),
-					);
+					setError(mapAdminError(err, 'spConnections.deleteFailed'));
 				}
 			},
 		});
@@ -245,16 +217,7 @@ export function SpConnectionFormPage() {
 			const result = await testSpConnectionAcs(id);
 			setAcsTestMessage(result.message);
 		} catch (err) {
-			setAcsTestMessage(
-				err instanceof AdminApiError
-					? formatAdminApiError(
-							err.statusCode,
-							err.message,
-							resolveI18nKey,
-							'spConnections.acsTestFailed',
-						)
-					: t('acsTestFailed'),
-			);
+			setAcsTestMessage(mapAdminError(err, 'spConnections.acsTestFailed'));
 		}
 	}
 
@@ -274,16 +237,7 @@ export function SpConnectionFormPage() {
 			);
 		} catch (err) {
 			setBackchannelTestOk(false);
-			setBackchannelTestMessage(
-				err instanceof AdminApiError
-					? formatAdminApiError(
-							err.statusCode,
-							err.message,
-							resolveI18nKey,
-							'spConnections.testBackchannelFailedGeneric',
-						)
-					: t('testBackchannelFailedGeneric'),
-			);
+			setBackchannelTestMessage(mapAdminError(err, 'spConnections.testBackchannelFailedGeneric'));
 		} finally {
 			setBackchannelTestBusy(false);
 		}
@@ -310,16 +264,7 @@ export function SpConnectionFormPage() {
 			}
 			setProbeSigningError(result.message ?? t('probeSigningFailed'));
 		} catch (err) {
-			setProbeSigningError(
-				err instanceof AdminApiError
-					? formatAdminApiError(
-							err.statusCode,
-							err.message,
-							resolveI18nKey,
-							'spConnections.probeSigningFailed',
-						)
-					: t('probeSigningFailed'),
-			);
+			setProbeSigningError(mapAdminError(err, 'spConnections.probeSigningFailed'));
 		} finally {
 			setProbeSigningBusy(false);
 		}

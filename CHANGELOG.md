@@ -35,6 +35,19 @@ frontend de-duplication) and remaining items land in subsequent commits under th
   admin/end-user session-TTL readers, the admin-user-create and SAML-SLO rate limiters, the SAML
   clock-skew reader and the audit-retention day count. `proxy-dispatcher`'s connect-timeout reader (a
   `Number()` + range copy) now uses the existing `boundedInt`. Behaviour-preserving.
+- **Admin SPA load/error boilerplate de-duplicated** (§6.9 / §A15+§A16): the identity sync-source filter
+  (`useIdentitySources()` hook + `<SourceFilterSelect>`) was already lifted out of the user/group/role/SAML-
+  session pages; this increment adds a single `mapAdminError(err, fallbackKey)` helper that collapses the
+  ~50 copy-pasted `err instanceof AdminApiError ? formatAdminApiError(…) : t(…)` catch ladders into one
+  call (the namespaced fallback key resolves identically through `resolveI18nKey`), and a
+  `useAdminResource(loader, { fallbackKey, deps })` hook that replaces the repeated
+  `let cancelled = false; void (async () => { … })(); return () => { cancelled = true }` load effect with a
+  single hook carrying the same out-of-order/unmount guards as `useIdentityListQuery`. Adopted in the SP/API
+  connection list pages, the dashboard, the sync-log detail page and the user/group/role detail pages.
+  Behaviour-preserving; form pages (react-hook-form `reset`) and the silent-refresh list keep their bespoke
+  loaders. The identity-list query serialiser was also generalised to one `toQuery()` helper (skips
+  `undefined`/`''`, stringifies booleans) and reused by the sync-log, SAML-session and test-SSO-URL endpoints
+  in `adminApi.ts`, replacing their per-endpoint `new URLSearchParams(); if (x) params.set(…)` ladders.
 
 ### Security
 

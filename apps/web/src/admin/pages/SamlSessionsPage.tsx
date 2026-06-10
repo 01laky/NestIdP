@@ -26,7 +26,7 @@ import { useIdentitySources } from '../hooks/useIdentitySources';
 import { ErrorBanner } from '../components/common/ErrorBanner';
 import { LoadingState } from '../components/common/LoadingState';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
-import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
+import { mapAdminError } from '../../i18n/api-error-messages';
 import {
 	Badge,
 	Button,
@@ -111,20 +111,11 @@ export function SamlSessionsPage() {
 			setData(result);
 			setSelectedIds(new Set());
 		} catch (err) {
-			setError(
-				err instanceof AdminApiError
-					? formatAdminApiError(
-							err.statusCode,
-							err.message,
-							resolveI18nKey,
-							'samlSessions.loadFailed',
-						)
-					: t('loadFailed'),
-			);
+			setError(mapAdminError(err, 'samlSessions.loadFailed'));
 		} finally {
 			setLoading(false);
 		}
-	}, [status, spConnectionId, apiConnectionId, q, page, t]);
+	}, [status, spConnectionId, apiConnectionId, q, page]);
 
 	useEffect(() => {
 		void load();

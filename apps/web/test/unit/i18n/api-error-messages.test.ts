@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { initI18n } from '@/i18n/i18n';
-import { formatAdminApiError, formatAuthApiError, resolveI18nKey } from '@/i18n/api-error-messages';
+import {
+	formatAdminApiError,
+	formatAuthApiError,
+	mapAdminError,
+	resolveI18nKey,
+} from '@/i18n/api-error-messages';
+import { AdminApiError } from '@/admin/adminApi';
 
 afterEach(async () => {
 	await initI18n('en');
@@ -77,5 +83,31 @@ describe('api-error-messages (WEB-I18N-53–64)', () => {
 	it('WEB-I18N-64: 429 uses unauthorized when message blank', async () => {
 		await initI18n('en');
 		expect(formatAdminApiError(429, '   ', resolveI18nKey)).toBe('Unauthorized');
+	});
+
+	it('WEB-I18N-65: mapAdminError on AdminApiError mirrors formatAdminApiError', async () => {
+		await initI18n('en');
+		const err = new AdminApiError(400, 'managed_by_sync');
+		expect(mapAdminError(err, 'errors.loadFailed')).toBe(
+			formatAdminApiError(400, 'managed_by_sync', resolveI18nKey, 'errors.loadFailed'),
+		);
+	});
+
+	it('WEB-I18N-66: mapAdminError on AdminApiError with blank message uses fallbackKey', async () => {
+		await initI18n('en');
+		const err = new AdminApiError(500, '');
+		expect(mapAdminError(err, 'errors.saveFailed')).toBe('Save failed');
+	});
+
+	it('WEB-I18N-67: mapAdminError on non-AdminApiError resolves the namespaced fallback', async () => {
+		await initI18n('en');
+		// equivalent to the old `: t('apply')` else-branch under the common namespace
+		expect(mapAdminError(new Error('boom'), 'common.apply')).toBe(resolveI18nKey('common.apply'));
+		expect(mapAdminError(new Error('boom'), 'common.apply')).toBe('Apply');
+	});
+
+	it('WEB-I18N-68: mapAdminError non-AdminApiError fallback is localised', async () => {
+		await initI18n('pl');
+		expect(mapAdminError('not-an-error', 'identity.usersTitle')).toBe('Użytkownicy');
 	});
 });

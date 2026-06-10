@@ -1,18 +1,13 @@
-import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AUDIT_ROUTE_PREFIX, IDENTITY_ROUTE_PREFIX, identityUserEditRoute } from '@nestidp/shared';
-import {
-	AdminApiError,
-	deleteIdentityUser,
-	getIdentityUser,
-	unlockIdentityUser,
-} from '../adminApi';
+import { deleteIdentityUser, getIdentityUser, unlockIdentityUser } from '../adminApi';
 import { AdminPageHeader } from '../components/layout/AdminPageHeader';
 import { ErrorBanner } from '../components/common/ErrorBanner';
 import { LoadingState } from '../components/common/LoadingState';
+import { useAdminResource } from '../hooks/useAdminResource';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
-import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
+import { mapAdminError } from '../../i18n/api-error-messages';
 import { identityOriginLabel, identityOriginToBadge } from '../status-badge';
 import { Badge, Button, ButtonLink, Panel, useConfirmAction, useToast } from '../../ui';
 
@@ -25,44 +20,16 @@ export function IdentityUserDetailPage() {
 	const { t: tCommon } = useTranslation('common');
 	const confirmAction = useConfirmAction();
 	useAdminDocumentTitle(t('viewUser'));
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
-	const [detail, setDetail] = useState<Awaited<ReturnType<typeof getIdentityUser>> | null>(null);
-
-	useEffect(() => {
-		if (!id) {
-			return;
-		}
-		let cancelled = false;
-		void (async () => {
-			try {
-				const data = await getIdentityUser(id, { auditLimit: 5 });
-				if (!cancelled) {
-					setDetail(data);
-				}
-			} catch (err) {
-				if (!cancelled) {
-					setError(
-						err instanceof AdminApiError
-							? formatAdminApiError(
-									err.statusCode,
-									err.message,
-									resolveI18nKey,
-									'identity.loadUserFailed',
-								)
-							: t('loadUserFailed'),
-					);
-				}
-			} finally {
-				if (!cancelled) {
-					setLoading(false);
-				}
-			}
-		})();
-		return () => {
-			cancelled = true;
-		};
-	}, [id, t]);
+	const {
+		data: detail,
+		loading,
+		error,
+		setData: setDetail,
+		setError,
+	} = useAdminResource(() => getIdentityUser(id as string, { auditLimit: 5 }), {
+		fallbackKey: 'identity.loadUserFailed',
+		deps: [id],
+	});
 
 	async function handleDelete() {
 		if (!detail || !id) {
@@ -80,16 +47,7 @@ export function IdentityUserDetailPage() {
 					showToast(t('toastUserDeleted'));
 					navigate(`${IDENTITY_ROUTE_PREFIX}/users`);
 				} catch (err) {
-					setError(
-						err instanceof AdminApiError
-							? formatAdminApiError(
-									err.statusCode,
-									err.message,
-									resolveI18nKey,
-									'errors.deleteFailed',
-								)
-							: resolveI18nKey('errors.deleteFailed'),
-					);
+					setError(mapAdminError(err, 'errors.deleteFailed'));
 				}
 			},
 		});

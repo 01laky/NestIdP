@@ -310,14 +310,7 @@ export function listSyncLogs(
 	limit?: number,
 	source?: SyncTriggerSource,
 ): Promise<SyncLogListResponseDto> {
-	const params = new URLSearchParams();
-	if (limit != null) {
-		params.set('limit', String(limit));
-	}
-	if (source) {
-		params.set('source', source);
-	}
-	const query = params.toString() ? `?${params.toString()}` : '';
+	const query = toQuery({ limit, source });
 	return adminFetch<SyncLogListResponseDto>(`${SYNC_API_PATH}/${connectionId}/logs${query}`);
 }
 
@@ -403,17 +396,11 @@ export function getSpConnectionTestSsoUrl(
 	id: string,
 	options: { signed?: boolean; encrypted?: boolean; relayState?: string } = {},
 ): Promise<SpConnectionTestSsoUrlResponseDto> {
-	const query = new URLSearchParams();
-	if (options.signed !== undefined) {
-		query.set('signed', String(options.signed));
-	}
-	if (options.encrypted !== undefined) {
-		query.set('encrypted', String(options.encrypted));
-	}
-	if (options.relayState) {
-		query.set('relayState', options.relayState);
-	}
-	const suffix = query.size > 0 ? `?${query.toString()}` : '';
+	const suffix = toQuery({
+		signed: options.signed,
+		encrypted: options.encrypted,
+		relayState: options.relayState,
+	});
 	return adminFetch<SpConnectionTestSsoUrlResponseDto>(
 		`${SP_CONNECTIONS_API_PATH}/${id}/test-sso-url${suffix}`,
 	);
@@ -444,14 +431,14 @@ export function parseSpSloFromMetadata(
 export function listSamlSessions(
 	query: SamlSsoSessionListQueryDto = {},
 ): Promise<SamlSsoSessionListResponseDto> {
-	const params = new URLSearchParams();
-	if (query.status) params.set('status', query.status);
-	if (query.spConnectionId) params.set('spConnectionId', query.spConnectionId);
-	if (query.apiConnectionId) params.set('apiConnectionId', query.apiConnectionId);
-	if (query.q) params.set('q', query.q);
-	if (query.page) params.set('page', String(query.page));
-	if (query.pageSize) params.set('pageSize', String(query.pageSize));
-	const suffix = params.size > 0 ? `?${params.toString()}` : '';
+	const suffix = toQuery({
+		status: query.status,
+		spConnectionId: query.spConnectionId,
+		apiConnectionId: query.apiConnectionId,
+		q: query.q,
+		page: query.page,
+		pageSize: query.pageSize,
+	});
 	return adminFetch<SamlSsoSessionListResponseDto>(`${SAML_SESSIONS_API_PATH}${suffix}`);
 }
 
@@ -507,7 +494,13 @@ export function getBackchannelQueueHealth(): Promise<SamlBackchannelQueueHealthD
 	return adminFetch<SamlBackchannelQueueHealthDto>(`${SAML_SESSIONS_API_PATH}/backchannel-health`);
 }
 
-function identityQuery(params: Record<string, string | number | undefined>): string {
+/**
+ * Builds a `?a=b&c=d` query suffix from a record, skipping `undefined`/`''` values and returning `''`
+ * when nothing survives (Prompt 38 §6.9). One shared serialiser for every admin GET that takes optional
+ * filters — replaces the per-endpoint `new URLSearchParams(); if (x) params.set(...)` ladders. Booleans
+ * are stringified (`false` → `'false'`), so a present-but-false flag is still sent.
+ */
+function toQuery(params: Record<string, string | number | boolean | undefined>): string {
 	const query = new URLSearchParams();
 	for (const [key, value] of Object.entries(params)) {
 		if (value !== undefined && value !== '') {
@@ -527,7 +520,7 @@ export function listIdentityUsers(
 	} = {},
 ): Promise<IdentityUserListResponseDto> {
 	return adminFetch<IdentityUserListResponseDto>(
-		`${IDENTITY_USERS_API_PATH}${identityQuery({
+		`${IDENTITY_USERS_API_PATH}${toQuery({
 			limit: params.limit ?? IDENTITY_LIST_PAGE_SIZE,
 			offset: params.offset,
 			search: params.search,
@@ -542,7 +535,7 @@ export function getIdentityUser(
 	params: { auditLimit?: number } = {},
 ): Promise<IdentityUserDetailResponseDto> {
 	return adminFetch<IdentityUserDetailResponseDto>(
-		`${IDENTITY_USERS_API_PATH}/${id}${identityQuery(params)}`,
+		`${IDENTITY_USERS_API_PATH}/${id}${toQuery(params)}`,
 	);
 }
 
@@ -573,7 +566,7 @@ export function listIdentityGroups(
 	params: { limit?: number; offset?: number; origin?: string; apiConnectionId?: string } = {},
 ): Promise<IdentityGroupListResponseDto> {
 	return adminFetch<IdentityGroupListResponseDto>(
-		`${IDENTITY_GROUPS_API_PATH}${identityQuery({
+		`${IDENTITY_GROUPS_API_PATH}${toQuery({
 			limit: params.limit ?? IDENTITY_LIST_PAGE_SIZE,
 			offset: params.offset,
 			origin: params.origin,
@@ -613,7 +606,7 @@ export function listIdentityRoles(
 	params: { limit?: number; offset?: number; origin?: string; apiConnectionId?: string } = {},
 ): Promise<IdentityRoleListResponseDto> {
 	return adminFetch<IdentityRoleListResponseDto>(
-		`${IDENTITY_ROLES_API_PATH}${identityQuery({
+		`${IDENTITY_ROLES_API_PATH}${toQuery({
 			limit: params.limit ?? IDENTITY_LIST_PAGE_SIZE,
 			offset: params.offset,
 			origin: params.origin,

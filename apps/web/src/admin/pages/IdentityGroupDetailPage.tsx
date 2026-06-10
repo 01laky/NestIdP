@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -6,12 +5,13 @@ import {
 	identityGroupEditRoute,
 	identityUserDetailRoute,
 } from '@nestidp/shared';
-import { AdminApiError, deleteIdentityGroup, getIdentityGroup } from '../adminApi';
+import { deleteIdentityGroup, getIdentityGroup } from '../adminApi';
 import { AdminPageHeader } from '../components/layout/AdminPageHeader';
 import { ErrorBanner } from '../components/common/ErrorBanner';
 import { LoadingState } from '../components/common/LoadingState';
+import { useAdminResource } from '../hooks/useAdminResource';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
-import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
+import { mapAdminError } from '../../i18n/api-error-messages';
 import { identityOriginLabel, identityOriginToBadge } from '../status-badge';
 import { buildIdentityMemberDeleteDetail } from '../identity-delete-detail';
 import { Badge, Button, ButtonLink, Panel, Table, useConfirmAction, useToast } from '../../ui';
@@ -25,44 +25,15 @@ export function IdentityGroupDetailPage() {
 	const { t: tCommon } = useTranslation('common');
 	const confirmAction = useConfirmAction();
 	useAdminDocumentTitle(t('viewGroup'));
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
-	const [detail, setDetail] = useState<Awaited<ReturnType<typeof getIdentityGroup>> | null>(null);
-
-	useEffect(() => {
-		if (!id) {
-			return;
-		}
-		let cancelled = false;
-		void (async () => {
-			try {
-				const data = await getIdentityGroup(id);
-				if (!cancelled) {
-					setDetail(data);
-				}
-			} catch (err) {
-				if (!cancelled) {
-					setError(
-						err instanceof AdminApiError
-							? formatAdminApiError(
-									err.statusCode,
-									err.message,
-									resolveI18nKey,
-									'identity.loadGroupFailed',
-								)
-							: t('loadGroupFailed'),
-					);
-				}
-			} finally {
-				if (!cancelled) {
-					setLoading(false);
-				}
-			}
-		})();
-		return () => {
-			cancelled = true;
-		};
-	}, [id, t]);
+	const {
+		data: detail,
+		loading,
+		error,
+		setError,
+	} = useAdminResource(() => getIdentityGroup(id as string), {
+		fallbackKey: 'identity.loadGroupFailed',
+		deps: [id],
+	});
 
 	async function handleDelete() {
 		if (!detail || !id) {
@@ -88,16 +59,7 @@ export function IdentityGroupDetailPage() {
 					showToast(t('toastGroupDeleted'));
 					navigate(`${IDENTITY_ROUTE_PREFIX}/groups`);
 				} catch (err) {
-					setError(
-						err instanceof AdminApiError
-							? formatAdminApiError(
-									err.statusCode,
-									err.message,
-									resolveI18nKey,
-									'errors.deleteFailed',
-								)
-							: resolveI18nKey('errors.deleteFailed'),
-					);
+					setError(mapAdminError(err, 'errors.deleteFailed'));
 				}
 			},
 		});

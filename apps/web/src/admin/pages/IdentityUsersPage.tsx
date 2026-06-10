@@ -8,7 +8,7 @@ import {
 	IDENTITY_USER_NEW_ROUTE,
 	identityUserDetailRoute,
 } from '@nestidp/shared';
-import { AdminApiError, listIdentityUsers } from '../adminApi';
+import { listIdentityUsers } from '../adminApi';
 import { AdminPageHeader } from '../components/layout/AdminPageHeader';
 import { IdentitySectionNav } from '../components/identity/IdentitySectionNav';
 import { SourceFilterSelect } from '../components/identity/SourceFilterSelect';
@@ -19,7 +19,7 @@ import { ErrorBanner } from '../components/common/ErrorBanner';
 import { LoadingState } from '../components/common/LoadingState';
 import { useIdentityListQuery } from '../hooks/useIdentityListQuery';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
-import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
+import { mapAdminError, resolveI18nKey } from '../../i18n/api-error-messages';
 import { identityOriginFilterLabel } from '../../i18n/enum-labels';
 import { identityOriginLabel, identityOriginToBadge } from '../status-badge';
 import { Badge, Button, ButtonLink, Panel, Select, TextInput } from '../../ui';
@@ -37,16 +37,8 @@ export function IdentityUsersPage() {
 	const { sources, sourceLabel } = useIdentitySources();
 
 	const mapError = useCallback(
-		(err: unknown) =>
-			err instanceof AdminApiError
-				? formatAdminApiError(
-						err.statusCode,
-						err.message,
-						resolveI18nKey,
-						'identity.loadUsersFailed',
-					)
-				: t('loadUsersFailed'),
-		[t],
+		(err: unknown) => mapAdminError(err, 'identity.loadUsersFailed'),
+		[],
 	);
 
 	const fetchPage = useCallback(

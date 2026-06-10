@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { SP_CONNECTION_ROUTE_PREFIX } from '@nestidp/shared';
-import { AdminApiError, getSpConnection, getSpConnectionTestSsoUrl } from '../adminApi';
+import { getSpConnection, getSpConnectionTestSsoUrl } from '../adminApi';
 import { AdminPageHeader } from '../components/layout/AdminPageHeader';
 import { ErrorBanner } from '../components/common/ErrorBanner';
 import { LoadingState } from '../components/common/LoadingState';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
-import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
+import { mapAdminError } from '../../i18n/api-error-messages';
 import { Button, Callout, Checkbox, TextArea, useToast } from '../../ui';
 
 const EXAMPLE_SCRIPT = 'docs/examples/saml-sp-initiated-redirect.mjs';
@@ -43,16 +43,7 @@ export function SpConnectionTestSsoPage() {
 				}
 			} catch (err) {
 				if (!cancelled) {
-					setError(
-						err instanceof AdminApiError
-							? formatAdminApiError(
-									err.statusCode,
-									err.message,
-									resolveI18nKey,
-									'spConnections.loadSsoHelperFailed',
-								)
-							: t('loadSsoHelperFailed'),
-					);
+					setError(mapAdminError(err, 'spConnections.loadSsoHelperFailed'));
 				}
 			} finally {
 				if (!cancelled) {
@@ -95,16 +86,7 @@ export function SpConnectionTestSsoPage() {
 				}
 			} catch (err) {
 				if (!cancelled) {
-					setError(
-						err instanceof AdminApiError
-							? formatAdminApiError(
-									err.statusCode,
-									err.message,
-									resolveI18nKey,
-									'spConnections.loadSsoHelperFailed',
-								)
-							: t('loadSsoHelperFailed'),
-					);
+					setError(mapAdminError(err, 'spConnections.loadSsoHelperFailed'));
 				}
 			} finally {
 				if (!cancelled) {

@@ -2,17 +2,12 @@ import { FormEvent, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { IDENTITY_ROUTE_PREFIX, identityRoleDetailRoute } from '@nestidp/shared';
-import {
-	AdminApiError,
-	createIdentityRole,
-	getIdentityRole,
-	updateIdentityRole,
-} from '../adminApi';
+import { createIdentityRole, getIdentityRole, updateIdentityRole } from '../adminApi';
 import { AdminPageHeader } from '../components/layout/AdminPageHeader';
 import { ErrorBanner } from '../components/common/ErrorBanner';
 import { LoadingState } from '../components/common/LoadingState';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
-import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
+import { mapAdminError } from '../../i18n/api-error-messages';
 import { Button, ButtonLink, Panel, TextInput, useToast } from '../../ui';
 
 export function IdentityRoleFormPage() {
@@ -47,16 +42,7 @@ export function IdentityRoleFormPage() {
 				setName(data.role.name);
 			} catch (err) {
 				if (!cancelled) {
-					setError(
-						err instanceof AdminApiError
-							? formatAdminApiError(
-									err.statusCode,
-									err.message,
-									resolveI18nKey,
-									'identity.loadRoleFailed',
-								)
-							: t('loadRoleFailed'),
-					);
+					setError(mapAdminError(err, 'identity.loadRoleFailed'));
 				}
 			} finally {
 				if (!cancelled) {
@@ -87,11 +73,7 @@ export function IdentityRoleFormPage() {
 				navigate(identityRoleDetailRoute(updated.role.id));
 			}
 		} catch (err) {
-			setError(
-				err instanceof AdminApiError
-					? formatAdminApiError(err.statusCode, err.message, resolveI18nKey, 'errors.saveFailed')
-					: resolveI18nKey('errors.saveFailed'),
-			);
+			setError(mapAdminError(err, 'errors.saveFailed'));
 		} finally {
 			setSaving(false);
 		}

@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AUDIT_CATEGORIES } from '@nestidp/shared';
-import { AdminApiError, auditExportUrl, getCsrfToken, listAuditEvents } from '../adminApi';
+import { auditExportUrl, getCsrfToken, listAuditEvents } from '../adminApi';
 import { AdminPageHeader } from '../components/layout/AdminPageHeader';
 import { ErrorBanner } from '../components/common/ErrorBanner';
 import { LoadingState } from '../components/common/LoadingState';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
-import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
+import { mapAdminError, resolveI18nKey } from '../../i18n/api-error-messages';
 import { auditEventLabel } from '../../i18n/audit-event-labels';
 import { auditCategoryLabel } from '../../i18n/enum-labels';
 import { Button, Select, Table, TextInput, useToast } from '../../ui';
@@ -41,11 +41,7 @@ export function AuditLogPage() {
 
 	useEffect(() => {
 		void load().catch((err) => {
-			setError(
-				err instanceof AdminApiError
-					? formatAdminApiError(err.statusCode, err.message, resolveI18nKey, 'audit.loadFailed')
-					: t('loadFailed'),
-			);
+			setError(mapAdminError(err, 'audit.loadFailed'));
 			setLoading(false);
 		});
 		// Initial load only; Filter button calls load() explicitly.

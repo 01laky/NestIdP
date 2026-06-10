@@ -1,13 +1,12 @@
-import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { API_CONNECTION_ROUTE_PREFIX } from '@nestidp/shared';
-import { AdminApiError, getSyncLog } from '../adminApi';
+import { getSyncLog } from '../adminApi';
 import { AdminPageHeader } from '../components/layout/AdminPageHeader';
 import { ErrorBanner } from '../components/common/ErrorBanner';
 import { LoadingState } from '../components/common/LoadingState';
+import { useAdminResource } from '../hooks/useAdminResource';
 import { useAdminDocumentTitle } from '../../i18n/useAdminDocumentTitle';
-import { formatAdminApiError, resolveI18nKey } from '../../i18n/api-error-messages';
 import { syncLogStatusToBadge } from '../status-badge';
 import { Badge, CodeBlock } from '../../ui';
 
@@ -18,44 +17,11 @@ export function SyncLogDetailPage() {
 	const { t: tApi } = useTranslation('apiConnections');
 	const { t: tCommon } = useTranslation('common');
 	useAdminDocumentTitle(t('syncLogDetail'));
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
-	const [log, setLog] = useState<Awaited<ReturnType<typeof getSyncLog>>['syncLog'] | null>(null);
-
-	useEffect(() => {
-		if (!syncLogId) {
-			return;
-		}
-		let cancelled = false;
-		void (async () => {
-			try {
-				const data = await getSyncLog(syncLogId);
-				if (!cancelled) {
-					setLog(data.syncLog);
-				}
-			} catch (err) {
-				if (!cancelled) {
-					setError(
-						err instanceof AdminApiError
-							? formatAdminApiError(
-									err.statusCode,
-									err.message,
-									resolveI18nKey,
-									'sync.loadLogFailed',
-								)
-							: t('loadLogFailed'),
-					);
-				}
-			} finally {
-				if (!cancelled) {
-					setLoading(false);
-				}
-			}
-		})();
-		return () => {
-			cancelled = true;
-		};
-	}, [syncLogId, t]);
+	const { data, loading, error } = useAdminResource(() => getSyncLog(syncLogId as string), {
+		fallbackKey: 'sync.loadLogFailed',
+		deps: [syncLogId],
+	});
+	const log = data?.syncLog ?? null;
 
 	if (loading) {
 		return <LoadingState />;
