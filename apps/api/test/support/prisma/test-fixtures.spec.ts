@@ -189,7 +189,7 @@ describe('test-fixtures', () => {
 	});
 
 	it('API-FIX-13: createTestAdminUserWithPassword hash verifies with known plaintext', async () => {
-		const { verifyPassword } = await import('@api/admin-auth/utils/password.util');
+		const { verifyPassword } = await import('@api/common/crypto/password.util');
 		let capturedHash = '';
 		const prisma = {
 			adminUser: {
@@ -209,7 +209,7 @@ describe('test-fixtures', () => {
 	});
 
 	it('API-FIX-15: createTestUserWithPassword hash verifies with known plaintext', async () => {
-		const { verifyPassword } = await import('@api/admin-auth/utils/password.util');
+		const { verifyPassword } = await import('@api/common/crypto/password.util');
 		let capturedHash = '';
 		const prisma = {
 			user: {

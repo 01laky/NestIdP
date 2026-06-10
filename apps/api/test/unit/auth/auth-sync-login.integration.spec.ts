@@ -28,7 +28,7 @@ import {
 } from '@test/support/prisma/test-fixtures';
 import { runMigrationsOnTestDb } from '@test/support/prisma/test-db.helper';
 import { AuthModule } from '@api/auth/auth.module';
-import { hashPassword } from '@api/admin-auth/utils/password.util';
+import { hashPassword } from '@api/common/crypto/password.util';
 
 jest.setTimeout(60_000);
 

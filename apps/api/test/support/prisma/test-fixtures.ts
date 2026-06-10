@@ -17,7 +17,7 @@ import { generateKeyPairSync } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { hashPassword } from '@api/admin-auth/utils/password.util';
+import { hashPassword } from '@api/common/crypto/password.util';
 import { encrypt } from '@api/encryption/utils/encryption.util';
 import { generateTestRsaEncryptionCert } from '@test/support/crypto/test-cert.util';
 import { buildTestAuthnRequestRedirectPayload as buildAuthnRedirectPayload } from '@test/support/saml/build-authn-request.util';

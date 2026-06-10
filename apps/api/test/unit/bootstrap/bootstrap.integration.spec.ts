@@ -3,7 +3,7 @@ import { unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PrismaClient } from '@prisma/client';
-import { hashPassword } from '@api/admin-auth/utils/password.util';
+import { hashPassword } from '@api/common/crypto/password.util';
 import { runBootstrap } from '@api/bootstrap/run-bootstrap';
 import { runMigrationsOnTestDb } from '@test/support/prisma/test-db.helper';
 import { createTestAdminUser } from '@test/support/prisma/test-fixtures';

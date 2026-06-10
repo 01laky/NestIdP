@@ -4,7 +4,7 @@ import {
 	hashPassword,
 	verifyPassword,
 	verifyPasswordTimingSafe,
-} from '@api/admin-auth/utils/password.util';
+} from '@api/common/crypto/password.util';
 
 describe('password.util', () => {
 	it('API-PWD-01: hash produces bcrypt $2 prefix', async () => {
@@ -45,7 +45,7 @@ describe('password.util', () => {
 	});
 
 	it('API-PWD-08: DUMMY_BCRYPT_HASH has bcrypt prefix', async () => {
-		const { DUMMY_BCRYPT_HASH } = await import('@api/admin-auth/utils/password.util');
+		const { DUMMY_BCRYPT_HASH } = await import('@api/common/crypto/password.util');
 		expect(DUMMY_BCRYPT_HASH.startsWith('$2b$')).toBe(true);
 	});
 
@@ -61,7 +61,7 @@ describe('password.util', () => {
 	}, 15_000);
 
 	it('API-PWD-10: a cost bcrypt rejects falls back to the pinned dummy hash', async () => {
-		const { DUMMY_BCRYPT_HASH } = await import('@api/admin-auth/utils/password.util');
+		const { DUMMY_BCRYPT_HASH } = await import('@api/common/crypto/password.util');
 		// bcrypt.hashSync throws on a non-numeric rounds argument → the fallback constant is returned
 		expect(getDummyBcryptHash('garbage' as unknown as number)).toBe(DUMMY_BCRYPT_HASH);
 	});

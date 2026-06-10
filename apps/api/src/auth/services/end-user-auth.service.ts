@@ -5,7 +5,7 @@ import type {
 	EndUserSessionStatusResponseDto,
 } from '@nestidp/shared';
 import { isPasswordHashAlgorithm } from '@nestidp/shared';
-import { verifyPasswordTimingSafe } from '../../admin-auth/utils/password.util';
+import { verifyPasswordTimingSafe } from '../../common/crypto/password.util';
 import { ActiveIdentityStore } from '../../identity/store/active-identity-store';
 import { PrismaService } from '../../prisma/services/prisma.service';
 import { EndUserAuthAuditService } from './end-user-auth-audit.service';

@@ -29,7 +29,7 @@ import {
 } from '../../auth-protection/account-lockout.service';
 import { AuthProtectionAuditService } from '../../auth-protection/auth-protection-audit.service';
 import { IdentityOrigin } from '@prisma/client';
-import { hashPassword } from '../../admin-auth/utils/password.util';
+import { hashPassword } from '../../common/crypto/password.util';
 import {
 	CREDENTIALS_ENCRYPTION,
 	type CredentialsEncryptionPort,

@@ -94,6 +94,13 @@ frontend de-duplication) and remaining items land in subsequent commits under th
 
 ### Added
 
+- **ESLint import-boundary rules** (§13): four `no-restricted-imports` blocks (each with an inline
+  rationale) now make the layering permanent — `auth`/`bootstrap` ↛ `admin-auth` (and the reverse),
+  the external identity store ↛ the Prisma-bound `identity.repository`, and the SPA ↛ server-only
+  dependencies (`cron-parser` directly, `@nestjs/*`, `@prisma/*`, `kysely`, `xml-crypto`, …). To enable
+  the first rule, `password.util` moved from `admin-auth/utils/` to `common/crypto/` (the §6.5 leftover) —
+  it was imported by end-user auth, bootstrap and identity-admin across the module boundary. A deliberate
+  violation was verified to fail `lint` and then removed.
 - **End-to-end secret-leak guard test** (§16): the `SLG-*` suite drives sentinel secrets (a bcrypt hash,
   an `ENCRYPTION_KEY`-shaped string, an OAuth client secret, a proxy password, a session cookie, a
   private-key PEM) through every formatting path that can reach logs or HTTP clients — audit metadata

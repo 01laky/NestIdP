@@ -5,11 +5,11 @@ import {
 	INVALID_CREDENTIALS_MESSAGE,
 } from '@api/auth/services/end-user-auth.service';
 
-jest.mock('@api/admin-auth/utils/password.util', () => ({
+jest.mock('@api/common/crypto/password.util', () => ({
 	verifyPasswordTimingSafe: jest.fn(),
 }));
 
-import { verifyPasswordTimingSafe } from '@api/admin-auth/utils/password.util';
+import { verifyPasswordTimingSafe } from '@api/common/crypto/password.util';
 
 describe('EndUserAuthService', () => {
 	const identityRepository = {

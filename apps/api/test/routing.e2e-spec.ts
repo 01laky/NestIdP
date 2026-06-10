@@ -252,7 +252,7 @@ describe('Routing (e2e)', () => {
 		prismaMock.spConnection.count.mockResolvedValue(4);
 
 		const password = 'e2e-admin-password';
-		const { hashPassword } = await import('@api/admin-auth/utils/password.util');
+		const { hashPassword } = await import('@api/common/crypto/password.util');
 		const passwordHash = await hashPassword(password);
 		prismaMock.adminUser.findUnique.mockImplementation(
 			async (args: { where: { username?: string; id?: string } }) => {
@@ -281,7 +281,7 @@ describe('Routing (e2e)', () => {
 
 	it('E2E-ADM-08-01: GET /api/admin returns dashboard DTO when authenticated', async () => {
 		const password = 'e2e-admin-password-2';
-		const { hashPassword } = await import('@api/admin-auth/utils/password.util');
+		const { hashPassword } = await import('@api/common/crypto/password.util');
 		const passwordHash = await hashPassword(password);
 		prismaMock.adminUser.findUnique.mockImplementation(
 			async (args: { where: { username?: string; id?: string } }) => {
@@ -310,7 +310,7 @@ describe('Routing (e2e)', () => {
 
 	it('E2E-ADM-08-02: GET /api/admin/sp-connections returns JSON with admin cookie', async () => {
 		const password = 'e2e-sp-admin-pass';
-		const { hashPassword } = await import('@api/admin-auth/utils/password.util');
+		const { hashPassword } = await import('@api/common/crypto/password.util');
 		const passwordHash = await hashPassword(password);
 		prismaMock.adminUser.findUnique.mockImplementation(
 			async (args: { where: { username?: string; id?: string } }) => {
@@ -366,7 +366,7 @@ describe('Routing (e2e)', () => {
 
 	it('E2E-AUTH-01: POST /api/admin/auth/login with wrong password returns 401', async () => {
 		const password = 'e2e-wrong-pass-test';
-		const { hashPassword } = await import('@api/admin-auth/utils/password.util');
+		const { hashPassword } = await import('@api/common/crypto/password.util');
 		const passwordHash = await hashPassword(password);
 		prismaMock.adminUser.findUnique.mockImplementation(
 			async (args: { where: { username?: string } }) => {
@@ -478,7 +478,7 @@ describe('Routing (e2e)', () => {
 
 	it('E2E-IDP-09-02: GET /api/admin/idp/settings with admin cookie returns JSON DTO', async () => {
 		const password = 'e2e-idp-settings-pass';
-		const { hashPassword } = await import('@api/admin-auth/utils/password.util');
+		const { hashPassword } = await import('@api/common/crypto/password.util');
 		const passwordHash = await hashPassword(password);
 		prismaMock.adminUser.findUnique.mockImplementation(
 			async (args: { where: { username?: string; id?: string } }) => {
@@ -563,7 +563,7 @@ describe('Routing (e2e)', () => {
 
 	it('E2E-10-07: GET /api/admin/admin-users with session returns JSON array', async () => {
 		const password = 'e2e-adm-usr-pass';
-		const { hashPassword } = await import('@api/admin-auth/utils/password.util');
+		const { hashPassword } = await import('@api/common/crypto/password.util');
 		const passwordHash = await hashPassword(password);
 		prismaMock.adminUser.findUnique.mockImplementation(
 			async (args: { where: { username?: string; id?: string } }) => {
@@ -585,7 +585,7 @@ describe('Routing (e2e)', () => {
 
 	it('E2E-10-08: GET /api/admin/audit-events with session returns paginated JSON', async () => {
 		const password = 'e2e-audit-pass';
-		const { hashPassword } = await import('@api/admin-auth/utils/password.util');
+		const { hashPassword } = await import('@api/common/crypto/password.util');
 		const passwordHash = await hashPassword(password);
 		prismaMock.adminUser.findUnique.mockImplementation(
 			async (args: { where: { username?: string; id?: string } }) => {
@@ -616,7 +616,7 @@ describe('Routing (e2e)', () => {
 
 	it('E2E-10-10: dashboard includes audit and admin users routes', async () => {
 		const password = 'e2e-dash-v10-pass';
-		const { hashPassword } = await import('@api/admin-auth/utils/password.util');
+		const { hashPassword } = await import('@api/common/crypto/password.util');
 		const passwordHash = await hashPassword(password);
 		prismaMock.adminUser.findUnique.mockImplementation(
 			async (args: { where: { username?: string; id?: string } }) => {
