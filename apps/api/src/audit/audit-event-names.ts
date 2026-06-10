@@ -54,6 +54,9 @@ export const AUDIT_EVENT_NAMES = [
 	'idp_encryption_auto_rotation_autodisabled',
 	'idp_auto_rotation_setting_changed',
 	'idp_auto_rotation_check_run',
+	'idp_signing_cert_unparseable',
+	'idp_encryption_cert_unparseable',
+	'idp_auto_rotation_deferred_boot',
 
 	// admin_config — SP connections
 	'sp_connection_created',

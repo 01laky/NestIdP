@@ -52,6 +52,9 @@ export class AuditQueryService {
 			filters: {
 				category: query.category,
 				event: query.event,
+				actorType: query.actorType,
+				subjectType: query.subjectType,
+				subjectId: query.subjectId,
 				since: query.since,
 				until: query.until,
 			},
@@ -71,6 +74,15 @@ export class AuditQueryService {
 		}
 		if (query.event) {
 			where.event = query.event;
+		}
+		if (query.actorType) {
+			where.actorType = query.actorType;
+		}
+		if (query.subjectType) {
+			where.subjectType = query.subjectType;
+		}
+		if (query.subjectId) {
+			where.subjectId = query.subjectId;
 		}
 		if (query.since || query.until) {
 			where.createdAt = {};

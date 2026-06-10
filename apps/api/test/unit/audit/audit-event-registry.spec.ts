@@ -92,10 +92,12 @@ describe('audit-event registry (AUDIT-REG, §15)', () => {
 				'auto_rotation_due_soon',
 				'auto_rotation_failed',
 				'auto_rotation_autodisabled',
+				'cert_unparseable',
 			]) {
 				expect(isAuditEventName(`idp_${kind}_${suffix}`)).toBe(true);
 			}
 		}
+		expect(isAuditEventName('idp_auto_rotation_deferred_boot')).toBe(true);
 		for (const scope of ['admin', 'end_user'] as const) {
 			expect(isAuditEventName(`${scope}_login_locked`)).toBe(true);
 			expect(isAuditEventName(`${scope}_account_unlocked`)).toBe(true);

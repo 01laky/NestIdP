@@ -38,6 +38,6 @@ import { ProxyCoreModule } from './proxy-core.module';
 		SyncSchedulerService,
 		{ provide: SCHEDULED_SYNC_NOTIFIER, useClass: NoopScheduledSyncNotifier },
 	],
-	exports: [SyncService, SyncScheduleConfigService, SyncMultiSourceConfig],
+	exports: [SyncService, SyncScheduleConfigService, SyncMultiSourceConfig, SyncSchedulerService],
 })
 export class SyncModule {}

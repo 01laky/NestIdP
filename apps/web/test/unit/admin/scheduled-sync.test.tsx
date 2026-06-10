@@ -213,6 +213,8 @@ describe('WEB-SCHED-02: sync history labels manual vs scheduled', () => {
 				usersSynced: 1,
 				groupsSynced: 0,
 				rolesSynced: 0,
+				groupsDeactivated: 0,
+				rolesDeactivated: 0,
 				dryRun: false,
 				triggerSource: l.triggerSource,
 				errors: null,

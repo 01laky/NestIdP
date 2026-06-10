@@ -56,6 +56,9 @@ export interface ListAuditEventsQueryDto {
 	offset?: number;
 	category?: AuditCategoryLiteral;
 	event?: string;
+	actorType?: AuditActorTypeLiteral;
+	subjectType?: string;
+	subjectId?: string;
 	since?: string;
 	until?: string;
 }

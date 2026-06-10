@@ -46,24 +46,26 @@ Categories are the Prisma `AuditCategory` enum; actor types the `AuditActorType`
 
 ### `admin_config` — operator configuration
 
-| Event                                                       | Actor         | When                                                     |
-| ----------------------------------------------------------- | ------------- | -------------------------------------------------------- |
-| `admin_user_bootstrapped`                                   | system        | Initial admin created at first boot                      |
-| `admin_user_created` / `_updated` / `_deleted`              | admin         | Admin-user CRUD                                          |
-| `admin_user_create_rate_limited`                            | admin         | Admin-user creation throttled                            |
-| `idp_settings_updated`                                      | admin         | IdP settings saved                                       |
-| `idp_signing_key_generated`                                 | system        | Signing material auto-provisioned on first use           |
-| `idp_signing_cert_generated` / `_uploaded`                  | admin         | Primary signing cert generated/uploaded                  |
-| `idp_encryption_cert_generated` / `_uploaded`               | admin         | Primary encryption cert generated/uploaded               |
-| `idp_<kind>_rotation_started` / `_completed` / `_cancelled` | admin         | Manual rotation lifecycle (`kind` ∈ signing, encryption) |
-| `idp_<kind>_auto_rotation_started` / `_completed`           | system        | Auto-rotation driver started/promoted a rotation         |
-| `idp_<kind>_auto_rotation_due_soon`                         | system        | Cert entered the notify window                           |
-| `idp_<kind>_auto_rotation_failed` / `_autodisabled`         | system        | Auto-rotation failure / failure-backoff disable          |
-| `idp_auto_rotation_setting_changed`                         | admin         | Auto-rotation toggled                                    |
-| `idp_auto_rotation_check_run`                               | admin\|system | On-demand vs scheduled rotation check                    |
-| `sp_connection_created` / `_updated` / `_deleted`           | admin         | SP connection CRUD                                       |
-| `sp_connection_acs_tested`                                  | admin         | Test-ACS probe run                                       |
-| `sp_signing_probe_performed`                                | admin         | SP signing probe run                                     |
+| Event                                                       | Actor         | When                                                                                                |
+| ----------------------------------------------------------- | ------------- | --------------------------------------------------------------------------------------------------- |
+| `admin_user_bootstrapped`                                   | system        | Initial admin created at first boot                                                                 |
+| `admin_user_created` / `_updated` / `_deleted`              | admin         | Admin-user CRUD                                                                                     |
+| `admin_user_create_rate_limited`                            | admin         | Admin-user creation throttled                                                                       |
+| `idp_settings_updated`                                      | admin         | IdP settings saved                                                                                  |
+| `idp_signing_key_generated`                                 | system        | Signing material auto-provisioned on first use                                                      |
+| `idp_signing_cert_generated` / `_uploaded`                  | admin         | Primary signing cert generated/uploaded                                                             |
+| `idp_encryption_cert_generated` / `_uploaded`               | admin         | Primary encryption cert generated/uploaded                                                          |
+| `idp_<kind>_rotation_started` / `_completed` / `_cancelled` | admin         | Manual rotation lifecycle (`kind` ∈ signing, encryption)                                            |
+| `idp_<kind>_auto_rotation_started` / `_completed`           | system        | Auto-rotation driver started/promoted a rotation                                                    |
+| `idp_<kind>_auto_rotation_due_soon`                         | system        | Cert entered the notify window                                                                      |
+| `idp_<kind>_auto_rotation_failed` / `_autodisabled`         | system        | Auto-rotation failure / failure-backoff disable                                                     |
+| `idp_<kind>_cert_unparseable`                               | system        | Active cert PEM unparseable — auto-rotation cannot evaluate it (deduped: once per process per cert) |
+| `idp_auto_rotation_deferred_boot`                           | system        | Due rotation deferred on the boot tick (outside boot grace)                                         |
+| `idp_auto_rotation_setting_changed`                         | admin         | Auto-rotation toggled                                                                               |
+| `idp_auto_rotation_check_run`                               | admin\|system | On-demand vs scheduled rotation check                                                               |
+| `sp_connection_created` / `_updated` / `_deleted`           | admin         | SP connection CRUD                                                                                  |
+| `sp_connection_acs_tested`                                  | admin         | Test-ACS probe run                                                                                  |
+| `sp_signing_probe_performed`                                | admin         | SP signing probe run                                                                                |
 
 ### `end_user_auth` — end-user authentication
 

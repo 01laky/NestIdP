@@ -27,11 +27,15 @@ export class SyncLogService {
 		logId: string,
 		status: SyncLogStatus,
 		// §5.B3: usersSkippedCollision is required — every terminal path carries the full snapshot.
+		// Prompt 39 D5: the deactivation counts are required too — 0 (not omitted) on dry runs,
+		// early failures and stale-run reclaims; only legacy rows keep NULL columns.
 		counters: {
 			usersSynced: number;
 			groupsSynced: number;
 			rolesSynced: number;
 			usersSkippedCollision: number;
+			groupsDeactivated: number;
+			rolesDeactivated: number;
 		},
 		errors: SyncLogErrorEntryDto[] | null,
 	): Promise<SyncLog> {
@@ -45,6 +49,8 @@ export class SyncLogService {
 				groupsSynced: counters.groupsSynced,
 				rolesSynced: counters.rolesSynced,
 				usersSkippedCollision: counters.usersSkippedCollision,
+				groupsDeactivated: counters.groupsDeactivated,
+				rolesDeactivated: counters.rolesDeactivated,
 				errors:
 					cappedErrors == null
 						? Prisma.JsonNull

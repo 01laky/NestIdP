@@ -12,6 +12,7 @@ import { EndUserAuthAuditService } from './end-user-auth-audit.service';
 import { toEndUserPublicDto } from '../mappers/end-user-auth.mapper';
 import { IdpSigningService } from '../../saml/services/idp-signing.service';
 import { SamlSessionBindService } from './saml-session-bind.service';
+import { getCachedIdpSettings } from '../../idp-settings/utils/idp-settings-cache.util';
 
 export const INVALID_CREDENTIALS_MESSAGE = 'Invalid username or password';
 
@@ -115,9 +116,7 @@ export class EndUserAuthService {
 				const bound = row.userId != null;
 				const expired = row.expiresAt <= new Date();
 				const spActive = row.spConnection.active;
-				const idpSettings = await this.prisma.idpSettings.findUnique({
-					where: { id: 'default' },
-				});
+				const idpSettings = await getCachedIdpSettings(this.prisma);
 				const hasSigning =
 					(await this.idpSigningService.hasSigningMaterial()) || idpSettings != null;
 				const userMatches =

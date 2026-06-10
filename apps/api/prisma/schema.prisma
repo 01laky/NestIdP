@@ -269,6 +269,10 @@ model SyncLog {
   rolesSynced     Int           @default(0)
   // Cross-connection username collisions skipped in this run (Prompt 37).
   usersSkippedCollision Int     @default(0)
+  // Orphan groups/roles removed in phase C (Prompt 39 D5). Nullable: historical rows have no data;
+  // new runs always write numbers (0 on dry runs and early failures).
+  groupsDeactivated Int?
+  rolesDeactivated  Int?
   errors          Json?
   // How the run was started (Prompt 32/37): "manual" | "scheduled" | "manual_all". Null on legacy rows = manual.
   triggerSource   String?

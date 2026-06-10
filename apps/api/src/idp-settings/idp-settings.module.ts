@@ -21,6 +21,6 @@ import { CERT_ROTATION_NOTIFIER, NoopCertRotationNotifier } from './cert-rotatio
 		CertRotationSchedulerService,
 		{ provide: CERT_ROTATION_NOTIFIER, useClass: NoopCertRotationNotifier },
 	],
-	exports: [IdpSettingsService],
+	exports: [IdpSettingsService, CertRotationSchedulerService],
 })
 export class IdpSettingsModule {}

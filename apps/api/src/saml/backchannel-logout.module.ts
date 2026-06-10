@@ -31,6 +31,6 @@ import { SamlSoapBackchannelService } from './services/saml-soap-backchannel.ser
 		{ provide: LOGOUT_PROPAGATION_NOTIFIER, useClass: NoopLogoutPropagationNotifier },
 		{ provide: LOGOUT_PROPAGATION_PORT, useExisting: LogoutPropagationService },
 	],
-	exports: [LOGOUT_PROPAGATION_PORT, LogoutPropagationService],
+	exports: [LOGOUT_PROPAGATION_PORT, LogoutPropagationService, BackchannelLogoutSchedulerService],
 })
 export class BackchannelLogoutModule {}

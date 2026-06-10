@@ -103,6 +103,35 @@ describe('IdpSettingsAuditService', () => {
 		});
 	});
 
+	it('API-IDP-AUDIT-11: logActiveCertUnparseable records a system row with the kind', () => {
+		const warnSpy = jest.spyOn(service['logger'], 'warn').mockImplementation();
+		try {
+			service.logActiveCertUnparseable('signing');
+			expect(audit.recordSafe).toHaveBeenCalledWith({
+				category: 'admin_config',
+				event: 'idp_signing_cert_unparseable',
+				actorType: 'system',
+				subjectType: 'IdpSettings',
+				subjectId: 'default',
+				metadata: { kind: 'signing' },
+			});
+		} finally {
+			warnSpy.mockRestore();
+		}
+	});
+
+	it('API-IDP-AUDIT-12: logAutoRotationDeferredBoot records a system row with kind + notAfter', () => {
+		service.logAutoRotationDeferredBoot('encryption', '2026-06-20T00:00:00.000Z');
+		expect(audit.recordSafe).toHaveBeenCalledWith({
+			category: 'admin_config',
+			event: 'idp_auto_rotation_deferred_boot',
+			actorType: 'system',
+			subjectType: 'IdpSettings',
+			subjectId: 'default',
+			metadata: { kind: 'encryption', notAfter: '2026-06-20T00:00:00.000Z' },
+		});
+	});
+
 	it('API-IDP-AUDIT-08: no audit payload contains PEM markers', () => {
 		const samplePem = '-----BEGIN PRIVATE KEY-----\nsecret\n-----END PRIVATE KEY-----';
 		service.logSettingsUpdated(['entityId']);

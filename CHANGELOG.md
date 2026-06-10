@@ -4,6 +4,43 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.19.0]
+
+The Prompt 38 §7 optional additions, re-cut as a minor release, plus the Prompt 39 D5 follow-up.
+
+### Added
+
+- **`GET /api/admin/idp/settings/cert-rotation/status`** — a light admin endpoint returning only the
+  per-kind auto-rotation status block (reusing the existing DTO shapes; byte-identical values to the full
+  settings read), for dashboards/monitoring that don't need the whole settings payload.
+- **New cert-rotation audit events**: `idp_<kind>_cert_unparseable` (an unparseable active cert is now
+  audited once per cert — previously only a per-tick warn log) and `idp_auto_rotation_deferred_boot`
+  (a due rotation check skipped by the `CERT_ROTATION_BOOT_GRACE_HOURS` window is recorded).
+- **Audit log filters by `actorType` / `subjectType` / `subjectId`** on both the list and the JSON/CSV
+  exports (validated — garbage actorType is a 400, not an empty page).
+- **Operational health surface**: `/health` now reports `version`, `gitSha` (from `BUILD_GIT_SHA`, null
+  when unset), `uptimeSeconds`, `audit: { persistFailures, lastPersistFailureAt }` (the previously
+  invisible `audit_persist_failed` swallow is now a monotonic counter), and per-scheduler liveness gauges
+  (`schedulers.{sync,backchannel,certRotation}: { lastTickAt, lastProcessed }`); `/ready`'s `migrations`
+  became `{ applied, available, upToDate }` (available counted without reading SQL, so the §17 guard
+  cannot fire from a health probe).
+- **`SyncLog.groupsDeactivated` / `rolesDeactivated`** (additive nullable columns + migration
+  `20260617120000_sync_log_deactivation_counts`): each run now persists how many orphan groups/roles its
+  deactivation phase deleted (0 on dry runs and early failures; `null` on historical rows). Closes the
+  Prompt 39 D5 TODO; the characterization goldens gained exactly the two new fields per scenario.
+
+### Changed
+
+- **Singleton IdP-settings reads are cached** (§A5): the ~14 hot-path reads of the `IdpSettings` row
+  (SAML SSO/SLO/metadata, end-user auth, encryption key resolution, back-channel propagation) go through
+  a per-Prisma-instance memo with a 5 s TTL plus explicit invalidation at every write site (all 13
+  `idp-settings.service` writes + the first-use signing-material claim). Disabled under `NODE_ENV=test`
+  and tunable via `IDP_SETTINGS_CACHE_TTL_MS` (0 disables). Read-modify-write paths keep direct reads.
+- **Due-soon rotation notifications are deduped** — `idp_<kind>_auto_rotation_due_soon` (audit + notifier)
+  now fires once per certificate (`notAfter`-keyed, re-armed by rotation; reset on restart), instead of on
+  every scheduler tick inside the notify window (previously up to ~1440 duplicates/day).
+- **Cert-rotation scheduler ticks log their duration** (`cert_rotation_tick_completed` with `durationMs`).
+
 ## [1.18.1]
 
 Codebase-wide refactor + hardening pass (Prompt 38): the §5 security/correctness fixes (each with a

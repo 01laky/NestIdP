@@ -5,6 +5,7 @@ import { create } from 'xmlbuilder2';
 import { PrismaService } from '../../prisma/services/prisma.service';
 import { IdpEncryptionService } from './idp-encryption.service';
 import { IdpSigningService } from './idp-signing.service';
+import { getCachedIdpSettings } from '../../idp-settings/utils/idp-settings-cache.util';
 
 @Injectable()
 export class SamlMetadataService {
@@ -16,7 +17,7 @@ export class SamlMetadataService {
 	) {}
 
 	async generateMetadata(): Promise<string> {
-		const settings = await this.prisma.idpSettings.findUnique({ where: { id: 'default' } });
+		const settings = await getCachedIdpSettings(this.prisma);
 		if (!settings) {
 			throw new Error('IdP settings not configured');
 		}

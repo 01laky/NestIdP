@@ -181,6 +181,17 @@ describe('SyncSchedulerService', () => {
 		setIntervalSpy.mockRestore();
 	});
 
+	it('SCHED-10: tickStats is null before the first tick, then records lastTickAt + due count', async () => {
+		expect(service.tickStats()).toEqual({ lastTickAt: null, lastProcessed: null });
+
+		prisma.apiConnection.findMany.mockResolvedValue([makeConn()]);
+		await service.runTick(NOW);
+
+		const stats = service.tickStats();
+		expect(stats.lastProcessed).toBe(1);
+		expect(stats.lastTickAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+	});
+
 	it('SCHED-09: an overlapping tick is skipped while the previous tick is still running', async () => {
 		service['ticking'] = true;
 		await service.runTick(NOW);

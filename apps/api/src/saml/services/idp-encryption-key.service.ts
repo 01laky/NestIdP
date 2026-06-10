@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { IDP_ENCRYPTION_DEFAULT_KEY_TRANSPORT_ALGORITHM_ID } from '@nestidp/shared';
 import { EncryptionService } from '../../encryption/services/encryption.service';
 import { PrismaService } from '../../prisma/services/prisma.service';
+import { getCachedIdpSettings } from '../../idp-settings/utils/idp-settings-cache.util';
 
 export interface IdpDecryptionMaterial {
 	privateKeyPem: string;
@@ -16,7 +17,7 @@ export class IdpEncryptionKeyService {
 	) {}
 
 	async getDecryptionMaterial(): Promise<IdpDecryptionMaterial[]> {
-		const settings = await this.prisma.idpSettings.findUnique({ where: { id: 'default' } });
+		const settings = await getCachedIdpSettings(this.prisma);
 		if (!settings) {
 			return [];
 		}
@@ -54,7 +55,7 @@ export class IdpEncryptionKeyService {
 	}
 
 	async hasEcEncryptionKey(): Promise<boolean> {
-		const settings = await this.prisma.idpSettings.findUnique({ where: { id: 'default' } });
+		const settings = await getCachedIdpSettings(this.prisma);
 		if (!settings?.encryptionCertPem || !settings.encryptionKeyEncrypted) {
 			return false;
 		}
@@ -66,7 +67,7 @@ export class IdpEncryptionKeyService {
 	}
 
 	async getEcDecryptionMaterial(): Promise<Array<{ privateKeyPem: string; ecCurve: string }>> {
-		const settings = await this.prisma.idpSettings.findUnique({ where: { id: 'default' } });
+		const settings = await getCachedIdpSettings(this.prisma);
 		if (!settings) {
 			return [];
 		}
@@ -101,7 +102,7 @@ export class IdpEncryptionKeyService {
 	}
 
 	async getRsaDecryptionMaterial(): Promise<IdpDecryptionMaterial[]> {
-		const settings = await this.prisma.idpSettings.findUnique({ where: { id: 'default' } });
+		const settings = await getCachedIdpSettings(this.prisma);
 		if (!settings) {
 			return [];
 		}

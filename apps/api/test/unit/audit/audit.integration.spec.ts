@@ -507,6 +507,144 @@ describe('audit integration (SQLite)', () => {
 		await agent.get(`${AUDIT_EVENTS_API_PATH}?evil=1`).expect(400);
 	});
 
+	it('API-AUD-27: list filters by actorType', async () => {
+		await prisma.auditEvent.create({
+			data: { category: 'sync', event: 'system_probe' as never, actorType: 'system' },
+		});
+		await prisma.auditEvent.create({
+			data: { category: 'admin_config', event: 'admin_probe' as never, actorType: 'admin' },
+		});
+
+		const agent = request.agent(app.getHttpServer() as App);
+		await loginAgent(agent);
+		const list = await agent.get(`${AUDIT_EVENTS_API_PATH}?actorType=system`).expect(200);
+
+		expect(list.body.items).toHaveLength(1);
+		expect(list.body.items[0].event).toBe('system_probe');
+	});
+
+	it('API-AUD-28: list filters by subjectType and subjectId, combined with actorType', async () => {
+		await prisma.auditEvent.create({
+			data: {
+				category: 'sync',
+				event: 'subject_match' as never,
+				actorType: 'system',
+				subjectType: 'ApiConnection',
+				subjectId: 'conn-match',
+			},
+		});
+		await prisma.auditEvent.create({
+			data: {
+				category: 'sync',
+				event: 'subject_other_id' as never,
+				actorType: 'system',
+				subjectType: 'ApiConnection',
+				subjectId: 'conn-other',
+			},
+		});
+		await prisma.auditEvent.create({
+			data: {
+				category: 'sync',
+				event: 'subject_other_type' as never,
+				actorType: 'system',
+				subjectType: 'SpConnection',
+				subjectId: 'conn-match',
+			},
+		});
+
+		const agent = request.agent(app.getHttpServer() as App);
+		await loginAgent(agent);
+
+		const byType = await agent
+			.get(`${AUDIT_EVENTS_API_PATH}?subjectType=ApiConnection`)
+			.expect(200);
+		expect(byType.body.items).toHaveLength(2);
+
+		const byId = await agent.get(`${AUDIT_EVENTS_API_PATH}?subjectId=conn-match`).expect(200);
+		expect(byId.body.items).toHaveLength(2);
+
+		const combined = await agent
+			.get(
+				`${AUDIT_EVENTS_API_PATH}?actorType=system&subjectType=ApiConnection&subjectId=conn-match`,
+			)
+			.expect(200);
+		expect(combined.body.items).toHaveLength(1);
+		expect(combined.body.items[0].event).toBe('subject_match');
+	});
+
+	it('API-AUD-29: invalid actorType → 400; overlong subject filters → 400', async () => {
+		const agent = request.agent(app.getHttpServer() as App);
+		await loginAgent(agent);
+		await agent.get(`${AUDIT_EVENTS_API_PATH}?actorType=robot`).expect(400);
+		await agent.get(`${AUDIT_EVENTS_API_PATH}/export?actorType=robot`).expect(400);
+		await agent.get(`${AUDIT_EVENTS_API_PATH}?subjectType=${'x'.repeat(101)}`).expect(400);
+		await agent.get(`${AUDIT_EVENTS_API_PATH}?subjectId=${'x'.repeat(201)}`).expect(400);
+		await agent.get(`${AUDIT_EVENTS_API_PATH}?actorType=end_user`).expect(200);
+	});
+
+	it('API-AUD-EXP-09: export json honours actorType/subject filters and echoes them', async () => {
+		await prisma.auditEvent.create({
+			data: {
+				category: 'sync',
+				event: 'export_subject_match' as never,
+				actorType: 'system',
+				subjectType: 'ApiConnection',
+				subjectId: 'conn-exp',
+			},
+		});
+		await prisma.auditEvent.create({
+			data: { category: 'sync', event: 'export_subject_miss' as never, actorType: 'admin' },
+		});
+
+		const agent = request.agent(app.getHttpServer() as App);
+		await loginAgent(agent);
+		const exported = await agent
+			.get(
+				`${AUDIT_EVENTS_API_PATH}/export?format=json&actorType=system&subjectType=ApiConnection&subjectId=conn-exp`,
+			)
+			.expect(200);
+
+		expect(exported.body.items).toHaveLength(1);
+		expect(exported.body.items[0].event).toBe('export_subject_match');
+		expect(exported.body.filters).toMatchObject({
+			actorType: 'system',
+			subjectType: 'ApiConnection',
+			subjectId: 'conn-exp',
+		});
+	});
+
+	it('API-AUD-EXP-10: export csv honours the actorType/subject filters', async () => {
+		await prisma.auditEvent.create({
+			data: {
+				category: 'sync',
+				event: 'csv_subject_match' as never,
+				actorType: 'system',
+				subjectType: 'ApiConnection',
+				subjectId: 'conn-csv',
+			},
+		});
+		await prisma.auditEvent.create({
+			data: {
+				category: 'sync',
+				event: 'csv_subject_miss' as never,
+				actorType: 'system',
+				subjectType: 'SpConnection',
+				subjectId: 'conn-csv',
+			},
+		});
+
+		const agent = request.agent(app.getHttpServer() as App);
+		await loginAgent(agent);
+		const exported = await agent
+			.get(
+				`${AUDIT_EVENTS_API_PATH}/export?format=csv&actorType=system&subjectType=ApiConnection&subjectId=conn-csv`,
+			)
+			.expect(200);
+
+		expect(String(exported.text)).toContain('csv_subject_match');
+		expect(String(exported.text)).not.toContain('csv_subject_miss');
+	});
+
 	it('API-AUD-EXP-01: export json includes filters echo', async () => {
 		const agent = request.agent(app.getHttpServer() as App);
 		await loginAgent(agent);

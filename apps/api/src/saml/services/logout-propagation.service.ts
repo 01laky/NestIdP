@@ -17,6 +17,7 @@ import {
 	LOGOUT_PROPAGATION_NOTIFIER,
 	type LogoutPropagationNotifier,
 } from './logout-propagation-notifier';
+import { getCachedIdpSettings } from '../../idp-settings/utils/idp-settings-cache.util';
 
 interface QueueRow {
 	id: string;
@@ -169,7 +170,7 @@ export class LogoutPropagationService implements LogoutPropagationPort {
 			if (!sp?.sloSoapUrl) {
 				return { ok: false, reason: 'no_soap_endpoint' };
 			}
-			const settings = await this.prisma.idpSettings.findUnique({ where: { id: 'default' } });
+			const settings = await getCachedIdpSettings(this.prisma);
 			if (!settings?.entityId) {
 				return { ok: false, reason: 'idp_not_configured' };
 			}
@@ -229,7 +230,7 @@ export class LogoutPropagationService implements LogoutPropagationPort {
 		}
 
 		const sp = await this.prisma.spConnection.findUnique({ where: { id: row.spConnectionId } });
-		const settings = await this.prisma.idpSettings.findUnique({ where: { id: 'default' } });
+		const settings = await getCachedIdpSettings(this.prisma);
 		const attempts = row.attempts + 1;
 		const requestId = row.requestId ?? `_${randomBytes(16).toString('hex')}`;
 

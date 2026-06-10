@@ -16,6 +16,7 @@ import { SignedXml } from 'xml-crypto';
 import { runOpenssl } from '../utils/openssl.util';
 import { applyNestIdpXmlCryptoExtensions } from '../xml-crypto-extended-algorithms';
 import { EncryptionService } from '../../encryption/services/encryption.service';
+import { invalidateIdpSettingsCache } from '../../idp-settings/utils/idp-settings-cache.util';
 import { PrismaService } from '../../prisma/services/prisma.service';
 import { SamlAuthAuditService } from './saml-auth-audit.service';
 
@@ -76,6 +77,7 @@ export class IdpSigningService {
 		if (claimed.count === 0) {
 			return this.ensureSigningMaterial();
 		}
+		invalidateIdpSettingsCache(this.prisma);
 		this.audit.logSigningKeyGenerated();
 		return {
 			certPem: generated.certPem,

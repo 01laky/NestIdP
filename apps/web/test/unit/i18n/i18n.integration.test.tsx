@@ -84,6 +84,8 @@ function syncLogStub(): SyncLogDto {
 		usersSynced: 0,
 		groupsSynced: 0,
 		rolesSynced: 0,
+		groupsDeactivated: 0,
+		rolesDeactivated: 0,
 	};
 }
 

@@ -435,9 +435,6 @@ export class SyncService {
 			connectionId,
 			counters.seenUserExternalIds,
 		);
-		// TODO(Prompt 39 D5): the deactivation counts are captured on SyncCounters for diagnostics but
-		// not persisted — SyncLog has no groupsDeactivated/rolesDeactivated columns and adding them
-		// needs a Prisma schema migration plus DTO/UI plumbing, out of scope for this refactor.
 		counters.setDeactivated(
 			'group',
 			await this.identityRepository.deleteOrphanGroups(connectionId, counters.seenGroupExternalIds),
@@ -789,7 +786,7 @@ export class SyncService {
 	 * (real runs only) and emit the completion/failure audit event. The success/failure asymmetries
 	 * are deliberate and preserved: a SUCCESS log stores `null` instead of an empty errors array and
 	 * clears the scheduled-failure backoff state; a FAILED run emits its audit event before the
-	 * connection update (the historical order). §5.B3: the full four-field counter snapshot is
+	 * connection update (the historical order). §5.B3: the full six-field counter snapshot is
 	 * carried on every terminal path — early exits report a genuine 0, never an omitted field.
 	 */
 	private async finalizeRun(params: {
@@ -878,7 +875,14 @@ export class SyncService {
 			await this.syncLogService.finishLog(
 				openLog.id,
 				'FAILED',
-				{ usersSynced: 0, groupsSynced: 0, rolesSynced: 0, usersSkippedCollision: 0 },
+				{
+					usersSynced: 0,
+					groupsSynced: 0,
+					rolesSynced: 0,
+					usersSkippedCollision: 0,
+					groupsDeactivated: 0,
+					rolesDeactivated: 0,
+				},
 				[
 					{
 						phase: 'concurrency',

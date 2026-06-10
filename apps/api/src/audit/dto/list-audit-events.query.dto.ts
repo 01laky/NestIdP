@@ -1,6 +1,7 @@
-import { IsIn, IsInt, IsISO8601, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsIn, IsInt, IsISO8601, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { Type } from 'class-transformer';
-import { AUDIT_CATEGORIES, AUDIT_EXPORT_FORMATS } from '@nestidp/shared';
+import { AUDIT_ACTOR_TYPES, AUDIT_CATEGORIES, AUDIT_EXPORT_FORMATS } from '@nestidp/shared';
+import { Trim } from '../../common/decorators/trim.decorator';
 
 export class ListAuditEventsQueryDto {
 	@IsOptional()
@@ -23,6 +24,22 @@ export class ListAuditEventsQueryDto {
 	@IsOptional()
 	@IsString()
 	event?: string;
+
+	@IsOptional()
+	@IsIn([...AUDIT_ACTOR_TYPES])
+	actorType?: (typeof AUDIT_ACTOR_TYPES)[number];
+
+	@IsOptional()
+	@Trim()
+	@IsString()
+	@MaxLength(100)
+	subjectType?: string;
+
+	@IsOptional()
+	@Trim()
+	@IsString()
+	@MaxLength(200)
+	subjectId?: string;
 
 	// §5.C: garbage dates previously flowed into `new Date(...)` → Invalid Date in the Prisma filter.
 	@IsOptional()

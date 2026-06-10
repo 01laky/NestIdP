@@ -11,10 +11,12 @@ import { getTestSigningMaterialWithDays } from '@test/support/prisma/test-fixtur
  */
 describe('IdpSettingsService — automatic rotation', () => {
 	let cert10d: { certPem: string; privateKeyPem: string };
+	let cert9d: { certPem: string; privateKeyPem: string };
 	let pendingCert: { certPem: string; privateKeyPem: string };
 
 	beforeAll(() => {
 		cert10d = getTestSigningMaterialWithDays('https://idp.example.com', 10);
+		cert9d = getTestSigningMaterialWithDays('https://idp.example.com', 9);
 		pendingCert = getTestSigningMaterialWithDays('https://idp-pending.example.com', 365);
 	});
 
@@ -47,6 +49,8 @@ describe('IdpSettingsService — automatic rotation', () => {
 		logAutoRotationAutodisabled: jest.fn(),
 		logAutoRotationCheckRun: jest.fn(),
 		logAutoRotationSettingChanged: jest.fn(),
+		logActiveCertUnparseable: jest.fn(),
+		logAutoRotationDeferredBoot: jest.fn(),
 	};
 	const notifier = {
 		onAutoRotationDueSoon: jest.fn(),
@@ -666,6 +670,74 @@ describe('IdpSettingsService — automatic rotation', () => {
 		} finally {
 			warnSpy.mockRestore();
 		}
+	});
+
+	// --- Prompt 38 §7 optional hardening -----------------------------------------------------------
+
+	it('CERT-ROT-DUE-03: due-soon is deduped per (kind, notAfter) — second tick silent, new cert re-arms', async () => {
+		config.leadDays.mockReturnValue(1);
+		config.notifyLeadDays.mockReturnValue(60);
+		wireDb(makeSettings({ autoRotateSigningEnabled: true }));
+		const svc = service();
+		await svc.runAutoRotationCheck({ trigger: 'scheduled' });
+		expect(notifier.onAutoRotationDueSoon).toHaveBeenCalledTimes(1);
+		expect(audit.logAutoRotationDueSoon).toHaveBeenCalledTimes(1);
+
+		// second tick, same active cert → both the audit row and the notifier call are deduped
+		await svc.runAutoRotationCheck({ trigger: 'scheduled' });
+		expect(notifier.onAutoRotationDueSoon).toHaveBeenCalledTimes(1);
+		expect(audit.logAutoRotationDueSoon).toHaveBeenCalledTimes(1);
+
+		// replacing the active cert (new notAfter) re-arms the notification
+		await prisma.idpSettings.update({
+			where: { id: 'default' },
+			data: { signingCertPem: cert9d.certPem },
+		});
+		await svc.runAutoRotationCheck({ trigger: 'scheduled' });
+		expect(notifier.onAutoRotationDueSoon).toHaveBeenCalledTimes(2);
+		expect(audit.logAutoRotationDueSoon).toHaveBeenCalledTimes(2);
+	});
+
+	it('CERT-ROT-FAIL-04: unparseable-cert audit row fires once per (kind, cert); a different broken cert re-fires', async () => {
+		const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+		try {
+			wireDb(makeSettings({ autoRotateSigningEnabled: true, signingCertPem: 'not-a-valid-pem' }));
+			const svc = service();
+			await svc.runAutoRotationCheck({ trigger: 'scheduled' });
+			expect(audit.logActiveCertUnparseable).toHaveBeenCalledTimes(1);
+			expect(audit.logActiveCertUnparseable).toHaveBeenCalledWith('signing');
+
+			// same broken cert on the next tick → the warn line repeats but the audit row does not
+			await svc.runAutoRotationCheck({ trigger: 'scheduled' });
+			expect(audit.logActiveCertUnparseable).toHaveBeenCalledTimes(1);
+			expect(warnSpy.mock.calls.filter((c) => String(c[0]).includes('unparseable')).length).toBe(2);
+
+			// a different broken cert is a new fact → audited again
+			await prisma.idpSettings.update({
+				where: { id: 'default' },
+				data: { signingCertPem: 'another-broken-pem' },
+			});
+			await svc.runAutoRotationCheck({ trigger: 'scheduled' });
+			expect(audit.logActiveCertUnparseable).toHaveBeenCalledTimes(2);
+		} finally {
+			warnSpy.mockRestore();
+		}
+	});
+
+	it('CERT-ROT-BOOT-03: a boot-grace deferral is audited; an in-grace boot start is not', async () => {
+		config.bootGraceHours.mockReturnValue(1); // cert ~10 days out → deferred on boot
+		wireDb(makeSettings({ autoRotateSigningEnabled: true }));
+		await service().runAutoRotationCheck({ trigger: 'boot' });
+		expect(audit.logAutoRotationDeferredBoot).toHaveBeenCalledWith('signing', expect.any(String));
+		expect(idpSigningService.generateKeyPairAndCert).not.toHaveBeenCalled();
+
+		jest.clearAllMocks();
+		config.leadDays.mockReturnValue(30);
+		config.bootGraceHours.mockReturnValue(1_000_000); // within grace → starts, no deferral audit
+		wireDb(makeSettings({ autoRotateSigningEnabled: true }));
+		await service().runAutoRotationCheck({ trigger: 'boot' });
+		expect(audit.logAutoRotationDeferredBoot).not.toHaveBeenCalled();
+		expect(idpSigningService.generateKeyPairAndCert).toHaveBeenCalled();
 	});
 
 	it('CERT-ROT-IND-02: both certs auto-rotate independently in a single tick', async () => {

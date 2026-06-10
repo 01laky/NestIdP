@@ -22,6 +22,8 @@ describe('sync.mapper', () => {
 		groupsSynced: 1,
 		rolesSynced: 1,
 		usersSkippedCollision: 0,
+		groupsDeactivated: 3,
+		rolesDeactivated: 1,
 		errors: null,
 		triggerSource: null,
 	};
@@ -117,6 +119,17 @@ describe('sync.mapper', () => {
 			errors: [{ phase: 'parse_users', message: 'Invalid user row' }],
 		});
 		expect(dto.dryRun).toBe(false);
+	});
+
+	it('API-SYNC-MAP-09: deactivation counts map through; NULL legacy columns map to null (Prompt 39 D5)', () => {
+		const dto = toSyncLogDto(baseLog);
+		expect(dto.groupsDeactivated).toBe(3);
+		expect(dto.rolesDeactivated).toBe(1);
+
+		// Legacy rows predate the columns — NULL must surface as null, never 0.
+		const legacy = toSyncLogDto({ ...baseLog, groupsDeactivated: null, rolesDeactivated: null });
+		expect(legacy.groupsDeactivated).toBeNull();
+		expect(legacy.rolesDeactivated).toBeNull();
 	});
 
 	it('toSyncStatusResponseDto maps connection and syncInProgress flag', () => {

@@ -123,6 +123,8 @@ describe('SyncService', () => {
 		groupsSynced: 0,
 		rolesSynced: 0,
 		usersSkippedCollision: 0,
+		groupsDeactivated: null,
+		rolesDeactivated: null,
 		errors: null,
 		triggerSource: null,
 	};
@@ -155,8 +157,9 @@ describe('SyncService', () => {
 		identityRepository.replaceUserGroups.mockResolvedValue(undefined);
 		identityRepository.replaceUserRoles.mockResolvedValue(undefined);
 		identityRepository.deactivateUsersNotInExternalIds.mockResolvedValue(undefined);
-		identityRepository.deleteOrphanGroups.mockResolvedValue(undefined);
-		identityRepository.deleteOrphanRoles.mockResolvedValue(undefined);
+		// The real repository returns the orphan delete COUNT (persisted since Prompt 39 D5).
+		identityRepository.deleteOrphanGroups.mockResolvedValue(0);
+		identityRepository.deleteOrphanRoles.mockResolvedValue(0);
 		prisma.apiConnection.update.mockImplementation(async ({ data }) => ({
 			...baseConnection,
 			...data,
@@ -169,6 +172,8 @@ describe('SyncService', () => {
 				usersSynced: counters.usersSynced,
 				groupsSynced: counters.groupsSynced,
 				rolesSynced: counters.rolesSynced,
+				groupsDeactivated: counters.groupsDeactivated,
+				rolesDeactivated: counters.rolesDeactivated,
 				errors: capSyncErrors(errors) as SyncLog['errors'],
 			}),
 		);
@@ -275,7 +280,14 @@ describe('SyncService', () => {
 		expect(syncLogService.finishLog).toHaveBeenCalledWith(
 			runningLog.id,
 			'FAILED',
-			{ usersSynced: 0, groupsSynced: 0, rolesSynced: 0, usersSkippedCollision: 0 },
+			{
+				usersSynced: 0,
+				groupsSynced: 0,
+				rolesSynced: 0,
+				usersSkippedCollision: 0,
+				groupsDeactivated: 0,
+				rolesDeactivated: 0,
+			},
 			expect.arrayContaining([expect.objectContaining({ phase: 'decrypt_credentials' })]),
 		);
 		expect(prisma.apiConnection.update).toHaveBeenCalledWith({
@@ -401,7 +413,14 @@ describe('SyncService', () => {
 		expect(syncLogService.finishLog).toHaveBeenCalledWith(
 			staleLog.id,
 			'FAILED',
-			{ usersSynced: 0, groupsSynced: 0, rolesSynced: 0, usersSkippedCollision: 0 },
+			{
+				usersSynced: 0,
+				groupsSynced: 0,
+				rolesSynced: 0,
+				usersSkippedCollision: 0,
+				groupsDeactivated: 0,
+				rolesDeactivated: 0,
+			},
 			[
 				expect.objectContaining({
 					phase: 'concurrency',
@@ -511,7 +530,14 @@ describe('SyncService', () => {
 		expect(syncLogService.finishLog).toHaveBeenCalledWith(
 			runningLog.id,
 			'SUCCESS',
-			{ usersSynced: 1, groupsSynced: 1, rolesSynced: 1, usersSkippedCollision: 0 },
+			{
+				usersSynced: 1,
+				groupsSynced: 1,
+				rolesSynced: 1,
+				usersSkippedCollision: 0,
+				groupsDeactivated: 0,
+				rolesDeactivated: 0,
+			},
 			null,
 		);
 	});
@@ -525,6 +551,42 @@ describe('SyncService', () => {
 
 		expect(identityRepository.deleteOrphanGroups).toHaveBeenCalledWith(CONNECTION_ID, new Set());
 		expect(identityRepository.deleteOrphanRoles).toHaveBeenCalledWith(CONNECTION_ID, new Set());
+	});
+
+	it('API-SYNC-SVC-D5-01: orphan-deactivation counts are persisted via finishLog and returned in the DTO (Prompt 39 D5)', async () => {
+		setupHappyPathMocks();
+		identityRepository.deleteOrphanGroups.mockResolvedValue(3);
+		identityRepository.deleteOrphanRoles.mockResolvedValue(2);
+
+		const result = await service.triggerSync(CONNECTION_ID);
+
+		expect(syncLogService.finishLog).toHaveBeenCalledWith(
+			'log-running',
+			'SUCCESS',
+			expect.objectContaining({ groupsDeactivated: 3, rolesDeactivated: 2 }),
+			null,
+		);
+		expect(result.syncLog.groupsDeactivated).toBe(3);
+		expect(result.syncLog.rolesDeactivated).toBe(2);
+	});
+
+	it('API-SYNC-SVC-D5-02: dry run persists 0 deactivation counts — orphan deletes are skipped (Prompt 39 D5)', async () => {
+		setupHappyPathMocks();
+		identityRepository.deleteOrphanGroups.mockResolvedValue(3);
+		identityRepository.deleteOrphanRoles.mockResolvedValue(2);
+
+		const result = await service.triggerSync(CONNECTION_ID, { dryRun: true });
+
+		expect(identityRepository.deleteOrphanGroups).not.toHaveBeenCalled();
+		expect(identityRepository.deleteOrphanRoles).not.toHaveBeenCalled();
+		expect(syncLogService.finishLog).toHaveBeenCalledWith(
+			'log-running',
+			'SUCCESS',
+			expect.objectContaining({ groupsDeactivated: 0, rolesDeactivated: 0 }),
+			expect.anything(),
+		);
+		expect(result.syncLog.groupsDeactivated).toBe(0);
+		expect(result.syncLog.rolesDeactivated).toBe(0);
 	});
 
 	it('API-SYNC-SVC-11: errors capped at 100', async () => {

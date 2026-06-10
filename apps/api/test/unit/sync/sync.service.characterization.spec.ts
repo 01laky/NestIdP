@@ -180,6 +180,8 @@ describe('SyncService characterization goldens (Prompt 38 §11)', () => {
 					groupsSynced: number;
 					rolesSynced: number;
 					usersSkippedCollision?: number;
+					groupsDeactivated?: number;
+					rolesDeactivated?: number;
 				},
 				errors: unknown,
 			) => ({
@@ -192,6 +194,8 @@ describe('SyncService characterization goldens (Prompt 38 §11)', () => {
 				groupsSynced: counters.groupsSynced,
 				rolesSynced: counters.rolesSynced,
 				usersSkippedCollision: counters.usersSkippedCollision ?? 0,
+				groupsDeactivated: counters.groupsDeactivated ?? null,
+				rolesDeactivated: counters.rolesDeactivated ?? null,
 				errors: capSyncErrors(errors as never) as SyncLog['errors'],
 			}),
 		);
@@ -237,8 +241,10 @@ describe('SyncService characterization goldens (Prompt 38 §11)', () => {
 		storeImpl.replaceUserGroups.mockResolvedValue(undefined);
 		storeImpl.replaceUserRoles.mockResolvedValue(undefined);
 		storeImpl.deactivateUsersNotInExternalIds.mockResolvedValue(undefined);
-		storeImpl.deleteOrphanGroups.mockResolvedValue(undefined);
-		storeImpl.deleteOrphanRoles.mockResolvedValue(undefined);
+		// The real store returns the orphan delete COUNT — persisted on SyncLog since Prompt 39 D5,
+		// so real runs golden a nonzero count while dry runs and pre-phase-C failures golden 0.
+		storeImpl.deleteOrphanGroups.mockResolvedValue(2);
+		storeImpl.deleteOrphanRoles.mockResolvedValue(1);
 	}
 
 	function golden(extra: Record<string, unknown> = {}) {

@@ -15,6 +15,12 @@ import { AdminModule } from '@api/admin/admin.module';
 import { AdminAuthModule } from '@api/admin-auth/admin-auth.module';
 import { AuthModule } from '@api/auth/auth.module';
 import { HealthModule } from '@api/health/health.module';
+import { HealthController } from '@api/health/controllers/health.controller';
+import { HealthService } from '@api/health/services/health.service';
+import { AuditPersistenceService } from '@api/audit/services/audit-persistence.service';
+import { SyncSchedulerService } from '@api/sync/services/sync-scheduler.service';
+import { CertRotationSchedulerService } from '@api/idp-settings/services/cert-rotation-scheduler.service';
+import { BackchannelLogoutSchedulerService } from '@api/saml/services/backchannel-logout-scheduler.service';
 import { IdentityModule } from '@api/identity/identity.module';
 import { PrismaModule } from '@api/prisma/prisma.module';
 import { PrismaService } from '@api/prisma/services/prisma.service';
@@ -134,6 +140,10 @@ describe('Routing (e2e)', () => {
 							ENCRYPTION_KEY: 'test-encryption-key-32chars!!',
 							IDP_BASE_URL: 'http://localhost:3000',
 							NODE_ENV: 'test',
+							// keep the schedulers (now in HealthModule's graph) from ticking during e2e
+							SYNC_SCHEDULER_TICK_MS: '0',
+							CERT_ROTATION_SCHEDULER_TICK_MS: '0',
+							SAML_BACKCHANNEL_LOGOUT_SCHEDULER_TICK_MS: '0',
 						}),
 					],
 				}),
@@ -170,7 +180,13 @@ describe('Routing (e2e)', () => {
 		const response = await request(app.getHttpServer() as App)
 			.get('/health')
 			.expect(200);
-		expect(response.body).toEqual({ status: 'ok', service: 'nest-idp-api' });
+		expect(response.body).toMatchObject({ status: 'ok', service: 'nest-idp-api' });
+		// v1.19.0 ops fields are present and DB-free
+		expect(response.body.uptimeSeconds).toBeGreaterThanOrEqual(0);
+		expect(response.body.audit).toEqual({ persistFailures: 0, lastPersistFailureAt: null });
+		expect(Object.keys(response.body.schedulers)).toEqual(
+			expect.arrayContaining(['backchannel', 'sync', 'certRotation']),
+		);
 		expect(prismaMock.pingDatabase).not.toHaveBeenCalled();
 	});
 
@@ -643,8 +659,11 @@ describe('Ready edge cases (e2e)', () => {
 		appliedMigrationCount: jest.fn().mockResolvedValue(0),
 		$disconnect: jest.fn(),
 	};
+	const nullTickStats = { tickStats: () => ({ lastTickAt: null, lastProcessed: null }) };
 
 	beforeAll(async () => {
+		// Wire HealthController/HealthService directly (instead of HealthModule) so this edge-case
+		// fixture does not boot the full scheduler module graph the real HealthModule now imports.
 		const moduleFixture: TestingModule = await Test.createTestingModule({
 			imports: [
 				ConfigModule.forRoot({
@@ -652,8 +671,18 @@ describe('Ready edge cases (e2e)', () => {
 					ignoreEnvFile: true,
 					load: [() => ({ DATABASE_URL: '' })],
 				}),
-				HealthModule,
 				PrismaModule,
+			],
+			controllers: [HealthController],
+			providers: [
+				HealthService,
+				{
+					provide: AuditPersistenceService,
+					useValue: { persistFailureStats: () => ({ count: 0, lastAt: null }) },
+				},
+				{ provide: SyncSchedulerService, useValue: nullTickStats },
+				{ provide: CertRotationSchedulerService, useValue: nullTickStats },
+				{ provide: BackchannelLogoutSchedulerService, useValue: nullTickStats },
 			],
 		})
 			.overrideProvider(PrismaService)

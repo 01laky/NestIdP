@@ -22,6 +22,8 @@ describe('SyncLogDetailPage Evergreen forms', () => {
 				usersSynced: 0,
 				groupsSynced: 0,
 				rolesSynced: 0,
+				groupsDeactivated: 0,
+				rolesDeactivated: 0,
 				dryRun: false,
 				triggerSource: 'manual',
 				errors: [{ phase: 'user_limit', message: 'boom' }],

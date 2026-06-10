@@ -95,6 +95,18 @@ describe('BackchannelLogoutSchedulerService (BC-PROP scheduler)', () => {
 		expect(processDue).toHaveBeenCalledTimes(2);
 	});
 
+	it('BC-PROP-06: tickStats is null before the first tick, then records lastTickAt + processed count', async () => {
+		const processDue = jest.fn().mockResolvedValue(4);
+		const { scheduler } = build({ tickMs: 1_000, processDue });
+		expect(scheduler.tickStats()).toEqual({ lastTickAt: null, lastProcessed: null });
+
+		await scheduler.runTick();
+
+		const stats = scheduler.tickStats();
+		expect(stats.lastProcessed).toBe(4);
+		expect(stats.lastTickAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+	});
+
 	it('prunes on a tick when the prune interval has elapsed', async () => {
 		const prune = jest.fn().mockResolvedValue(3);
 		const { scheduler } = build({ tickMs: 1_000, pruneIntervalMs: 1, prune });

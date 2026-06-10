@@ -12,6 +12,7 @@ import {
 } from '@nestidp/shared';
 import { runOpenssl } from '../utils/openssl.util';
 import { PrismaService } from '../../prisma/services/prisma.service';
+import { getCachedIdpSettings } from '../../idp-settings/utils/idp-settings-cache.util';
 
 export interface GeneratedEncryptionKeyPair {
 	privateKeyPem: string;
@@ -24,7 +25,7 @@ export class IdpEncryptionService {
 	constructor(private readonly prisma: PrismaService) {}
 
 	async getMetadataEncryptionCertificates(): Promise<string[]> {
-		const settings = await this.prisma.idpSettings.findUnique({ where: { id: 'default' } });
+		const settings = await getCachedIdpSettings(this.prisma);
 		if (!settings) {
 			throw new Error('IdP settings not configured');
 		}

@@ -76,9 +76,22 @@ describe('ApiConnectionDto', () => {
 
 describe('HealthResponse', () => {
 	it('uses fixed ok status and service identifier', () => {
-		const health: HealthResponse = { status: 'ok', service: 'nest-idp-api' };
+		const health: HealthResponse = {
+			status: 'ok',
+			service: 'nest-idp-api',
+			version: '1.19.0',
+			gitSha: null,
+			uptimeSeconds: 42,
+			audit: { persistFailures: 0, lastPersistFailureAt: null },
+			schedulers: {
+				backchannel: { lastTickAt: null, lastProcessed: null },
+				sync: { lastTickAt: null, lastProcessed: null },
+				certRotation: { lastTickAt: null, lastProcessed: null },
+			},
+		};
 		expect(health.status).toBe('ok');
 		expect(health.service).toBe('nest-idp-api');
+		expect(health.schedulers.sync.lastTickAt).toBeNull();
 	});
 });
 

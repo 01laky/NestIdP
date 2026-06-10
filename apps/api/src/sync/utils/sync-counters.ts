@@ -4,6 +4,8 @@ export interface SyncCounterSnapshot {
 	groupsSynced: number;
 	rolesSynced: number;
 	usersSkippedCollision: number;
+	groupsDeactivated: number;
+	rolesDeactivated: number;
 }
 
 /**
@@ -17,7 +19,7 @@ export class SyncCounters {
 	groupsSynced = 0;
 	rolesSynced = 0;
 	usersSkippedCollision = 0;
-	/** Orphan rows removed in phase C; captured for diagnostics (not yet persisted, see D5). */
+	/** Orphan rows removed in phase C; persisted on SyncLog (Prompt 39 D5). Stays 0 on dry runs. */
 	groupsDeactivated = 0;
 	rolesDeactivated = 0;
 
@@ -65,7 +67,7 @@ export class SyncCounters {
 
 	/**
 	 * The single destructure point for finalizeRun (§5.B3): every terminal path — SUCCESS, early
-	 * bearer/fetch failure, catch-all FAILED — reports the same full four-field shape.
+	 * bearer/fetch failure, catch-all FAILED — reports the same full six-field shape.
 	 */
 	toCounterSnapshot(): SyncCounterSnapshot {
 		return {
@@ -73,6 +75,8 @@ export class SyncCounters {
 			groupsSynced: this.groupsSynced,
 			rolesSynced: this.rolesSynced,
 			usersSkippedCollision: this.usersSkippedCollision,
+			groupsDeactivated: this.groupsDeactivated,
+			rolesDeactivated: this.rolesDeactivated,
 		};
 	}
 }

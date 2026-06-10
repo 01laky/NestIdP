@@ -97,6 +97,29 @@ describe('AuditPersistenceService', () => {
 		expect(warnPayload).toMatchObject({ event: 'audit_persist_failed' });
 	});
 
+	it('API-AUD-PERS-07: persist failures increment the monotonic counter and stamp lastAt', async () => {
+		expect(service.persistFailureStats()).toEqual({ count: 0, lastAt: null });
+
+		prisma.auditEvent.create.mockRejectedValueOnce(new Error('db unavailable'));
+		service.recordSafe({ category: 'sync', event: 'sync_completed', actorType: 'system' });
+		await flushPromises();
+
+		const afterFirst = service.persistFailureStats();
+		expect(afterFirst.count).toBe(1);
+		expect(afterFirst.lastAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+
+		prisma.auditEvent.create.mockRejectedValueOnce(new Error('still down'));
+		service.recordSafe({ category: 'sync', event: 'sync_completed', actorType: 'system' });
+		await flushPromises();
+		expect(service.persistFailureStats().count).toBe(2);
+	});
+
+	it('API-AUD-PERS-08: successful persists do not move the failure stats', async () => {
+		service.recordSafe({ category: 'sync', event: 'sync_completed', actorType: 'system' });
+		await flushPromises();
+		expect(service.persistFailureStats()).toEqual({ count: 0, lastAt: null });
+	});
+
 	it('API-AUD-PERS-05: stdout payload never includes denylisted metadata keys', () => {
 		service.recordSafe({
 			category: 'admin_config',

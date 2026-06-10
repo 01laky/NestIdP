@@ -7,6 +7,7 @@ import {
 	appliedMigrationCount,
 	applyMigrations,
 	assertSplittableSql,
+	countMigrationDirs,
 	DbMigrationError,
 	runMigrations,
 	splitSqlStatements,
@@ -298,6 +299,46 @@ describe('db-migrator', () => {
 			await expect(appliedMigrationCount(client)).resolves.toBe(0);
 			await applyMigrations(client, { migrationsDir: dir });
 			await expect(appliedMigrationCount(client)).resolves.toBe(STEPS.length);
+		} finally {
+			client.close();
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	it('OPS-18: countMigrationDirs counts directories only, ignores files, and is 0 for a missing dir', () => {
+		const dir = makeMigrationsDir(STEPS);
+		writeFileSync(join(dir, 'README.md'), '# not a migration');
+		try {
+			expect(countMigrationDirs(dir)).toBe(STEPS.length);
+			expect(countMigrationDirs(join(tmpdir(), `nope-${randomUUID()}`))).toBe(0);
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	it('OPS-18: countMigrationDirs never runs the §17 SQL guard (an unsafe migration still counts)', () => {
+		const dir = makeMigrationsDir([
+			{
+				name: '20260101000000_bad_trigger',
+				sql: 'CREATE TRIGGER tr AFTER INSERT ON ok FOR EACH ROW SELECT 1;',
+			},
+		]);
+		try {
+			expect(countMigrationDirs(dir)).toBe(1); // listMigrations would throw here — counting must not
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	it('OPS-18: applied count equals countMigrationDirs after a full migration run (upToDate)', async () => {
+		const dir = makeMigrationsDir(STEPS);
+		const { url } = tmpDbUrl();
+		const client = createClient({ url });
+		try {
+			await applyMigrations(client, { migrationsDir: dir });
+			const applied = await appliedMigrationCount(client);
+			expect(applied).toBe(countMigrationDirs(dir));
+			expect(applied >= countMigrationDirs(dir)).toBe(true); // /ready upToDate semantics
 		} finally {
 			client.close();
 			rmSync(dir, { recursive: true, force: true });

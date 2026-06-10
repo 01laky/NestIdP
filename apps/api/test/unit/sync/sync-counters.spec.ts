@@ -1,7 +1,7 @@
 import { SyncCounters } from '@api/sync/utils/sync-counters';
 
 describe('SyncCounters (Prompt 39 D1a)', () => {
-	it('CNT-01: toCounterSnapshot returns exactly the four counter fields', () => {
+	it('CNT-01: toCounterSnapshot returns exactly the six counter fields', () => {
 		const counters = new SyncCounters();
 		counters.addUser();
 		counters.addGroupOnce('g1');
@@ -13,8 +13,10 @@ describe('SyncCounters (Prompt 39 D1a)', () => {
 			groupsSynced: 1,
 			rolesSynced: 1,
 			usersSkippedCollision: 1,
+			groupsDeactivated: 0,
+			rolesDeactivated: 0,
 		});
-		expect(Object.keys(counters.toCounterSnapshot())).toHaveLength(4);
+		expect(Object.keys(counters.toCounterSnapshot())).toHaveLength(6);
 	});
 
 	it('CNT-02: addGroupOnce counts on first call and returns false on repeat', () => {
@@ -52,12 +54,14 @@ describe('SyncCounters (Prompt 39 D1a)', () => {
 
 		expect(counters.groupsDeactivated).toBe(3);
 		expect(counters.rolesDeactivated).toBe(5);
-		// Deactivation counts are diagnostics — never part of the finishLog snapshot.
+		// Prompt 39 D5: deactivation counts are part of the finishLog snapshot and persisted.
 		expect(counters.toCounterSnapshot()).toEqual({
 			usersSynced: 0,
 			groupsSynced: 0,
 			rolesSynced: 0,
 			usersSkippedCollision: 0,
+			groupsDeactivated: 3,
+			rolesDeactivated: 5,
 		});
 	});
 });

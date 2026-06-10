@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { SyncLogErrorEntryDto } from '@nestidp/shared';
+import type { SchedulerTickStats, SyncLogErrorEntryDto } from '@nestidp/shared';
 import { CronScheduleError, SYNC_SCHEDULE_DEFAULT_TIMEZONE } from '@nestidp/shared';
 import { parseBoolEnv } from '../../common/config/parse-bool-env.util';
 import { errorMessage as messageOf } from '../../common/utils/error-message.util';
@@ -29,6 +29,8 @@ export class SyncSchedulerService implements OnModuleInit, OnModuleDestroy {
 	private readonly logger = new Logger(SyncSchedulerService.name);
 	private intervalHandle: ReturnType<typeof setInterval> | null = null;
 	private ticking = false;
+	private lastTickAt: string | null = null;
+	private lastProcessed: number | null = null;
 
 	constructor(
 		private readonly prisma: PrismaService,
@@ -111,6 +113,11 @@ export class SyncSchedulerService implements OnModuleInit, OnModuleDestroy {
 		}
 	}
 
+	/** Liveness gauge for /health: last completed tick + due connections it handled. */
+	tickStats(): SchedulerTickStats {
+		return { lastTickAt: this.lastTickAt, lastProcessed: this.lastProcessed };
+	}
+
 	/** One scheduler tick: trigger every due connection. Guarded against overlapping ticks. */
 	async runTick(now: Date = new Date()): Promise<void> {
 		if (this.ticking) {
@@ -128,6 +135,7 @@ export class SyncSchedulerService implements OnModuleInit, OnModuleDestroy {
 				},
 				orderBy: { nextRunAt: 'asc' },
 			});
+			this.lastProcessed = due.length;
 			for (const connection of due) {
 				try {
 					await this.processDueConnection(connection, now);
@@ -137,6 +145,7 @@ export class SyncSchedulerService implements OnModuleInit, OnModuleDestroy {
 				}
 			}
 		} finally {
+			this.lastTickAt = new Date().toISOString();
 			this.ticking = false;
 		}
 	}

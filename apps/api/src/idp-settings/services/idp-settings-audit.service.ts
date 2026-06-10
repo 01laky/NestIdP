@@ -262,6 +262,33 @@ export class IdpSettingsAuditService {
 		});
 	}
 
+	/** Persisted row for an unparseable active cert — the caller dedupes per (kind, cert) per process. */
+	logActiveCertUnparseable(kind: 'signing' | 'encryption'): void {
+		const event = `idp_${kind}_cert_unparseable` as const;
+		this.logger.warn(JSON.stringify({ event, kind }));
+		this.audit.recordSafe({
+			category: 'admin_config',
+			event,
+			actorType: 'system',
+			subjectType: 'IdpSettings',
+			subjectId: 'default',
+			metadata: { kind },
+		});
+	}
+
+	logAutoRotationDeferredBoot(kind: 'signing' | 'encryption', notAfter: string | null): void {
+		const payload = { event: 'idp_auto_rotation_deferred_boot', kind, notAfter };
+		this.logger.log(JSON.stringify(payload));
+		this.audit.recordSafe({
+			category: 'admin_config',
+			event: 'idp_auto_rotation_deferred_boot',
+			actorType: 'system',
+			subjectType: 'IdpSettings',
+			subjectId: 'default',
+			metadata: { kind, notAfter },
+		});
+	}
+
 	logAutoRotationSettingChanged(fields: string[]): void {
 		const payload = { event: 'idp_auto_rotation_setting_changed', fields };
 		this.logger.log(JSON.stringify(payload));

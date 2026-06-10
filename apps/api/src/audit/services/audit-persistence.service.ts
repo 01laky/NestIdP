@@ -21,14 +21,24 @@ export interface AuditRecordInput {
 @Injectable()
 export class AuditPersistenceService {
 	private readonly logger = new Logger(AuditPersistenceService.name);
+	// Monotonic in-process failure signal: audit_persist_failed is intentionally swallowed (audit
+	// must never break the audited action), so /health surfaces these counters instead.
+	private persistFailureCount = 0;
+	private lastPersistFailureAt: string | null = null;
 
 	constructor(private readonly prisma: PrismaService) {}
+
+	persistFailureStats(): { count: number; lastAt: string | null } {
+		return { count: this.persistFailureCount, lastAt: this.lastPersistFailureAt };
+	}
 
 	recordSafe(input: AuditRecordInput): void {
 		const payload = this.buildStdoutPayload(input);
 		this.logger.log(JSON.stringify(payload));
 
 		void this.persist(input).catch((error) => {
+			this.persistFailureCount += 1;
+			this.lastPersistFailureAt = new Date().toISOString();
 			const message = error instanceof Error ? error.message : String(error);
 			this.logger.warn(JSON.stringify({ event: 'audit_persist_failed', message }));
 		});

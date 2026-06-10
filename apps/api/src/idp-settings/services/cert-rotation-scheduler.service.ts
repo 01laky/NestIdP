@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { SchedulerTickStats } from '@nestidp/shared';
 import { parseBoolEnv } from '../../common/config/parse-bool-env.util';
 import { CertRotationConfig } from '../cert-rotation.config';
 import { IdpSettingsService } from './idp-settings.service';
@@ -17,6 +18,8 @@ export class CertRotationSchedulerService implements OnModuleInit, OnModuleDestr
 	private intervalHandle: ReturnType<typeof setInterval> | null = null;
 	private ticking = false;
 	private bootTickPending = true;
+	private lastTickAt: string | null = null;
+	private lastProcessed: number | null = null;
 
 	constructor(
 		private readonly idpSettingsService: IdpSettingsService,
@@ -51,6 +54,11 @@ export class CertRotationSchedulerService implements OnModuleInit, OnModuleDestr
 		}
 	}
 
+	/** Liveness gauge for /health: last completed tick + cert kinds it evaluated. */
+	tickStats(): SchedulerTickStats {
+		return { lastTickAt: this.lastTickAt, lastProcessed: this.lastProcessed };
+	}
+
 	/** One scheduler tick: jitter, then a re-entrancy-guarded auto-rotation evaluation. */
 	async runTick(): Promise<void> {
 		if (this.ticking) {
@@ -59,14 +67,24 @@ export class CertRotationSchedulerService implements OnModuleInit, OnModuleDestr
 		this.ticking = true;
 		const trigger = this.bootTickPending ? 'boot' : 'scheduled';
 		this.bootTickPending = false;
+		const startedAtMs = Date.now();
 		try {
 			await this.applyJitter();
 			await this.idpSettingsService.runAutoRotationCheck({ trigger });
+			this.lastProcessed = 2; // one check evaluates both cert kinds (signing + encryption)
+			this.logger.log(
+				JSON.stringify({
+					event: 'cert_rotation_tick_completed',
+					durationMs: Date.now() - startedAtMs,
+					trigger,
+				}),
+			);
 		} catch (error) {
 			this.logger.warn(
 				JSON.stringify({ event: 'cert_rotation_tick_failed', message: messageOf(error) }),
 			);
 		} finally {
+			this.lastTickAt = new Date().toISOString();
 			this.ticking = false;
 		}
 	}

@@ -57,6 +57,73 @@ describe('AuditQueryService', () => {
 		expect(where.createdAt.lte).toEqual(new Date('2026-12-31T23:59:59.999Z'));
 	});
 
+	it('API-AUD-QRY-08: list applies actorType filter alone', async () => {
+		prisma.auditEvent.findMany.mockResolvedValue([]);
+		prisma.auditEvent.count.mockResolvedValue(0);
+
+		await service.list({ actorType: 'system' });
+
+		expect(prisma.auditEvent.findMany).toHaveBeenCalledWith(
+			expect.objectContaining({ where: { actorType: 'system' } }),
+		);
+	});
+
+	it('API-AUD-QRY-09: list applies subjectType and subjectId filters', async () => {
+		prisma.auditEvent.findMany.mockResolvedValue([]);
+		prisma.auditEvent.count.mockResolvedValue(0);
+
+		await service.list({ subjectType: 'ApiConnection', subjectId: 'conn-1' });
+
+		expect(prisma.auditEvent.findMany).toHaveBeenCalledWith(
+			expect.objectContaining({ where: { subjectType: 'ApiConnection', subjectId: 'conn-1' } }),
+		);
+	});
+
+	it('API-AUD-QRY-10: actor/subject filters combine with category, event and date range', async () => {
+		prisma.auditEvent.findMany.mockResolvedValue([]);
+		prisma.auditEvent.count.mockResolvedValue(0);
+
+		await service.list({
+			category: 'sync',
+			event: 'sync_scheduled_run_failed',
+			actorType: 'system',
+			subjectType: 'ApiConnection',
+			subjectId: 'conn-1',
+			since: '2026-01-01T00:00:00.000Z',
+		});
+
+		const where = prisma.auditEvent.findMany.mock.calls[0][0].where;
+		expect(where).toMatchObject({
+			category: 'sync',
+			event: 'sync_scheduled_run_failed',
+			actorType: 'system',
+			subjectType: 'ApiConnection',
+			subjectId: 'conn-1',
+		});
+		expect(where.createdAt.gte).toEqual(new Date('2026-01-01T00:00:00.000Z'));
+	});
+
+	it('API-AUD-QRY-11: export applies actor/subject filters and echoes them', async () => {
+		prisma.auditEvent.findMany.mockResolvedValue([]);
+
+		const body = await service.exportJson({
+			actorType: 'admin',
+			subjectType: 'SpConnection',
+			subjectId: 'sp-1',
+		});
+
+		expect(prisma.auditEvent.findMany).toHaveBeenCalledWith(
+			expect.objectContaining({
+				where: { actorType: 'admin', subjectType: 'SpConnection', subjectId: 'sp-1' },
+			}),
+		);
+		expect(body.filters).toMatchObject({
+			actorType: 'admin',
+			subjectType: 'SpConnection',
+			subjectId: 'sp-1',
+		});
+	});
+
 	it('API-AUD-QRY-04: exportJson sets truncated when at export cap', async () => {
 		prisma.auditEvent.findMany.mockResolvedValue(
 			Array.from({ length: AUDIT_EXPORT_MAX_ROWS }, (_, index) => ({

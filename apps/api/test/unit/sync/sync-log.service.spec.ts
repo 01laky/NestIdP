@@ -103,7 +103,14 @@ describe('SyncLogService', () => {
 		await service.finishLog(
 			'log-1',
 			'SUCCESS',
-			{ usersSynced: 0, groupsSynced: 0, rolesSynced: 0, usersSkippedCollision: 0 },
+			{
+				usersSynced: 0,
+				groupsSynced: 0,
+				rolesSynced: 0,
+				usersSkippedCollision: 0,
+				groupsDeactivated: 0,
+				rolesDeactivated: 0,
+			},
 			errors,
 		);
 
@@ -122,10 +129,39 @@ describe('SyncLogService', () => {
 		await service.finishLog(
 			'log-1',
 			'FAILED',
-			{ usersSynced: 0, groupsSynced: 0, rolesSynced: 0, usersSkippedCollision: 0 },
+			{
+				usersSynced: 0,
+				groupsSynced: 0,
+				rolesSynced: 0,
+				usersSkippedCollision: 0,
+				groupsDeactivated: 0,
+				rolesDeactivated: 0,
+			},
 			null,
 		);
 
 		expect(prisma.syncLog.update.mock.calls[0][0].data.errors).toBe(Prisma.JsonNull);
+	});
+
+	it('SLG-D5-01: finishLog persists the orphan-deactivation counts (Prompt 39 D5)', async () => {
+		prisma.syncLog.update.mockResolvedValue({ id: 'log-1' });
+
+		await service.finishLog(
+			'log-1',
+			'SUCCESS',
+			{
+				usersSynced: 4,
+				groupsSynced: 2,
+				rolesSynced: 1,
+				usersSkippedCollision: 0,
+				groupsDeactivated: 3,
+				rolesDeactivated: 5,
+			},
+			null,
+		);
+
+		const updateData = prisma.syncLog.update.mock.calls[0][0].data;
+		expect(updateData.groupsDeactivated).toBe(3);
+		expect(updateData.rolesDeactivated).toBe(5);
 	});
 });

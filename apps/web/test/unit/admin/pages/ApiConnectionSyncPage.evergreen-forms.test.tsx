@@ -101,6 +101,8 @@ describe('ApiConnectionSyncPage Evergreen forms', () => {
 			usersSynced: 1,
 			groupsSynced: 0,
 			rolesSynced: 0,
+			groupsDeactivated: 0,
+			rolesDeactivated: 0,
 			dryRun: false,
 			errors: null,
 		};

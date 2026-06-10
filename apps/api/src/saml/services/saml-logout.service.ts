@@ -28,6 +28,7 @@ import { IdpSigningService } from './idp-signing.service';
 import { SamlAuthAuditService } from './saml-auth-audit.service';
 import { SamlLogoutResponseBuilderService } from './saml-logout-response-builder.service';
 import { SamlPostBindingService } from './saml-post-binding.service';
+import { getCachedIdpSettings } from '../../idp-settings/utils/idp-settings-cache.util';
 
 export interface SamlRedirectSloInput {
 	samlRequest: string;
@@ -110,7 +111,7 @@ export class SamlLogoutService {
 			throw new BadRequestException(reason);
 		}
 
-		const settings = await this.prisma.idpSettings.findUnique({ where: { id: 'default' } });
+		const settings = await getCachedIdpSettings(this.prisma);
 		if (!settings) {
 			this.audit.logLogoutRequestRejected('idp_not_configured', ctx.clientIp, ctx.bindingType);
 			throw new ServiceUnavailableException('IdP is not configured');

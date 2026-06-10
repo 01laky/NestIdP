@@ -40,6 +40,21 @@ export interface IdpAutoRotationStatusDto {
 	willAutoCompleteAt: string | null;
 }
 
+/** One cert kind's slice of `GET …/cert-rotation/status` — reuses {@link IdpAutoRotationStatusDto}. */
+export interface IdpCertRotationKindStatusDto {
+	/** Active cert expiry (ISO), or null when missing/unparseable. */
+	certNotAfter: string | null;
+	auto: IdpAutoRotationStatusDto;
+}
+
+/** Light read-only auto-rotation status projection (`GET …/cert-rotation/status`, Prompt 38 §7). */
+export interface IdpCertRotationStatusDto {
+	signing: IdpCertRotationKindStatusDto;
+	encryption: IdpCertRotationKindStatusDto;
+	lastAutoRotationCheckAt: string | null;
+	lastAutoRotationActionAt: string | null;
+}
+
 export type AdminDashboardIdpCertStatus = 'missing' | 'ok' | 'expiring_soon' | 'rotation_active';
 
 export type AdminDashboardEncryptionCertStatus = 'not_configured' | AdminDashboardIdpCertStatus;

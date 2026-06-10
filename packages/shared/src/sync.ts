@@ -18,6 +18,10 @@ export interface SyncLogDto {
 	rolesSynced: number;
 	/** Cross-connection username collisions skipped in this run (Prompt 37; present from v1.18.0). */
 	usersSkippedCollision?: number;
+	/** Orphan groups removed in this run (Prompt 39 D5; v1.19.0). Null on legacy rows; 0 on dry runs. */
+	groupsDeactivated: number | null;
+	/** Orphan roles removed in this run (Prompt 39 D5; v1.19.0). Null on legacy rows; 0 on dry runs. */
+	rolesDeactivated: number | null;
 	/** True when run was POST with dryRun — detected via dry_run_summary error entry. */
 	dryRun: boolean;
 	/** How the run was started; null on legacy rows is treated as 'manual'. */

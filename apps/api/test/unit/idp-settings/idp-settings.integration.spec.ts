@@ -193,6 +193,41 @@ describe('IdP settings admin API (SQLite)', () => {
 		expect(res.body.rotation.hasPendingCertificate).toBe(false);
 	});
 
+	it('API-IDP-ADM-40: GET cert-rotation/status without admin session → 401', async () => {
+		await request(app.getHttpServer() as App)
+			.get(`${IDP_SETTINGS_API_PATH}/cert-rotation/status`)
+			.expect(401);
+	});
+
+	it('API-IDP-ADM-41: GET cert-rotation/status returns only the per-kind auto-rotation block', async () => {
+		const agent = await adminAgent();
+		const res = await agent.get(`${IDP_SETTINGS_API_PATH}/cert-rotation/status`).expect(200);
+		expect(Object.keys(res.body).sort()).toEqual([
+			'encryption',
+			'lastAutoRotationActionAt',
+			'lastAutoRotationCheckAt',
+			'signing',
+		]);
+		for (const kind of ['signing', 'encryption'] as const) {
+			expect(Object.keys(res.body[kind]).sort()).toEqual(['auto', 'certNotAfter']);
+			expect(res.body[kind].auto).toEqual(
+				expect.objectContaining({
+					enabled: expect.any(Boolean),
+					disabledAt: null,
+					consecutiveFailures: expect.any(Number),
+					lastError: null,
+					willAutoCompleteAt: null,
+				}),
+			);
+		}
+		// signing cert exists in this fixture → its expiry is surfaced
+		expect(res.body.signing.certNotAfter).toEqual(expect.any(String));
+		// never leaks key material or full-settings fields
+		const serialized = JSON.stringify(res.body);
+		expect(serialized).not.toContain('PRIVATE KEY');
+		expect(res.body.entityId).toBeUndefined();
+	});
+
 	it('API-IDP-ADM-06: PATCH without CSRF → 403', async () => {
 		const agent = await adminAgent();
 		await agent

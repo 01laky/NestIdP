@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { SchedulerTickStats } from '@nestidp/shared';
 import { parseBoolEnv } from '../../common/config/parse-bool-env.util';
 import { BackchannelLogoutConfig } from './backchannel-logout.config';
 import { LogoutPropagationService } from './logout-propagation.service';
@@ -16,6 +17,8 @@ export class BackchannelLogoutSchedulerService implements OnModuleInit, OnModule
 	private handle: ReturnType<typeof setInterval> | null = null;
 	private ticking = false;
 	private lastPruneMs = 0;
+	private lastTickAt: string | null = null;
+	private lastProcessed: number | null = null;
 
 	constructor(
 		private readonly propagation: LogoutPropagationService,
@@ -49,6 +52,11 @@ export class BackchannelLogoutSchedulerService implements OnModuleInit, OnModule
 		}
 	}
 
+	/** Liveness gauge for /health: last completed tick + due deliveries it processed. */
+	tickStats(): SchedulerTickStats {
+		return { lastTickAt: this.lastTickAt, lastProcessed: this.lastProcessed };
+	}
+
 	/** One tick: process due deliveries + occasional prune. Re-entrancy-guarded; never throws. */
 	async runTick(): Promise<void> {
 		if (this.ticking) {
@@ -56,7 +64,7 @@ export class BackchannelLogoutSchedulerService implements OnModuleInit, OnModule
 		}
 		this.ticking = true;
 		try {
-			await this.propagation.processDue();
+			this.lastProcessed = await this.propagation.processDue();
 			const pruneInterval = this.config.pruneIntervalMs();
 			if (pruneInterval > 0 && Date.now() - this.lastPruneMs >= pruneInterval) {
 				this.lastPruneMs = Date.now();
@@ -73,6 +81,7 @@ export class BackchannelLogoutSchedulerService implements OnModuleInit, OnModule
 				}),
 			);
 		} finally {
+			this.lastTickAt = new Date().toISOString();
 			this.ticking = false;
 		}
 	}

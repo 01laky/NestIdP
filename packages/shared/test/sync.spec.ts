@@ -42,10 +42,22 @@ describe('sync shared types', () => {
 			usersSynced: 1,
 			groupsSynced: 0,
 			rolesSynced: 0,
+			groupsDeactivated: 2,
+			rolesDeactivated: 0,
 			dryRun: false,
 			triggerSource: 'manual',
 			errors: null,
 		};
 		expect(log.durationMs).toBe(1000);
+		expect(log.groupsDeactivated).toBe(2);
+	});
+
+	it('SH-SYNC-05: SyncLogDto deactivation counts are nullable for legacy rows (Prompt 39 D5)', () => {
+		const legacy: Pick<SyncLogDto, 'groupsDeactivated' | 'rolesDeactivated'> = {
+			groupsDeactivated: null,
+			rolesDeactivated: null,
+		};
+		expect(legacy.groupsDeactivated).toBeNull();
+		expect(legacy.rolesDeactivated).toBeNull();
 	});
 });

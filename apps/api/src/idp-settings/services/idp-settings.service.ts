@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
 	BadRequestException,
 	ConflictException,
@@ -10,6 +11,7 @@ import { ConfigService } from '@nestjs/config';
 import type {
 	GenerateIdpEncryptionCertRequestDto,
 	GenerateIdpSigningCertRequestDto,
+	IdpCertRotationStatusDto,
 	IdpMetadataPreviewResponseDto,
 	IdpMetadataUrlResponseDto,
 	IdpSettingsPublicDto,
@@ -29,6 +31,7 @@ import {
 import type { IdpSettings, Prisma } from '@prisma/client';
 import { EncryptionService } from '../../encryption/services/encryption.service';
 import { redactSecrets } from '../../encryption/utils/redact-secret.util';
+import { invalidateIdpSettingsCache } from '../utils/idp-settings-cache.util';
 import { PrismaService } from '../../prisma/services/prisma.service';
 import { IdpEncryptionService } from '../../saml/services/idp-encryption.service';
 import { IdpSigningService } from '../../saml/services/idp-signing.service';
@@ -106,6 +109,17 @@ export class IdpSettingsService {
 	async getSettings(): Promise<IdpSettingsPublicDto> {
 		const settings = await this.findSettingsOrThrow();
 		return this.toPublicDto(settings);
+	}
+
+	/** Light read-only projection of the full public DTO — just the per-kind auto-rotation status (§7). */
+	async getCertRotationStatus(): Promise<IdpCertRotationStatusDto> {
+		const dto = await this.getSettings();
+		return {
+			signing: { certNotAfter: dto.signingCertNotAfter, auto: dto.rotation.auto },
+			encryption: { certNotAfter: dto.encryptionCertNotAfter, auto: dto.encryptionRotation.auto },
+			lastAutoRotationCheckAt: dto.lastAutoRotationCheckAt,
+			lastAutoRotationActionAt: dto.lastAutoRotationActionAt,
+		};
 	}
 
 	async updateSettings(body: UpdateIdpSettingsRequestDto): Promise<IdpSettingsPublicDto> {
@@ -191,6 +205,7 @@ export class IdpSettingsService {
 			where: { id: 'default' },
 			data,
 		});
+		invalidateIdpSettingsCache(this.prisma);
 		if (updatedFields.length > 0) {
 			this.audit.logSettingsUpdated(updatedFields);
 		}
@@ -215,6 +230,7 @@ export class IdpSettingsService {
 				generated.metadata,
 			),
 		});
+		invalidateIdpSettingsCache(this.prisma);
 		this.audit.logSigningCertGenerated(
 			false,
 			this.auditMetaFromGenerated(body, generated.metadata),
@@ -235,6 +251,7 @@ export class IdpSettingsService {
 				pair.crypto,
 			),
 		});
+		invalidateIdpSettingsCache(this.prisma);
 		this.audit.logSigningCertUploaded(false);
 		return this.toPublicDto(updated);
 	}
@@ -280,6 +297,7 @@ export class IdpSettingsService {
 				new Date(),
 			),
 		});
+		invalidateIdpSettingsCache(this.prisma);
 		return this.toPublicDto(updated);
 	}
 
@@ -302,6 +320,7 @@ export class IdpSettingsService {
 				generated.metadata,
 			),
 		});
+		invalidateIdpSettingsCache(this.prisma);
 		this.audit.logEncryptionCertGenerated(
 			false,
 			this.auditMetaFromEncryptionGenerated(body, generated.metadata),
@@ -328,6 +347,7 @@ export class IdpSettingsService {
 				pair.crypto,
 			),
 		});
+		invalidateIdpSettingsCache(this.prisma);
 		this.audit.logEncryptionCertUploaded(false);
 		return this.toPublicDto(updated);
 	}
@@ -379,6 +399,7 @@ export class IdpSettingsService {
 				new Date(),
 			),
 		});
+		invalidateIdpSettingsCache(this.prisma);
 		return this.toPublicDto(updated);
 	}
 
@@ -420,6 +441,7 @@ export class IdpSettingsService {
 			where: { id: 'default' },
 			data: descriptor.completeData(settings),
 		});
+		invalidateIdpSettingsCache(this.prisma);
 		if (descriptor.kind === 'signing') {
 			this.audit.logRotationCompleted();
 		} else {
@@ -441,6 +463,7 @@ export class IdpSettingsService {
 			where: { id: 'default' },
 			data: descriptor.clearPendingData(),
 		});
+		invalidateIdpSettingsCache(this.prisma);
 		if (descriptor.kind === 'signing') {
 			this.audit.logRotationCancelled();
 		} else {
@@ -477,6 +500,21 @@ export class IdpSettingsService {
 	 * the other; nothing throws out of here.
 	 */
 	private autoRotationInFlight = false;
+
+	/**
+	 * Persisted-audit dedup for unparseable active certs: the warning log line stays per-tick, but the
+	 * audit row is written at most once per process per (kind, cert PEM). In-memory by design — a restart
+	 * re-audits the (still broken) cert once, which is the desired "still broken after redeploy" signal.
+	 */
+	private readonly unparseableCertAudited = new Set<string>();
+
+	/**
+	 * Due-soon notification dedup: per kind, the active-cert `notAfter` we last notified for. A tick
+	 * inside the notify window only notifies (audit row + notifier hook) when the cert changed since the
+	 * last notification — a completed rotation installs a cert with a new `notAfter` and so re-arms it.
+	 * In-memory by design: a restart sends one fresh due-soon notification per still-due cert.
+	 */
+	private readonly dueSoonNotifiedNotAfter = new Map<CertRotationKind, string>();
 
 	/**
 	 * Manual complete/cancel must not interleave with an in-flight auto-rotation check — a manual
@@ -538,6 +576,7 @@ export class IdpSettingsService {
 				where: { id: 'default' },
 				data: { lastAutoRotationCheckAt: now },
 			});
+			invalidateIdpSettingsCache(this.prisma);
 			return this.toPublicDto(updated);
 		} finally {
 			this.autoRotationInFlight = false;
@@ -594,15 +633,27 @@ export class IdpSettingsService {
 					message: 'Active certificate could not be parsed — auto-rotation cannot evaluate it',
 				}),
 			);
+			const dedupKey = `${kind}:${createHash('sha256').update(activeCertPem).digest('hex')}`;
+			if (!this.unparseableCertAudited.has(dedupKey)) {
+				this.unparseableCertAudited.add(dedupKey);
+				this.audit.logActiveCertUnparseable(kind);
+			}
 			return settings;
 		}
 		if (isCertExpiringSoon(notAfter, this.certRotationConfig.leadDays(kind))) {
 			if (trigger === 'boot' && !this.withinBootGrace(notAfter, now)) {
-				return settings; // defer surprise rotation right after a deploy
+				// defer surprise rotation right after a deploy — audited so the operator sees why the
+				// in-lead-window cert was not rotated on this boot
+				this.audit.logAutoRotationDeferredBoot(kind, notAfter);
+				return settings;
 			}
 			return this.autoStartKind(kind, settings, now, dryRun);
 		}
-		if (isCertExpiringSoon(notAfter, this.certRotationConfig.notifyLeadDays())) {
+		if (
+			isCertExpiringSoon(notAfter, this.certRotationConfig.notifyLeadDays()) &&
+			this.dueSoonNotifiedNotAfter.get(kind) !== notAfter
+		) {
+			this.dueSoonNotifiedNotAfter.set(kind, notAfter);
 			await this.notifySafe(() =>
 				this.certRotationNotifier.onAutoRotationDueSoon({ kind, activeCertNotAfter: notAfter }),
 			);
@@ -665,6 +716,7 @@ export class IdpSettingsService {
 				...this.clearFailureData(kind),
 			},
 		});
+		invalidateIdpSettingsCache(this.prisma);
 		this.audit.logAutoRotationStarted(kind, false, { notAfter });
 		await this.notifySafe(() =>
 			this.certRotationNotifier.onAutoRotationStarted({
@@ -702,6 +754,7 @@ export class IdpSettingsService {
 			where: { id: 'default' },
 			data: { ...promotion, lastAutoRotationActionAt: now, ...this.clearFailureData(kind) },
 		});
+		invalidateIdpSettingsCache(this.prisma);
 		this.audit.logAutoRotationCompleted(kind, false);
 		await this.notifySafe(() => this.certRotationNotifier.onAutoRotationCompleted({ kind }));
 		return updated;
@@ -737,6 +790,7 @@ export class IdpSettingsService {
 						...(autodisable ? { encryptionAutoRotationDisabledAt: new Date() } : {}),
 					};
 		const updated = await this.prisma.idpSettings.update({ where: { id: 'default' }, data });
+		invalidateIdpSettingsCache(this.prisma);
 		this.audit.logAutoRotationFailed(kind, reason, count);
 		if (autodisable) {
 			this.audit.logAutoRotationAutodisabled(kind, count);

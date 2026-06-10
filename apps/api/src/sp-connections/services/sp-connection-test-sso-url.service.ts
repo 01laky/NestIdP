@@ -10,6 +10,7 @@ import {
 } from '../../saml/utils/build-authn-request.util';
 import { encryptAuthnRequestForIdp } from '../../saml/utils/encrypt-authn-request-for-idp.util';
 import { buildSignedAuthnRequestRedirectQuery } from '../../saml/utils/sign-authn-request-redirect.util';
+import { getCachedIdpSettings } from '../../idp-settings/utils/idp-settings-cache.util';
 
 @Injectable()
 export class SpConnectionTestSsoUrlService {
@@ -41,7 +42,7 @@ export class SpConnectionTestSsoUrlService {
 		const encrypted = options.encrypted === true;
 
 		if (encrypted) {
-			const settings = await this.prisma.idpSettings.findUnique({ where: { id: 'default' } });
+			const settings = await getCachedIdpSettings(this.prisma);
 			if (!settings?.encryptionCertPem) {
 				throw new BadRequestException('IdP encryption certificate required for encrypted test URL');
 			}

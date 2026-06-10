@@ -1,19 +1,52 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { ReadyCheckResult, ReadyExternalIdentityDb, ReadyScheduler } from '@nestidp/shared';
+import type {
+	HealthResponse,
+	ReadyCheckResult,
+	ReadyExternalIdentityDb,
+	ReadyMigrations,
+	ReadyScheduler,
+} from '@nestidp/shared';
+import { AuditPersistenceService } from '../../audit/services/audit-persistence.service';
+import { CertRotationSchedulerService } from '../../idp-settings/services/cert-rotation-scheduler.service';
+import { countMigrationDirs } from '../../prisma/db-migrator';
 import { PrismaService } from '../../prisma/services/prisma.service';
+import { BackchannelLogoutSchedulerService } from '../../saml/services/backchannel-logout-scheduler.service';
+import { SyncSchedulerService } from '../../sync/services/sync-scheduler.service';
 
 @Injectable()
 export class HealthService {
+	// Resolved once: the version cannot change while the process is up.
+	private cachedVersion: string | null | undefined;
+
 	constructor(
 		private readonly prisma: PrismaService,
 		private readonly configService: ConfigService,
+		private readonly auditPersistence: AuditPersistenceService,
+		private readonly syncScheduler: SyncSchedulerService,
+		private readonly certRotationScheduler: CertRotationSchedulerService,
+		private readonly backchannelScheduler: BackchannelLogoutSchedulerService,
 	) {}
 
-	getHealth() {
+	getHealth(): HealthResponse {
+		const persistFailures = this.auditPersistence.persistFailureStats();
 		return {
 			status: 'ok' as const,
 			service: 'nest-idp-api' as const,
+			version: this.resolveVersion(),
+			gitSha: this.configService.get<string>('BUILD_GIT_SHA') || null,
+			uptimeSeconds: Math.floor(process.uptime()),
+			audit: {
+				persistFailures: persistFailures.count,
+				lastPersistFailureAt: persistFailures.lastAt,
+			},
+			schedulers: {
+				backchannel: this.backchannelScheduler.tickStats(),
+				sync: this.syncScheduler.tickStats(),
+				certRotation: this.certRotationScheduler.tickStats(),
+			},
 		};
 	}
 
@@ -56,11 +89,31 @@ export class HealthService {
 				status: degraded ? 'unavailable' : 'ok',
 				service: 'nest-idp-api',
 				database: 'connected',
-				migrations: await this.prisma.appliedMigrationCount(),
+				migrations: await this.migrationsStatus(),
 				...(externalIdentityDb ? { externalIdentityDb } : {}),
 				...(scheduler ? { scheduler } : {}),
 			},
 		};
+	}
+
+	/** Applied (tracking table) vs available (migration dirs on disk — no SQL is read or validated). */
+	private async migrationsStatus(): Promise<ReadyMigrations> {
+		const applied = await this.prisma.appliedMigrationCount();
+		let available = 0;
+		try {
+			available = countMigrationDirs();
+		} catch {
+			available = 0; // unreadable migrations dir must not break readiness
+		}
+		return { applied, available, upToDate: applied >= available };
+	}
+
+	private resolveVersion(): string | null {
+		if (this.cachedVersion === undefined) {
+			this.cachedVersion =
+				this.configService.get<string>('npm_package_version') || readPackageJsonVersion();
+		}
+		return this.cachedVersion;
 	}
 
 	/** Scheduled-sync liveness (Prompt 32): tick enabled + how many connections are scheduled / due. */
@@ -112,5 +165,16 @@ export class HealthService {
 		} catch {
 			return undefined;
 		}
+	}
+}
+
+/** Fallback when npm_package_version is absent (production `node dist/main.js`): the api package.json. */
+function readPackageJsonVersion(): string | null {
+	try {
+		const raw = readFileSync(join(process.cwd(), 'package.json'), 'utf8');
+		const parsed = JSON.parse(raw) as { version?: unknown };
+		return typeof parsed.version === 'string' && parsed.version ? parsed.version : null;
+	} catch {
+		return null;
 	}
 }

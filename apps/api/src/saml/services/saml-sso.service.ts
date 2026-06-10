@@ -30,6 +30,7 @@ import {
 	verifyRedirectBindingSignature,
 } from '../utils/saml-authn-request-redirect-signature.util';
 import { getSamlRedirectSignatureAlgorithm } from '@nestidp/shared';
+import { getCachedIdpSettings } from '../../idp-settings/utils/idp-settings-cache.util';
 
 export interface SamlPostSsoInput {
 	samlRequest: string;
@@ -82,7 +83,7 @@ export class SamlSsoService {
 			throw error;
 		}
 
-		const settings = await this.prisma.idpSettings.findUnique({ where: { id: 'default' } });
+		const settings = await getCachedIdpSettings(this.prisma);
 		if (!settings) {
 			this.audit.logRequestRejected('idp_not_configured', clientIp);
 			throw new ServiceUnavailableException('IdP is not configured');
@@ -189,7 +190,7 @@ export class SamlSsoService {
 			throw error;
 		}
 
-		const settings = await this.prisma.idpSettings.findUnique({ where: { id: 'default' } });
+		const settings = await getCachedIdpSettings(this.prisma);
 		if (!settings) {
 			this.audit.logRequestRejected('idp_not_configured', clientIp, 'post');
 			throw new ServiceUnavailableException('IdP is not configured');
@@ -426,7 +427,7 @@ export class SamlSsoService {
 			throw new ForbiddenException('SAML session does not belong to the authenticated user');
 		}
 
-		const settings = await this.prisma.idpSettings.findUnique({ where: { id: 'default' } });
+		const settings = await getCachedIdpSettings(this.prisma);
 		if (!settings) {
 			this.audit.logResponseFailed(samlSessionId, 'idp_not_configured');
 			throw new ServiceUnavailableException('IdP is not configured');

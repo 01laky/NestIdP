@@ -268,6 +268,18 @@ export async function runMigrations(opts?: {
 	}
 }
 
+/**
+ * Number of migration directories on disk (used by /ready to report applied vs available).
+ * Deliberately does NOT read or §17-validate any migration.sql — it only counts directories, so a
+ * health probe can never trip assertSplittableSql side effects.
+ */
+export function countMigrationDirs(dir: string = defaultMigrationsDir()): number {
+	if (!existsSync(dir)) {
+		return 0;
+	}
+	return readdirSync(dir).filter((n) => statSync(join(dir, n)).isDirectory()).length;
+}
+
 /** Count of applied migrations (used by the health endpoint). */
 export async function appliedMigrationCount(client: Client): Promise<number> {
 	try {

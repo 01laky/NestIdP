@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Patch, Post, UseGuards, ValidationPipe } from '@nestjs/common';
 import {
 	IDP_SETTINGS_API_PATH,
+	type IdpCertRotationStatusDto,
 	type IdpMetadataPreviewResponseDto,
 	type IdpSettingsPublicDto,
 } from '@nestidp/shared';
@@ -118,6 +119,11 @@ export class IdpSettingsController {
 	@UseGuards(AdminCsrfGuard)
 	cancelEncryptionRotation(): Promise<IdpSettingsPublicDto> {
 		return this.idpSettingsService.cancelEncryptionRotation();
+	}
+
+	@Get('cert-rotation/status')
+	getCertRotationStatus(): Promise<IdpCertRotationStatusDto> {
+		return this.idpSettingsService.getCertRotationStatus();
 	}
 
 	@Post('cert-rotation/run-check')

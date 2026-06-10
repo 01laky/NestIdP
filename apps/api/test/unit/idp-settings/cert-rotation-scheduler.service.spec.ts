@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CertRotationSchedulerService } from '@api/idp-settings/services/cert-rotation-scheduler.service';
 
@@ -106,5 +107,66 @@ describe('CertRotationSchedulerService (Prompt 34)', () => {
 		const svc = make();
 		await svc.runTick();
 		expect(idpSettingsService.runAutoRotationCheck).toHaveBeenCalledTimes(1);
+	});
+
+	it('CERT-ROT-SCHED-06: tickStats is null before the first tick, then records lastTickAt + kinds evaluated', async () => {
+		const svc = make();
+		expect(svc.tickStats()).toEqual({ lastTickAt: null, lastProcessed: null });
+
+		await svc.runTick();
+
+		const stats = svc.tickStats();
+		expect(stats.lastProcessed).toBe(2); // signing + encryption evaluated per check
+		expect(stats.lastTickAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+	});
+
+	it('CERT-ROT-SCHED-06b: a failed tick still stamps lastTickAt but not lastProcessed', async () => {
+		const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+		try {
+			idpSettingsService.runAutoRotationCheck.mockRejectedValueOnce(new Error('boom'));
+			const svc = make();
+			await svc.runTick();
+			const stats = svc.tickStats();
+			expect(stats.lastTickAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+			expect(stats.lastProcessed).toBeNull();
+		} finally {
+			warnSpy.mockRestore();
+		}
+	});
+
+	it('CERT-ROT-SCHED-05: a completed tick logs cert_rotation_tick_completed with durationMs + trigger', async () => {
+		const logSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+		try {
+			const svc = make();
+			await svc.runTick();
+			const line = logSpy.mock.calls
+				.map((c) => String(c[0]))
+				.find((l) => l.includes('cert_rotation_tick_completed'));
+			expect(line).toBeDefined();
+			const parsed = JSON.parse(line!) as { event: string; durationMs: number; trigger: string };
+			expect(parsed.event).toBe('cert_rotation_tick_completed');
+			expect(parsed.durationMs).toBeGreaterThanOrEqual(0);
+			expect(parsed.trigger).toBe('boot');
+		} finally {
+			logSpy.mockRestore();
+		}
+	});
+
+	it('CERT-ROT-SCHED-05b: a failed tick does not log tick_completed', async () => {
+		const logSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+		const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+		try {
+			idpSettingsService.runAutoRotationCheck.mockRejectedValueOnce(new Error('boom'));
+			const svc = make();
+			await svc.runTick();
+			const completed = logSpy.mock.calls
+				.map((c) => String(c[0]))
+				.find((l) => l.includes('cert_rotation_tick_completed'));
+			expect(completed).toBeUndefined();
+			expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('cert_rotation_tick_failed'));
+		} finally {
+			logSpy.mockRestore();
+			warnSpy.mockRestore();
+		}
 	});
 });

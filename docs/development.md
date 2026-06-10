@@ -56,8 +56,8 @@ To author a new migration, run `pnpm db:new-migration` — it uses `prisma migra
 | `/saml/*`                    | SAML protocol (metadata, SP-initiated SSO)                |
 | `/api/admin/audit-events`    | Persistent audit log (list + export)                      |
 | `/api/admin/admin-users`     | Operator account CRUD                                     |
-| `/health`                    | Liveness — always OK, no database                         |
-| `/ready`                     | Readiness — Prisma ping                                   |
+| `/health`                    | Liveness — version/build/uptime + in-process gauges       |
+| `/ready`                     | Readiness — Prisma ping + migration progress              |
 | `/admin/login`               | React operator login (separate from SAML `/login`)        |
 | `/admin/settings/idp`        | IdP settings — entity ID, cert lifecycle, rotation wizard |
 | `/admin/settings/admins`     | Operator account management                               |
@@ -235,29 +235,29 @@ single-instance (multi-replica would double-drive).
 
 Full operator surface:
 
-| Method | Path                                   | Auth    | CSRF  | Description                                           |
-| ------ | -------------------------------------- | ------- | ----- | ----------------------------------------------------- |
-| POST   | `/api/admin/auth/login`                | —       | —     | Operator login                                        |
-| POST   | `/api/admin/auth/logout`               | session | yes\* | Logout (\*when session cookie present)                |
-| POST   | `/api/admin/auth/change-password`      | session | yes   | Self-service password change (current + new)          |
-| GET    | `/api/admin/auth/me`                   | session | —     | Session + `csrfToken`                                 |
-| GET    | `/api/admin`                           | session | —     | Dashboard (`AdminDashboardResponseDto`)               |
-| GET    | `/api/admin/api-connections`           | session | —     | List API connections                                  |
-| POST   | `/api/admin/api-connections`           | session | yes   | Create connection (**v1: max 1**)                     |
-| GET    | `/api/admin/api-connections/:id`       | session | —     | Get connection                                        |
-| PATCH  | `/api/admin/api-connections/:id`       | session | yes   | Update connection                                     |
-| DELETE | `/api/admin/api-connections/:id`       | session | yes   | Delete connection                                     |
-| POST   | `/api/admin/api-connections/:id/test`  | session | yes   | Connectivity probe (`GET {baseUrl}/users?limit=1`)    |
-| POST   | `/api/admin/sync/:connectionId`        | session | yes   | Trigger identity sync (optional `{ "dryRun": true }`) |
-| GET    | `/api/admin/sync/:connectionId/status` | session | —     | Sync status + latest log                              |
-| GET    | `/api/admin/sync/:connectionId/logs`   | session | —     | List sync logs (`?limit=`, default 20, max 100)       |
-| GET    | `/api/admin/sync/logs/:syncLogId`      | session | —     | Get sync log detail                                   |
-| GET    | `/api/admin/admin-users`               | session | —     | List operator accounts (no password hashes)           |
-| POST   | `/api/admin/admin-users`               | session | yes   | Create operator (rate limited)                        |
-| PATCH  | `/api/admin/admin-users/:id`           | session | yes   | Reset another admin’s password                        |
-| DELETE | `/api/admin/admin-users/:id`           | session | yes   | Delete operator (not last / not self)                 |
-| GET    | `/api/admin/audit-events`              | session | —     | Paginated audit log (`?category=`, `since`, …)        |
-| GET    | `/api/admin/audit-events/export`       | session | —     | Export JSON/CSV (max 10_000 rows)                     |
+| Method | Path                                   | Auth    | CSRF  | Description                                                                                            |
+| ------ | -------------------------------------- | ------- | ----- | ------------------------------------------------------------------------------------------------------ |
+| POST   | `/api/admin/auth/login`                | —       | —     | Operator login                                                                                         |
+| POST   | `/api/admin/auth/logout`               | session | yes\* | Logout (\*when session cookie present)                                                                 |
+| POST   | `/api/admin/auth/change-password`      | session | yes   | Self-service password change (current + new)                                                           |
+| GET    | `/api/admin/auth/me`                   | session | —     | Session + `csrfToken`                                                                                  |
+| GET    | `/api/admin`                           | session | —     | Dashboard (`AdminDashboardResponseDto`)                                                                |
+| GET    | `/api/admin/api-connections`           | session | —     | List API connections                                                                                   |
+| POST   | `/api/admin/api-connections`           | session | yes   | Create connection (**v1: max 1**)                                                                      |
+| GET    | `/api/admin/api-connections/:id`       | session | —     | Get connection                                                                                         |
+| PATCH  | `/api/admin/api-connections/:id`       | session | yes   | Update connection                                                                                      |
+| DELETE | `/api/admin/api-connections/:id`       | session | yes   | Delete connection                                                                                      |
+| POST   | `/api/admin/api-connections/:id/test`  | session | yes   | Connectivity probe (`GET {baseUrl}/users?limit=1`)                                                     |
+| POST   | `/api/admin/sync/:connectionId`        | session | yes   | Trigger identity sync (optional `{ "dryRun": true }`)                                                  |
+| GET    | `/api/admin/sync/:connectionId/status` | session | —     | Sync status + latest log                                                                               |
+| GET    | `/api/admin/sync/:connectionId/logs`   | session | —     | List sync logs (`?limit=`, default 20, max 100)                                                        |
+| GET    | `/api/admin/sync/logs/:syncLogId`      | session | —     | Get sync log detail                                                                                    |
+| GET    | `/api/admin/admin-users`               | session | —     | List operator accounts (no password hashes)                                                            |
+| POST   | `/api/admin/admin-users`               | session | yes   | Create operator (rate limited)                                                                         |
+| PATCH  | `/api/admin/admin-users/:id`           | session | yes   | Reset another admin’s password                                                                         |
+| DELETE | `/api/admin/admin-users/:id`           | session | yes   | Delete operator (not last / not self)                                                                  |
+| GET    | `/api/admin/audit-events`              | session | —     | Paginated audit log (`?category=`, `event`, `actorType`, `subjectType`, `subjectId`, `since`, `until`) |
+| GET    | `/api/admin/audit-events/export`       | session | —     | Export JSON/CSV (same filters as list; max 10_000 rows)                                                |
 
 Constants in `@nestidp/shared`:
 
@@ -540,6 +540,19 @@ curl -s -b "$COOKIE_JAR" "http://localhost:3000/api/admin/sync/CONNECTION_ID/log
 | Migrations not run   | 200       | 503 `disconnected`   |
 
 `/health` never calls Prisma. The API starts even when the database is unavailable; only `/ready` reflects DB state.
+
+`/health` additionally reports (all in-process, still no database):
+
+| Field                                            | Meaning                                                                                             |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| `version`                                        | App version (`npm_package_version`, falling back to the api `package.json`); `null` if unresolvable |
+| `gitSha`                                         | Build commit from the `BUILD_GIT_SHA` env (inject in Docker builds); `null` when unset              |
+| `uptimeSeconds`                                  | `Math.floor(process.uptime())`                                                                      |
+| `audit.persistFailures` / `lastPersistFailureAt` | Monotonic `audit_persist_failed` counter + last failure timestamp (otherwise swallowed)             |
+| `schedulers.{backchannel,sync,certRotation}`     | Per-scheduler `{ lastTickAt, lastProcessed }` gauges; `null` before the first tick                  |
+
+`/ready` reports `migrations` as `{ applied, available, upToDate }` — applied rows in the tracking
+table vs migration directories shipped on disk (`upToDate` = `applied >= available`).
 
 ## SAML module
 
