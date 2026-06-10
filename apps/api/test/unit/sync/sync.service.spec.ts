@@ -1182,10 +1182,13 @@ describe('SyncService', () => {
 		});
 
 		it('MAS-ALL-01/02: aggregates per-connection results in createdAt order and isolates failures', async () => {
-			prisma.apiConnection.findMany.mockResolvedValue([
-				{ id: 'c1', name: 'A' },
-				{ id: 'c2', name: 'B' },
-			]);
+			prisma.apiConnection.findMany
+				.mockResolvedValueOnce([
+					{ id: 'c1', name: 'A' },
+					{ id: 'c2', name: 'B' },
+				])
+				.mockResolvedValueOnce([]); // excluded query
+
 			jest.spyOn(service, 'isSyncInProgress').mockResolvedValue(false);
 			const trigger = jest
 				.spyOn(service, 'triggerSync')
@@ -1209,12 +1212,33 @@ describe('SyncService', () => {
 		});
 
 		it('MAS-ALL-03: an in-progress connection is reported skipped, not double-run', async () => {
-			prisma.apiConnection.findMany.mockResolvedValue([{ id: 'c1', name: 'A' }]);
+			prisma.apiConnection.findMany
+				.mockResolvedValueOnce([{ id: 'c1', name: 'A' }])
+				.mockResolvedValueOnce([]); // excluded query
 			jest.spyOn(service, 'isSyncInProgress').mockResolvedValue(true);
 			const trigger = jest.spyOn(service, 'triggerSync');
 			const res = await service.syncAll({});
 			expect(res.results[0].status).toBe('skipped_in_progress');
 			expect(trigger).not.toHaveBeenCalled();
+		});
+
+		it('MAS-ALL-EXCLUDED: includeInSyncAll:false non-local sources are emitted as excluded results and counted (§B3)', async () => {
+			prisma.apiConnection.findMany
+				.mockResolvedValueOnce([{ id: 'c1', name: 'A' }]) // included
+				.mockResolvedValueOnce([{ id: 'c9', name: 'Opted-out' }]); // excluded
+			jest.spyOn(service, 'isSyncInProgress').mockResolvedValue(false);
+			const trigger = jest
+				.spyOn(service, 'triggerSync')
+				.mockResolvedValue(log({ usersSynced: 3 }) as never);
+
+			const res = await service.syncAll({});
+
+			// The excluded source is never contacted, only reported.
+			expect(trigger).toHaveBeenCalledTimes(1);
+			expect(trigger).toHaveBeenCalledWith('c1', expect.anything());
+			const excluded = res.results.find((r) => r.connectionId === 'c9');
+			expect(excluded).toMatchObject({ status: 'excluded', name: 'Opted-out', usersSynced: 0 });
+			expect(res.totals).toMatchObject({ connections: 2, succeeded: 1, excluded: 1 });
 		});
 
 		it('MAS-ALL-05: dry-run does not check in-progress and passes dryRun through', async () => {

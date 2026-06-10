@@ -414,6 +414,12 @@ export class SyncService {
 			where: { isLocalDirectory: false, includeInSyncAll: true },
 			orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
 		});
+		// Non-local connections opted out of "sync all" — surfaced as `excluded` results so they aren't
+		// silently invisible (Prompt 38 §B3); they are never contacted.
+		const excludedConnections = await this.prisma.apiConnection.findMany({
+			where: { isLocalDirectory: false, includeInSyncAll: false },
+			orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+		});
 		const byId = new Map<string, SyncAllConnectionResultDto>();
 		const concurrency = this.multiSourceConfig.syncAllConcurrency();
 
@@ -458,14 +464,18 @@ export class SyncService {
 			}
 		});
 
-		// Stable output in createdAt order (runPool may complete out of order).
-		const results = connections.map((c) => byId.get(c.id) ?? this.skippedResult(c.id, c.name));
+		// Stable output in createdAt order (runPool may complete out of order); excluded sources last.
+		const includedResults = connections.map(
+			(c) => byId.get(c.id) ?? this.skippedResult(c.id, c.name),
+		);
+		const excludedResults = excludedConnections.map((c) => this.excludedResult(c.id, c.name));
+		const results = [...includedResults, ...excludedResults];
 		const totals = {
 			connections: results.length,
 			succeeded: results.filter((r) => r.status === 'succeeded').length,
 			failed: results.filter((r) => r.status === 'failed').length,
 			skippedInProgress: results.filter((r) => r.status === 'skipped_in_progress').length,
-			excluded: 0,
+			excluded: excludedResults.length,
 			usersSynced: results.reduce((n, r) => n + r.usersSynced, 0),
 			usersSkippedCollision: results.reduce((n, r) => n + r.usersSkippedCollision, 0),
 		};
@@ -484,6 +494,18 @@ export class SyncService {
 			connectionId,
 			name,
 			status: 'skipped_in_progress',
+			usersSynced: 0,
+			groupsSynced: 0,
+			rolesSynced: 0,
+			usersSkippedCollision: 0,
+		};
+	}
+
+	private excludedResult(connectionId: string, name: string): SyncAllConnectionResultDto {
+		return {
+			connectionId,
+			name,
+			status: 'excluded',
 			usersSynced: 0,
 			groupsSynced: 0,
 			rolesSynced: 0,
