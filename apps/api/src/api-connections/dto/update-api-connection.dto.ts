@@ -1,131 +1,14 @@
-import { Transform } from 'class-transformer';
-import {
-	IsBoolean,
-	IsIn,
-	IsNotEmpty,
-	IsObject,
-	IsOptional,
-	IsString,
-	MaxLength,
-	ValidateIf,
-} from 'class-validator';
-import type {
-	ApiContractConfig,
-	AuthType,
-	OAuthClientAuthMethod,
-	UsernameCollisionPolicy,
-} from '@nestidp/shared';
-import {
-	AUTH_TYPES,
-	OAUTH_CLIENT_AUTH_METHODS,
-	USERNAME_COLLISION_POLICIES,
-} from '@nestidp/shared';
+import { PartialType } from '@nestjs/mapped-types';
+import { IsBoolean, IsOptional } from 'class-validator';
+import { CreateApiConnectionBodyDto } from './create-api-connection.dto';
 
-export class UpdateApiConnectionBodyDto {
-	@IsOptional()
-	@Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-	@IsString()
-	@IsNotEmpty()
-	@MaxLength(128)
-	name?: string;
-
-	@IsOptional()
-	@Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-	@IsString()
-	@IsNotEmpty()
-	@MaxLength(2048)
-	baseUrl?: string;
-
-	@IsOptional()
-	@IsIn([...AUTH_TYPES])
-	authType?: AuthType;
-
-	@IsOptional()
-	@ValidateIf((_o, value) => value !== undefined)
-	@IsString()
-	@IsNotEmpty()
-	@MaxLength(4096)
-	bearerToken?: string;
-
-	@IsOptional()
-	@ValidateIf((_, value) => value !== null)
-	@IsObject()
-	apiContractConfig?: ApiContractConfig | null;
-
-	// --- OAuth 2.0 Client Credentials ---
-	@IsOptional()
-	@IsString()
-	@MaxLength(1024)
-	oauthTokenUrl?: string;
-
-	@IsOptional()
-	@IsString()
-	@MaxLength(1024)
-	oauthClientId?: string;
-
-	@IsOptional()
-	@IsString()
-	@MaxLength(4096)
-	oauthClientSecret?: string;
-
-	@IsOptional()
-	@IsString()
-	@MaxLength(1024)
-	oauthScope?: string;
-
-	@IsOptional()
-	@IsString()
-	@MaxLength(1024)
-	oauthAudience?: string;
-
-	@IsOptional()
-	@IsIn(OAUTH_CLIENT_AUTH_METHODS.map((m) => m.id))
-	oauthClientAuthMethod?: OAuthClientAuthMethod;
-
-	@IsOptional()
-	@ValidateIf((_, value) => value !== null)
-	@IsObject()
-	oauthTokenRequestParams?: Record<string, string> | null;
-
-	// --- Outbound HTTP proxy (Prompt 33) ---
-	@IsOptional()
-	@IsBoolean()
-	proxyEnabled?: boolean;
-
-	@IsOptional()
-	@ValidateIf((_, value) => value !== null)
-	@IsString()
-	@MaxLength(2048)
-	proxyUrl?: string | null;
-
-	@IsOptional()
-	@ValidateIf((_, value) => value !== null)
-	@IsString()
-	@MaxLength(256)
-	proxyUsername?: string | null;
-
-	@IsOptional()
-	@ValidateIf((_, value) => value !== null)
-	@IsString()
-	@MaxLength(1024)
-	proxyPassword?: string | null;
-
-	@IsOptional()
-	@ValidateIf((_, value) => value !== null)
-	@IsString()
-	@MaxLength(4096)
-	noProxyHosts?: string | null;
-
-	// --- Multiple API connections for sync (Prompt 37) ---
-	@IsOptional()
-	@IsBoolean()
-	includeInSyncAll?: boolean;
-
-	@IsOptional()
-	@ValidateIf((_, value) => value !== null)
-	@IsIn([...USERNAME_COLLISION_POLICIES])
-	usernameCollisionPolicy?: UsernameCollisionPolicy | null;
-
+/**
+ * Update body = the create body with every field optional (Prompt 38 §6.3 / §A11), plus the update-only
+ * `acknowledgeRebind` flag. `PartialType` inherits each property's validators (trim / length / enum /
+ * non-empty) and adds `@IsOptional()`, reproducing the previously hand-maintained copy.
+ */
+export class UpdateApiConnectionBodyDto extends PartialType(CreateApiConnectionBodyDto) {
+	/** Confirms an intentional base-URL/auth rebind that would otherwise be refused. */
 	@IsOptional()
 	@IsBoolean()
 	acknowledgeRebind?: boolean;

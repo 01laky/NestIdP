@@ -1,75 +1,9 @@
-import {
-	IsBoolean,
-	IsNotEmpty,
-	IsObject,
-	IsOptional,
-	IsString,
-	MaxLength,
-	ValidateIf,
-} from 'class-validator';
-import type { SpAttributeMappingConfig } from '@nestidp/shared';
-import { MAX_PEM_LENGTH } from '../../common/constants/crypto-limits';
+import { PartialType } from '@nestjs/mapped-types';
+import { CreateSpConnectionBodyDto } from './create-sp-connection.dto';
 
-export class UpdateSpConnectionBodyDto {
-	@IsOptional()
-	@IsString()
-	@IsNotEmpty()
-	@MaxLength(128)
-	name?: string;
-
-	@IsOptional()
-	@IsString()
-	@IsNotEmpty()
-	@MaxLength(512)
-	spEntityId?: string;
-
-	@IsOptional()
-	@IsString()
-	@IsNotEmpty()
-	@MaxLength(2048)
-	acsUrl?: string;
-
-	@IsOptional()
-	@ValidateIf((_, value) => value !== null)
-	@IsString()
-	@MaxLength(2048)
-	sloUrl?: string | null;
-
-	@IsOptional()
-	@ValidateIf((_, value) => value !== null)
-	@IsString()
-	@MaxLength(2048)
-	sloSoapUrl?: string | null;
-
-	@IsOptional()
-	@IsString()
-	@MaxLength(512)
-	nameIdFormat?: string;
-
-	@IsOptional()
-	@ValidateIf((_, value) => value !== null)
-	@IsObject()
-	attributeMapping?: SpAttributeMappingConfig | null;
-
-	@IsOptional()
-	@IsBoolean()
-	active?: boolean;
-
-	@IsOptional()
-	@ValidateIf((_, value) => value !== null)
-	@IsString()
-	@MaxLength(MAX_PEM_LENGTH)
-	spCertificate?: string | null;
-
-	@IsOptional()
-	@IsBoolean()
-	wantAssertionsEncrypted?: boolean;
-
-	@IsOptional()
-	@IsBoolean()
-	wantAuthnRequestsSigned?: boolean;
-
-	@IsOptional()
-	@IsBoolean()
-	wantLogoutRequestsSigned?: boolean;
-}
+/**
+ * Update body = the create body with every field optional (Prompt 38 §6.3 / §A11). `PartialType` inherits
+ * each property's validators (so a supplied value is still trimmed/length-checked/non-empty) and adds
+ * `@IsOptional()`, exactly reproducing the previously hand-maintained copy.
+ */
+export class UpdateSpConnectionBodyDto extends PartialType(CreateSpConnectionBodyDto) {}
