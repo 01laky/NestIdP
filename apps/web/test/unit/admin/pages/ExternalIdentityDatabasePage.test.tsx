@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ExternalDbStatusResponseDto } from '@nestidp/shared';
 import * as adminApi from '@/admin/adminApi';
+import { AdminApiError } from '@/admin/adminApi';
 import { ExternalIdentityDatabasePage } from '@/admin/pages/ExternalIdentityDatabasePage';
 
 function fillConnForm() {
@@ -155,5 +156,101 @@ describe('ExternalIdentityDatabasePage', () => {
 		expect(screen.getByRole('button', { name: 'Disconnect' })).toBeTruthy();
 		// connect form hidden while configured
 		expect(screen.queryByText(/Connect an external database/i)).toBeNull();
+	});
+});
+
+/**
+ * The five action error paths (Prompt 38 §8): every catch funnels through mapAdminError with an
+ * externalDb.* fallback key — an AdminApiError with a server message surfaces that message, an
+ * AdminApiError with a blank message or a plain Error degrades to the translated fallback toast.
+ */
+describe('ExternalIdentityDatabasePage error paths', () => {
+	it('WEB-EXTDB-ERR-01: failed Test connection surfaces the AdminApiError server message', async () => {
+		vi.spyOn(adminApi, 'getExternalIdentityDbStatus').mockResolvedValue(notConfigured());
+		vi.spyOn(adminApi, 'testExternalIdentityDb').mockRejectedValue(
+			new AdminApiError(500, 'external db exploded'),
+		);
+		renderPage();
+		await screen.findByText(/Connect an external database/i);
+		fillConnForm();
+		fireEvent.click(screen.getByRole('button', { name: 'Test connection' }));
+		expect(await screen.findByText('external db exploded')).toBeTruthy();
+	});
+
+	it('WEB-EXTDB-ERR-02: failed Test connection with a plain Error falls back to connectionTestFailed', async () => {
+		vi.spyOn(adminApi, 'getExternalIdentityDbStatus').mockResolvedValue(notConfigured());
+		vi.spyOn(adminApi, 'testExternalIdentityDb').mockRejectedValue(new Error('boom'));
+		renderPage();
+		await screen.findByText(/Connect an external database/i);
+		fillConnForm();
+		fireEvent.click(screen.getByRole('button', { name: 'Test connection' }));
+		expect(await screen.findByText('Failed to test the connection')).toBeTruthy();
+		// the raw error message must not leak to the operator
+		expect(screen.queryByText('boom')).toBeNull();
+		// busy state is released after the failure
+		await waitFor(() =>
+			expect(
+				(screen.getByRole('button', { name: 'Test connection' }) as HTMLButtonElement).disabled,
+			).toBe(false),
+		);
+	});
+
+	it('WEB-EXTDB-ERR-03: failed Preview falls back to previewFailed and renders no preview panel', async () => {
+		vi.spyOn(adminApi, 'getExternalIdentityDbStatus').mockResolvedValue(notConfigured());
+		vi.spyOn(adminApi, 'previewExternalIdentityDb').mockRejectedValue(new Error('boom'));
+		renderPage();
+		await screen.findByText(/Connect an external database/i);
+		fillConnForm();
+		fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
+		expect(await screen.findByText('Failed to preview the connection')).toBeTruthy();
+		expect(screen.queryByTestId('external-db-preview')).toBeNull();
+	});
+
+	it('WEB-EXTDB-ERR-04: failed Connect falls back to connectFailed and keeps the form visible', async () => {
+		vi.spyOn(adminApi, 'getExternalIdentityDbStatus').mockResolvedValue(notConfigured());
+		vi.spyOn(adminApi, 'connectExternalIdentityDb').mockRejectedValue(new Error('boom'));
+		renderPage();
+		await screen.findByText(/Connect an external database/i);
+		fillConnForm();
+		fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
+		expect(await screen.findByText('Failed to connect the external database')).toBeTruthy();
+		// still not configured → connect form stays
+		expect(screen.getByText(/Connect an external database/i)).toBeTruthy();
+	});
+
+	it('WEB-EXTDB-ERR-05: failed Re-sync surfaces the AdminApiError server message', async () => {
+		vi.spyOn(adminApi, 'getExternalIdentityDbStatus').mockResolvedValue(active());
+		vi.spyOn(adminApi, 'resyncExternalIdentityDb').mockRejectedValue(
+			new AdminApiError(503, 'resync exploded'),
+		);
+		renderPage();
+		await screen.findByRole('button', { name: 'Re-sync' });
+		fireEvent.click(screen.getByRole('button', { name: 'Re-sync' }));
+		expect(await screen.findByText('resync exploded')).toBeTruthy();
+	});
+
+	it('WEB-EXTDB-ERR-06: failed Re-sync with a plain Error falls back to resyncFailed', async () => {
+		vi.spyOn(adminApi, 'getExternalIdentityDbStatus').mockResolvedValue(active());
+		vi.spyOn(adminApi, 'resyncExternalIdentityDb').mockRejectedValue(new Error('boom'));
+		renderPage();
+		await screen.findByRole('button', { name: 'Re-sync' });
+		fireEvent.click(screen.getByRole('button', { name: 'Re-sync' }));
+		expect(await screen.findByText('Failed to re-sync the external database')).toBeTruthy();
+	});
+
+	it('WEB-EXTDB-ERR-07: failed Disconnect with a blank AdminApiError message falls back to disconnectFailed', async () => {
+		vi.spyOn(adminApi, 'getExternalIdentityDbStatus').mockResolvedValue(active());
+		const disconnect = vi
+			.spyOn(adminApi, 'disconnectExternalIdentityDb')
+			.mockRejectedValue(new AdminApiError(500, ''));
+		renderPage();
+		await screen.findByRole('button', { name: 'Disconnect' });
+		fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
+		await screen.findByRole('dialog');
+		clickDialogConfirm('Move data back & disconnect');
+		await waitFor(() => expect(disconnect).toHaveBeenCalledTimes(1));
+		expect(await screen.findByText('Failed to disconnect the external database')).toBeTruthy();
+		// status panel still shows the (unchanged) active connection
+		expect(screen.getByTestId('external-db-status').textContent).toContain('active');
 	});
 });
