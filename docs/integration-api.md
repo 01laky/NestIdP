@@ -231,11 +231,11 @@ The config is **sparse** — any key you omit keeps its default; you only need t
 
 ```json
 {
-  "endpoints": {
-    "usersPath": "/api/users",
-    "userGroupsPath": "/api/users/:id/groups",
-    "userRolesPath": "/api/users/:id/roles"
-  }
+	"endpoints": {
+		"usersPath": "/api/users",
+		"userGroupsPath": "/api/users/:id/groups",
+		"userRolesPath": "/api/users/:id/roles"
+	}
 }
 ```
 
@@ -247,11 +247,11 @@ Dot-path to unwrap a JSON envelope before reading the rows. An empty string (def
 
 ```json
 {
-  "responseRoot": {
-    "users": "data.items",
-    "groups": "result",
-    "roles": ""
-  }
+	"responseRoot": {
+		"users": "data.items",
+		"groups": "result",
+		"roles": ""
+	}
 }
 ```
 
@@ -263,17 +263,17 @@ Rename the JSON keys NestIdP reads from each row. Values are dot-paths into the 
 
 ```json
 {
-  "userFieldMap": {
-    "id":                    "userId",
-    "username":              "loginName",
-    "email":                 "emailAddress",
-    "displayName":           "profile.fullName",
-    "passwordHash":          "credentials.hash",
-    "passwordHashAlgorithm": "credentials.algorithm",
-    "active":                "enabled"
-  },
-  "groupFieldMap": { "id": "groupId", "name": "groupName" },
-  "roleFieldMap":  { "id": "roleId",  "name": "roleName" }
+	"userFieldMap": {
+		"id": "userId",
+		"username": "loginName",
+		"email": "emailAddress",
+		"displayName": "profile.fullName",
+		"passwordHash": "credentials.hash",
+		"passwordHashAlgorithm": "credentials.algorithm",
+		"active": "enabled"
+	},
+	"groupFieldMap": { "id": "groupId", "name": "groupName" },
+	"roleFieldMap": { "id": "roleId", "name": "roleName" }
 }
 ```
 
@@ -295,10 +295,10 @@ By default NestIdP makes per-user calls to the group and role endpoints. If your
 
 ```json
 {
-  "membershipSource": {
-    "groups": { "mode": "embedded", "embeddedPath": "groups" },
-    "roles":  { "mode": "embedded", "embeddedPath": "membership.roles" }
-  }
+	"membershipSource": {
+		"groups": { "mode": "embedded", "embeddedPath": "groups" },
+		"roles": { "mode": "embedded", "embeddedPath": "membership.roles" }
+	}
 }
 ```
 
@@ -306,21 +306,21 @@ By default NestIdP makes per-user calls to the group and role endpoints. If your
 
 ### Pagination (`pagination`)
 
-| `mode`             | Required params              | Optional params                                      |
-| ------------------ | ---------------------------- | ---------------------------------------------------- |
-| `"none"` (default) | —                            | —                                                    |
-| `"offset"`         | `offsetParam`                | `limitParam`, `pageSize` (default 100), `maxPages`   |
-| `"page"`           | `pageParam`                  | `limitParam`, `pageSize` (default 100), `startPage` (default 1), `maxPages` |
+| `mode`             | Required params | Optional params                                                             |
+| ------------------ | --------------- | --------------------------------------------------------------------------- |
+| `"none"` (default) | —               | —                                                                           |
+| `"offset"`         | `offsetParam`   | `limitParam`, `pageSize` (default 100), `maxPages`                          |
+| `"page"`           | `pageParam`     | `limitParam`, `pageSize` (default 100), `startPage` (default 1), `maxPages` |
 
 ```json
 {
-  "pagination": {
-    "mode": "offset",
-    "limitParam": "limit",
-    "offsetParam": "offset",
-    "pageSize": 100,
-    "maxPages": 200
-  }
+	"pagination": {
+		"mode": "offset",
+		"limitParam": "limit",
+		"offsetParam": "offset",
+		"pageSize": 100,
+		"maxPages": 200
+	}
 }
 ```
 
@@ -346,8 +346,8 @@ Injected on every outbound call for this connection. `Authorization` cannot be o
 
 ```json
 {
-  "queryParams": { "include_inactive": "true" },
-  "headers": { "X-Tenant-ID": "acme" }
+	"queryParams": { "include_inactive": "true" },
+	"headers": { "X-Tenant-ID": "acme" }
 }
 ```
 
@@ -357,10 +357,10 @@ Up to 20 entries per map; keys and values ≤ 256 characters.
 
 Applied when the mapped field is absent from the API row:
 
-| Key                      | Type              | Effect                                                              |
-| ------------------------ | ----------------- | ------------------------------------------------------------------- |
-| `displayNameFromUsername`| `boolean`         | Copy the mapped `username` value into `displayName` when absent     |
-| `email`                  | `string \| null`  | Fallback email when the API omits the field                         |
+| Key                       | Type             | Effect                                                          |
+| ------------------------- | ---------------- | --------------------------------------------------------------- |
+| `displayNameFromUsername` | `boolean`        | Copy the mapped `username` value into `displayName` when absent |
+| `email`                   | `string \| null` | Fallback email when the API omits the field                     |
 
 ```json
 { "defaults": { "displayNameFromUsername": true, "email": "noreply@corp.example" } }
@@ -368,11 +368,11 @@ Applied when the mapped field is absent from the API row:
 
 ### Error policy and caps
 
-| Key                | Default   | Description                                                                        |
-| ------------------ | --------- | ---------------------------------------------------------------------------------- |
-| `onRowError`       | `"skip"`  | `"skip"` records the error and continues; `"fail"` aborts the entire sync run      |
-| `maxGroupsPerUser` | `null`    | Truncate groups per user beyond this cap (1–10 000)                                |
-| `maxRolesPerUser`  | `null`    | Truncate roles per user beyond this cap (1–10 000)                                 |
+| Key                | Default  | Description                                                                   |
+| ------------------ | -------- | ----------------------------------------------------------------------------- |
+| `onRowError`       | `"skip"` | `"skip"` records the error and continues; `"fail"` aborts the entire sync run |
+| `maxGroupsPerUser` | `null`   | Truncate groups per user beyond this cap (1–10 000)                           |
+| `maxRolesPerUser`  | `null`   | Truncate roles per user beyond this cap (1–10 000)                            |
 
 ### Presets
 
@@ -386,30 +386,30 @@ Two starter templates are available in the admin console (`API connections → e
 
 ```json
 {
-  "endpoints": {
-    "usersPath": "/api/v2/users",
-    "userGroupsPath": "/api/v2/users/:id/groups",
-    "userRolesPath": "/api/v2/users/:id/roles"
-  },
-  "responseRoot": { "users": "data" },
-  "userFieldMap": {
-    "id": "user_id",
-    "email": "email",
-    "displayName": "name",
-    "passwordHash": "app_metadata.passwordHash",
-    "active": "blocked"
-  },
-  "passwordHashAlgorithmConstant": "bcrypt",
-  "activeMapping": { "inverted": true },
-  "pagination": {
-    "mode": "page",
-    "pageParam": "page",
-    "limitParam": "per_page",
-    "pageSize": 50,
-    "startPage": 0,
-    "maxPages": 50
-  },
-  "onRowError": "skip"
+	"endpoints": {
+		"usersPath": "/api/v2/users",
+		"userGroupsPath": "/api/v2/users/:id/groups",
+		"userRolesPath": "/api/v2/users/:id/roles"
+	},
+	"responseRoot": { "users": "data" },
+	"userFieldMap": {
+		"id": "user_id",
+		"email": "email",
+		"displayName": "name",
+		"passwordHash": "app_metadata.passwordHash",
+		"active": "blocked"
+	},
+	"passwordHashAlgorithmConstant": "bcrypt",
+	"activeMapping": { "inverted": true },
+	"pagination": {
+		"mode": "page",
+		"pageParam": "page",
+		"limitParam": "per_page",
+		"pageSize": 50,
+		"startPage": 0,
+		"maxPages": 50
+	},
+	"onRowError": "skip"
 }
 ```
 

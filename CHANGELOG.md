@@ -4,6 +4,16 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.20.3]
+
+### Fixed
+
+- **CI docker-smoke job (`yaml: line 7: found character that cannot start any token`)** — both
+  `deploy/docker-compose.prod.yml` and `deploy/docker-compose.dev.yml` were indented with tabs, which YAML
+  forbids, so `docker compose up` failed to parse them. Converted all leading tabs to spaces. (The repo-wide
+  "tabs everywhere" convention cannot apply to YAML; the `pnpm format` glob already excludes `.yml`/`.yaml`,
+  so Prettier's `useTabs: true` will not re-introduce them.)
+
 ## [1.20.2]
 
 Prod / dev environment separation (Prompt 41): `deploy/` folder, explicit `.prod`/`.dev` suffixes on all
@@ -15,11 +25,11 @@ compose files and env templates, standalone dev compose (no overlay + profiles t
 - **`deploy/` folder** — all deployment artifacts moved here; `Dockerfile` and `Dockerfile.dev` stay in
   root per Docker convention.
 - **`deploy/docker-compose.prod.yml`** (renamed from `docker-compose.yml`): updated `build: { context: ..,
-  dockerfile: Dockerfile }`, `env_file: .env.docker.prod`, `IDP_BASE_URL` removed from compose
+dockerfile: Dockerfile }`, `env_file: .env.docker.prod`, `IDP_BASE_URL` removed from compose
   `environment:` block so the env file value is always used (was previously silently overridden to
   `http://localhost:3000`).
 - **`deploy/docker-compose.dev.yml`** (moved from root, now standalone — not an overlay): `build: { context:
-  .., dockerfile: Dockerfile.dev }`, `env_file: .env.docker.dev`, bind-mount updated `./` → `../`, all
+.., dockerfile: Dockerfile.dev }`, `env_file: .env.docker.dev`, bind-mount updated `./` → `../`, all
   `profiles:` entries removed (no prod service to suppress when running standalone).
 - **`deploy/.env.docker.prod.example`** (committed) — production env template with every secret as
   `change-me-generate-with-openssl-rand-hex-32`; `IDP_BASE_URL=https://idp.your-domain.com` (HTTPS);

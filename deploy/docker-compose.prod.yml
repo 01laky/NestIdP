@@ -4,31 +4,31 @@
 # Full guide: docs/deployment.md
 
 services:
-	nestidp:
-		build:
-			context: ..
-			dockerfile: Dockerfile
-		restart: unless-stopped
-		ports:
-			- '3000:3000'
-		env_file:
-			- .env.docker.prod
-		environment:
-			# DATABASE_URL is tied to the named volume mount path — not configurable via env file.
-			DATABASE_URL: file:/app/apps/api/data/nestidp.db
-			# NODE_ENV is always production for this compose file.
-			NODE_ENV: production
-			PORT: '3000'
-			# IDP_BASE_URL is NOT set here — set it in .env.docker.prod (HTTPS in production).
-			# Setting it here would override the env file and break custom domain deployments.
-		volumes:
-			- nestidp_data:/app/apps/api/data
-		healthcheck:
-			test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/health']
-			interval: 10s
-			timeout: 5s
-			retries: 5
-			start_period: 120s
+  nestidp:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    env_file:
+      - .env.docker.prod
+    environment:
+      # DATABASE_URL is tied to the named volume mount path — not configurable via env file.
+      DATABASE_URL: file:/app/apps/api/data/nestidp.db
+      # NODE_ENV is always production for this compose file.
+      NODE_ENV: production
+      PORT: '3000'
+      # IDP_BASE_URL is NOT set here — set it in .env.docker.prod (HTTPS in production).
+      # Setting it here would override the env file and break custom domain deployments.
+    volumes:
+      - nestidp_data:/app/apps/api/data
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/health']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
 
 volumes:
-	nestidp_data:
+  nestidp_data:

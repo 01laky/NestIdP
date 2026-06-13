@@ -6,12 +6,12 @@ Deployment artifacts for NestIdP. Full documentation: [docs/deployment.md](../do
 
 ## Files
 
-| File | Description |
-|---|---|
-| `docker-compose.prod.yml` | Production stack — single container, named DB volume (`nestidp_data`) |
-| `docker-compose.dev.yml` | Development stack — bind-mount + Nest watch + Vite HMR |
+| File                       | Description                                                               |
+| -------------------------- | ------------------------------------------------------------------------- |
+| `docker-compose.prod.yml`  | Production stack — single container, named DB volume (`nestidp_data`)     |
+| `docker-compose.dev.yml`   | Development stack — bind-mount + Nest watch + Vite HMR                    |
 | `.env.docker.prod.example` | Production env template — copy to `.env.docker.prod`, replace all secrets |
-| `.env.docker.dev.example` | Dev env template — copy to `.env.docker.dev`, pre-filled, nothing to edit |
+| `.env.docker.dev.example`  | Dev env template — copy to `.env.docker.dev`, pre-filled, nothing to edit |
 
 `.env.docker.prod` and `.env.docker.dev` are gitignored — never commit secrets.
 
@@ -37,29 +37,29 @@ curl -sf http://localhost:3000/ready
 
 ## Port usage
 
-| Environment | Ports |
-|---|---|
-| `pnpm docker:prod` | `3000` (API + built SPA) |
-| `pnpm docker:dev` | `3000` (API), `5173` (Vite HMR) |
+| Environment        | Ports                           |
+| ------------------ | ------------------------------- |
+| `pnpm docker:prod` | `3000` (API + built SPA)        |
+| `pnpm docker:dev`  | `3000` (API), `5173` (Vite HMR) |
 
 > **Do not run both simultaneously on the same host** — port 3000 conflicts. Stop one before starting the other.
 
 ## DB storage
 
-| Environment | Location | Managed by |
-|---|---|---|
-| `pnpm docker:prod` | Docker named volume `nestidp_data` | Docker (survives `down`, removed by `docker:prod:reset`) |
-| `pnpm docker:dev` | Host file `apps/api/data/nestidp.db` (via bind-mount) | Git-ignored; inspect directly on host |
+| Environment        | Location                                              | Managed by                                               |
+| ------------------ | ----------------------------------------------------- | -------------------------------------------------------- |
+| `pnpm docker:prod` | Docker named volume `nestidp_data`                    | Docker (survives `down`, removed by `docker:prod:reset`) |
+| `pnpm docker:dev`  | Host file `apps/api/data/nestidp.db` (via bind-mount) | Git-ignored; inspect directly on host                    |
 
 These are completely separate data stores — running one environment never touches the other's DB.
 
 ## Useful commands
 
-| Task | Command |
-|---|---|
-| Follow dev logs | `pnpm docker:dev:logs` |
-| Open shell in dev container | `pnpm docker:dev:shell` |
-| Wipe dev volumes (node_modules) | `pnpm docker:dev:reset` |
-| Follow prod logs | `pnpm docker:prod:logs` |
-| Run prod migrations only | `pnpm docker:prod:migrate` |
-| Wipe prod DB volume | `pnpm docker:prod:reset` |
+| Task                            | Command                    |
+| ------------------------------- | -------------------------- |
+| Follow dev logs                 | `pnpm docker:dev:logs`     |
+| Open shell in dev container     | `pnpm docker:dev:shell`    |
+| Wipe dev volumes (node_modules) | `pnpm docker:dev:reset`    |
+| Follow prod logs                | `pnpm docker:prod:logs`    |
+| Run prod migrations only        | `pnpm docker:prod:migrate` |
+| Wipe prod DB volume             | `pnpm docker:prod:reset`   |

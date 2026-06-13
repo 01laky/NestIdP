@@ -312,22 +312,22 @@ Alert when:
 
 ## Developer commands
 
-| Command                  | Description                                                      |
-| ------------------------ | ---------------------------------------------------------------- |
-| `pnpm dev`               | Shared types watch + API (port 3000) + Vite (port 5173)          |
-| `pnpm docker:dev`        | Hot-reload stack in Docker (Nest watch + Vite HMR)               |
-| `pnpm docker:dev:logs`   | Follow dev container logs                                        |
-| `pnpm docker:dev:shell`  | Open shell in the running dev container                          |
-| `pnpm docker:prod`       | Production stack (detached, named DB volume)                     |
-| `pnpm docker:prod:logs`  | Follow prod container logs                                       |
-| `pnpm docker:prod:migrate` | Run migrations only, then exit (upgrade / init-container)      |
-| `pnpm build`             | Production build of all packages                                 |
-| `pnpm test`              | Monorepo tests (shared + API + web)                              |
-| `pnpm lint`              | ESLint + TypeScript check                                        |
-| `pnpm diagrams:build`    | Regenerate `.mmd` → `.svg` in `docs/img/`                        |
-| `pnpm docs:screenshots`  | Build + run Playwright screenshot spec (writes `docs/img/*.png`) |
-| `pnpm db:migrate:deploy` | Apply pending DB migrations                                      |
-| `pnpm db:new-migration`  | Author a new Prisma migration                                    |
+| Command                    | Description                                                      |
+| -------------------------- | ---------------------------------------------------------------- |
+| `pnpm dev`                 | Shared types watch + API (port 3000) + Vite (port 5173)          |
+| `pnpm docker:dev`          | Hot-reload stack in Docker (Nest watch + Vite HMR)               |
+| `pnpm docker:dev:logs`     | Follow dev container logs                                        |
+| `pnpm docker:dev:shell`    | Open shell in the running dev container                          |
+| `pnpm docker:prod`         | Production stack (detached, named DB volume)                     |
+| `pnpm docker:prod:logs`    | Follow prod container logs                                       |
+| `pnpm docker:prod:migrate` | Run migrations only, then exit (upgrade / init-container)        |
+| `pnpm build`               | Production build of all packages                                 |
+| `pnpm test`                | Monorepo tests (shared + API + web)                              |
+| `pnpm lint`                | ESLint + TypeScript check                                        |
+| `pnpm diagrams:build`      | Regenerate `.mmd` → `.svg` in `docs/img/`                        |
+| `pnpm docs:screenshots`    | Build + run Playwright screenshot spec (writes `docs/img/*.png`) |
+| `pnpm db:migrate:deploy`   | Apply pending DB migrations                                      |
+| `pnpm db:new-migration`    | Author a new Prisma migration                                    |
 
 ---
 

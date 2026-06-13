@@ -312,19 +312,19 @@ Configure load balancers to use `/ready` for traffic routing.
 
 ### Env file overview
 
-| File | Template | Used by | Committed? |
-| --- | --- | --- | --- |
-| `deploy/.env.docker.prod` | `deploy/.env.docker.prod.example` | `pnpm docker:prod` | No |
-| `deploy/.env.docker.dev` | `deploy/.env.docker.dev.example` | `pnpm docker:dev` | No |
-| `.env` | `.env.example` | `pnpm dev` (host, no Docker) | No |
+| File                      | Template                          | Used by                      | Committed? |
+| ------------------------- | --------------------------------- | ---------------------------- | ---------- |
+| `deploy/.env.docker.prod` | `deploy/.env.docker.prod.example` | `pnpm docker:prod`           | No         |
+| `deploy/.env.docker.dev`  | `deploy/.env.docker.dev.example`  | `pnpm docker:dev`            | No         |
+| `.env`                    | `.env.example`                    | `pnpm dev` (host, no Docker) | No         |
 
 ### DB storage per environment
 
-| Environment | Location | Managed by |
-| --- | --- | --- |
-| `pnpm docker:prod` | Docker named volume `nestidp_data` | Docker (survives `down`, removed by `docker:prod:reset`) |
-| `pnpm docker:dev` | Host file `apps/api/data/nestidp.db` (via bind-mount) | Git-ignored; inspect directly on host |
-| `pnpm dev` (host) | Host file `apps/api/data/nestidp.db` | Same path as docker dev — shared if both run from same repo |
+| Environment        | Location                                              | Managed by                                                  |
+| ------------------ | ----------------------------------------------------- | ----------------------------------------------------------- |
+| `pnpm docker:prod` | Docker named volume `nestidp_data`                    | Docker (survives `down`, removed by `docker:prod:reset`)    |
+| `pnpm docker:dev`  | Host file `apps/api/data/nestidp.db` (via bind-mount) | Git-ignored; inspect directly on host                       |
+| `pnpm dev` (host)  | Host file `apps/api/data/nestidp.db`                  | Same path as docker dev — shared if both run from same repo |
 
 > **Running both docker:prod and docker:dev simultaneously is not supported** — both expose port `3000` and will conflict. Stop one before starting the other.
 
@@ -346,14 +346,14 @@ pnpm dev
 
 ### Useful shortcuts
 
-| Task | Command |
-| --- | --- |
-| Follow dev logs | `pnpm docker:dev:logs` |
-| Open shell in dev container | `pnpm docker:dev:shell` |
-| Wipe dev volumes (node_modules) | `pnpm docker:dev:reset` |
-| Follow prod logs | `pnpm docker:prod:logs` |
-| Run prod migrations only | `pnpm docker:prod:migrate` |
-| Wipe prod DB volume | `pnpm docker:prod:reset` |
+| Task                            | Command                    |
+| ------------------------------- | -------------------------- |
+| Follow dev logs                 | `pnpm docker:dev:logs`     |
+| Open shell in dev container     | `pnpm docker:dev:shell`    |
+| Wipe dev volumes (node_modules) | `pnpm docker:dev:reset`    |
+| Follow prod logs                | `pnpm docker:prod:logs`    |
+| Run prod migrations only        | `pnpm docker:prod:migrate` |
+| Wipe prod DB volume             | `pnpm docker:prod:reset`   |
 
 See [development.md](./development.md) for the full local dev guide.
 
