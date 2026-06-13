@@ -235,7 +235,10 @@ See [deployment.md](./deployment.md) for Compose, key management, and backups, a
 
 ## Operations: rekey, backup, restore
 
-The `db-cli.mjs` helper opens the file through the libSQL adapter with the current key:
+The `db-cli.mjs` helper opens the file through the libSQL adapter with the current key. These four
+scripts live in the `@nestidp/api` workspace, not at the repo root — run them from `apps/api/`, or from
+the root (or inside the Docker container, whose WORKDIR is `/app`) prefix with the workspace filter, e.g.
+`pnpm --filter @nestidp/api db:rekey`:
 
 | Script            | Action                                                                                 |
 | ----------------- | -------------------------------------------------------------------------------------- |

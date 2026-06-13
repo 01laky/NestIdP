@@ -139,15 +139,15 @@ v1 accepts **bcrypt only**.
 
 ## Sync semantics (NestIdP behaviour)
 
-| Behaviour                        | v1                                                                                         |
-| -------------------------------- | ------------------------------------------------------------------------------------------ |
-| Sync mode                        | **Full snapshot** per run — entire `GET /users` response                                   |
-| Users missing from snapshot      | **Soft-deactivate** (`active: false`, memberships cleared) — not hard-deleted              |
-| Incremental / `updatedAt` filter | Not supported                                                                              |
-| Max users per run                | `SYNC_MAX_USERS_PER_RUN` (default **10000**)                                               |
-| Concurrency                      | One real sync per connection; stale `IN_PROGRESS` recovered after `SYNC_STALE_RUN_MINUTES` |
-| `dryRun: true`                   | Fetches API and writes `SyncLog` only — no identity DB changes                             |
-| Connectivity test                | `GET {baseUrl}/users?limit=1` with Bearer token                                            |
+| Behaviour                        | v1                                                                                                                                                              |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sync mode                        | **Full snapshot** per run — entire `GET /users` response                                                                                                        |
+| Users missing from snapshot      | **Soft-deactivate** (`active: false`, memberships cleared) — not hard-deleted                                                                                   |
+| Incremental / `updatedAt` filter | Not supported                                                                                                                                                   |
+| Max users per run                | `SYNC_MAX_USERS_PER_RUN` (default **10000**)                                                                                                                    |
+| Concurrency                      | One real sync per connection; stale `IN_PROGRESS` recovered after `SYNC_STALE_RUN_MINUTES`                                                                      |
+| `dryRun: true`                   | Fetches API and writes `SyncLog` only — no identity DB changes                                                                                                  |
+| Connectivity test                | `GET {baseUrl}{usersPath}` with Bearer token (adds the configured pagination `limitParam`=`pageSize` if set; the default `none` pagination adds no query param) |
 
 Trigger sync from the admin UI or `POST /api/admin/sync/:connectionId` (see [development.md](./development.md)).
 
@@ -380,7 +380,7 @@ Two starter templates are available in the admin console (`API connections → e
 
 **`keycloak-like`** — Keycloak Admin REST API (`/admin/realms/master/...`), offset pagination (`max` / `first`), maps `enabled` → `active` and `firstName` → `displayName`.
 
-**`auth0-like`** — Auth0 Management API (`/api/v2/...`), page pagination, maps `user_id` → `id`, `name` → `displayName`, `blocked` → `active` with `inverted: true`.
+**`auth0-like`** — Auth0 Management API (`/api/v2/...`), page pagination, maps `user_id` → `id`, `name` → `displayName`, and `blocked` → `active` via `activeMapping: { trueValues: ['false'] }` (Auth0's `blocked: false` means the account is active).
 
 ### Complete example
 

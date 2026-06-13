@@ -1,3 +1,5 @@
+import { useId } from 'react';
+
 export function Checkbox({
 	label,
 	checked,
@@ -13,7 +15,11 @@ export function Checkbox({
 	hint?: string;
 	id?: string;
 }) {
-	const inputId = id ?? label.replace(/\s+/g, '-').toLowerCase();
+	// Fall back to a guaranteed-unique id (like TextInput) rather than deriving it from the label:
+	// two checkboxes sharing a label (e.g. a group and a role both named "Admins" in the membership
+	// picker) would otherwise collide on id/htmlFor and clicking one would toggle the wrong input.
+	const generatedId = useId();
+	const inputId = id ?? generatedId;
 
 	return (
 		<label className="evg-field evg-field--checkbox" htmlFor={inputId}>

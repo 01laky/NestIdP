@@ -4,7 +4,7 @@
 
 **A self-hosted SAML 2.0 Identity Provider you deploy in minutes**
 
-[![Version](https://img.shields.io/badge/version-1.20.2-blue?style=flat-square)](package.json)
+[![Version](https://img.shields.io/badge/version-1.20.4-blue?style=flat-square)](package.json)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-green?style=flat-square)](package.json)
 [![pnpm](https://img.shields.io/badge/pnpm-%3E%3D9-orange?style=flat-square)](package.json)
 [![License](https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square)](LICENSE)

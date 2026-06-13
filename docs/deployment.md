@@ -147,10 +147,10 @@ Persist the `data/` directory on a volume so the file survives container restart
 
 ### Consistent encrypted backup (`VACUUM INTO`)
 
-`pnpm db:backup` produces an encrypted copy that is readable only with the same `DATABASE_ENCRYPTION_KEY`:
+`pnpm --filter @nestidp/api db:backup` produces an encrypted copy that is readable only with the same `DATABASE_ENCRYPTION_KEY` (the `db:backup`/`db:dump`/`db:restore`/`db:rekey` scripts live in the `@nestidp/api` workspace, not at the repo root):
 
 ```bash
-docker compose -f deploy/docker-compose.prod.yml exec nestidp pnpm db:backup -- /app/apps/api/data/backup-$(date +%Y%m%d).db
+docker compose -f deploy/docker-compose.prod.yml exec nestidp pnpm --filter @nestidp/api db:backup -- /app/apps/api/data/backup-$(date +%Y%m%d).db
 docker compose -f deploy/docker-compose.prod.yml cp nestidp:/app/apps/api/data/backup-YYYYMMDD.db ./backups/
 ```
 
@@ -164,12 +164,12 @@ cp apps/api/data/nestidp.db* ./backups/
 
 ### Restore
 
-Stop the API, put the backup file at `DATABASE_URL`'s path, and start with the matching `DATABASE_ENCRYPTION_KEY`. For a plaintext-dump round-trip (e.g. re-keying or migrating media) use `pnpm db:dump` / `pnpm db:restore` — see [database.md](./database.md#operations-rekey-backup-restore).
+Stop the API, put the backup file at `DATABASE_URL`'s path, and start with the matching `DATABASE_ENCRYPTION_KEY`. For a plaintext-dump round-trip (e.g. re-keying or migrating media) use `pnpm --filter @nestidp/api db:dump` / `pnpm --filter @nestidp/api db:restore` — see [database.md](./database.md#operations-rekey-backup-restore).
 
 ### Rekey (rotate the at-rest key)
 
 ```bash
-docker compose -f deploy/docker-compose.prod.yml exec nestidp pnpm db:rekey -- "$NEW_KEY"
+docker compose -f deploy/docker-compose.prod.yml exec nestidp pnpm --filter @nestidp/api db:rekey -- "$NEW_KEY"
 # then update DATABASE_ENCRYPTION_KEY in deploy/.env.docker.prod and restart
 ```
 
@@ -297,12 +297,14 @@ Configure your load balancer or orchestrator to use `/ready` for traffic routing
 
 ```json
 {
-	"status": "connected",
+	"status": "ok",
+	"service": "nest-idp-api",
+	"database": "connected",
 	"migrations": { "applied": 18, "available": 18, "upToDate": true }
 }
 ```
 
-`status` is one of `connected`, `disconnected`, `not_configured`. `upToDate: false` means pending migrations — restart with a newer image or run `pnpm db:migrate:deploy`.
+`status` is `ok` (HTTP 200) or `unavailable` (HTTP 503). The separate `database` field is one of `connected`, `disconnected`, `not_configured`. `upToDate: false` means pending migrations — restart with a newer image or run `pnpm db:migrate:deploy`. Probe on `status == "ok"` (or simply the 200/503 code), not on `database`.
 
 Configure load balancers to use `/ready` for traffic routing.
 
@@ -370,10 +372,10 @@ The DB file is missing, `DATABASE_URL` is unset, or migrations have not run. Con
 ```bash
 # Check migration status
 curl http://localhost:3000/ready
-# Expected: { "status": "connected", "migrations": { "upToDate": true } }
+# Expected: { "status": "ok", "database": "connected", "migrations": { "upToDate": true } }
 ```
 
-If `status: disconnected`, verify `DATABASE_URL` points to a writable path and `DATABASE_ENCRYPTION_KEY` is set (required in production).
+If `database: disconnected`, verify `DATABASE_URL` points to a writable path and `DATABASE_ENCRYPTION_KEY` is set (required in production).
 
 ### Admin login returns 401 "Invalid credentials"
 
@@ -404,7 +406,7 @@ Accounts lock after `LOGIN_LOCKOUT_THRESHOLD` consecutive failures. The lockout 
 
 ### Encrypted DB fails to open after key rotation
 
-A `DATABASE_ENCRYPTION_KEY` change requires re-keying the database before swapping the key. Use `pnpm db:rekey` **before** updating the env var, or restore from a backup taken with the old key. Losing the key makes the file permanently unreadable — store it in a secrets manager alongside a recent backup.
+A `DATABASE_ENCRYPTION_KEY` change requires re-keying the database before swapping the key. Use `pnpm --filter @nestidp/api db:rekey` **before** updating the env var, or restore from a backup taken with the old key. Losing the key makes the file permanently unreadable — store it in a secrets manager alongside a recent backup.
 
 ---
 

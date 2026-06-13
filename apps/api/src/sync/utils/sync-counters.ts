@@ -29,6 +29,14 @@ export class SyncCounters {
 	readonly upsertedGroupExternalIds = new Set<string>();
 	readonly upsertedRoleExternalIds = new Set<string>();
 
+	/**
+	 * Set when ≥1 user's membership fetch failed this run. The "seen" set for that kind is then
+	 * incomplete, so orphan deletion is skipped for it — deleting a group/role that is only "unseen"
+	 * because the user listing it failed to fetch would cascade-delete still-valid memberships
+	 * (FK onDelete: Cascade). Conservative: a few stale orphans survive until the next clean run.
+	 */
+	private readonly membershipFetchFailed = { group: false, role: false };
+
 	addUser(): void {
 		this.usersSynced += 1;
 	}
@@ -55,6 +63,16 @@ export class SyncCounters {
 		this.upsertedRoleExternalIds.add(externalId);
 		this.rolesSynced += 1;
 		return true;
+	}
+
+	/** Record that a membership fetch failed for ≥1 user of this kind (gates orphan deletion). */
+	markMembershipFetchFailed(kind: 'group' | 'role'): void {
+		this.membershipFetchFailed[kind] = true;
+	}
+
+	/** True when orphan deletion for this kind must be skipped (its "seen" census is incomplete). */
+	shouldSkipOrphanDeletion(kind: 'group' | 'role'): boolean {
+		return this.membershipFetchFailed[kind];
 	}
 
 	setDeactivated(kind: 'group' | 'role', count: number): void {

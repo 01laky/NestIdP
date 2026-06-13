@@ -31,6 +31,29 @@ describe('Checkbox and Fieldset — extended edge cases', () => {
 		expect(box.id).toBe('my-flag');
 	});
 
+	it('WEB-EVG-111b: two checkboxes sharing a label get distinct ids (no collision)', () => {
+		// Regression: ids were derived from the label, so duplicate labels (e.g. a group and a role
+		// both named "Admins" in the membership picker) collided and clicking one toggled the other.
+		const onFirst = vi.fn();
+		const onSecond = vi.fn();
+		const { container } = render(
+			<>
+				<Checkbox label="Admins" checked={false} onChange={onFirst} />
+				<Checkbox label="Admins" checked={false} onChange={onSecond} />
+			</>,
+		);
+		const inputs = Array.from(container.querySelectorAll('input[type="checkbox"]'));
+		expect(inputs).toHaveLength(2);
+		expect(inputs[0].id).not.toBe(inputs[1].id);
+		expect(inputs[0].id).toBeTruthy();
+
+		// Clicking the first label toggles ONLY the first checkbox.
+		const labels = Array.from(container.querySelectorAll('label'));
+		fireEvent.click(labels[0]);
+		expect(onFirst).toHaveBeenCalledTimes(1);
+		expect(onSecond).not.toHaveBeenCalled();
+	});
+
 	it('WEB-EVG-112: Checkbox uncheck calls onChange(false)', () => {
 		const onChange = vi.fn();
 		render(<Checkbox label="Active" checked onChange={onChange} />);

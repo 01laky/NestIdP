@@ -64,4 +64,17 @@ describe('SyncCounters (Prompt 39 D1a)', () => {
 			rolesDeactivated: 5,
 		});
 	});
+
+	it('CNT-06: membership-fetch-failure flag gates orphan deletion per kind, independently', () => {
+		const counters = new SyncCounters();
+		// Nothing failed yet → neither kind is skipped.
+		expect(counters.shouldSkipOrphanDeletion('group')).toBe(false);
+		expect(counters.shouldSkipOrphanDeletion('role')).toBe(false);
+
+		counters.markMembershipFetchFailed('group');
+
+		// A group fetch failure must not gate role orphan deletion (independent flags).
+		expect(counters.shouldSkipOrphanDeletion('group')).toBe(true);
+		expect(counters.shouldSkipOrphanDeletion('role')).toBe(false);
+	});
 });

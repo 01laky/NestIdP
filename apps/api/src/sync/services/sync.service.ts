@@ -270,6 +270,21 @@ export class SyncService {
 			}
 		}
 
+		// §5.C safety guard: the fetch succeeded and returned rows, but NONE carried a usable id (e.g.
+		// the configured id field path is wrong or was renamed upstream). Treating an all-unusable
+		// batch as "the source is now empty" would deactivate EVERY synced user via `notIn: []` and
+		// still report SUCCESS. Abort the run instead so a contract break never silently wipes the
+		// directory. A genuinely empty body (usersBody.length === 0) still flows through and
+		// deactivates all — that case is intentional and tested (API-SYNC-SVC-06).
+		if (usersBody.length > 0 && userRowsById.size === 0) {
+			errors.add(
+				'parse_users',
+				`External API returned ${usersBody.length} row(s) but none had a usable user id at ` +
+					`"${contract.userFieldMap.id}" — aborting to avoid mass-deactivation`,
+			);
+			return null;
+		}
+
 		// Cross-connection username collision policy: per-connection override → global default (Prompt 37).
 		// §5.C: the stored override is validated (not blind-cast) — an unknown value falls back to global.
 		const collisionPolicy: UsernameCollisionPolicy =
@@ -405,6 +420,9 @@ export class SyncService {
 				const fetchError = m?.errorByKind[kind.kind];
 				if (fetchError) {
 					pushMembershipFetchError(errors, kind.kind, processedUser.externalUserId, fetchError);
+					// The seen-set for this kind is now incomplete; skip its orphan deletion in phase C
+					// so a transient fetch failure cannot delete still-referenced groups/roles (§5.C).
+					counters.markMembershipFetchFailed(kind.kind);
 					continue;
 				}
 				const rawRows = m?.rawByKind[kind.kind];
@@ -435,14 +453,23 @@ export class SyncService {
 			connectionId,
 			counters.seenUserExternalIds,
 		);
-		counters.setDeactivated(
-			'group',
-			await this.identityRepository.deleteOrphanGroups(connectionId, counters.seenGroupExternalIds),
-		);
-		counters.setDeactivated(
-			'role',
-			await this.identityRepository.deleteOrphanRoles(connectionId, counters.seenRoleExternalIds),
-		);
+		// Skip orphan deletion for a kind whose membership fetch failed for ≥1 user this run: its
+		// "seen" census is incomplete, so an "unseen" group/role may still be referenced (§5.C).
+		if (!counters.shouldSkipOrphanDeletion('group')) {
+			counters.setDeactivated(
+				'group',
+				await this.identityRepository.deleteOrphanGroups(
+					connectionId,
+					counters.seenGroupExternalIds,
+				),
+			);
+		}
+		if (!counters.shouldSkipOrphanDeletion('role')) {
+			counters.setDeactivated(
+				'role',
+				await this.identityRepository.deleteOrphanRoles(connectionId, counters.seenRoleExternalIds),
+			);
+		}
 	}
 
 	/**

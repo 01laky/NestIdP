@@ -356,6 +356,38 @@ describe('SpConnectionsService', () => {
 		);
 	});
 
+	it('SLO: removing cert while a SOAP SLO endpoint remains → BadRequestException', async () => {
+		// Regression guard: create refuses a SOAP SLO endpoint without an SP cert (needed to verify
+		// the SP LogoutResponse). The update guard previously checked only the three boolean flags,
+		// so PATCH { spCertificate: null } could strip the cert while sloSoapUrl stayed configured.
+		prisma.spConnection.findUnique.mockResolvedValue({
+			...sampleRow,
+			spCertificate: certPem,
+			sloSoapUrl: 'https://sp.example.com/slo/soap',
+			wantAssertionsEncrypted: false,
+			wantAuthnRequestsSigned: false,
+			wantLogoutRequestsSigned: false,
+		});
+		await expect(service.update(sampleRow.id, { spCertificate: null })).rejects.toThrow(
+			BadRequestException,
+		);
+	});
+
+	it('SLO: removing cert AND the SOAP SLO endpoint in the same request → allowed', async () => {
+		prisma.spConnection.findUnique.mockResolvedValue({
+			...sampleRow,
+			spCertificate: certPem,
+			sloSoapUrl: 'https://sp.example.com/slo/soap',
+			wantAssertionsEncrypted: false,
+			wantAuthnRequestsSigned: false,
+			wantLogoutRequestsSigned: false,
+		});
+		prisma.spConnection.update.mockResolvedValue(sampleRow);
+		await service.update(sampleRow.id, { spCertificate: null, sloSoapUrl: '' });
+		expect(prisma.spConnection.update.mock.calls[0][0].data.spCertificate).toBeNull();
+		expect(prisma.spConnection.update.mock.calls[0][0].data.sloSoapUrl).toBeNull();
+	});
+
 	it('SLO: update clears sloUrl with empty string', async () => {
 		prisma.spConnection.findUnique.mockResolvedValue(sampleRow);
 		prisma.spConnection.update.mockResolvedValue(sampleRow);

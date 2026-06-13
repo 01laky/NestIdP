@@ -203,9 +203,17 @@ export class SpConnectionsService {
 				body.wantLogoutRequestsSigned !== undefined
 					? body.wantLogoutRequestsSigned
 					: existing.wantLogoutRequestsSigned;
-			if (!nextCert?.trim() && (nextWantEncrypted || nextWantSigned || nextWantLogoutSigned)) {
+			// A configured SOAP SLO endpoint also requires the SP cert (to verify the SP's
+			// LogoutResponse) — mirror the create-time invariant so the cert cannot be stripped while
+			// a SOAP SLO URL remains, even when this request does not touch sloSoapUrl.
+			const nextSoapSloUrl =
+				body.sloSoapUrl !== undefined ? this.validateSloUrl(body.sloSoapUrl) : existing.sloSoapUrl;
+			if (
+				!nextCert?.trim() &&
+				(nextWantEncrypted || nextWantSigned || nextWantLogoutSigned || nextSoapSloUrl)
+			) {
 				throw new BadRequestException(
-					'Disable encrypt assertions, require signed AuthnRequest, and require signed LogoutRequest before removing SP certificate',
+					'Disable encrypt assertions, require signed AuthnRequest, require signed LogoutRequest, and remove the SOAP SLO endpoint before removing SP certificate',
 				);
 			}
 		}

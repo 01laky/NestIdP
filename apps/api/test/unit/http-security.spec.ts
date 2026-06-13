@@ -69,6 +69,24 @@ describe('http-security', () => {
 		expect(app.getHttpAdapter().getInstance().get('trust proxy')).toBe(1);
 	});
 
+	it('API-TRUST-03b: TRUST_PROXY=yes / on / mixed-case enable trust proxy (shared bool parser)', async () => {
+		// Regression guard: previously only the literal 'true'/'1' enabled it, so 'yes'/'on'/'True'
+		// silently left req.ip as the proxy IP. The shared parseBoolEnv now backs this toggle.
+		for (const value of ['yes', 'on', 'True', 'TRUE']) {
+			await createApp({ NODE_ENV: 'test', TRUST_PROXY: value });
+			expect(app.getHttpAdapter().getInstance().get('trust proxy')).toBe(1);
+			await app.close();
+		}
+	});
+
+	it('API-TRUST-03c: a non-truthy TRUST_PROXY (e.g. "no", empty) leaves it disabled', async () => {
+		for (const value of ['no', 'off', '0', '']) {
+			await createApp({ NODE_ENV: 'test', TRUST_PROXY: value });
+			expect(app.getHttpAdapter().getInstance().get('trust proxy')).toBeFalsy();
+			await app.close();
+		}
+	});
+
 	it('API-TRUST-04: X-Forwarded-For used as req.ip when trust proxy enabled', async () => {
 		await createApp({ NODE_ENV: 'test', TRUST_PROXY: 'true' });
 		const response = await request(app.getHttpServer() as App)

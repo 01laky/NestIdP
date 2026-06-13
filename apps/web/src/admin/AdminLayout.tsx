@@ -146,27 +146,59 @@ export function AdminLayout() {
 						<Routes>
 							<Route index element={<DashboardPage />} />
 							<Route path="api-connections" element={<ApiConnectionsListPage />} />
-							<Route path="api-connections/new" element={<ApiConnectionFormPage />} />
-							<Route path="api-connections/:id" element={<ApiConnectionFormPage />} />
+							{/* Distinct keys force a remount when switching between the "new" and edit forms so
+							    the create form never reuses a previously-edited connection's field state. */}
+							<Route
+								path="api-connections/new"
+								element={<ApiConnectionFormPage key="api-connection-new" />}
+							/>
+							<Route
+								path="api-connections/:id"
+								element={<ApiConnectionFormPage key="api-connection-edit" />}
+							/>
 							<Route path="api-connections/:id/sync" element={<ApiConnectionSyncPage />} />
 							<Route path="sync-schedules" element={<SyncSchedulesPage />} />
 							<Route path="sync-logs/:syncLogId" element={<SyncLogDetailPage />} />
 							<Route path="sp-connections" element={<SpConnectionsListPage />} />
-							<Route path="sp-connections/new" element={<SpConnectionFormPage />} />
-							<Route path="sp-connections/:id" element={<SpConnectionFormPage />} />
+							<Route
+								path="sp-connections/new"
+								element={<SpConnectionFormPage key="sp-connection-new" />}
+							/>
+							<Route
+								path="sp-connections/:id"
+								element={<SpConnectionFormPage key="sp-connection-edit" />}
+							/>
 							<Route path="sp-connections/:id/test-sso" element={<SpConnectionTestSsoPage />} />
 							<Route path="sessions" element={<SamlSessionsPage />} />
 							<Route path="identity/users" element={<IdentityUsersPage />} />
-							<Route path="identity/users/new" element={<IdentityUserFormPage />} />
-							<Route path="identity/users/:id/edit" element={<IdentityUserFormPage />} />
+							<Route
+								path="identity/users/new"
+								element={<IdentityUserFormPage key="identity-user-new" />}
+							/>
+							<Route
+								path="identity/users/:id/edit"
+								element={<IdentityUserFormPage key="identity-user-edit" />}
+							/>
 							<Route path="identity/users/:id" element={<IdentityUserDetailPage />} />
 							<Route path="identity/groups" element={<IdentityGroupsPage />} />
-							<Route path="identity/groups/new" element={<IdentityGroupFormPage />} />
-							<Route path="identity/groups/:id/edit" element={<IdentityGroupFormPage />} />
+							<Route
+								path="identity/groups/new"
+								element={<IdentityGroupFormPage key="identity-group-new" />}
+							/>
+							<Route
+								path="identity/groups/:id/edit"
+								element={<IdentityGroupFormPage key="identity-group-edit" />}
+							/>
 							<Route path="identity/groups/:id" element={<IdentityGroupDetailPage />} />
 							<Route path="identity/roles" element={<IdentityRolesPage />} />
-							<Route path="identity/roles/new" element={<IdentityRoleFormPage />} />
-							<Route path="identity/roles/:id/edit" element={<IdentityRoleFormPage />} />
+							<Route
+								path="identity/roles/new"
+								element={<IdentityRoleFormPage key="identity-role-new" />}
+							/>
+							<Route
+								path="identity/roles/:id/edit"
+								element={<IdentityRoleFormPage key="identity-role-edit" />}
+							/>
 							<Route path="identity/roles/:id" element={<IdentityRoleDetailPage />} />
 							<Route
 								path="settings"

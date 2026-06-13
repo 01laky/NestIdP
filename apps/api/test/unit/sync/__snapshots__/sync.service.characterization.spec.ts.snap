@@ -689,7 +689,7 @@ exports[`SyncService characterization goldens (Prompt 38 §11) scenario 4: membe
       "log-c1234567890123456789012345",
       "SUCCESS",
       {
-        "groupsDeactivated": 2,
+        "groupsDeactivated": 0,
         "groupsSynced": 1,
         "rolesDeactivated": 1,
         "rolesSynced": 2,
@@ -751,7 +751,7 @@ exports[`SyncService characterization goldens (Prompt 38 §11) scenario 4: membe
         },
       ],
       "finishedAt": "2026-01-01T00:00:01.000Z",
-      "groupsDeactivated": 2,
+      "groupsDeactivated": 0,
       "groupsSynced": 1,
       "id": "log-c1234567890123456789012345",
       "rolesDeactivated": 1,
@@ -871,15 +871,6 @@ exports[`SyncService characterization goldens (Prompt 38 §11) scenario 4: membe
         },
       ],
       "method": "deactivateUsersNotInExternalIds",
-    },
-    {
-      "args": [
-        "c1234567890123456789012345",
-        Set {
-          "g1",
-        },
-      ],
-      "method": "deleteOrphanGroups",
     },
     {
       "args": [

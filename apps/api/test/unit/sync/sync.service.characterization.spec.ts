@@ -310,6 +310,9 @@ describe('SyncService characterization goldens (Prompt 38 §11)', () => {
 	});
 
 	it('scenario 4: membership-phase failure — groups fetch rejects for one user', async () => {
+		// Golden updated in v1.20.4: a group fetch failure now SKIPS group orphan deletion
+		// (groupsDeactivated: 0, no deleteOrphanGroups call) so a transient fetch error cannot
+		// cascade-delete still-referenced groups. Roles fetched fine, so role deletion still runs.
 		identitySyncClient.fetchGroupsRawForUser.mockImplementation(
 			async (_baseUrl: string, _token: string, externalUserId: string) => {
 				if (externalUserId === 'ext-u2') {

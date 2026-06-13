@@ -80,6 +80,24 @@ describe('authApi', () => {
 		);
 	});
 
+	it('WEB-AUTH-API-07b: completeSsoLogin forwards Retry-After on 429 (backoff timer)', async () => {
+		// Regression: the SSO-complete path dropped retryAfterSeconds, so a throttled completion
+		// showed a generic error with no countdown. It must mirror loginEndUser/authFetch.
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: false,
+			status: 429,
+			statusText: 'Too Many Requests',
+			headers: { get: (name: string) => (name === 'Retry-After' ? '42' : null) },
+			json: async () => ({ statusCode: 429, message: 'Too many attempts' }),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		await expect(completeSsoLogin('clxxxxxxxxxxxxxxxxxxxxxxxxx')).rejects.toMatchObject({
+			statusCode: 429,
+			retryAfterSeconds: 42,
+		});
+	});
+
 	it('WEB-AUTH-API-05: loginEndUser surfaces 429 rate limit message', async () => {
 		const fetchMock = vi.fn().mockResolvedValue({
 			ok: false,

@@ -383,6 +383,77 @@ describe('SyncService', () => {
 		expect(result.syncLog.status).toBe('SUCCESS');
 	});
 
+	it('API-SYNC-SVC-06b: rows returned but NONE have a usable id → FAILED, no mass-deactivation', async () => {
+		// Regression guard: the external API returns a non-empty body whose rows all lack a usable id
+		// (e.g. the id field path was renamed upstream). seenUserExternalIds would be empty and
+		// `notIn: []` would deactivate EVERY synced user. The run must abort (FAILED) instead.
+		setupHappyPathMocks();
+		identitySyncClient.fetchUsersRaw.mockResolvedValue([
+			validExternalUser({ id: undefined, username: 'noid-1' }),
+			validExternalUser({ id: '', username: 'noid-2' }),
+		]);
+
+		const result = await service.triggerSync(CONNECTION_ID);
+
+		expect(result.syncLog.status).toBe('FAILED');
+		expect(result.syncLog.errors ?? []).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					phase: 'parse_users',
+					message: expect.stringContaining('none had a usable user id'),
+				}),
+			]),
+		);
+		// The catastrophic call must NOT happen.
+		expect(identityRepository.deactivateUsersNotInExternalIds).not.toHaveBeenCalled();
+		expect(identityRepository.deleteOrphanGroups).not.toHaveBeenCalled();
+		expect(identityRepository.deleteOrphanRoles).not.toHaveBeenCalled();
+	});
+
+	it('API-SYNC-SVC-20b: group membership fetch failure → orphan GROUP deletion skipped (no data loss)', async () => {
+		// Regression guard: when a user's group fetch fails, that user's existing memberships are
+		// preserved — but the group they reference is then "unseen" and would be orphan-deleted,
+		// cascade-deleting the preserved memberships. Orphan deletion for groups must be skipped.
+		setupHappyPathMocks();
+		identitySyncClient.fetchGroupsRawForUser.mockRejectedValue(
+			new IdentitySyncHttpError('Identity API returned HTTP 503', {
+				statusCode: 503,
+				reachable: true,
+			}),
+		);
+
+		const result = await service.triggerSync(CONNECTION_ID);
+
+		expect(result.syncLog.status).toBe('SUCCESS');
+		// Groups: fetch failed → orphan deletion skipped. Roles: fetched fine → still runs.
+		expect(identityRepository.deleteOrphanGroups).not.toHaveBeenCalled();
+		expect(identityRepository.deleteOrphanRoles).toHaveBeenCalledWith(
+			CONNECTION_ID,
+			new Set(['r1']),
+		);
+		expect(result.syncLog.groupsDeactivated).toBe(0);
+	});
+
+	it('API-SYNC-SVC-21b: role membership fetch failure → orphan ROLE deletion skipped (no data loss)', async () => {
+		setupHappyPathMocks();
+		identitySyncClient.fetchRolesRawForUser.mockRejectedValue(
+			new IdentitySyncHttpError('Identity API returned HTTP 502', {
+				statusCode: 502,
+				reachable: true,
+			}),
+		);
+
+		const result = await service.triggerSync(CONNECTION_ID);
+
+		expect(result.syncLog.status).toBe('SUCCESS');
+		expect(identityRepository.deleteOrphanRoles).not.toHaveBeenCalled();
+		expect(identityRepository.deleteOrphanGroups).toHaveBeenCalledWith(
+			CONNECTION_ID,
+			new Set(['g1']),
+		);
+		expect(result.syncLog.rolesDeactivated).toBe(0);
+	});
+
 	it('API-SYNC-SVC-07: Concurrent sync → 409', async () => {
 		prisma.apiConnection.findUnique.mockResolvedValue({
 			...baseConnection,

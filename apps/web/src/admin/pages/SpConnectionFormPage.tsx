@@ -390,6 +390,7 @@ export function SpConnectionFormPage() {
 						</Select>
 						<Checkbox label={tCommon('active')} checked={active} onChange={setActive} />
 						<Checkbox
+							id="encrypt-saml-assertions"
 							label={t('wantAssertionsEncrypted')}
 							hint={t('wantAssertionsEncryptedHint')}
 							checked={wantAssertionsEncrypted}

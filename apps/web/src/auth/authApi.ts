@@ -97,7 +97,9 @@ export async function completeSsoLogin(samlSessionId: string): Promise<string> {
 
 	if (!response.ok) {
 		const error = await parseErrorResponse(response);
-		throw new AuthApiError(error.statusCode, error.message);
+		// Preserve Retry-After on a 429 so a throttled SSO completion can show the backoff timer,
+		// consistent with loginEndUser/authFetch (which already forward it).
+		throw new AuthApiError(error.statusCode, error.message, parseRetryAfter(response));
 	}
 
 	return response.text();

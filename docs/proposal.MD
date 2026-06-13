@@ -611,7 +611,7 @@ From **v1.1.0**, the operator console and SAML login page use the **Evergreen** 
 Login page (separate from admin):
 
 ```
-/login?samlRequest=...&relayState=...
+/login?samlSessionId=...
   Username field
   Password field
   Submit → POST /api/auth/login → SAML Response POST back to SP

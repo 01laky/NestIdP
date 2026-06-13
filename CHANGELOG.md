@@ -4,6 +4,53 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.20.4]
+
+Codebase audit pass: correctness fixes found by a full src/docs review, each covered by a regression
+test. No new features; no behavior change to the happy paths.
+
+### Fixed
+
+- **Sync: mass-deactivation guard (data-loss).** When the external API returned a non-empty body whose
+  rows all lacked a usable id (e.g. the id field path was renamed upstream), `seenUserExternalIds` was
+  empty and `deactivateUsersNotInExternalIds` ran `notIn: []`, which Prisma treats as "match all" —
+  deactivating **every** synced user while the run still reported SUCCESS. The run now aborts (FAILED)
+  with a `parse_users` error when rows are returned but none are usable. A genuinely empty body still
+  deactivates all (intentional, unchanged). `apps/api/src/sync/services/sync.service.ts`.
+- **Sync: orphan-deletion skipped after a membership fetch failure (data-loss).** A group/role that was
+  "seen" only via a user whose membership fetch failed was treated as orphaned and deleted, cascade-
+  deleting still-valid membership rows. Orphan deletion is now skipped for any kind (`group`/`role`)
+  whose membership fetch failed for ≥1 user that run. `sync.service.ts`, `sync/utils/sync-counters.ts`.
+- **SP connections: SOAP-SLO certificate-removal guard.** `update` could strip the SP certificate while
+  a SOAP SLO endpoint remained configured — the exact state `create` refuses (the cert is needed to
+  verify the SP's `LogoutResponse`). The cert-removal guard now also accounts for the effective
+  `sloSoapUrl`. `apps/api/src/sp-connections/services/sp-connections.service.ts`.
+- **`TRUST_PROXY` env parsing.** Only the literal `true`/`1` enabled trust-proxy; `yes`/`on`/`True`
+  were silently ignored, leaving `req.ip` as the proxy IP (corrupting rate-limit keys and audit IPs).
+  Now uses the shared `parseBoolEnv`. `apps/api/src/common/utils/http-security.ts`.
+- **Web: `Checkbox` id collision.** The DOM id was derived from the label text, so two checkboxes with
+  the same label (e.g. a group and a role both named "Admins") collided and clicking one toggled the
+  other. Now falls back to `useId()` like `TextInput`. `apps/web/src/ui/Checkbox.tsx`.
+- **Web: create form pre-filled from a previously edited connection.** The `new` and edit routes shared
+  one component instance, so navigating edit → new left all fields (including secrets) populated. Each
+  form route now has a distinct `key`, forcing a fresh mount. `apps/web/src/admin/AdminLayout.tsx`.
+- **Web: `completeSsoLogin` dropped `Retry-After` on 429.** A throttled SSO completion showed a generic
+  error with no backoff timer; it now forwards `retryAfterSeconds` like the other auth calls.
+  `apps/web/src/auth/authApi.ts`.
+
+### Documentation
+
+- `docs/deployment.md`: corrected the `/ready` response shape (`status` is `ok`/`unavailable`; the
+  separate `database` field carries `connected`/`disconnected`/`not_configured`).
+- `docs/deployment.md`, `docs/database.md`, `docs/RELEASE.md`: the `db:backup`/`db:dump`/`db:restore`/
+  `db:rekey` scripts live in the `@nestidp/api` workspace (not the repo root); documented the
+  `pnpm --filter @nestidp/api …` invocation that actually works from root and inside the container.
+- `docs/proposal.MD`: login URL param is `samlSessionId`, not `samlRequest`/`relayState`.
+- `docs/integration-api.md`: corrected the connectivity-test request (configured `usersPath` + optional
+  pagination `limitParam`, not a hardcoded `/users?limit=1`) and the `auth0-like` preset's active
+  mapping (`activeMapping: { trueValues: ['false'] }`, not `inverted: true`).
+- `README.md`: version badge bumped to match `package.json`.
+
 ## [1.20.3]
 
 ### Fixed
