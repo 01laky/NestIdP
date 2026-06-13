@@ -120,9 +120,31 @@ End users authenticate with **username + password** verified against synced bcry
 
 Register each application that receives SAML assertions from this IdP.
 
-### New connection (example: Grafana Cloud)
+### Import from SP metadata (fastest, v1.21.0)
 
-Copy **SP Entity ID** and **ACS URL** from the SP’s SAML metadata (not from NestIdP metadata).
+Instead of transcribing fields by hand, use the **Import from SP metadata** panel at the top of the SP
+connection form. Either **paste the SP’s `EntityDescriptor` XML** or **fetch it from a URL**, then click
+_Parse & prefill_ / _Fetch & prefill_. NestIdP extracts and fills:
+
+- **Entity ID** (`entityID`)
+- **ACS URL** — the SP’s `AssertionConsumerService` (HTTP-POST preferred; if several are advertised, a
+  picker lets you choose)
+- **SLO** (front-channel) and the **SOAP SLO** back-channel endpoint
+- **NameID format** (when a supported one is advertised)
+- the SP **signing certificate** (from the metadata `KeyDescriptor`)
+- a suggested **Require signed AuthnRequest** when the metadata declares `AuthnRequestsSigned`
+
+The values are only **prefilled for review** — nothing is saved automatically. Warnings (e.g. no signing
+certificate, expired metadata, an entity ID that already exists) appear above the form. On an **existing**
+connection the import acts as a **reviewed refresh** (handy for rotating a signing certificate): it lists
+the fields that would change and asks you to confirm before overwriting. The fetch-from-URL path runs
+server-side with a bounded timeout, size cap, and redirect cap (see the `SP_METADATA_FETCH_*` settings in
+[deployment.md](./deployment.md)).
+
+### New connection (manual, example: Grafana Cloud)
+
+If you prefer, copy **SP Entity ID** and **ACS URL** from the SP’s SAML metadata (not from NestIdP
+metadata) and enter them directly.
 
 ![New SP connection — Grafana Cloud entity ID and ACS](./img/sp-connection-new-grafana.png)
 

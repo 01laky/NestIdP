@@ -389,7 +389,39 @@
 		"testBackchannelBusy": "Testing…",
 		"testBackchannelOk": "Reachable — the SP accepted a signed probe LogoutRequest.",
 		"testBackchannelFailed": "Failed: {{reason}}",
-		"testBackchannelFailedGeneric": "Back-channel test failed."
+		"testBackchannelFailedGeneric": "Back-channel test failed.",
+		"import": {
+			"panelTitle": "Importuj z metadanych SP",
+			"intro": "Wklej XML EntityDescriptor SP lub pobierz go z adresu URL, aby wstępnie wypełnić formularz. Przed zapisaniem sprawdź wartości.",
+			"modePaste": "Wklej XML",
+			"modeUrl": "Pobierz z URL",
+			"xmlLabel": "XML metadanych SP",
+			"xmlPlaceholder": "Wklej XML EntityDescriptor SP…",
+			"urlLabel": "URL metadanych SP",
+			"urlPlaceholder": "https://sp.example.com/saml/metadata",
+			"parseButton": "Przetwórz i wypełnij",
+			"fetchButton": "Pobierz i wypełnij",
+			"busy": "Importowanie…",
+			"notSpMetadata": "W metadanych nie znaleziono deskryptora SP.",
+			"success": "Pola wypełnione z metadanych — sprawdź przed zapisaniem.",
+			"failed": "Nie udało się zaimportować metadanych.",
+			"acsPickerLabel": "Assertion Consumer Service (z metadanych)",
+			"refreshTitle": "Zastosować zaimportowane metadane?",
+			"refreshDescription": "Spowoduje to nadpisanie pól formularza wartościami z metadanych. Sprawdź zmiany przed zapisaniem.",
+			"conflictMessage": "Połączenie SP z tym entity ID już istnieje: {{name}}.",
+			"conflictLink": "Otwórz istniejące połączenie",
+			"warnings": {
+				"no_signing_certificate": "Metadane nie zawierają certyfikatu podpisującego — ustaw certyfikat SP ręcznie, jeśli potrzebujesz podpisanych AuthnRequest, szyfrowania lub SOAP SLO.",
+				"invalid_signing_certificate": "Nie udało się przetworzyć certyfikatu podpisującego z metadanych i nie został on zaimportowany.",
+				"no_acs": "Metadane nie zawierają punktu końcowego Assertion Consumer Service — ustaw adres ACS ręcznie.",
+				"acs_non_post_only": "Metadane udostępniają tylko powiązania ACS inne niż POST; NestIdP dostarcza asercję przez HTTP-POST.",
+				"unsupported_nameid_format": "Format NameID z metadanych nie jest obsługiwany ({{detail}}); zachowano domyślny.",
+				"no_slo": "Metadane nie udostępniają punktu końcowego Single Logout.",
+				"metadata_expired": "Metadane wygasły {{detail}} — pobierz aktualne metadane.",
+				"multiple_entities": "Dokument zawiera wiele podmiotów; zaimportowano pierwszy SP.",
+				"authn_requests_signed_no_cert": "SP żąda podpisanych AuthnRequest, ale nie znaleziono użytecznego certyfikatu."
+			}
+		}
 	},
 	"idpSettings": {
 		"encryptionEcKeyAgreementInfo": "EC encryption key — ECDH-ES key agreement (XML Encryption 1.1). Service Providers must support xenc11:AgreementMethod. RSA keys are more widely compatible.",

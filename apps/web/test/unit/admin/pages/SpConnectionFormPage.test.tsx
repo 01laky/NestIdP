@@ -252,19 +252,292 @@ describe('SpConnectionFormPage', () => {
 		expect(screen.queryByRole('button', { name: 'Test back-channel SLO' })).toBeNull();
 	});
 
-	it('WEB-BC-02e: metadata autofill populates the SOAP SLO field', async () => {
-		vi.spyOn(adminApi, 'parseSpSloFromMetadata').mockResolvedValue({
-			redirect: null,
-			post: null,
-			soap: 'https://sp.example.com/slo/soap-from-meta',
-		});
+	// --- Import from SP metadata (Prompt 42, WEB-SPM) ----------------------------------------------
+
+	function importResult(overrides: Partial<adminApi.SpConnectionPublicDto> = {}) {
+		const base = {
+			valid: true,
+			entityId: 'https://sp.example.com/sp',
+			acsUrl: 'https://sp.example.com/acs',
+			acsOptions: [
+				{
+					binding: 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST',
+					location: 'https://sp.example.com/acs',
+					index: 0,
+					isDefault: true,
+				},
+			],
+			sloUrl: 'https://sp.example.com/slo',
+			sloSoapUrl: 'https://sp.example.com/slo/soap',
+			nameIdFormat: 'urn:oasis:names:tc:SAML:2.0:nameid-format:persistent',
+			spCertificate: '-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----',
+			signingCertificates: ['-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----'],
+			authnRequestsSigned: false,
+			wantAssertionsSigned: false,
+			signed: false,
+			warnings: [],
+			entityIdConflict: null,
+		};
+		return { ...base, ...overrides } as unknown as Awaited<
+			ReturnType<typeof adminApi.parseSpMetadata>
+		>;
+	}
+
+	it('WEB-SPM-01: pasting metadata prefills entityID, ACS, SLO, SOAP and cert (review before save)', async () => {
+		const parseSpy = vi.spyOn(adminApi, 'parseSpMetadata').mockResolvedValue(importResult());
+		const createSpy = vi.spyOn(adminApi, 'createSpConnection');
 		const { container } = renderNew();
-		const metaArea = container.querySelector('textarea') as HTMLTextAreaElement;
-		fireEvent.change(metaArea, { target: { value: '<md:EntityDescriptor/>' } });
-		fireEvent.click(screen.getByRole('button', { name: 'Extract SLO URL' }));
-		await waitFor(() => {
-			const soap = container.querySelector('input[name="sloSoapUrl"]') as HTMLInputElement;
-			expect(soap.value).toBe('https://sp.example.com/slo/soap-from-meta');
+		fireEvent.change(container.querySelector('textarea[name="importXml"]')!, {
+			target: { value: '<md:EntityDescriptor/>' },
 		});
+		fireEvent.click(screen.getByRole('button', { name: 'Parse & prefill' }));
+		await waitFor(() => {
+			expect(parseSpy).toHaveBeenCalledWith('<md:EntityDescriptor/>');
+			expect((container.querySelector('input[name="spEntityId"]') as HTMLInputElement).value).toBe(
+				'https://sp.example.com/sp',
+			);
+			expect((container.querySelector('input[name="acsUrl"]') as HTMLInputElement).value).toBe(
+				'https://sp.example.com/acs',
+			);
+			expect((container.querySelector('input[name="sloSoapUrl"]') as HTMLInputElement).value).toBe(
+				'https://sp.example.com/slo/soap',
+			);
+		});
+		// Nothing was auto-submitted.
+		expect(createSpy).not.toHaveBeenCalled();
+	});
+
+	it('WEB-SPM-01b: warnings and an entityID conflict are surfaced', async () => {
+		vi.spyOn(adminApi, 'parseSpMetadata').mockResolvedValue(
+			importResult({
+				warnings: [
+					{ code: 'no_signing_certificate' },
+					{ code: 'metadata_expired', detail: '2020-01-01' },
+				],
+				entityIdConflict: { id: 'sp-existing', name: 'Existing SP' },
+			} as never),
+		);
+		const { container } = renderNew();
+		fireEvent.change(container.querySelector('textarea[name="importXml"]')!, {
+			target: { value: '<md/>' },
+		});
+		fireEvent.click(screen.getByRole('button', { name: 'Parse & prefill' }));
+		await waitFor(() => {
+			expect(screen.getByText(/no signing certificate/i)).toBeDefined();
+			expect(screen.getByText(/expired on 2020-01-01/i)).toBeDefined();
+			expect(screen.getByText(/Existing SP/)).toBeDefined();
+		});
+	});
+
+	it('WEB-SPM-02: an ACS picker appears for multiple endpoints and switching changes acsUrl', async () => {
+		vi.spyOn(adminApi, 'parseSpMetadata').mockResolvedValue(
+			importResult({
+				acsUrl: 'https://sp.example.com/acs-a',
+				acsOptions: [
+					{
+						binding: 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST',
+						location: 'https://sp.example.com/acs-a',
+						index: 0,
+						isDefault: true,
+					},
+					{
+						binding: 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST',
+						location: 'https://sp.example.com/acs-b',
+						index: 1,
+						isDefault: false,
+					},
+				],
+			} as never),
+		);
+		const { container } = renderNew();
+		fireEvent.change(container.querySelector('textarea[name="importXml"]')!, {
+			target: { value: '<md/>' },
+		});
+		fireEvent.click(screen.getByRole('button', { name: 'Parse & prefill' }));
+		const picker = await screen.findByRole('combobox', { name: /Assertion Consumer Service/i });
+		fireEvent.change(picker, { target: { value: 'https://sp.example.com/acs-b' } });
+		expect((container.querySelector('input[name="acsUrl"]') as HTMLInputElement).value).toBe(
+			'https://sp.example.com/acs-b',
+		);
+	});
+
+	it('WEB-SPM-03: fetch-by-URL mode calls fetchSpMetadataFromUrl and prefills', async () => {
+		const fetchSpy = vi.spyOn(adminApi, 'fetchSpMetadataFromUrl').mockResolvedValue(importResult());
+		const { container } = renderNew();
+		fireEvent.click(screen.getByRole('button', { name: 'Fetch from URL' }));
+		fireEvent.change(container.querySelector('input[name="importUrl"]')!, {
+			target: { value: 'https://sp.example.com/metadata' },
+		});
+		fireEvent.click(screen.getByRole('button', { name: 'Fetch & prefill' }));
+		await waitFor(() => {
+			expect(fetchSpy).toHaveBeenCalledWith('https://sp.example.com/metadata');
+			expect((container.querySelector('input[name="spEntityId"]') as HTMLInputElement).value).toBe(
+				'https://sp.example.com/sp',
+			);
+		});
+	});
+
+	it('WEB-SPM-03b: invalid (not SP) metadata shows a message and prefills nothing', async () => {
+		vi.spyOn(adminApi, 'parseSpMetadata').mockResolvedValue(
+			importResult({ valid: false, entityId: null, acsUrl: null } as never),
+		);
+		const { container } = renderNew();
+		fireEvent.change(container.querySelector('textarea[name="importXml"]')!, {
+			target: { value: '<not-sp/>' },
+		});
+		fireEvent.click(screen.getByRole('button', { name: 'Parse & prefill' }));
+		await waitFor(() => {
+			expect(screen.getByText(/No SP descriptor found/i)).toBeDefined();
+		});
+		expect((container.querySelector('input[name="spEntityId"]') as HTMLInputElement).value).toBe(
+			'',
+		);
+	});
+
+	it('WEB-SPM-04: on the edit form, import is a confirmed refresh before overwriting fields', async () => {
+		vi.spyOn(adminApi, 'getSpConnection').mockResolvedValue(
+			spFixture({ spEntityId: 'urn:sp:old' }) as never,
+		);
+		vi.spyOn(adminApi, 'parseSpMetadata').mockResolvedValue(
+			importResult({ entityId: 'urn:sp:refreshed' } as never),
+		);
+		const { container } = renderEdit();
+		await waitFor(() =>
+			expect((container.querySelector('input[name="spEntityId"]') as HTMLInputElement).value).toBe(
+				'urn:sp:old',
+			),
+		);
+		fireEvent.change(container.querySelector('textarea[name="importXml"]')!, {
+			target: { value: '<md/>' },
+		});
+		fireEvent.click(screen.getByRole('button', { name: 'Parse & prefill' }));
+		// A confirm dialog appears; the field is unchanged until confirmed.
+		const applyBtn = await screen.findByRole('button', { name: 'Apply' });
+		expect((container.querySelector('input[name="spEntityId"]') as HTMLInputElement).value).toBe(
+			'urn:sp:old',
+		);
+		fireEvent.click(applyBtn);
+		await waitFor(() =>
+			expect((container.querySelector('input[name="spEntityId"]') as HTMLInputElement).value).toBe(
+				'urn:sp:refreshed',
+			),
+		);
+	});
+
+	it('WEB-SPM-04b: cancelling the edit-refresh confirm leaves fields unchanged', async () => {
+		vi.spyOn(adminApi, 'getSpConnection').mockResolvedValue(
+			spFixture({ spEntityId: 'urn:sp:keepme' }) as never,
+		);
+		vi.spyOn(adminApi, 'parseSpMetadata').mockResolvedValue(
+			importResult({ entityId: 'urn:sp:discarded' } as never),
+		);
+		const { container } = renderEdit();
+		await waitFor(() =>
+			expect((container.querySelector('input[name="spEntityId"]') as HTMLInputElement).value).toBe(
+				'urn:sp:keepme',
+			),
+		);
+		fireEvent.change(container.querySelector('textarea[name="importXml"]')!, {
+			target: { value: '<md/>' },
+		});
+		fireEvent.click(screen.getByRole('button', { name: 'Parse & prefill' }));
+		const cancelBtn = await screen.findByRole('button', { name: 'Cancel' });
+		fireEvent.click(cancelBtn);
+		await waitFor(() => expect(screen.queryByRole('button', { name: 'Apply' })).toBeNull());
+		expect((container.querySelector('input[name="spEntityId"]') as HTMLInputElement).value).toBe(
+			'urn:sp:keepme',
+		);
+	});
+
+	it('WEB-SPM-05: an import failure surfaces an error message and prefills nothing', async () => {
+		vi.spyOn(adminApi, 'parseSpMetadata').mockRejectedValue(
+			new adminApi.AdminApiError(400, 'Could not fetch SP metadata: too_large'),
+		);
+		const { container } = renderNew();
+		fireEvent.change(container.querySelector('textarea[name="importXml"]')!, {
+			target: { value: '<md/>' },
+		});
+		fireEvent.click(screen.getByRole('button', { name: 'Parse & prefill' }));
+		await waitFor(() => {
+			expect(screen.getByText(/too_large/i)).toBeDefined();
+		});
+		expect((container.querySelector('input[name="spEntityId"]') as HTMLInputElement).value).toBe(
+			'',
+		);
+	});
+
+	it('WEB-SPM-06: after importing, save sends the importSource for audit', async () => {
+		vi.spyOn(adminApi, 'parseSpMetadata').mockResolvedValue(importResult());
+		const createSpy = vi.spyOn(adminApi, 'createSpConnection').mockResolvedValue({
+			item: { id: 'sp-imported' },
+		} as never);
+		const { container } = renderNew();
+		fireEvent.change(container.querySelector('textarea[name="importXml"]')!, {
+			target: { value: '<md/>' },
+		});
+		fireEvent.click(screen.getByRole('button', { name: 'Parse & prefill' }));
+		await waitFor(() =>
+			expect((container.querySelector('input[name="spEntityId"]') as HTMLInputElement).value).toBe(
+				'https://sp.example.com/sp',
+			),
+		);
+		// Name is not carried by metadata — set it, then save.
+		fireEvent.change(container.querySelector('input[name="name"]')!, {
+			target: { value: 'Imported App' },
+		});
+		fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+		await waitFor(() => {
+			expect(createSpy).toHaveBeenCalledWith(
+				expect.objectContaining({ importSource: 'metadata_xml' }),
+			);
+		});
+	});
+
+	it('WEB-SPM-07: toggling to "Fetch from URL" swaps the textarea for a URL input', async () => {
+		const { container } = renderNew();
+		expect(container.querySelector('textarea[name="importXml"]')).not.toBeNull();
+		expect(container.querySelector('input[name="importUrl"]')).toBeNull();
+		fireEvent.click(screen.getByRole('button', { name: 'Fetch from URL' }));
+		expect(container.querySelector('input[name="importUrl"]')).not.toBeNull();
+		expect(container.querySelector('textarea[name="importXml"]')).toBeNull();
+	});
+
+	it('WEB-SPM-08: a signing cert + AuthnRequestsSigned suggestion ticks the checkbox', async () => {
+		vi.spyOn(adminApi, 'parseSpMetadata').mockResolvedValue(
+			importResult({ authnRequestsSigned: true } as never),
+		);
+		const { container } = renderNew();
+		fireEvent.change(container.querySelector('textarea[name="importXml"]')!, {
+			target: { value: '<md/>' },
+		});
+		fireEvent.click(screen.getByRole('button', { name: 'Parse & prefill' }));
+		await waitFor(() => {
+			const cb = screen.getByRole('checkbox', { name: /Require signed AuthnRequest/i });
+			expect(cb).toHaveProperty('checked', true);
+			expect(cb).toHaveProperty('disabled', false); // cert present → enabled
+		});
+	});
+
+	it('WEB-SPM-09: import buttons are disabled until their input has content', () => {
+		const { container } = renderNew();
+		expect(screen.getByRole('button', { name: 'Parse & prefill' })).toHaveProperty(
+			'disabled',
+			true,
+		);
+		fireEvent.change(container.querySelector('textarea[name="importXml"]')!, {
+			target: { value: ' ' },
+		});
+		// whitespace-only stays disabled
+		expect(screen.getByRole('button', { name: 'Parse & prefill' })).toHaveProperty(
+			'disabled',
+			true,
+		);
+		fireEvent.change(container.querySelector('textarea[name="importXml"]')!, {
+			target: { value: '<md/>' },
+		});
+		expect(screen.getByRole('button', { name: 'Parse & prefill' })).toHaveProperty(
+			'disabled',
+			false,
+		);
 	});
 });

@@ -389,7 +389,39 @@
 		"testBackchannelBusy": "Testuje sa…",
 		"testBackchannelOk": "Dostupné — SP prijal podpísanú skúšobnú LogoutRequest.",
 		"testBackchannelFailed": "Zlyhalo: {{reason}}",
-		"testBackchannelFailedGeneric": "Test back-channelu zlyhal."
+		"testBackchannelFailedGeneric": "Test back-channelu zlyhal.",
+		"import": {
+			"panelTitle": "Import z SP metadát",
+			"intro": "Vložte XML EntityDescriptor SP alebo ho načítajte z URL na predvyplnenie formulára. Pred uložením skontrolujte hodnoty.",
+			"modePaste": "Vložiť XML",
+			"modeUrl": "Načítať z URL",
+			"xmlLabel": "XML metadát SP",
+			"xmlPlaceholder": "Vložte XML EntityDescriptor SP…",
+			"urlLabel": "URL metadát SP",
+			"urlPlaceholder": "https://sp.example.com/saml/metadata",
+			"parseButton": "Spracovať a predvyplniť",
+			"fetchButton": "Načítať a predvyplniť",
+			"busy": "Importujem…",
+			"notSpMetadata": "V metadátach sa nenašiel SP deskriptor.",
+			"success": "Polia predvyplnené z metadát — pred uložením skontrolujte.",
+			"failed": "Metadáta sa nepodarilo importovať.",
+			"acsPickerLabel": "Assertion Consumer Service (z metadát)",
+			"refreshTitle": "Použiť importované metadáta?",
+			"refreshDescription": "Týmto sa polia formulára prepíšu hodnotami z metadát. Pred uložením skontrolujte zmeny.",
+			"conflictMessage": "SP pripojenie s týmto entity ID už existuje: {{name}}.",
+			"conflictLink": "Otvoriť existujúce pripojenie",
+			"warnings": {
+				"no_signing_certificate": "Metadáta neobsahujú podpisový certifikát — ak potrebujete podpísané AuthnRequest, šifrovanie alebo SOAP SLO, nastavte SP certifikát ručne.",
+				"invalid_signing_certificate": "Podpisový certifikát v metadátach sa nepodarilo spracovať a nebol importovaný.",
+				"no_acs": "Metadáta neobsahujú endpoint Assertion Consumer Service — nastavte ACS URL ručne.",
+				"acs_non_post_only": "Metadáta uvádzajú iba ne-POST ACS väzby; NestIdP doručuje aserciu cez HTTP-POST.",
+				"unsupported_nameid_format": "Formát NameID z metadát nie je podporovaný ({{detail}}); ponecháva sa predvolený.",
+				"no_slo": "Metadáta neuvádzajú žiadny endpoint Single Logout.",
+				"metadata_expired": "Platnosť metadát vypršala {{detail}} — načítajte aktuálne metadáta.",
+				"multiple_entities": "Dokument obsahuje viacero entít; importovala sa prvá SP.",
+				"authn_requests_signed_no_cert": "SP vyžaduje podpísané AuthnRequest, no nenašiel sa použiteľný certifikát."
+			}
+		}
 	},
 	"idpSettings": {
 		"encryptionEcKeyAgreementInfo": "EC encryption key — ECDH-ES key agreement (XML Encryption 1.1). Service Providers must support xenc11:AgreementMethod. RSA keys are more widely compatible.",

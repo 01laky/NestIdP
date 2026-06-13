@@ -10,6 +10,7 @@ import { SpConnectionTestSsoUrlService } from './services/sp-connection-test-sso
 import { SpConnectionsAuditService } from './services/sp-connections-audit.service';
 import { SpConnectionsController } from './controllers/sp-connections.controller';
 import { SpConnectionsService } from './services/sp-connections.service';
+import { SpMetadataFetchConfig } from './sp-metadata-fetch.config';
 
 @Module({
 	imports: [PrismaModule, AuditCoreModule, AdminAuthModule, IdpSettingsModule],
@@ -20,6 +21,7 @@ import { SpConnectionsService } from './services/sp-connections.service';
 		SpConnectionTestAcsService,
 		SpConnectionTestSsoUrlService,
 		SpConnectionProbeSigningService,
+		SpMetadataFetchConfig,
 	],
 	exports: [SpConnectionsService],
 })

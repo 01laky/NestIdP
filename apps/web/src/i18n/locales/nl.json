@@ -389,7 +389,39 @@
 		"testBackchannelBusy": "Testing…",
 		"testBackchannelOk": "Reachable — the SP accepted a signed probe LogoutRequest.",
 		"testBackchannelFailed": "Failed: {{reason}}",
-		"testBackchannelFailedGeneric": "Back-channel test failed."
+		"testBackchannelFailedGeneric": "Back-channel test failed.",
+		"import": {
+			"panelTitle": "Importeren uit SP-metadata",
+			"intro": "Plak de SP EntityDescriptor-XML of haal deze op via een URL om het formulier voor in te vullen. Controleer de waarden voordat u opslaat.",
+			"modePaste": "XML plakken",
+			"modeUrl": "Ophalen via URL",
+			"xmlLabel": "SP-metadata-XML",
+			"xmlPlaceholder": "Plak de SP EntityDescriptor-XML…",
+			"urlLabel": "SP-metadata-URL",
+			"urlPlaceholder": "https://sp.example.com/saml/metadata",
+			"parseButton": "Verwerken en invullen",
+			"fetchButton": "Ophalen en invullen",
+			"busy": "Importeren…",
+			"notSpMetadata": "Geen SP-descriptor gevonden in de metadata.",
+			"success": "Velden vooraf ingevuld uit metadata — controleer voordat u opslaat.",
+			"failed": "Kan de metadata niet importeren.",
+			"acsPickerLabel": "Assertion Consumer Service (uit metadata)",
+			"refreshTitle": "Geïmporteerde metadata toepassen?",
+			"refreshDescription": "Hiermee worden de formuliervelden overschreven met de waarden uit de metadata. Controleer de wijzigingen voordat u opslaat.",
+			"conflictMessage": "Er bestaat al een SP-verbinding met deze entity-ID: {{name}}.",
+			"conflictLink": "Bestaande verbinding openen",
+			"warnings": {
+				"no_signing_certificate": "De metadata bevat geen ondertekeningscertificaat — stel het SP-certificaat handmatig in als u ondertekende AuthnRequests, versleuteling of SOAP-SLO nodig hebt.",
+				"invalid_signing_certificate": "Het ondertekeningscertificaat in de metadata kon niet worden verwerkt en is niet geïmporteerd.",
+				"no_acs": "De metadata bevat geen Assertion Consumer Service-eindpunt — stel de ACS-URL handmatig in.",
+				"acs_non_post_only": "De metadata adverteert alleen niet-POST ACS-bindingen; NestIdP levert de assertie via HTTP-POST.",
+				"unsupported_nameid_format": "Het NameID-formaat uit de metadata wordt niet ondersteund ({{detail}}); de standaard blijft behouden.",
+				"no_slo": "De metadata adverteert geen Single Logout-eindpunt.",
+				"metadata_expired": "De metadata is verlopen op {{detail}} — haal verse metadata op.",
+				"multiple_entities": "Het document bevat meerdere entiteiten; de eerste SP is geïmporteerd.",
+				"authn_requests_signed_no_cert": "De SP vraagt om ondertekende AuthnRequests maar er is geen bruikbaar certificaat gevonden."
+			}
+		}
 	},
 	"idpSettings": {
 		"encryptionEcKeyAgreementInfo": "EC encryption key — ECDH-ES key agreement (XML Encryption 1.1). Service Providers must support xenc11:AgreementMethod. RSA keys are more widely compatible.",

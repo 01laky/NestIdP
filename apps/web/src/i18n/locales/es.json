@@ -389,7 +389,39 @@
 		"testBackchannelBusy": "Testing…",
 		"testBackchannelOk": "Reachable — the SP accepted a signed probe LogoutRequest.",
 		"testBackchannelFailed": "Failed: {{reason}}",
-		"testBackchannelFailedGeneric": "Back-channel test failed."
+		"testBackchannelFailedGeneric": "Back-channel test failed.",
+		"import": {
+			"panelTitle": "Importar desde metadatos del SP",
+			"intro": "Pegue el XML EntityDescriptor del SP u obténgalo desde una URL para rellenar el formulario. Revise los valores antes de guardar.",
+			"modePaste": "Pegar XML",
+			"modeUrl": "Obtener desde URL",
+			"xmlLabel": "XML de metadatos del SP",
+			"xmlPlaceholder": "Pegue el XML EntityDescriptor del SP…",
+			"urlLabel": "URL de metadatos del SP",
+			"urlPlaceholder": "https://sp.example.com/saml/metadata",
+			"parseButton": "Analizar y rellenar",
+			"fetchButton": "Obtener y rellenar",
+			"busy": "Importando…",
+			"notSpMetadata": "No se encontró un descriptor de SP en los metadatos.",
+			"success": "Campos rellenados desde los metadatos: revise antes de guardar.",
+			"failed": "No se pudieron importar los metadatos.",
+			"acsPickerLabel": "Assertion Consumer Service (de los metadatos)",
+			"refreshTitle": "¿Aplicar los metadatos importados?",
+			"refreshDescription": "Esto sobrescribirá los campos del formulario con los valores de los metadatos. Revise los cambios antes de guardar.",
+			"conflictMessage": "Ya existe una conexión SP con este entity ID: {{name}}.",
+			"conflictLink": "Abrir la conexión existente",
+			"warnings": {
+				"no_signing_certificate": "Los metadatos no tienen certificado de firma; configure el certificado del SP manualmente si necesita AuthnRequests firmados, cifrado o SLO SOAP.",
+				"invalid_signing_certificate": "No se pudo analizar el certificado de firma de los metadatos y no se importó.",
+				"no_acs": "Los metadatos no tienen un endpoint Assertion Consumer Service; configure la URL de ACS manualmente.",
+				"acs_non_post_only": "Los metadatos solo anuncian enlaces ACS que no son POST; NestIdP entrega la aserción mediante HTTP-POST.",
+				"unsupported_nameid_format": "El formato NameID de los metadatos no es compatible ({{detail}}); se mantiene el predeterminado.",
+				"no_slo": "Los metadatos no anuncian ningún endpoint de Single Logout.",
+				"metadata_expired": "Los metadatos caducaron el {{detail}}: obtenga metadatos actualizados.",
+				"multiple_entities": "El documento contiene varias entidades; se importó el primer SP.",
+				"authn_requests_signed_no_cert": "El SP solicita AuthnRequests firmados pero no se encontró un certificado utilizable."
+			}
+		}
 	},
 	"idpSettings": {
 		"encryptionEcKeyAgreementInfo": "EC encryption key — ECDH-ES key agreement (XML Encryption 1.1). Service Providers must support xenc11:AgreementMethod. RSA keys are more widely compatible.",

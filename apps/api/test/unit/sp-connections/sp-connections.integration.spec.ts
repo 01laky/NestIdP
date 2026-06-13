@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { createServer, type Server } from 'node:http';
 import { unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -761,5 +762,243 @@ describe('SP connections admin API (SQLite)', () => {
 			.set(csrfHeader(csrf))
 			.send({ wantAssertionsEncrypted: true })
 			.expect(400);
+	});
+
+	describe('SP metadata import (Prompt 42)', () => {
+		const certBody = VALID_PEM.replace(/-----(BEGIN|END) CERTIFICATE-----/g, '').replace(
+			/\s+/g,
+			'',
+		);
+		const fullMetadata = `<?xml version="1.0"?>
+<md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata" xmlns:ds="http://www.w3.org/2000/09/xmldsig#" entityID="https://import.example.com/sp">
+  <md:SPSSODescriptor AuthnRequestsSigned="true" protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+    <md:KeyDescriptor use="signing"><ds:KeyInfo><ds:X509Data><ds:X509Certificate>${certBody}</ds:X509Certificate></ds:X509Data></ds:KeyInfo></md:KeyDescriptor>
+    <md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://import.example.com/slo"/>
+    <md:NameIDFormat>urn:oasis:names:tc:SAML:2.0:nameid-format:persistent</md:NameIDFormat>
+    <md:AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="https://import.example.com/acs" index="0" isDefault="true"/>
+  </md:SPSSODescriptor>
+</md:EntityDescriptor>`;
+
+		it('SPM-API-01: POST /parse-metadata returns the full import DTO (admin + CSRF)', async () => {
+			const agent = request.agent(app.getHttpServer() as App);
+			const csrf = await loginCsrf(agent);
+			const res = await agent
+				.post(`${SP_CONNECTIONS_API_PATH}/parse-metadata`)
+				.set(csrfHeader(csrf))
+				.send({ metadataXml: fullMetadata })
+				.expect(200);
+			expect(res.body.valid).toBe(true);
+			expect(res.body.entityId).toBe('https://import.example.com/sp');
+			expect(res.body.acsUrl).toBe('https://import.example.com/acs');
+			expect(res.body.sloUrl).toBe('https://import.example.com/slo');
+			expect(res.body.spCertificate).toBe(VALID_PEM);
+			expect(res.body.authnRequestsSigned).toBe(true);
+		});
+
+		it('SPM-API-01b: POST /parse-metadata without an admin session → 401', async () => {
+			await request(app.getHttpServer() as App)
+				.post(`${SP_CONNECTIONS_API_PATH}/parse-metadata`)
+				.send({ metadataXml: fullMetadata })
+				.expect(401);
+		});
+
+		it('SPM-API-01c: parse-metadata surfaces an entityID conflict for an existing SP', async () => {
+			await createTestSpConnection(prisma, {
+				name: 'Already Imported',
+				spEntityId: 'https://conflict.example.com/sp',
+			});
+			const conflictMetadata = fullMetadata.replace(
+				'https://import.example.com/sp',
+				'https://conflict.example.com/sp',
+			);
+			const agent = request.agent(app.getHttpServer() as App);
+			const csrf = await loginCsrf(agent);
+			const res = await agent
+				.post(`${SP_CONNECTIONS_API_PATH}/parse-metadata`)
+				.set(csrfHeader(csrf))
+				.send({ metadataXml: conflictMetadata })
+				.expect(200);
+			expect(res.body.entityIdConflict?.name).toBe('Already Imported');
+		});
+
+		it('SPM-API-02: POST /fetch-metadata fetches from a live URL and parses it', async () => {
+			const server: Server = createServer((_req, res) => {
+				res.setHeader('Content-Type', 'application/xml');
+				res.end(fullMetadata);
+			});
+			await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+			const port = (server.address() as { port: number }).port;
+			try {
+				const agent = request.agent(app.getHttpServer() as App);
+				const csrf = await loginCsrf(agent);
+				const res = await agent
+					.post(`${SP_CONNECTIONS_API_PATH}/fetch-metadata`)
+					.set(csrfHeader(csrf))
+					.send({ url: `http://127.0.0.1:${port}/sp-metadata.xml` })
+					.expect(200);
+				expect(res.body.entityId).toBe('https://import.example.com/sp');
+				expect(res.body.acsUrl).toBe('https://import.example.com/acs');
+			} finally {
+				await new Promise<void>((resolve) => server.close(() => resolve()));
+			}
+		});
+
+		it('SPM-API-02b: POST /fetch-metadata with an invalid URL → 400', async () => {
+			const agent = request.agent(app.getHttpServer() as App);
+			const csrf = await loginCsrf(agent);
+			await agent
+				.post(`${SP_CONNECTIONS_API_PATH}/fetch-metadata`)
+				.set(csrfHeader(csrf))
+				.send({ url: 'not-a-url' })
+				.expect(400);
+		});
+
+		it('SPM-API-03: legacy /parse-slo-from-metadata still returns {redirect,post,soap}', async () => {
+			const agent = request.agent(app.getHttpServer() as App);
+			const csrf = await loginCsrf(agent);
+			const res = await agent
+				.post(`${SP_CONNECTIONS_API_PATH}/parse-slo-from-metadata`)
+				.set(csrfHeader(csrf))
+				.send({ metadataXml: fullMetadata })
+				.expect(200);
+			expect(res.body).toEqual({
+				redirect: 'https://import.example.com/slo',
+				post: null,
+				soap: null,
+			});
+		});
+
+		it('SPM-SAVE-01: creating from imported values still enforces SOAP-SLO-requires-cert', async () => {
+			// The importer only fills the form; saving runs the normal create validation.
+			const agent = request.agent(app.getHttpServer() as App);
+			const csrf = await loginCsrf(agent);
+			await agent
+				.post(SP_CONNECTIONS_API_PATH)
+				.set(csrfHeader(csrf))
+				.send({
+					name: 'Imported SOAP no cert',
+					spEntityId: 'https://import.example.com/soap-nocert',
+					acsUrl: 'https://import.example.com/acs',
+					sloSoapUrl: 'https://import.example.com/slo/soap',
+				})
+				.expect(400);
+		});
+
+		it('SPM-SAVE-02: refreshing an existing SP with a rotated signing cert updates it', async () => {
+			const sp = await createTestSpConnection(prisma, {
+				name: 'Rotate Target',
+				spEntityId: 'https://import.example.com/rotate',
+			});
+			const newCert = getTestSigningMaterial('urn:test:rotated-cert').certPem.trim();
+			const agent = request.agent(app.getHttpServer() as App);
+			const csrf = await loginCsrf(agent);
+			const res = await agent
+				.patch(`${SP_CONNECTIONS_API_PATH}/${sp.id}`)
+				.set(csrfHeader(csrf))
+				.send({ spCertificate: newCert })
+				.expect(200);
+			expect(res.body.item.hasSpCertificate).toBe(true);
+			const reloaded = await prisma.spConnection.findUnique({ where: { id: sp.id } });
+			expect(reloaded?.spCertificate).toBe(newCert);
+		});
+
+		it('SPM-API-04: parse-metadata without CSRF → 403', async () => {
+			const agent = await adminAgent();
+			await agent
+				.post(`${SP_CONNECTIONS_API_PATH}/parse-metadata`)
+				.send({ metadataXml: fullMetadata })
+				.expect(403);
+		});
+
+		it('SPM-API-05: malformed / non-SP metadata → 200 with valid:false (not an error)', async () => {
+			const agent = request.agent(app.getHttpServer() as App);
+			const csrf = await loginCsrf(agent);
+			const res = await agent
+				.post(`${SP_CONNECTIONS_API_PATH}/parse-metadata`)
+				.set(csrfHeader(csrf))
+				.send({ metadataXml: '<not-sp-metadata/>' })
+				.expect(200);
+			expect(res.body.valid).toBe(false);
+			expect(res.body.entityId).toBeNull();
+		});
+
+		it('SPM-API-06: parse-metadata rejects unknown fields (forbidNonWhitelisted)', async () => {
+			const agent = request.agent(app.getHttpServer() as App);
+			const csrf = await loginCsrf(agent);
+			await agent
+				.post(`${SP_CONNECTIONS_API_PATH}/parse-metadata`)
+				.set(csrfHeader(csrf))
+				.send({ metadataXml: fullMetadata, evil: 'x' })
+				.expect(400);
+		});
+
+		it('SPM-API-07: fetch-metadata maps an upstream 404 to 400', async () => {
+			const server: Server = createServer((_req, res) => {
+				res.statusCode = 404;
+				res.end('nope');
+			});
+			await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+			const port = (server.address() as { port: number }).port;
+			try {
+				const agent = request.agent(app.getHttpServer() as App);
+				const csrf = await loginCsrf(agent);
+				await agent
+					.post(`${SP_CONNECTIONS_API_PATH}/fetch-metadata`)
+					.set(csrfHeader(csrf))
+					.send({ url: `http://127.0.0.1:${port}/missing.xml` })
+					.expect(400);
+			} finally {
+				await new Promise<void>((resolve) => server.close(() => resolve()));
+			}
+		});
+
+		it('SPM-SAVE-03: creating from the full imported values succeeds and audits the source', async () => {
+			const agent = request.agent(app.getHttpServer() as App);
+			const csrf = await loginCsrf(agent);
+			const res = await agent
+				.post(SP_CONNECTIONS_API_PATH)
+				.set(csrfHeader(csrf))
+				.send({
+					name: 'Imported Full',
+					spEntityId: 'https://import.example.com/full',
+					acsUrl: 'https://import.example.com/acs',
+					sloUrl: 'https://import.example.com/slo',
+					nameIdFormat: 'urn:oasis:names:tc:SAML:2.0:nameid-format:persistent',
+					spCertificate: VALID_PEM,
+					wantAuthnRequestsSigned: true,
+					importSource: 'metadata_url',
+				})
+				.expect(201);
+			expect(res.body.item.spEntityId).toBe('https://import.example.com/full');
+			expect(res.body.item.hasSpCertificate).toBe(true);
+			expect(res.body.item.wantAuthnRequestsSigned).toBe(true);
+			// The audit write is fire-and-forget; poll briefly for the row, then check its source.
+			let event: { metadata: unknown } | null = null;
+			for (let attempt = 0; attempt < 40 && !event; attempt += 1) {
+				event = await prisma.auditEvent.findFirst({
+					where: { subjectId: res.body.item.id, event: 'sp_connection_created' },
+				});
+				if (!event) {
+					await new Promise((resolve) => setTimeout(resolve, 25));
+				}
+			}
+			expect(event).not.toBeNull();
+			expect((event!.metadata as { source?: string }).source).toBe('metadata_url');
+		});
+
+		it('SPM-SAVE-04: an invalid importSource value is rejected (whitelist)', async () => {
+			const agent = request.agent(app.getHttpServer() as App);
+			const csrf = await loginCsrf(agent);
+			await agent
+				.post(SP_CONNECTIONS_API_PATH)
+				.set(csrfHeader(csrf))
+				.send({
+					name: 'Bad Source',
+					spEntityId: 'https://import.example.com/badsource',
+					acsUrl: 'https://import.example.com/acs',
+					importSource: 'hacker',
+				})
+				.expect(400);
+		});
 	});
 });

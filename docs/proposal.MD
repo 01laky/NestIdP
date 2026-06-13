@@ -588,8 +588,8 @@ From **v1.1.0**, the operator console and SAML login page use the **Evergreen** 
 │                                 (v2: endpoint + field mapping + proxy on /:id)
 ├── /sp-connections
 │   ├── /                         List SP connections
-│   ├── /new                      Create SP connection
-│   └── /:id                      Edit SP + attribute mapping
+│   ├── /new                      Create SP connection (import from SP metadata XML/URL, v1.21.0)
+│   └── /:id                      Edit SP + attribute mapping (re-import metadata as a reviewed refresh)
 ├── /identity
 │   ├── /users                    Browse users; manual CRUD via /new and /:id/edit (synced read-only)
 │   ├── /users/new                Create manual user (password + memberships)

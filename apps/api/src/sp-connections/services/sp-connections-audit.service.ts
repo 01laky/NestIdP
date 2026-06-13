@@ -20,12 +20,18 @@ export class SpConnectionsAuditService {
 		});
 	}
 
-	logCreated(id: string, spEntityId: string): void {
-		this.record('sp_connection_created', id, { spEntityId });
+	logCreated(id: string, spEntityId: string, options?: { source?: string | null }): void {
+		this.record('sp_connection_created', id, {
+			spEntityId,
+			...(options?.source ? { source: options.source } : {}),
+		});
 	}
 
-	logUpdated(id: string, spEntityId: string): void {
-		this.record('sp_connection_updated', id, { spEntityId });
+	logUpdated(id: string, spEntityId: string, options?: { source?: string | null }): void {
+		this.record('sp_connection_updated', id, {
+			spEntityId,
+			...(options?.source ? { source: options.source } : {}),
+		});
 	}
 
 	logDeleted(id: string, spEntityId: string): void {

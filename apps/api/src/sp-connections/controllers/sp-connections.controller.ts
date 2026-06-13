@@ -25,6 +25,7 @@ import {
 	type SpConnectionResponseDto,
 	type SpConnectionTestAcsResponseDto,
 	type SpConnectionTestSsoUrlResponseDto,
+	type SpMetadataImportResponseDto,
 	type TestSpBackchannelSloResponseDto,
 } from '@nestidp/shared';
 import { AdminAuthGuard } from '../../admin-auth/guards/admin-auth.guard';
@@ -36,6 +37,8 @@ import { SpConnectionTestAcsService } from '../services/sp-connection-test-acs.s
 import { SpConnectionTestSsoUrlService } from '../services/sp-connection-test-sso-url.service';
 import { ProbeSpSigningBodyDto } from '../dto/probe-sp-signing.dto';
 import { ParseSloMetadataBodyDto } from '../dto/parse-slo-metadata.dto';
+import { ParseSpMetadataBodyDto } from '../dto/parse-sp-metadata.dto';
+import { FetchSpMetadataBodyDto } from '../dto/fetch-sp-metadata.dto';
 import { CreateSpConnectionBodyDto } from '../dto/create-sp-connection.dto';
 import { SpConnectionsService } from '../services/sp-connections.service';
 import { UpdateSpConnectionBodyDto } from '../dto/update-sp-connection.dto';
@@ -118,6 +121,26 @@ export class SpConnectionsController {
 		body: ParseSloMetadataBodyDto,
 	): ParseSloFromMetadataResponseDto {
 		return this.spConnectionsService.parseSloFromMetadata(body.metadataXml);
+	}
+
+	@Post('parse-metadata')
+	@HttpCode(HttpStatus.OK)
+	@UseGuards(AdminCsrfGuard)
+	parseMetadata(
+		@Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+		body: ParseSpMetadataBodyDto,
+	): Promise<SpMetadataImportResponseDto> {
+		return this.spConnectionsService.parseSpMetadata(body.metadataXml);
+	}
+
+	@Post('fetch-metadata')
+	@HttpCode(HttpStatus.OK)
+	@UseGuards(AdminCsrfGuard)
+	fetchMetadata(
+		@Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+		body: FetchSpMetadataBodyDto,
+	): Promise<SpMetadataImportResponseDto> {
+		return this.spConnectionsService.fetchSpMetadataFromUrl(body.url);
 	}
 
 	@Post(':id/probe-sp-signing')

@@ -389,7 +389,39 @@
 		"testBackchannelBusy": "Testing…",
 		"testBackchannelOk": "Reachable — the SP accepted a signed probe LogoutRequest.",
 		"testBackchannelFailed": "Failed: {{reason}}",
-		"testBackchannelFailedGeneric": "Back-channel test failed."
+		"testBackchannelFailedGeneric": "Back-channel test failed.",
+		"import": {
+			"panelTitle": "Aus SP-Metadaten importieren",
+			"intro": "Fügen Sie das SP-EntityDescriptor-XML ein oder rufen Sie es über eine URL ab, um das Formular vorzubefüllen. Prüfen Sie die Werte vor dem Speichern.",
+			"modePaste": "XML einfügen",
+			"modeUrl": "Von URL abrufen",
+			"xmlLabel": "SP-Metadaten-XML",
+			"xmlPlaceholder": "SP-EntityDescriptor-XML einfügen…",
+			"urlLabel": "SP-Metadaten-URL",
+			"urlPlaceholder": "https://sp.example.com/saml/metadata",
+			"parseButton": "Einlesen & vorbefüllen",
+			"fetchButton": "Abrufen & vorbefüllen",
+			"busy": "Importieren…",
+			"notSpMetadata": "In den Metadaten wurde kein SP-Deskriptor gefunden.",
+			"success": "Felder aus Metadaten vorbefüllt — vor dem Speichern prüfen.",
+			"failed": "Die Metadaten konnten nicht importiert werden.",
+			"acsPickerLabel": "Assertion Consumer Service (aus Metadaten)",
+			"refreshTitle": "Importierte Metadaten anwenden?",
+			"refreshDescription": "Dadurch werden die Formularfelder mit den Werten aus den Metadaten überschrieben. Prüfen Sie die Änderungen vor dem Speichern.",
+			"conflictMessage": "Eine SP-Verbindung mit dieser Entity-ID existiert bereits: {{name}}.",
+			"conflictLink": "Vorhandene Verbindung öffnen",
+			"warnings": {
+				"no_signing_certificate": "Die Metadaten enthalten kein Signaturzertifikat — setzen Sie das SP-Zertifikat manuell, wenn Sie signierte AuthnRequests, Verschlüsselung oder SOAP-SLO benötigen.",
+				"invalid_signing_certificate": "Das Signaturzertifikat in den Metadaten konnte nicht verarbeitet werden und wurde nicht importiert.",
+				"no_acs": "Die Metadaten enthalten keinen Assertion-Consumer-Service-Endpunkt — setzen Sie die ACS-URL manuell.",
+				"acs_non_post_only": "Die Metadaten bieten nur Nicht-POST-ACS-Bindings; NestIdP liefert die Assertion per HTTP-POST.",
+				"unsupported_nameid_format": "Das NameID-Format aus den Metadaten wird nicht unterstützt ({{detail}}); der Standard bleibt erhalten.",
+				"no_slo": "Die Metadaten geben keinen Single-Logout-Endpunkt an.",
+				"metadata_expired": "Die Metadaten sind am {{detail}} abgelaufen — rufen Sie aktuelle Metadaten ab.",
+				"multiple_entities": "Das Dokument enthält mehrere Entitäten; der erste SP wurde importiert.",
+				"authn_requests_signed_no_cert": "Der SP verlangt signierte AuthnRequests, aber es wurde kein verwendbares Zertifikat gefunden."
+			}
+		}
 	},
 	"idpSettings": {
 		"encryptionEcKeyAgreementInfo": "EC encryption key — ECDH-ES key agreement (XML Encryption 1.1). Service Providers must support xenc11:AgreementMethod. RSA keys are more widely compatible.",

@@ -1,5 +1,6 @@
 import {
 	IsBoolean,
+	IsIn,
 	IsNotEmpty,
 	IsObject,
 	IsOptional,
@@ -7,7 +8,7 @@ import {
 	MaxLength,
 	ValidateIf,
 } from 'class-validator';
-import type { SpAttributeMappingConfig } from '@nestidp/shared';
+import type { SpAttributeMappingConfig, SpConnectionImportSource } from '@nestidp/shared';
 import { MAX_PEM_LENGTH } from '../../common/constants/crypto-limits';
 
 export class CreateSpConnectionBodyDto {
@@ -69,4 +70,8 @@ export class CreateSpConnectionBodyDto {
 	@IsOptional()
 	@IsBoolean()
 	wantLogoutRequestsSigned?: boolean;
+
+	@IsOptional()
+	@IsIn(['metadata_xml', 'metadata_url'])
+	importSource?: SpConnectionImportSource;
 }

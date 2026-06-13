@@ -14,10 +14,15 @@ import type {
 	SpConnectionListResponseDto,
 	SpConnectionPublicDto,
 	SpConnectionResponseDto,
+	SpMetadataEntityConflictDto,
+	SpMetadataImportResponseDto,
 	UpdateSpConnectionRequestDto,
 } from '@nestidp/shared';
 import { DEFAULT_SAML_NAME_ID_FORMAT, SAML_NAME_ID_FORMATS } from '@nestidp/shared';
-import { extractSloUrlFromSpMetadata } from '../../saml/utils/sp-metadata-slo.util';
+import { extractSloUrlFromSpMetadata, extractSpMetadata } from '../../saml/utils/sp-metadata.util';
+import { buildSpMetadataImportResult } from '../utils/sp-metadata-import.util';
+import { fetchSpMetadataDocument, SpMetadataFetchError } from '../utils/sp-metadata-fetch.util';
+import { SpMetadataFetchConfig } from '../sp-metadata-fetch.config';
 import { assertValidAcsUrl, AcsUrlValidationError } from '../../common/utils/acs-url.util';
 import { PrismaService } from '../../prisma/services/prisma.service';
 import {
@@ -39,6 +44,7 @@ export class SpConnectionsService {
 		private readonly configService: ConfigService,
 		private readonly audit: SpConnectionsAuditService,
 		private readonly idpSettingsService: IdpSettingsService,
+		private readonly metadataFetchConfig: SpMetadataFetchConfig,
 	) {}
 
 	async list(): Promise<SpConnectionListResponseDto> {
@@ -87,7 +93,7 @@ export class SpConnectionsService {
 			},
 		});
 
-		this.audit.logCreated(row.id, row.spEntityId);
+		this.audit.logCreated(row.id, row.spEntityId, { source: body.importSource });
 		return { item: toSpConnectionPublicDto(row) };
 	}
 
@@ -223,7 +229,7 @@ export class SpConnectionsService {
 			data,
 		});
 
-		this.audit.logUpdated(row.id, row.spEntityId);
+		this.audit.logUpdated(row.id, row.spEntityId, { source: body.importSource });
 		return { item: toSpConnectionPublicDto(row) };
 	}
 
@@ -240,6 +246,48 @@ export class SpConnectionsService {
 
 	parseSloFromMetadata(metadataXml: string): ParseSloFromMetadataResponseDto {
 		return extractSloUrlFromSpMetadata(metadataXml);
+	}
+
+	/**
+	 * Parse pasted SP metadata into a form prefill (Prompt 42). Read-only: never creates/mutates an SP.
+	 * Surfaces an `entityIdConflict` when the parsed entityID already matches an existing connection.
+	 */
+	async parseSpMetadata(metadataXml: string): Promise<SpMetadataImportResponseDto> {
+		const parsed = extractSpMetadata(metadataXml);
+		const entityIdConflict = await this.findEntityIdConflict(parsed.entityId);
+		return buildSpMetadataImportResult(parsed, { now: new Date(), entityIdConflict });
+	}
+
+	/** Fetch SP metadata from an operator-supplied URL (bounded), then parse it like the paste path. */
+	async fetchSpMetadataFromUrl(url: string): Promise<SpMetadataImportResponseDto> {
+		let xml: string;
+		try {
+			xml = await fetchSpMetadataDocument(url, {
+				timeoutMs: this.metadataFetchConfig.timeoutMs(),
+				maxBytes: this.metadataFetchConfig.maxBytes(),
+				maxRedirects: this.metadataFetchConfig.maxRedirects(),
+			});
+		} catch (error) {
+			if (error instanceof SpMetadataFetchError) {
+				// Map to a safe 400 — never echo the raw response body.
+				throw new BadRequestException(`Could not fetch SP metadata: ${error.code}`);
+			}
+			throw error;
+		}
+		return this.parseSpMetadata(xml);
+	}
+
+	private async findEntityIdConflict(
+		entityId: string | null,
+	): Promise<SpMetadataEntityConflictDto | null> {
+		if (!entityId) {
+			return null;
+		}
+		const existing = await this.prisma.spConnection.findUnique({
+			where: { spEntityId: entityId },
+			select: { id: true, name: true },
+		});
+		return existing ? { id: existing.id, name: existing.name } : null;
 	}
 
 	private async findOrThrow(id: string) {

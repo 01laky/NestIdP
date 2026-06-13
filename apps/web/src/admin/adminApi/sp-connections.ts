@@ -10,6 +10,7 @@ import type {
 	SpConnectionResponseDto,
 	SpConnectionTestAcsResponseDto,
 	SpConnectionTestSsoUrlResponseDto,
+	SpMetadataImportResponseDto,
 	TestSpBackchannelSloResponseDto,
 	UpdateSpConnectionRequestDto,
 } from '@nestidp/shared';
@@ -106,6 +107,22 @@ export function parseSpSloFromMetadata(
 		`${SP_CONNECTIONS_API_PATH}/parse-slo-from-metadata`,
 		{ method: 'POST', body: JSON.stringify({ metadataXml }) },
 	);
+}
+
+/** Parse pasted SP metadata XML into a full form prefill (Prompt 42). */
+export function parseSpMetadata(metadataXml: string): Promise<SpMetadataImportResponseDto> {
+	return adminFetch<SpMetadataImportResponseDto>(`${SP_CONNECTIONS_API_PATH}/parse-metadata`, {
+		method: 'POST',
+		body: JSON.stringify({ metadataXml }),
+	});
+}
+
+/** Fetch SP metadata from a URL (server-side) and parse it into a full form prefill (Prompt 42). */
+export function fetchSpMetadataFromUrl(url: string): Promise<SpMetadataImportResponseDto> {
+	return adminFetch<SpMetadataImportResponseDto>(`${SP_CONNECTIONS_API_PATH}/fetch-metadata`, {
+		method: 'POST',
+		body: JSON.stringify({ url }),
+	});
 }
 
 export type { SpConnectionPublicDto } from '@nestidp/shared';

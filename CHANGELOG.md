@@ -4,6 +4,51 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.21.0]
+
+Import an SP connection from its SAML metadata (Prompt 42). The SP connection form gains an
+**Import from metadata** panel that prefills every field for operator review — no more hand-transcribing.
+
+### Added
+
+- **SP metadata parser** (`apps/api/src/saml/utils/sp-metadata.util.ts` — `extractSpMetadata`): extracts
+  `entityID`, all `AssertionConsumerService` endpoints (binding/location/index/isDefault), the SLO trio
+  (redirect/POST/SOAP), `NameIDFormat`s, the signing `KeyDescriptor` certificate(s),
+  `AuthnRequestsSigned`/`WantAssertionsSigned`, `validUntil`, and whether the document is signed. Handles
+  the `EntitiesDescriptor` wrapper (picks the SP entity) and enveloped-signed metadata (parses; signature
+  not verified in v1). Hardened: rejects a DOCTYPE (XXE/entity-expansion defence — `@xmldom/xmldom` does
+  not resolve external entities), caps input size, and never throws on malformed input. The legacy
+  SLO-only `extractSloUrlFromSpMetadata` now delegates here (single source of truth).
+- **Prefill resolver** (`sp-metadata-import.util.ts`): picks the ACS (HTTP-POST preferred;
+  isDefault → lowest index → first), the first supported NameID format, and the first X509-valid signing
+  certificate, and collects non-fatal warnings (no/invalid signing cert, non-POST-only ACS, unsupported
+  NameID, no SLO, expired metadata, multiple entities, AuthnRequestsSigned-without-cert).
+- **Metadata-by-URL fetch** (`sp-metadata-fetch.util.ts`): server-side GET bounded by timeout, response
+  size cap, and a manual redirect cap; HTTPS preferred (http allowed, the UI warns); never logs the body;
+  failures map to typed errors → safe `400`.
+- **API:** `POST /api/admin/sp-connections/parse-metadata` and `…/fetch-metadata` return a full prefill
+  DTO (`SpMetadataImportResponseDto`) including an `entityIdConflict` when the entityID already exists. The
+  legacy `…/parse-slo-from-metadata` is unchanged.
+- **Web:** the SP connection form (create + edit) now leads with an **Import from metadata** panel
+  (paste XML / fetch URL), an ACS picker when several endpoints are advertised, warning callouts, an
+  entity-ID-conflict link, and — on the edit form — a **reviewed refresh** that lists the fields that would
+  change (e.g. a rotated signing certificate) before applying. Nothing is auto-saved; saving still runs the
+  normal create/update validation. New strings in all 10 locales.
+- **Config:** `SP_METADATA_FETCH_TIMEOUT_MS` (5000), `SP_METADATA_FETCH_MAX_BYTES` (262144),
+  `SP_METADATA_FETCH_MAX_REDIRECTS` (3), all bounded.
+- **Audit:** the create/update audit records a non-secret `source` (`metadata_xml` / `metadata_url`) when
+  the form was prefilled from an import. The parse/fetch endpoints are read-only and never log raw
+  metadata or certificate bodies.
+- Extensive edge-case unit tests: `SPM-PARSE-*` (parser), `SPM-PREFILL-*` (resolver), `SPM-FETCH-*` (URL
+  fetch), `SPM-SVC-*` (service), `SPM-API-*` / `SPM-SAVE-*` (HTTP integration, incl. a live-URL fetch),
+  and `WEB-SPM-*` (form).
+
+### Notes
+
+- Out of scope (deferred): verifying the metadata document's XML signature, scheduled/auto metadata
+  refresh, storing a `metadataUrl` for one-click refresh, and bulk import of an `EntitiesDescriptor`
+  (the first SP is imported with a warning).
+
 ## [1.20.4]
 
 Codebase audit pass: correctness fixes found by a full src/docs review, each covered by a regression

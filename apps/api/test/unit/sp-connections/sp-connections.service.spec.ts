@@ -39,11 +39,18 @@ describe('SpConnectionsService', () => {
 		}),
 	} as unknown as ConfigService;
 
+	const metadataFetchConfig = {
+		timeoutMs: () => 5000,
+		maxBytes: () => 262144,
+		maxRedirects: () => 3,
+	};
+
 	const service = new SpConnectionsService(
 		prisma as never,
 		configService,
 		audit as never,
 		idpSettingsService as never,
+		metadataFetchConfig as never,
 	);
 
 	const sampleRow = {
@@ -83,7 +90,9 @@ describe('SpConnectionsService', () => {
 				}),
 			}),
 		);
-		expect(audit.logCreated).toHaveBeenCalledWith(sampleRow.id, sampleRow.spEntityId);
+		expect(audit.logCreated).toHaveBeenCalledWith(sampleRow.id, sampleRow.spEntityId, {
+			source: undefined,
+		});
 		expect(result.item.name).toBe('App');
 	});
 
@@ -399,5 +408,125 @@ describe('SpConnectionsService', () => {
 		const xml =
 			'<md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata"><md:SPSSODescriptor><md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://sp/slo"/></md:SPSSODescriptor></md:EntityDescriptor>';
 		expect(service.parseSloFromMetadata(xml).redirect).toBe('https://sp/slo');
+	});
+
+	describe('parseSpMetadata / fetchSpMetadataFromUrl (Prompt 42)', () => {
+		const certBody = REAL_CERT_PEM.replace(/-----(BEGIN|END) CERTIFICATE-----/g, '').replace(
+			/\s+/g,
+			'',
+		);
+		const fullMetadata = `<?xml version="1.0"?>
+<md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata" xmlns:ds="http://www.w3.org/2000/09/xmldsig#" entityID="https://sp.example.com/sp">
+  <md:SPSSODescriptor AuthnRequestsSigned="true" protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+    <md:KeyDescriptor use="signing"><ds:KeyInfo><ds:X509Data><ds:X509Certificate>${certBody}</ds:X509Certificate></ds:X509Data></ds:KeyInfo></md:KeyDescriptor>
+    <md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://sp.example.com/slo"/>
+    <md:NameIDFormat>urn:oasis:names:tc:SAML:2.0:nameid-format:persistent</md:NameIDFormat>
+    <md:AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="https://sp.example.com/acs" index="0" isDefault="true"/>
+  </md:SPSSODescriptor>
+</md:EntityDescriptor>`;
+
+		it('SPM-SVC-01: parseSpMetadata returns a full prefill from pasted metadata', async () => {
+			const result = await service.parseSpMetadata(fullMetadata);
+			expect(result.valid).toBe(true);
+			expect(result.entityId).toBe('https://sp.example.com/sp');
+			expect(result.acsUrl).toBe('https://sp.example.com/acs');
+			expect(result.sloUrl).toBe('https://sp.example.com/slo');
+			expect(result.nameIdFormat).toBe('urn:oasis:names:tc:SAML:2.0:nameid-format:persistent');
+			expect(result.spCertificate).toBe(REAL_CERT_PEM);
+			expect(result.authnRequestsSigned).toBe(true);
+			expect(result.entityIdConflict).toBeNull();
+		});
+
+		it('SPM-SVC-02: entityIdConflict is surfaced when the entityID already exists', async () => {
+			prisma.spConnection.findUnique.mockResolvedValue({ id: 'c999', name: 'Existing SP' });
+			const result = await service.parseSpMetadata(fullMetadata);
+			expect(prisma.spConnection.findUnique).toHaveBeenCalledWith({
+				where: { spEntityId: 'https://sp.example.com/sp' },
+				select: { id: true, name: true },
+			});
+			expect(result.entityIdConflict).toEqual({ id: 'c999', name: 'Existing SP' });
+		});
+
+		it('SPM-SVC-03: fetchSpMetadataFromUrl fetches then parses (global fetch stubbed)', async () => {
+			const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
+				ok: true,
+				status: 200,
+				headers: { get: () => null },
+				text: async () => fullMetadata,
+				body: undefined,
+			} as unknown as Response);
+			try {
+				const result = await service.fetchSpMetadataFromUrl('https://sp.example.com/metadata');
+				expect(result.entityId).toBe('https://sp.example.com/sp');
+				expect(result.acsUrl).toBe('https://sp.example.com/acs');
+			} finally {
+				fetchSpy.mockRestore();
+			}
+		});
+
+		it('SPM-SVC-04: a fetch failure maps to BadRequestException (no raw body leak)', async () => {
+			const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
+				ok: false,
+				status: 500,
+				headers: { get: () => null },
+			} as unknown as Response);
+			try {
+				await expect(service.fetchSpMetadataFromUrl('https://sp/x')).rejects.toThrow(
+					BadRequestException,
+				);
+			} finally {
+				fetchSpy.mockRestore();
+			}
+		});
+
+		it('SPM-SVC-07: invalid metadata → valid:false DTO and no entityID conflict lookup', async () => {
+			const result = await service.parseSpMetadata('<not-sp/>');
+			expect(result.valid).toBe(false);
+			expect(result.entityId).toBeNull();
+			expect(result.entityIdConflict).toBeNull();
+			expect(prisma.spConnection.findUnique).not.toHaveBeenCalled();
+		});
+
+		it('SPM-SVC-08: an oversized fetch maps to BadRequestException', async () => {
+			const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
+				ok: true,
+				status: 200,
+				headers: { get: (n: string) => (n.toLowerCase() === 'content-length' ? '99999999' : null) },
+				text: async () => 'x',
+				body: undefined,
+			} as unknown as Response);
+			try {
+				await expect(service.fetchSpMetadataFromUrl('https://sp/big')).rejects.toThrow(
+					BadRequestException,
+				);
+			} finally {
+				fetchSpy.mockRestore();
+			}
+		});
+
+		it('SPM-SVC-06: create records the metadata import source in the audit (non-secret)', async () => {
+			prisma.spConnection.create.mockResolvedValue(sampleRow);
+			await service.create({
+				name: 'Imported',
+				spEntityId: 'urn:sp:imported',
+				acsUrl: 'https://sp.example.com/acs',
+				importSource: 'metadata_url',
+			} as never);
+			expect(audit.logCreated).toHaveBeenCalledWith(sampleRow.id, sampleRow.spEntityId, {
+				source: 'metadata_url',
+			});
+		});
+
+		it('SPM-SVC-05: an invalid URL maps to BadRequestException before any fetch', async () => {
+			const fetchSpy = jest.spyOn(global, 'fetch');
+			try {
+				await expect(service.fetchSpMetadataFromUrl('not-a-url')).rejects.toThrow(
+					BadRequestException,
+				);
+				expect(fetchSpy).not.toHaveBeenCalled();
+			} finally {
+				fetchSpy.mockRestore();
+			}
+		});
 	});
 });

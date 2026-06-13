@@ -4,7 +4,7 @@
 
 **A self-hosted SAML 2.0 Identity Provider you deploy in minutes**
 
-[![Version](https://img.shields.io/badge/version-1.20.4-blue?style=flat-square)](package.json)
+[![Version](https://img.shields.io/badge/version-1.21.0-blue?style=flat-square)](package.json)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-green?style=flat-square)](package.json)
 [![pnpm](https://img.shields.io/badge/pnpm-%3E%3D9-orange?style=flat-square)](package.json)
 [![License](https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square)](LICENSE)
@@ -48,6 +48,7 @@ You need to add SSO to Grafana, a custom app, or a SaaS product — but you alre
 
 - **Multiple identity sources** — sync from several REST APIs independently; per-source scoping, collision handling, and scheduled cron runs
 - **Signing + encryption certificates** — separate independent lifecycles; auto-rotation scheduler (opt-in); dual-cert metadata during rotation so SPs upgrade without downtime
+- **Import SP from metadata** — paste an SP's `EntityDescriptor` XML or fetch it by URL to prefill the connection (entity ID, ACS, SLO, NameID, signing cert) for review; re-import to refresh a rotated cert
 - **Back-channel SLO** — propagate logout to every participating SP over SOAP with persistent retry queue
 - **OAuth 2.0 client-credentials** — authenticate outbound sync calls via CC grant in addition to static bearer tokens
 - **Per-connection outbound proxy** — route sync HTTP through a corporate proxy; per-connection no-proxy rules

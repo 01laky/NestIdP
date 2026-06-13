@@ -147,6 +147,9 @@ export interface SpConnectionResponseDto {
 	item: SpConnectionPublicDto;
 }
 
+/** How an SP connection's fields were entered, for audit only (Prompt 42); never persisted. */
+export type SpConnectionImportSource = 'metadata_xml' | 'metadata_url';
+
 export interface CreateSpConnectionRequestDto {
 	name: string;
 	spEntityId: string;
@@ -160,6 +163,8 @@ export interface CreateSpConnectionRequestDto {
 	wantAssertionsEncrypted?: boolean;
 	wantAuthnRequestsSigned?: boolean;
 	wantLogoutRequestsSigned?: boolean;
+	/** Audit-only hint: set when the form was prefilled from imported metadata. Not stored. */
+	importSource?: SpConnectionImportSource;
 }
 
 export interface UpdateSpConnectionRequestDto {
@@ -175,6 +180,8 @@ export interface UpdateSpConnectionRequestDto {
 	wantAssertionsEncrypted?: boolean;
 	wantAuthnRequestsSigned?: boolean;
 	wantLogoutRequestsSigned?: boolean;
+	/** Audit-only hint: set when the form was prefilled from imported metadata. Not stored. */
+	importSource?: SpConnectionImportSource;
 }
 
 export interface ParseSloFromMetadataRequestDto {
@@ -186,6 +193,84 @@ export interface ParseSloFromMetadataResponseDto {
 	post: string | null;
 	/** SOAP back-channel SLO endpoint, when the metadata advertises it (Prompt 36). */
 	soap: string | null;
+}
+
+/* ---- SP metadata import (Prompt 42) ---- */
+
+/** One `md:AssertionConsumerService` endpoint parsed from SP metadata. */
+export interface SpMetadataAcsOption {
+	binding: string;
+	location: string;
+	/** `index` attribute, or null when absent. */
+	index: number | null;
+	isDefault: boolean;
+}
+
+/** Stable warning codes from an SP metadata import; the web maps these to localized copy. */
+export type SpMetadataWarningCode =
+	| 'no_signing_certificate'
+	| 'invalid_signing_certificate'
+	| 'no_acs'
+	| 'acs_non_post_only'
+	| 'unsupported_nameid_format'
+	| 'no_slo'
+	| 'metadata_expired'
+	| 'multiple_entities'
+	| 'authn_requests_signed_no_cert';
+
+export interface SpMetadataWarning {
+	code: SpMetadataWarningCode;
+	/** Optional human-readable detail (e.g. an expiry date or unsupported format) for interpolation. */
+	detail?: string | null;
+}
+
+/** Existing SP connection whose `spEntityId` matches the imported metadata's entityID. */
+export interface SpMetadataEntityConflictDto {
+	id: string;
+	name: string;
+}
+
+export interface SpMetadataImportRequestDto {
+	metadataXml: string;
+}
+
+export interface FetchSpMetadataRequestDto {
+	url: string;
+}
+
+/**
+ * Result of parsing SP metadata into a form prefill (Prompt 42). All fields are non-secret. The
+ * importer only fills the SP form for operator review; saving still runs the normal create/update
+ * validation.
+ */
+export interface SpMetadataImportResponseDto {
+	/** True when an `SPSSODescriptor` was found and parsed. */
+	valid: boolean;
+	entityId: string | null;
+	/** Chosen ACS location (prefilled into `acsUrl`); HTTP-POST preferred. */
+	acsUrl: string | null;
+	/** All ACS endpoints found, so the UI can offer a picker. */
+	acsOptions: SpMetadataAcsOption[];
+	/** Front-channel SLO (redirect preferred, then POST), prefilled into `sloUrl`. */
+	sloUrl: string | null;
+	/** SOAP back-channel SLO, prefilled into `sloSoapUrl`. */
+	sloSoapUrl: string | null;
+	/** Chosen NameID format (a supported one), else null → UI keeps the default. */
+	nameIdFormat: string | null;
+	/** First valid signing certificate PEM (prefilled into `spCertificate`). */
+	spCertificate: string | null;
+	/** All valid signing certificate PEMs (rollover); `spCertificate` === the first entry. */
+	signingCertificates: string[];
+	/** SP declares it signs its AuthnRequests → suggested `wantAuthnRequestsSigned`. */
+	authnRequestsSigned: boolean;
+	/** SP wants signed assertions (informational; the IdP always signs). */
+	wantAssertionsSigned: boolean;
+	/** Whether the metadata document carried an XML signature (informational only; not verified). */
+	signed: boolean;
+	/** Non-fatal notes for the operator. */
+	warnings: SpMetadataWarning[];
+	/** Present when `entityId` already matches an existing SP connection. */
+	entityIdConflict: SpMetadataEntityConflictDto | null;
 }
 
 export interface DeleteSpConnectionResponseDto {

@@ -389,7 +389,39 @@
 		"testBackchannelBusy": "Testing…",
 		"testBackchannelOk": "Reachable — the SP accepted a signed probe LogoutRequest.",
 		"testBackchannelFailed": "Failed: {{reason}}",
-		"testBackchannelFailedGeneric": "Back-channel test failed."
+		"testBackchannelFailedGeneric": "Back-channel test failed.",
+		"import": {
+			"panelTitle": "Import from SP metadata",
+			"intro": "Paste the SP EntityDescriptor XML or fetch it from a URL to prefill the form. Review the values before saving.",
+			"modePaste": "Paste XML",
+			"modeUrl": "Fetch from URL",
+			"xmlLabel": "SP metadata XML",
+			"xmlPlaceholder": "Paste SP EntityDescriptor XML…",
+			"urlLabel": "SP metadata URL",
+			"urlPlaceholder": "https://sp.example.com/saml/metadata",
+			"parseButton": "Parse & prefill",
+			"fetchButton": "Fetch & prefill",
+			"busy": "Importing…",
+			"notSpMetadata": "No SP descriptor found in the metadata.",
+			"success": "Fields prefilled from metadata — review before saving.",
+			"failed": "Could not import the metadata.",
+			"acsPickerLabel": "Assertion Consumer Service (from metadata)",
+			"refreshTitle": "Apply imported metadata?",
+			"refreshDescription": "This will overwrite the form fields with the values from the metadata. Review the changes before saving.",
+			"conflictMessage": "An SP connection with this entity ID already exists: {{name}}.",
+			"conflictLink": "Open the existing connection",
+			"warnings": {
+				"no_signing_certificate": "The metadata has no signing certificate — set the SP certificate manually if you need signed AuthnRequests, encryption, or SOAP SLO.",
+				"invalid_signing_certificate": "The signing certificate in the metadata could not be parsed and was not imported.",
+				"no_acs": "The metadata has no Assertion Consumer Service endpoint — set the ACS URL manually.",
+				"acs_non_post_only": "The metadata only advertises non-POST ACS bindings; NestIdP delivers the assertion via HTTP-POST.",
+				"unsupported_nameid_format": "The metadata NameID format is not supported ({{detail}}); the default is kept.",
+				"no_slo": "The metadata advertises no Single Logout endpoint.",
+				"metadata_expired": "The metadata expired on {{detail}} — fetch fresh metadata.",
+				"multiple_entities": "The document contains multiple entities; the first SP was imported.",
+				"authn_requests_signed_no_cert": "The SP requests signed AuthnRequests but no usable certificate was found."
+			}
+		}
 	},
 	"idpSettings": {
 		"encryptionEcKeyAgreementInfo": "EC encryption key — ECDH-ES key agreement (XML Encryption 1.1). Service Providers must support xenc11:AgreementMethod. RSA keys are more widely compatible.",

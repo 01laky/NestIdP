@@ -1,13 +1,19 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import type { SpAttributeMappingConfig } from '@nestidp/shared';
+import type {
+	SpAttributeMappingConfig,
+	SpMetadataAcsOption,
+	SpMetadataImportResponseDto,
+	SpMetadataWarning,
+} from '@nestidp/shared';
 import { SAML_NAME_ID_FORMATS, SP_CONNECTION_ROUTE_PREFIX } from '@nestidp/shared';
 import {
 	createSpConnection,
 	deleteSpConnection,
+	fetchSpMetadataFromUrl,
 	getSpConnection,
-	parseSpSloFromMetadata,
+	parseSpMetadata,
 	probeSpConnectionSigning,
 	testSpConnectionAcs,
 	testSpConnectionBackchannel,
@@ -52,8 +58,19 @@ export function SpConnectionFormPage() {
 	const [wantAssertionsEncrypted, setWantAssertionsEncrypted] = useState(false);
 	const [wantAuthnRequestsSigned, setWantAuthnRequestsSigned] = useState(false);
 	const [wantLogoutRequestsSigned, setWantLogoutRequestsSigned] = useState(false);
-	const [sloMetadataXml, setSloMetadataXml] = useState('');
-	const [sloMetadataMessage, setSloMetadataMessage] = useState<string | null>(null);
+	const [importMode, setImportMode] = useState<'paste' | 'url'>('paste');
+	const [importXml, setImportXml] = useState('');
+	const [importUrl, setImportUrl] = useState('');
+	const [importBusy, setImportBusy] = useState(false);
+	const [importMessage, setImportMessage] = useState<string | null>(null);
+	const [importMessageOk, setImportMessageOk] = useState(false);
+	const [importWarnings, setImportWarnings] = useState<SpMetadataWarning[]>([]);
+	const [importConflict, setImportConflict] =
+		useState<SpMetadataImportResponseDto['entityIdConflict']>(null);
+	const [acsOptions, setAcsOptions] = useState<SpMetadataAcsOption[]>([]);
+	const [importedSource, setImportedSource] = useState<'metadata_xml' | 'metadata_url' | null>(
+		null,
+	);
 	const [attributeMapping, setAttributeMapping] = useState<SpAttributeMappingConfig | null>(null);
 	const [spCertificate, setSpCertificate] = useState('');
 	const [hasStoredSpCertificate, setHasStoredSpCertificate] = useState(false);
@@ -147,6 +164,7 @@ export function SpConnectionFormPage() {
 			wantLogoutRequestsSigned,
 			attributeMapping,
 			...(spCertificateValue !== undefined ? { spCertificate: spCertificateValue } : {}),
+			...(importedSource ? { importSource: importedSource } : {}),
 		};
 		try {
 			if (isNew) {
@@ -164,25 +182,95 @@ export function SpConnectionFormPage() {
 		}
 	}
 
-	async function handleAutofillSlo() {
-		setSloMetadataMessage(null);
-		try {
-			const result = await parseSpSloFromMetadata(sloMetadataXml);
-			const found = result.redirect ?? result.post;
-			if (found) {
-				setSloUrl(found);
-			}
-			if (result.soap) {
-				setSloSoapUrl(result.soap);
-			}
-			if (found || result.soap) {
-				setSloMetadataMessage(result.soap ? t('autofillSloSoapFound') : t('autofillSloFound'));
-			} else {
-				setSloMetadataMessage(t('autofillSloNotFound'));
-			}
-		} catch {
-			setSloMetadataMessage(t('autofillSloNotFound'));
+	function applyImport(result: SpMetadataImportResponseDto) {
+		if (result.entityId) {
+			setSpEntityId(result.entityId);
 		}
+		setAcsOptions(result.acsOptions);
+		if (result.acsUrl) {
+			setAcsUrl(result.acsUrl);
+		}
+		if (result.sloUrl) {
+			setSloUrl(result.sloUrl);
+		}
+		if (result.sloSoapUrl) {
+			setSloSoapUrl(result.sloSoapUrl);
+		}
+		if (result.nameIdFormat) {
+			setNameIdFormat(result.nameIdFormat);
+		}
+		if (result.spCertificate) {
+			setSpCertificate(result.spCertificate);
+			setSpCertificateTouched(true);
+			setHasStoredSpCertificate(true);
+			// Only suggest "require signed AuthnRequest" when a usable cert came with it.
+			if (result.authnRequestsSigned) {
+				setWantAuthnRequestsSigned(true);
+			}
+		}
+		setImportWarnings(result.warnings);
+		setImportConflict(result.entityIdConflict);
+		setImportedSource(importMode === 'paste' ? 'metadata_xml' : 'metadata_url');
+		setImportMessageOk(true);
+		setImportMessage(t('import.success'));
+	}
+
+	async function runImport(): Promise<SpMetadataImportResponseDto | null> {
+		setImportBusy(true);
+		setImportMessage(null);
+		setImportMessageOk(false);
+		try {
+			const result =
+				importMode === 'paste'
+					? await parseSpMetadata(importXml)
+					: await fetchSpMetadataFromUrl(importUrl);
+			if (!result.valid) {
+				setImportWarnings([]);
+				setImportConflict(null);
+				setImportMessageOk(false);
+				setImportMessage(t('import.notSpMetadata'));
+				return null;
+			}
+			return result;
+		} catch (err) {
+			setImportMessageOk(false);
+			setImportMessage(mapAdminError(err, 'spConnections.import.failed'));
+			return null;
+		} finally {
+			setImportBusy(false);
+		}
+	}
+
+	async function handleImport() {
+		const result = await runImport();
+		if (!result) {
+			return;
+		}
+		// On the edit form the import is a reviewed refresh — confirm before overwriting fields, and
+		// spell out which fields would change (especially a rotated signing certificate).
+		if (!isNew) {
+			const changed: string[] = [];
+			if (result.entityId && result.entityId !== spEntityId) changed.push(t('spEntityId'));
+			if (result.acsUrl && result.acsUrl !== acsUrl) changed.push(t('acsUrl'));
+			if (result.sloUrl && result.sloUrl !== sloUrl) changed.push(t('sloUrl'));
+			if (result.sloSoapUrl && result.sloSoapUrl !== sloSoapUrl) changed.push(t('sloSoapUrl'));
+			if (result.nameIdFormat && result.nameIdFormat !== nameIdFormat)
+				changed.push(t('nameIdFormat'));
+			if (result.spCertificate) changed.push(t('spCertificatePem'));
+			const description = changed.length
+				? `${t('import.refreshDescription')} — ${changed.join(', ')}`
+				: t('import.refreshDescription');
+			await confirmAction({
+				title: t('import.refreshTitle'),
+				description,
+				confirmLabel: tCommon('apply'),
+				onConfirm: async () => {
+					applyImport(result);
+				},
+			});
+			return;
+		}
+		applyImport(result);
 	}
 
 	async function handleDeactivateAndDelete() {
@@ -292,6 +380,77 @@ export function SpConnectionFormPage() {
 					onSubmit={(event) => void handleSubmit(event)}
 				>
 					<fieldset className="evg-stack" disabled={saving}>
+						<div className="evg-filters-panel">
+							<h3 className="evg-section-title">{t('import.panelTitle')}</h3>
+							<p className="evg-muted">{t('import.intro')}</p>
+							<div className="evg-stack inline" role="group">
+								<Button
+									type="button"
+									variant={importMode === 'paste' ? 'secondary' : 'link'}
+									onClick={() => setImportMode('paste')}
+								>
+									{t('import.modePaste')}
+								</Button>
+								<Button
+									type="button"
+									variant={importMode === 'url' ? 'secondary' : 'link'}
+									onClick={() => setImportMode('url')}
+								>
+									{t('import.modeUrl')}
+								</Button>
+							</div>
+							{importMode === 'paste' ? (
+								<TextArea
+									label={t('import.xmlLabel')}
+									name="importXml"
+									value={importXml}
+									placeholder={t('import.xmlPlaceholder')}
+									onChange={(e) => setImportXml(e.target.value)}
+									rows={5}
+								/>
+							) : (
+								<TextInput
+									label={t('import.urlLabel')}
+									name="importUrl"
+									value={importUrl}
+									placeholder={t('import.urlPlaceholder')}
+									onChange={(e) => setImportUrl(e.target.value)}
+								/>
+							)}
+							<Button
+								type="button"
+								variant="secondary"
+								disabled={
+									importBusy ||
+									(importMode === 'paste'
+										? importXml.trim().length === 0
+										: importUrl.trim().length === 0)
+								}
+								onClick={() => void handleImport()}
+							>
+								{importBusy
+									? t('import.busy')
+									: importMode === 'paste'
+										? t('import.parseButton')
+										: t('import.fetchButton')}
+							</Button>
+							{importMessage ? (
+								<Callout variant={importMessageOk ? 'success' : 'warning'}>{importMessage}</Callout>
+							) : null}
+							{importConflict ? (
+								<Callout variant="warning">
+									{t('import.conflictMessage', { name: importConflict.name })}{' '}
+									<Link to={`${SP_CONNECTION_ROUTE_PREFIX}/${importConflict.id}`}>
+										{t('import.conflictLink')}
+									</Link>
+								</Callout>
+							) : null}
+							{importWarnings.map((w) => (
+								<Callout key={w.code} variant="warning">
+									{t(`import.warnings.${w.code}`, { detail: w.detail ?? '' })}
+								</Callout>
+							))}
+						</div>
 						<TextInput
 							label={tCommon('name')}
 							name="name"
@@ -316,6 +475,19 @@ export function SpConnectionFormPage() {
 							required
 							requiredMark
 						/>
+						{acsOptions.length > 1 ? (
+							<Select
+								label={t('import.acsPickerLabel')}
+								value={acsUrl}
+								onChange={(e) => setAcsUrl(e.target.value)}
+							>
+								{acsOptions.map((option) => (
+									<option key={option.location} value={option.location}>
+										{`${option.location} (${option.binding.split(':').pop()})`}
+									</option>
+								))}
+							</Select>
+						) : null}
 						<TextInput
 							label={t('sloUrl')}
 							name="sloUrl"
@@ -323,25 +495,6 @@ export function SpConnectionFormPage() {
 							hint={t('sloUrlHint')}
 							onChange={(e) => setSloUrl(e.target.value)}
 						/>
-						<details className="evg-filters-panel evg-filters-panel--collapsible">
-							<summary>{t('autofillSloFromMetadata')}</summary>
-							<TextArea
-								label={t('autofillSloFromMetadata')}
-								value={sloMetadataXml}
-								placeholder={t('autofillSloMetadataPlaceholder')}
-								onChange={(e) => setSloMetadataXml(e.target.value)}
-								rows={4}
-							/>
-							<Button
-								type="button"
-								variant="link"
-								onClick={() => void handleAutofillSlo()}
-								disabled={saving || sloMetadataXml.trim().length === 0}
-							>
-								{t('autofillSloApply')}
-							</Button>
-							{sloMetadataMessage ? <p className="evg-muted">{sloMetadataMessage}</p> : null}
-						</details>
 						<TextInput
 							label={t('sloSoapUrl')}
 							name="sloSoapUrl"
